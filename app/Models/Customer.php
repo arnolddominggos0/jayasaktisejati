@@ -12,5 +12,4 @@ class Customer extends Model
         'contact_info',
         'address',
     ];
-
 }

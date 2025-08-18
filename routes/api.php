@@ -1,12 +1,18 @@
 <?php
 
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 
-// Route::get('/user', function (Request $request) {
-//     return $request->user();
-// })->middleware('auth:sanctum');
+Route::prefix('user')->group(function () {
+    // Public
+    Route::post('/register', [AuthController::class, 'register'])->name('user.register');
+    Route::post('/login',    [AuthController::class, 'login'])
+        ->middleware('throttle:10,1')
+        ->name('user.login');
 
-
-Route::middleware('auth:sanctum')->get('/me', [AuthController::class, 'me']);
+    // Protected
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/me',     [AuthController::class, 'me'])->name('user.me');
+        Route::post('/logout',[AuthController::class, 'logout'])->name('user.logout');
+    });
+});
