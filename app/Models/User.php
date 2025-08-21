@@ -22,6 +22,7 @@ class User extends Authenticatable
         'email',
         'password',
         'branch_id',
+        'office_id',
     ];
 
     /**
@@ -50,5 +51,15 @@ class User extends Authenticatable
     public function branch()
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function office()
+    {
+        return $this->belongsTo(Office::class);
+    }
+
+    public function getDefaultGuardName(): string
+    {
+        return 'web';
     }
 }

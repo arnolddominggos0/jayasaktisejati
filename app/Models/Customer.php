@@ -8,8 +8,15 @@ class Customer extends Model
 {
     protected $fillable = [
         'name',
+        'nik',
         'npwp',
-        'contact_info',
-        'address',
+        'phone_number',
+        'email',
+        'office_id'
     ];
+
+    public function office()
+    {
+        return $this->belongsTo(Office::class);
+    }
 }
