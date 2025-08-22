@@ -200,7 +200,7 @@ return [
         'store' => 'default',
     ],
 
-    'default' => [
-        'guard_name' => 'web',
-    ],
+    'defaults' => [
+        'guard' => 'web'
+    ]
 ];

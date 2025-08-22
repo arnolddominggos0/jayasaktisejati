@@ -24,7 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web([]);
 
         $middleware->api([
-            EnsureFrontendRequestsAreStateful::class,
+            // EnsureFrontendRequestsAreStateful::class,
         ]);
 
         $middleware->alias([
@@ -33,5 +33,28 @@ return Application::configure(basePath: dirname(__DIR__))
             'scope.branch'        => ScopeByBranch::class,
         ]);
     })
-    ->withExceptions(function (Exceptions $exceptions) {})
+    // bootstrap/app.php
+    ->withExceptions(function (Illuminate\Foundation\Configuration\Exceptions $exceptions) {
+        $exceptions->render(function (Throwable $e, Illuminate\Http\Request $request) {
+            if (! $request->is('api/*')) {
+                return null; // biarkan default untuk non-API
+            }
+
+            if ($e instanceof Illuminate\Validation\ValidationException) {
+                return response()->json([
+                    'message' => 'The given data was invalid.',
+                    'errors'  => $e->errors(),
+                ], $e->status);
+            }
+
+            if ($e instanceof Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+                $status  = $e->getStatusCode();
+                $message = trim($e->getMessage()) ?: 'Error';
+                return response()->json(['message' => $message], $status);
+            }
+
+            // selain itu biarkan Laravel yang tangani
+            return null;
+        });
+    })
     ->create();

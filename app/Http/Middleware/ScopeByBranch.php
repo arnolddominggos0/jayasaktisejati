@@ -19,7 +19,7 @@ class ScopeByBranch
             app()->instance('currentBranchId', $currentBranchId);
             $request->attributes->set('currentBranchId', $currentBranchId);
         }
-
+ 
 
         return $next($request);
     }

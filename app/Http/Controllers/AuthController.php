@@ -5,43 +5,66 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Arr;
 use App\Models\{User, Branch};
 
 class AuthController extends Controller
 {
     public function register(Request $request)
     {
-        $data = $request->validate([
-            'name'         => ['required', 'string', 'max:255'],
-            'email'        => ['required', 'email', 'max:255', 'unique:users'],
-            'password'     => ['required', 'string', 'min:8', 'confirmed'],
-            'role'         => ['required', Rule::in(['super_admin', 'office_admin', 'field_coordinator', 'customer'])],
-            'branch_code'  => ['nullable', 'string', 'max:10'],
+
+        $request->merge([
+            'branch_code' => $request->filled('branch_code')
+                ? strtoupper(trim((string) $request->branch_code))
+                : null,
         ]);
 
-        $branchId = null;
-        if (!empty($data['branch_code'])) {
-            $branchId = Branch::firstOrCreate(
-                ['code' => strtoupper($data['branch_code'])],
-                ['name' => strtoupper($data['branch_code'])]
-            )->id;
-        }
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'role' => ['required', Rule::in(['super_admin', 'office_admin', 'field_coordinator', 'customer'])],
+            'branch_code' => [
+                'nullable',
+                'string',
+                'max:10',
+                'required_if:role,super_admin,office_admin,field_coordinator',
+                'prohibited_if:role,customer',
+                'exists:branches,code',
+            ],
+        ]);
+
+        $isInternal = in_array($data['role'], ['super_admin', 'office_admin', 'field_coordinator'], true);
+        $branchId = $isInternal
+            ? Branch::where('code', $data['branch_code'])->value('id')
+            : null;
+
 
         $user = User::create([
-            'name'      => $data['name'],
-            'email'     => $data['email'],-
-            'password'  => Hash::make($data['password']),
-            'branch_id' => $branchId,
+            'name' => $data['name'],
+            'email' => $data['email'],
+            'password' => Hash::make($data['password']),
+            'branch_id' => $branchId, // null untuk customer
         ]);
+
         $user->syncRoles([$data['role']]);
 
         $user->tokens()->delete();
         $token = $user->createToken('jss-token')->plainTextToken;
 
+
         return response()->json([
-            'user' => Arr::only($user->toArray(), ['id', 'name', 'email', 'branch_id']),
-            'branch' => $user->branch ? Arr::only($user->branch->toArray(), ['id', 'code', 'name']) : null,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'branch_id' => $user->branch_id,
+            ],
+            'branch' => $user->branch ? [
+                'id' => $user->branch->id,
+                'code' => $user->branch->code,
+                'name' => $user->branch->name,
+            ] : null,
             'roles' => $user->getRoleNames(),
             'token' => $token,
         ], 201);
@@ -50,30 +73,43 @@ class AuthController extends Controller
     public function login(Request $request)
     {
         $payload = $request->validate([
-            'email'    => ['required', 'email'],
+            'email' => ['required', 'email'],
             'password' => ['required', 'string', 'min:8'],
-            'as'       => ['nullable', Rule::in(['super_admin', 'office_admin', 'field_coordinator', 'customer'])],
+            'as' => ['nullable', Rule::in(['super_admin', 'office_admin', 'field_coordinator', 'customer'])],
         ]);
+
 
         $user = User::where('email', $payload['email'])->first();
         if (!$user || !Hash::check($payload['password'], $user->password)) {
             return response()->json(['message' => 'Invalid credentials'], 422);
         }
 
-        if (!empty($payload['as']) && ! $user->hasRole($payload['as'])) {
+
+        if (!empty($payload['as']) && !$user->hasRole($payload['as'])) {
             return response()->json(['message' => 'Role mismatch: user is not ' . $payload['as']], 403);
         }
+
 
         $user->tokens()->delete();
         $token = $user->createToken('jss-token')->plainTextToken;
 
+
         return response()->json([
-            'user' => Arr::only($user->toArray(), ['id', 'name', 'email', 'branch_id']),
-            'branch' => $user->branch ? Arr::only($user->branch->toArray(), ['id', 'code', 'name']) : null,
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'branch_id' => $user->branch_id,
+            ],
+            'branch' => $user->branch ? [
+                'id' => $user->branch->id,
+                'code' => $user->branch->code,
+                'name' => $user->branch->name,
+            ] : null,
             'roles' => $user->getRoleNames(),
             'is_super_admin' => $user->hasRole('super_admin'),
             'is_office_admin' => $user->hasRole('office_admin'),
-            'is_field_coordinator' => $user->hasRole('field_coozrdinator'),
+            'is_field_coordinator' => $user->hasRole('field_coordinator'),
             'is_customer' => $user->hasRole('customer'),
             'token' => $token,
         ], 200);
@@ -85,8 +121,17 @@ class AuthController extends Controller
 
 
         return response()->json([
-            'user' => Arr::only($u->toArray(), ['id', 'name', 'emai-l', 'branch_id']),
-            'branch' => $u->branch ? Arr::only($u->branch->toArray(), ['id', 'code', 'name']) : null,
+            'user' => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+                'branch_id' => $u->branch_id,
+            ],
+            'branch' => $u->branch ? [
+                'id' => $u->branch->id,
+                'code' => $u->branch->code,
+                'name' => $u->branch->name,
+            ] : null,
             'roles' => $u->getRoleNames(),
         ]);
     }
@@ -99,16 +144,45 @@ class AuthController extends Controller
 
     public function index(Request $request)
     {
-        $users = User::with('branch')->get();
-        return response()->json($users->map(function ($user) {
-            return [
-                'id' => $user->id,
-            'name' => $user->name,
-                'email' => $user->email,
-                'branch_id' => $user->branch_id,
-                'branch' => $user->branch ? Arr::only($user->branch->toArray(), ['id', 'code', 'name']) : null,
-                'roles' => $user->getRoleNames(),
-            ];
-        }));
+        $auth = $request->user();
+        if (!$auth) return response()->json(['message' => 'Unauthenticated'], 401);
+        if ($auth->hasRole('customer')) return response()->json(['message' => 'Forbidden'], 403);
+
+
+        $q = User::query()
+            ->select(['id', 'name', 'email', 'branch_id'])
+            ->with(['branch:id,code,name', 'roles:id,name']);
+
+
+        if (!$auth->hasRole('super_admin')) {
+            $currentBranchId = $request->attributes->get('currentBranchId');
+            if (empty($currentBranchId)) return response()->json([]);
+            $q->where('branch_id', $currentBranchId);
+        }
+
+
+        if ($s = $request->query('q')) {
+            $q->where(function ($w) use ($s) {
+                $w->where('name', 'ilike', "%{$s}%")
+                    ->orWhere('email', 'ilike', "%{$s}%");
+            });
+        }
+
+
+        $users = $q->orderBy('name')->get();
+
+
+        return response()->json($users->map(fn($u) => [
+            'id' => $u->id,
+            'name' => $u->name,
+            'email' => $u->email,
+            'branch_id' => $u->branch_id,
+            'branch' => $u->branch ? [
+                'id' => $u->branch->id,
+                'code' => $u->branch->code,
+                'name' => $u->branch->name,
+            ] : null,
+            'roles' => $u->roles->pluck('name'),
+        ]));
     }
 }

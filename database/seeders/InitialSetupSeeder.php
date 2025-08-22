@@ -6,28 +6,31 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 use App\Models\User;
-use App\Models\Office;
+use App\Models\Branch;
 
 class InitialSetupSeeder extends Seeder
 {
     public function run(): void
     {
-        $jkt = Office::firstOrCreate(['code' => 'JKT'], ['name' => 'Jakarta']);
-        $mdo = Office::firstOrCreate(['code' => 'MDO'], ['name' => 'Manado']);
-
-        foreach (['super-admin','admin-office','koordinator-lapangan','customer'] as $r) {
-            Role::firstOrCreate(['name' => $r]);
+        // Roles
+        foreach (['super_admin', 'office_admin', 'field_coordinator', 'customer'] as $r) {
+            Role::findOrCreate($r, 'web');
         }
 
-        $sa = User::firstOrCreate(
-            ['email' => 'superadmin@local.test'],
-            [
-                'name'      => 'Super Admin',
-                'username'  => 'super-admin',
-                'password'  => Hash::make('password'),
-                'office_id' => $jkt->id,
-            ]
-        );
-        $sa->assignRole('super-admin');
+
+        // Branch awal
+        $jkt = Branch::firstOrCreate(['code' => 'JKT'], ['name' => 'JKT']);
+
+
+        // Super admin
+        if (!User::where('email', 'admin@jss.local')->exists()) {
+            $admin = User::create([
+                'name' => 'Super Admin',
+                'email' => 'admin@jss.local',
+                'password' => Hash::make('Admin#12345'),
+                'branch_id' => $jkt->id,
+            ]);
+            $admin->syncRoles(['super_admin']);
+        }
     }
 }
