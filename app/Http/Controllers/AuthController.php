@@ -141,48 +141,4 @@ class AuthController extends Controller
         $request->user()?->currentAccessToken()?->delete();
         return response()->json(['message' => 'logged out']);
     }
-
-    public function index(Request $request)
-    {
-        $auth = $request->user();
-        if (!$auth) return response()->json(['message' => 'Unauthenticated'], 401);
-        if ($auth->hasRole('customer')) return response()->json(['message' => 'Forbidden'], 403);
-
-
-        $q = User::query()
-            ->select(['id', 'name', 'email', 'branch_id'])
-            ->with(['branch:id,code,name', 'roles:id,name']);
-
-
-        if (!$auth->hasRole('super_admin')) {
-            $currentBranchId = $request->attributes->get('currentBranchId');
-            if (empty($currentBranchId)) return response()->json([]);
-            $q->where('branch_id', $currentBranchId);
-        }
-
-
-        if ($s = $request->query('q')) {
-            $q->where(function ($w) use ($s) {
-                $w->where('name', 'ilike', "%{$s}%")
-                    ->orWhere('email', 'ilike', "%{$s}%");
-            });
-        }
-
-
-        $users = $q->orderBy('name')->get();
-
-
-        return response()->json($users->map(fn($u) => [
-            'id' => $u->id,
-            'name' => $u->name,
-            'email' => $u->email,
-            'branch_id' => $u->branch_id,
-            'branch' => $u->branch ? [
-                'id' => $u->branch->id,
-                'code' => $u->branch->code,
-                'name' => $u->branch->name,
-            ] : null,
-            'roles' => $u->roles->pluck('name'),
-        ]));
-    }
 }
