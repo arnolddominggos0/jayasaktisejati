@@ -2,23 +2,23 @@
 
 namespace App\Providers\Filament;
 
-use App\Http\Middleware\ScopeByBranch;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
-use Filament\Pages\Dashboard;
+use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
-use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
+use Filament\Support\Facades\FilamentView;
+use Filament\Widgets;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Filament\View\PanelsRenderHook;
 
 class AdminPanelProvider extends PanelProvider
 {
@@ -28,24 +28,29 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->login()
+
+            //Brand
             ->brandName('Jaya Sakti Sejati')
-            ->brandLogo(asset('brand/logo.jpg'))
-            ->favicon(asset('favicon.ico'))
+            // ->databaseNotifications()
+            ->globalSearchKeyBindings(['ctrl+k', 'cmd+k'])
+            ->sidebarCollapsibleOnDesktop()
+            ->brandLogo(fn() => view('filament.logo'))
+            ->favicon(asset('images/favicon/favicon.ico'))
             ->colors([
                 'primary' => Color::hex('#0137A1'),
             ])
 
-            // ->viteTheme('resources/css/filament/admin/theme.css')
-
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
-            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
+            ->viteTheme('resources/css/filament/admin/theme.css')
+            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
+            ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
-                Dashboard::class,
+                Pages\Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
+            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                AccountWidget::class,
-                FilamentInfoWidget::class,
+                Widgets\AccountWidget::class,
+                Widgets\FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -57,14 +62,34 @@ class AdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
-                ScopeByBranch::class,
             ])
             ->authMiddleware([
                 Authenticate::class,
-            ])
+            ]);
+    }
 
-            ->sidebarCollapsibleOnDesktop()
-            ->breadcrumbs(false)
-            ->login();
+    public function boot(): void
+    {
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::TOPBAR_START,
+            fn() => view('filament.topbar.page-title')->render()
+        );
+
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::TOPBAR_START,
+            fn() => view('filament.topbar.search')->render()
+        );
+
+        // Kanan: bell + tombol Export
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::TOPBAR_END,
+            fn() => view('filament.topbar.actions')->render()
+        );
+
+        // Sembunyikan page header putih hanya di Dashboard
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::HEAD_END,
+            fn() => view('filament.topbar.hide-dashboard-header')->render()
+        );
     }
 }

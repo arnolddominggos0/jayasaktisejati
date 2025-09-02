@@ -51,7 +51,6 @@ class UserController extends Controller
             $q->role($role);
         }
 
-        // Filter status opsional (aktifkan jika punya kolom is_active)
         if ($status = $request->input('status')) {
             if ($status === 'active') {
                 $q->where('is_active', true);

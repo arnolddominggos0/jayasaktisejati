@@ -1,57 +1,66 @@
-/* Reset semua SVG di panel admin agar tidak membesar */
-[data-panel-id="admin"] .fi-sidebar-nav .fi-sidebar-item svg,
-[data-panel-id="admin"] .fi-sidebar-group-button svg,
-[data-panel-id="admin"] .fi-header nav svg,
-[data-panel-id="admin"] .fi-topbar nav svg,
-[data-panel-id="admin"] .fi-icon {
-  width: 20px !important;
-  height: 20px !important;
-  max-width: 20px !important;
-  max-height: 20px !important;
-  flex: none !important;
-  display: inline-block !important;
-  stroke-width: 1.5 !important; /* biar tipis, default Heroicon */
-  color: inherit !important;
-  fill: none !important;
-}
+/* resources/css/filament/admin/theme.css */
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
 
-/* Sidebar container */
-[data-panel-id="admin"] .fi-sidebar {
-  background: #fff !important;
-  border-right: 1px solid #e5e7eb !important;
-}
+@config 'tailwind.config.js';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* Headbar */
-[data-panel-id="admin"] .fi-header {
-  background: #fff !important;
-  border-bottom: 1px solid #e5e7eb !important;
-}
+@layer components {
+    .fi-topbar {
+        @apply sticky top-0 z-30 bg-white border-b border-slate-200 h-14 relative;
+    }
 
-/* Search jadi pill */
-[data-panel-id="admin"] .fi-header input[type="search"],
-[data-panel-id="admin"] .fi-header .fi-input {
-  border: 1px solid #e5e7eb !important;
-  border-radius: 9999px !important;
-  padding-left: 1rem !important;
-  padding-right: 1rem !important;
-}
 
-/* Menu item */
-[data-panel-id="admin"] .fi-sidebar-nav .fi-sidebar-item a {
-  display: flex !important;
-  align-items: center !important;
-  gap: .75rem !important;
-  padding: .625rem .75rem !important;
-  border-radius: .75rem !important;
-  font-size: 15px !important;
-  color: #0f172a !important;
-}
+    .fi-topbar .fi-global-search .fi-input {
+        @apply rounded-xl;
+    }
 
-[data-panel-id="admin"] .fi-sidebar-nav .fi-sidebar-item a:hover {
-  background: #f9fafb !important;
-}
+    .fi-header {
+        @apply bg-white rounded-2xl shadow-card px-6 py-3 mb-6;
+    }
 
-[data-panel-id="admin"] .fi-sidebar-nav .fi-active > a {
-  background: #0137A1 !important;
-  color: #fff !important;
+    .fi-header-heading {
+        @apply text-[20px] font-semibold text-slate-900;
+    }
+
+    .fi-sidebar {
+        @apply bg-white border-r border-slate-200 h-14 relative;
+    }
+
+    .fi-sidebar .fi-sidebar-item .fi-sidebar-item-button {
+        @apply rounded-xl text-slate-700 hover:bg-slate-100 px-3 py-2.5;
+    }
+
+    .fi-sidebar .fi-sidebar-item .fi-sidebar-item-icon {
+        @apply text-slate-500;
+    }
+
+    .fi-sidebar .fi-sidebar-item .fi-sidebar-item-label {
+        @apply font-medium;
+    }
+
+    .fi-sidebar .fi-sidebar-item[aria-current='page'] .fi-sidebar-item-button {
+        @apply bg-blue-50 text-blue-700 font-medium;
+    }
+
+    .fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button,
+    .fi-sidebar .fi-sidebar-item[data-state='active'] .fi-sidebar-item-button,
+    .fi-sidebar .fi-sidebar-item--active .fi-sidebar-item-button {
+        @apply bg-blue-50 text-blue-700 font-medium !important;
+    }
+
+    .fi-sidebar .fi-sidebar-item[aria-current='page'] .fi-sidebar-item-icon {
+        @apply text-blue-600;
+    }
+
+    .fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button .fi-sidebar-item-icon,
+    .fi-sidebar .fi-sidebar-item[data-state='active'] .fi-sidebar-item-button .fi-sidebar-item-icon,
+    .fi-sidebar .fi-sidebar-item--active .fi-sidebar-item-button .fi-sidebar-item-icon {
+        @apply text-blue-600 !important;
+    }
+
+    .fi-sidebar-close-overlay {
+        @apply fixed inset-0 bg-slate-900/40 z-[70];
+    }
 }
