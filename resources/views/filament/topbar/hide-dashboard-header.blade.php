@@ -1,3 +1,5 @@
-@if (request()->routeIs('filament.admin.pages.dashboard'))
-  <style>.fi-header{display:none!important}</style>
-@endif
+<style>
+    .fi-page-header {
+        display: none !important;
+    }
+</style>

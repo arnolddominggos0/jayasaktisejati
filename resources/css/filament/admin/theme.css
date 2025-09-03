@@ -1,66 +1,27 @@
-/* resources/css/filament/admin/theme.css */
-@import '../../../../vendor/filament/filament/resources/css/theme.css';
-
-@config 'tailwind.config.js';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer components {
-    .fi-topbar {
-        @apply sticky top-0 z-30 bg-white border-b border-slate-200 h-14 relative;
-    }
+/* Import base theme Filament & enable Tailwind in this build */
+@import '/vendor/filament/filament/resources/css/theme.css';
+@config './tailwind.config.js';
 
+/* Topbar height & spacing */
+.fi-topbar { @apply h-16; }
+.fi-topbar > div { @apply gap-3; }
 
-    .fi-topbar .fi-global-search .fi-input {
-        @apply rounded-xl;
-    }
+/* Rapikan alignment item di topbar */
+.fi-topbar .fi-topbar-item { display: inline-flex; align-items: center; }
 
-    .fi-header {
-        @apply bg-white rounded-2xl shadow-card px-6 py-3 mb-6;
-    }
+/* Sembunyikan header page bawaan (kita pakai page-title custom) */
+.fi-page-header { display: none !important; }
 
-    .fi-header-heading {
-        @apply text-[20px] font-semibold text-slate-900;
-    }
+/* Global Search bawaan: batasi lebar agar match mockup */
+.fi-topbar .fi-global-search { max-width: 28rem; margin-left: auto; margin-right: auto; }
+@media (max-width: 1024px) { .fi-topbar .fi-global-search { max-width: 16.5rem; } }
 
-    .fi-sidebar {
-        @apply bg-white border-r border-slate-200 h-14 relative;
-    }
-
-    .fi-sidebar .fi-sidebar-item .fi-sidebar-item-button {
-        @apply rounded-xl text-slate-700 hover:bg-slate-100 px-3 py-2.5;
-    }
-
-    .fi-sidebar .fi-sidebar-item .fi-sidebar-item-icon {
-        @apply text-slate-500;
-    }
-
-    .fi-sidebar .fi-sidebar-item .fi-sidebar-item-label {
-        @apply font-medium;
-    }
-
-    .fi-sidebar .fi-sidebar-item[aria-current='page'] .fi-sidebar-item-button {
-        @apply bg-blue-50 text-blue-700 font-medium;
-    }
-
-    .fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button,
-    .fi-sidebar .fi-sidebar-item[data-state='active'] .fi-sidebar-item-button,
-    .fi-sidebar .fi-sidebar-item--active .fi-sidebar-item-button {
-        @apply bg-blue-50 text-blue-700 font-medium !important;
-    }
-
-    .fi-sidebar .fi-sidebar-item[aria-current='page'] .fi-sidebar-item-icon {
-        @apply text-blue-600;
-    }
-
-    .fi-sidebar .fi-sidebar-item.fi-active .fi-sidebar-item-button .fi-sidebar-item-icon,
-    .fi-sidebar .fi-sidebar-item[data-state='active'] .fi-sidebar-item-button .fi-sidebar-item-icon,
-    .fi-sidebar .fi-sidebar-item--active .fi-sidebar-item-button .fi-sidebar-item-icon {
-        @apply text-blue-600 !important;
-    }
-
-    .fi-sidebar-close-overlay {
-        @apply fixed inset-0 bg-slate-900/40 z-[70];
-    }
-}
+/* Sidebar look & mobile width (opsional) */
+.fi-sidebar { @apply bg-white; }
+.fi-sidebar .fi-sidebar-item a { @apply rounded-xl; }
+.fi-sidebar .fi-sidebar-item a:hover { @apply bg-slate-100; }
+@media (max-width: 640px){ .fi-sidebar{ max-width: 18rem; } }
