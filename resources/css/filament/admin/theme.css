@@ -6,21 +6,16 @@
 @import '/vendor/filament/filament/resources/css/theme.css';
 @config './tailwind.config.js';
 
-/* Topbar height & spacing */
 .fi-topbar { @apply h-16; }
 .fi-topbar > div { @apply gap-3; }
 
-/* Rapikan alignment item di topbar */
 .fi-topbar .fi-topbar-item { display: inline-flex; align-items: center; }
 
-/* Sembunyikan header page bawaan (kita pakai page-title custom) */
 .fi-page-header { display: none !important; }
 
-/* Global Search bawaan: batasi lebar agar match mockup */
 .fi-topbar .fi-global-search { max-width: 28rem; margin-left: auto; margin-right: auto; }
 @media (max-width: 1024px) { .fi-topbar .fi-global-search { max-width: 16.5rem; } }
 
-/* Sidebar look & mobile width (opsional) */
 .fi-sidebar { @apply bg-white; }
 .fi-sidebar .fi-sidebar-item a { @apply rounded-xl; }
 .fi-sidebar .fi-sidebar-item a:hover { @apply bg-slate-100; }
