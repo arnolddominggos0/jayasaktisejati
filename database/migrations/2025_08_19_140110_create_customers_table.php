@@ -6,28 +6,40 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
-        {
-            Schema::create('customers', function (Blueprint $table) {
+    {
+        Schema::create('customers', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 20)->unique();
-            $table->string('name');
-            $table->string('email')->nullable();
-            $table->string('nik')->unique()->length(16);
-            $table->string('npwp')->nullable();
-            $table->text('phone_number')->nullable();
-            $table->string('email')->unique();
-            $table->foreignId('office_id')->constrained('offices')->onDelete('cascade');
-            $table->timestamps();
+
+            // Identitas pelanggan
+            $table->string('code', 20)->unique();           // ex: CUST-2025-00001
+            $table->string('name', 191);
+
+            // Email: boleh NULL, tapi jika diisi harus unik (Postgres mengizinkan banyak NULL pada UNIQUE)
+            $table->string('email', 191)->nullable()->unique();
+
+            // NIK opsional (atau wajib jika bisnis mensyaratkan). Panjang 16, unik saat ada.
+            $table->string('nik', 16)->nullable()->unique();
+
+            // NPWP opsional
+            $table->string('npwp', 32)->nullable();
+
+            // Nomor telepon; gunakan string agar mudah di-validate (leading zero, tanda +62, dsb)
+            $table->string('phone_number', 32)->nullable();
+
+            // Relasi ke kantor/depo
+            $table->foreignId('office_id')
+                ->constrained('offices')
+                ->cascadeOnDelete();
+
+            $table->timestampsTz();
+
+            // Index bantu pencarian
+            $table->index(['name']);
+            $table->index(['office_id']);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('customers');
