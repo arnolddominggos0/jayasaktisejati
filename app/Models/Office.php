@@ -11,13 +11,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Office extends Model
 {
     protected $fillable = [
+        'code',
         'name',
         'address',
+        'city',
+        'branch_id',
     ];
 
 
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
 }

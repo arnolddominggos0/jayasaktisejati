@@ -11,8 +11,11 @@ return new class extends Migration {
     {
         Schema::create('offices', function (Blueprint $table) {
             $table->id();
+            $table->string('code', 32)->unique();
             $table->string('name');
-            $table->string('code', 10)->unique(); 
+            $table->string('city')->nullable();
+            $table->string('address')->nullable();
+            $table->foreignId('branch_id')->constrained()->cascadeOnDelete();
             $table->timestamps();
         });
     }

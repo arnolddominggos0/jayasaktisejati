@@ -33,10 +33,10 @@ return new class extends Migration
             $table->string('route_summary', 192)->nullable();
 
             // Mode & layanan (awal: string biasa)
-            $table->string('mode', 10)->nullable();            // → cast ke shipment_mode
-            $table->string('service_type', 32)->nullable();    // → cast ke service_type
-            $table->string('service_option', 20)->nullable();  // fcl/lcl/truck/towing/car_carrier
-            $table->string('cargo_type', 16)->nullable();      // → cast ke cargo_type
+            $table->string('mode', 10)->nullable();            
+            $table->string('service_type', 32)->nullable();    
+            $table->string('service_option', 20)->nullable();  
+            $table->string('cargo_type', 16)->nullable();      
 
             // Laut
             $table->string('vessel_name', 100)->nullable();
@@ -53,7 +53,6 @@ return new class extends Migration
             $table->string('driver_name', 100)->nullable();
             $table->string('driver_phone', 20)->nullable();
 
-            // Status (awal: string biasa; default diset setelah cast)
             $table->string('status', 16);
 
             $table->text('notes')->nullable();
@@ -61,14 +60,12 @@ return new class extends Migration
 
             $table->timestampsTz();
 
-            // Index bantu
             $table->index(['status']);
             $table->index(['service_type']);
             $table->index(['origin_office_id']);
             $table->index(['destination_office_id']);
         });
 
-        // Pastikan types SUDAH ADA (file enums harus punya timestamp lebih awal!)
         DB::statement("ALTER TABLE shipments ALTER COLUMN status DROP DEFAULT;");
         DB::statement("ALTER TABLE shipments ALTER COLUMN status TYPE shipment_status USING status::shipment_status;");
         DB::statement("ALTER TABLE shipments ALTER COLUMN status SET DEFAULT 'draft';");

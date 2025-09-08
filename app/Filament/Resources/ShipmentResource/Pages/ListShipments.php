@@ -15,18 +15,14 @@ class ListShipments extends ListRecords
     protected function getHeaderWidgets(): array
     {
         return [
-            ShipmentStats::class,
-            RecentShipmentActivities::class,
+            ShipmentStats::class,            
+            RecentShipmentActivities::class, 
         ];
     }
 
     public function getHeaderWidgetsColumns(): int | array
     {
-        return [
-            'sm' => 1,
-            'md' => 2,
-            'xl' => 12,
-        ];
+        return 3;
     }
 
     protected function getHeaderActions(): array
@@ -36,7 +32,7 @@ class ListShipments extends ListRecords
                 ->label('Export')
                 ->icon('heroicon-m-arrow-down-tray')
                 ->color('gray')
-                ->action(fn() => $this->dispatch('toast', type: 'success', message: 'Simulasi export berhasil ngab😉')),
+                ->action(fn () => $this->dispatch('toast', type: 'success', message: 'Simulasi export berhasil ngab😉')),
             Actions\CreateAction::make()->label('Buat Permintaan'),
         ];
     }

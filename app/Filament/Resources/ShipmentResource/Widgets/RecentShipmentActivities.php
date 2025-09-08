@@ -2,64 +2,39 @@
 
 namespace App\Filament\Resources\ShipmentResource\Widgets;
 
+use Filament\Widgets\Widget;
+use Spatie\Activitylog\Models\Activity;
 use App\Models\Shipment;
-use App\Enums\ShipmentStatus;
-use Filament\Tables;
-use Filament\Widgets\TableWidget as BaseWidget;
-use Illuminate\Database\Eloquent\Builder;
 
-class RecentShipmentActivities extends BaseWidget
+class RecentShipmentActivities extends Widget
 {
-    protected int|string|array $columnSpan = 4;
+    protected static string $view = 'filament.widgets.recent-shipment-activities';
+    protected int|string|array $columnSpan = 3;
+    protected static ?string $pollingInterval = '30s';
 
-    protected function getTableQuery(): Builder
+    protected function getViewData(): array
     {
-        return Shipment::query()->latest('updated_at')->limit(10);
+        $activities = Activity::query()
+            ->where('log_name', 'permintaan_pengiriman')
+            ->where('subject_type', Shipment::class)
+            ->whereIn('event', ['created', 'status_changed'])
+            ->with(['causer', 'subject'])
+            ->latest('created_at')
+            ->limit(30)
+            ->get();
+
+        return compact('activities');
     }
 
-    protected function getTableColumns(): array
+    public static function badgeColor(?string $status): string
     {
-        return [
-            Tables\Columns\TextColumn::make('updated_at')
-                ->since()
-                ->label('Waktu')
-                ->sortable(),
-
-            Tables\Columns\TextColumn::make('code')
-                ->badge()
-                ->label('Kode')
-                ->copyable(),
-
-            Tables\Columns\TextColumn::make('status')
-                ->label('Status')
-                ->badge()
-                ->getStateUsing(fn ($record) =>
-                    $record->status instanceof ShipmentStatus
-                        ? $record->status->value
-                        : (string) $record->status
-                )
-                ->colors([
-                    'gray'    => ['draft'],
-                    'warning' => ['pending','hold'],
-                    'info'    => ['pickup','transit'],
-                    'success' => ['delivered'],
-                    'danger'  => ['cancelled'],
-                ])
-                ->formatStateUsing(fn (?string $state) => match ($state) {
-                    'draft' => 'Draft',
-                    'pending' => 'Pending',
-                    'pickup' => 'Pickup',
-                    'transit' => 'Transit',
-                    'delivered' => 'Delivered',
-                    'hold' => 'Hold',
-                    'cancelled' => 'Cancelled',
-                    default => $state ? ucfirst($state) : '-',
-                }),
-        ];
-    }
-
-    protected function getTableHeading(): string
-    {
-        return 'Aktivitas Terbaru';
+        return match ($status) {
+            'draft' => 'gray',
+            'pending','hold' => 'warning',
+            'pickup','transit' => 'info',
+            'delivered' => 'success',
+            'cancelled' => 'danger',
+            default => 'gray',
+        };
     }
 }
