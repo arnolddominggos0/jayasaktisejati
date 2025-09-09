@@ -33,6 +33,10 @@ use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+// TEMP: untuk cek keberadaan tabel & query tanpa Model
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 class ShipmentResource extends Resource
 {
@@ -46,6 +50,10 @@ class ShipmentResource extends Resource
 
     public static function form(Form $form): Form
     {
+        // TEMP: flags – aktifkan dropdown jika tabelnya sudah ada
+        $hasFleetSchedules = Schema::hasTable('fleet_schedules');
+        $hasDrivers        = Schema::hasTable('drivers');
+
         return $form->schema([
             Section::make('A. Data Customer & Dokumen')
                 ->columns(12)
@@ -69,15 +77,18 @@ class ShipmentResource extends Resource
                     Select::make('request_type')
                         ->label('Jenis Permintaan *')
                         ->options([
-                            'sppb' => 'SPPB',
-                            'do'   => 'DO',
-                            'lain' => 'Lainnya',
+                            'sppb'    => 'SPPB',
+                            'do'      => 'DO',
+                            'walk_in' => 'Walk-in',
                         ])->native(false)->required()->live()
-                        ->columnSpan(3),
+                        ->columnSpan(4),
 
                     TextInput::make('doc_number')
                         ->label('No. Dokumen (SPPB/DO)')
-                        ->placeholder('Opsional')->maxLength(64)->columnSpan(3),
+                        ->required(fn (Forms\Get $get) => in_array($get('request_type'), ['sppb','do'], true))
+                        ->hidden(fn (Forms\Get $get) => $get('request_type') === 'walk_in')
+                        ->placeholder('Wajib untuk SPPB/DO; Walk-in otomatis')
+                        ->maxLength(64)->columnSpan(3),
 
                     Select::make('priority')
                         ->label('Prioritas')
@@ -134,6 +145,8 @@ class ShipmentResource extends Resource
                             $set('driver_phone', null);
                             $set('pickup_date', null);
                             $set('service_option', null);
+                            $set('schedule_id', null);
+                            $set('driver_id', null);
                         })
                         ->columnSpan(12),
 
@@ -167,17 +180,71 @@ class ShipmentResource extends Resource
                                 ->extraAttributes(['class' => 'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium bg-blue-100 text-blue-700'])
                                 ->columnSpan(12),
 
-                            ToggleButtons::make('service_option')
-                                ->label('Layanan Laut')
-                                ->options(['fcl' => 'FCL', 'lcl' => 'LCL'])
-                                ->inline()->required()->columnSpan(12),
+                            // TEMP: dropdown Jadwal Kapal hanya jika tabel ada
+                            Select::make('schedule_id')
+                                ->label('Jadwal Kapal')
+                                ->searchable()
+                                ->preload()
+                                ->options(function () use ($hasFleetSchedules) {
+                                    if (! $hasFleetSchedules) return [];
+                                    return DB::table('fleet_schedules')
+                                        ->orderByDesc('etd')
+                                        ->limit(200)
+                                        ->get()
+                                        ->mapWithKeys(function ($s) {
+                                            $label = sprintf(
+                                                '%s / %s — %s (%s → %s)',
+                                                $s->vessel_name,
+                                                $s->voyage ?? '-',
+                                                $s->etd ? Carbon::parse($s->etd)->format('d M Y') : '-',
+                                                $s->pol ?? '-',
+                                                $s->pod ?? '-',
+                                            );
+                                            return [$s->id => $label];
+                                        })
+                                        ->toArray();
+                                })
+                                ->required(fn () => $hasFleetSchedules)
+                                ->hidden(fn () => ! $hasFleetSchedules)
+                                ->live()
+                                ->afterStateUpdated(function ($state, Forms\Set $set) use ($hasFleetSchedules) {
+                                    if (! $hasFleetSchedules || ! $state) {
+                                        foreach (['vessel_name','voyage','pol','pod'] as $f) $set($f, null);
+                                        $set('etd', null);
+                                        $set('eta', null);
+                                        return;
+                                    }
+                                    $s = DB::table('fleet_schedules')->where('id', $state)->first();
+                                    foreach (['vessel_name','voyage','pol','pod'] as $f) $set($f, $s?->$f);
+                                    $set('etd', $s?->etd ? \Illuminate\Support\Carbon::parse($s->etd)->toDateTimeString() : null);
+                                    $set('eta', $s?->eta ? \Illuminate\Support\Carbon::parse($s->eta)->toDateTimeString() : null);
+                                })
+                                ->columnSpan(12),
 
-                            TextInput::make('vessel_name')->label('Nama Kapal')->maxLength(100)->columnSpan(4),
-                            TextInput::make('voyage')->label('Voyage/Trip')->maxLength(50)->columnSpan(4),
-                            DatePicker::make('etd')->label('ETD (Rencana Berangkat)')->native(false)->columnSpan(4),
-                            DatePicker::make('eta')->label('ETA (Perkiraan Tiba)')->native(false)->columnSpan(4),
-                            TextInput::make('pol')->label('POL — Pelabuhan Muat')->maxLength(100)->columnSpan(4),
-                            TextInput::make('pod')->label('POD — Pelabuhan Bongkar')->maxLength(100)->columnSpan(4),
+                            // Snapshot fields – readonly kalau dropdown aktif, editable kalau manual
+                            TextInput::make('vessel_name')->label('Nama Kapal')
+                                ->disabled(fn () => $hasFleetSchedules)->dehydrated()
+                                ->columnSpan(4),
+
+                            TextInput::make('voyage')->label('Voyage/Trip')
+                                ->disabled(fn () => $hasFleetSchedules)->dehydrated()
+                                ->columnSpan(4),
+
+                            DatePicker::make('etd')->label('ETD')
+                                ->native(false)->disabled(fn () => $hasFleetSchedules)->dehydrated()
+                                ->columnSpan(4),
+
+                            DatePicker::make('eta')->label('ETA')
+                                ->native(false)->disabled(fn () => $hasFleetSchedules)->dehydrated()
+                                ->columnSpan(4),
+
+                            TextInput::make('pol')->label('POL — Pelabuhan Muat')
+                                ->disabled(fn () => $hasFleetSchedules)->dehydrated()
+                                ->columnSpan(4),
+
+                            TextInput::make('pod')->label('POD — Pelabuhan Bongkar')
+                                ->disabled(fn () => $hasFleetSchedules)->dehydrated()
+                                ->columnSpan(4),
                         ]),
 
                     // LAND
@@ -196,21 +263,51 @@ class ShipmentResource extends Resource
                                     'car_carrier' => 'Car Carrier (CC)',
                                     'towing'      => 'Towing',
                                     'truck'       => 'Truck',
-                                ])->native(false)->live()
-                                  ->afterStateUpdated(function (Forms\Set $set, $state) {
-                                      $set('service_option', match ($state) {
-                                          'car_carrier' => 'car_carrier',
-                                          'towing'      => 'towing',
-                                          default       => 'truck',
-                                      });
-                                  })
-                                  ->columnSpan(4),
+                                ])
+                                ->native(false)->live()
+                                ->afterStateUpdated(
+                                    fn (Forms\Set $set, $state) =>
+                                    $set('service_option', match ($state) {
+                                        'car_carrier' => 'car_carrier',
+                                        'towing'      => 'towing',
+                                        default       => 'truck'
+                                    })
+                                )
+                                ->columnSpan(4),
 
                             TextInput::make('vehicle_plate')->label('No. Polisi Armada')->maxLength(20)->columnSpan(4),
                             DatePicker::make('pickup_date')->label('Tanggal Pickup (estimasi)')->native(false)->columnSpan(4),
 
-                            TextInput::make('driver_name')->label('Nama Supir')->maxLength(100)->columnSpan(6),
-                            TextInput::make('driver_phone')->label('No. HP Supir')->tel()->maxLength(20)->columnSpan(6),
+                            // TEMP: dropdown supir hanya jika tabel drivers ada
+                            Select::make('driver_id')
+                                ->label('Nama Supir')
+                                ->options(function () use ($hasDrivers) {
+                                    if (! $hasDrivers) return [];
+                                    return DB::table('drivers')->orderBy('name')
+                                        ->pluck('name', 'id')->toArray();
+                                })
+                                ->searchable()->preload()
+                                ->live()
+                                ->afterStateUpdated(function ($state, Forms\Set $set) use ($hasDrivers) {
+                                    if (! $hasDrivers || ! $state) return;
+                                    $d = DB::table('drivers')->where('id', $state)->first();
+                                    if ($d) {
+                                        $set('driver_name',  $d->name ?? null);
+                                        $set('driver_phone', $d->phone ?? null);
+                                    }
+                                })
+                                ->hidden(fn () => ! $hasDrivers)   // sembunyikan kalau belum ada tabel
+                                ->columnSpan(6),
+
+                            // snapshot supir (manual fallback / tetap tampil)
+                            TextInput::make('driver_name')->label('Nama Supir (snapshot)')
+                                ->placeholder($hasDrivers ? 'Otomatis saat pilih supir' : 'Isi manual')
+                                ->columnSpan(3),
+
+                            TextInput::make('driver_phone')->label('HP Supir (snapshot)')
+                                ->tel()
+                                ->placeholder($hasDrivers ? 'Otomatis saat pilih supir' : 'Isi manual')
+                                ->columnSpan(3),
                         ]),
                 ]),
 
@@ -247,7 +344,8 @@ class ShipmentResource extends Resource
 
                 TextColumn::make('service_type')
                     ->label('Layanan')
-                    ->getStateUsing(fn ($record) =>
+                    ->getStateUsing(
+                        fn ($record) =>
                         $record->service_type instanceof ServiceType
                             ? $record->service_type->value
                             : (string) $record->service_type
@@ -268,8 +366,11 @@ class ShipmentResource extends Resource
                 TextColumn::make('service_option')
                     ->label('Opsi')
                     ->formatStateUsing(fn (?string $state) => match ($state) {
-                        'fcl' => 'FCL', 'lcl' => 'LCL',
-                        'truck' => 'Truck', 'towing' => 'Towing', 'car_carrier' => 'Car Carrier',
+                        'fcl' => 'FCL',
+                        'lcl' => 'LCL',
+                        'truck' => 'Truck',
+                        'towing' => 'Towing',
+                        'car_carrier' => 'Car Carrier',
                         default => $state ?: '-',
                     })
                     ->badge()
@@ -277,8 +378,8 @@ class ShipmentResource extends Resource
 
                 TextColumn::make('cargo_type')
                     ->label('Muatan')
-                    // ⇩⇩ FIX: konversi enum ke string dulu
-                    ->getStateUsing(fn ($record) =>
+                    ->getStateUsing(
+                        fn ($record) =>
                         $record->cargo_type instanceof CargoType
                             ? $record->cargo_type->value
                             : (string) $record->cargo_type
@@ -294,18 +395,19 @@ class ShipmentResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->getStateUsing(fn ($record) =>
+                    ->getStateUsing(
+                        fn ($record) =>
                         $record->status instanceof ShipmentStatus
                             ? $record->status->value
                             : (string) $record->status
                     )
                     ->formatStateUsing(fn (?string $state) => match ($state) {
-                        'draft' => 'Draft',
-                        'pending' => 'Pending',
-                        'pickup' => 'Pickup',
-                        'transit' => 'Transit',
+                        'draft'     => 'Draft',
+                        'pending'   => 'Pending',
+                        'pickup'    => 'Pickup',
+                        'transit'   => 'Transit',
                         'delivered' => 'Delivered',
-                        'hold' => 'Hold',
+                        'hold'      => 'Hold',
                         'cancelled' => 'Cancelled',
                         default => $state ? ucfirst($state) : '-',
                     })
@@ -329,12 +431,12 @@ class ShipmentResource extends Resource
             ->filters([
                 SelectFilter::make('status')
                     ->label('Status')->options([
-                        'draft' => 'Draft',
-                        'pending' => 'Pending',
-                        'pickup' => 'Pickup',
-                        'transit' => 'Transit',
+                        'draft'     => 'Draft',
+                        'pending'   => 'Pending',
+                        'pickup'    => 'Pickup',
+                        'transit'   => 'Transit',
                         'delivered' => 'Delivered',
-                        'hold' => 'Hold',
+                        'hold'      => 'Hold',
                         'cancelled' => 'Cancelled',
                     ])->native(false),
 

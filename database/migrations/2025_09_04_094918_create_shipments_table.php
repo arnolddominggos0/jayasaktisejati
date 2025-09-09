@@ -13,7 +13,7 @@ return new class extends Migration
             $table->id();
 
             // Identitas
-            $table->string('code', 32)->unique()->index();
+            $table->string('code')->unique()->index();
             $table->foreignId('customer_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('origin_office_id')->nullable()->constrained('offices')->nullOnDelete();
             $table->foreignId('destination_office_id')->nullable()->constrained('offices')->nullOnDelete();
@@ -33,10 +33,10 @@ return new class extends Migration
             $table->string('route_summary', 192)->nullable();
 
             // Mode & layanan (awal: string biasa)
-            $table->string('mode', 10)->nullable();            
-            $table->string('service_type', 32)->nullable();    
-            $table->string('service_option', 20)->nullable();  
-            $table->string('cargo_type', 16)->nullable();      
+            $table->string('mode', 10)->nullable();
+            $table->string('service_type', 32)->nullable();
+            $table->string('service_option', 20)->nullable();
+            $table->string('cargo_type', 16)->nullable();
 
             // Laut
             $table->string('vessel_name', 100)->nullable();
@@ -52,16 +52,30 @@ return new class extends Migration
             $table->dateTimeTz('pickup_date')->nullable();
             $table->string('driver_name', 100)->nullable();
             $table->string('driver_phone', 20)->nullable();
+            $table->timestampTz('estimated_ready_at')->nullable();
 
             $table->string('status', 16);
 
             $table->text('notes')->nullable();
             $table->boolean('confirm_is_true')->default(false);
 
-            $table->timestampsTz();
+            //relasi lookup
+            $table->unsignedBigInteger('schedule_id')->nullable()->index();
+            $table->unsignedBigInteger('driver_id')->nullable()->index();
+
+
+            //cancel support
+            $table->timestampTz('cancelled_at')->nullable()->index();
+            $table->foreignId('cancelled_by')->nullable()->constrained('users')->nullOnDelete();
+
+            //Flag edit
+            $table->jsonb('edited_fields')->nullable();
+            $table->foreignId('last_edited_by')->nullable()->constrained('users')->nullOnDelete();
 
             $table->index(['status']);
             $table->index(['service_type']);
+            $table->index(['request_type']);
+            $table->index(['priority']);
             $table->index(['origin_office_id']);
             $table->index(['destination_office_id']);
         });

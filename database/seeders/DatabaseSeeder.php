@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RolesAndUsersSeeder::class);
         $this->call(InitialSetupSeeder::class);
-        $this->call(ShipmentDemoSeeder::class);
+        $this->call(DummyOperationalSeeder::class);
+        // $this->call(ShipmentDemoSeeder::class);
     }
 }
