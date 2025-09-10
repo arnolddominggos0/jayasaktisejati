@@ -17,7 +17,37 @@ class InitialSetupSeeder extends Seeder
             Role::findOrCreate($r, 'web');
         }
 
-        // Super admin
+        // === Branches DULU ===
+        $jkt = Branch::firstOrCreate(['code' => 'JKT'], ['name' => 'Jakarta']);
+        $mdo = Branch::firstOrCreate(['code' => 'MDO'], ['name' => 'Manado']);
+
+        // === Offices ===
+        Office::firstOrCreate(
+            ['code' => 'OF-JAK-PRI'],
+            ['name' => 'Depo Tanjung Priok', 'city' => 'Jakarta', 'address' => 'Pelabuhan Tanjung Priok', 'branch_id' => $jkt->id]
+        );
+        Office::firstOrCreate(
+            ['code' => 'OF-JAK-CIK'],
+            ['name' => 'Depo Cakung', 'city' => 'Jakarta', 'address' => 'KBN Cakung', 'branch_id' => $jkt->id]
+        );
+        Office::firstOrCreate(
+            ['code' => 'OF-MDO-BIT'],
+            ['name' => 'Depo Bitung', 'city' => 'Manado', 'address' => 'Pelabuhan Bitung', 'branch_id' => $mdo->id]
+        );
+        Office::firstOrCreate(
+            ['code' => 'OF-MDO-KAI'],
+            ['name' => 'Depo Kairagi', 'city' => 'Manado', 'address' => 'Kairagi', 'branch_id' => $mdo->id]
+        );
+        Office::firstOrCreate(
+            ['code' => 'OF-SBY-PEK'],
+            ['name' => 'Depo Tanjung Perak', 'city' => 'Surabaya', 'address' => 'Pelabuhan Tanjung Perak', 'branch_id' => $jkt->id]
+        );
+        Office::firstOrCreate(
+            ['code' => 'OF-MKS-SOA'],
+            ['name' => 'Depo Soekarno-Hatta MKS', 'city' => 'Makassar', 'address' => 'Soekarno-Hatta', 'branch_id' => $mdo->id]
+        );
+
+        // === Super admin SESUDAH branch tersedia ===
         if (!User::where('email', 'admin@jss.local')->exists()) {
             $admin = User::create([
                 'name' => 'Super Admin',
@@ -27,38 +57,8 @@ class InitialSetupSeeder extends Seeder
             ]);
             $admin->syncRoles(['super_admin']);
         }
-        // === Branches ===
-        $jkt = Branch::firstOrCreate(['code' => 'JKT'], ['name' => 'Jakarta']);
-        $mdo = Branch::firstOrCreate(['code' => 'MDO'], ['name' => 'Manado']);
 
-        Office::firstOrCreate(
-            ['code' => 'OF-JAK-PRI'],
-            ['name' => 'Depo Tanjung Priok', 'city' => 'Jakarta', 'address' => 'Pelabuhan Tanjung Priok', 'branch_id' => $jkt->id]
-        );
-        Office::firstOrCreate(
-            ['code' => 'OF-JAK-CIK'],
-            ['name' => 'Depo Cakung', 'city' => 'Jakarta', 'address' => 'KBN Cakung', 'branch_id' => $jkt->id]
-        );
-
-        // Manado cluster
-        Office::firstOrCreate(
-            ['code' => 'OF-MDO-BIT'],
-            ['name' => 'Depo Bitung', 'city' => 'Manado', 'address' => 'Pelabuhan Bitung', 'branch_id' => $mdo->id]
-        );
-        Office::firstOrCreate(
-            ['code' => 'OF-MDO-KAI'],
-            ['name' => 'Depo Kairagi', 'city' => 'Manado', 'address' => 'Kairagi', 'branch_id' => $mdo->id]
-        );
-
-        Office::firstOrCreate(
-            ['code' => 'OF-SBY-PEK'],
-            ['name' => 'Depo Tanjung Perak', 'city' => 'Surabaya', 'address' => 'Pelabuhan Tanjung Perak', 'branch_id' => $jkt->id] // boleh taruh di JKT dulu
-        );
-        Office::firstOrCreate(
-            ['code' => 'OF-MKS-SOA'],
-            ['name' => 'Depo Soekarno-Hatta MKS', 'city' => 'Makassar', 'address' => 'Soekarno-Hatta', 'branch_id' => $mdo->id] // taruh di MDO
-        );
-
+        // === Customers (dummy) ===
         $customers = [
             ['code' => 'CUST-IND-A01', 'name' => 'PT Indo Auto Prima'],
             ['code' => 'CUST-SML-A02', 'name' => 'PT Samudera Logistic'],
@@ -81,7 +81,7 @@ class InitialSetupSeeder extends Seeder
                     'phone_number' => '08' . fake()->numerify('##########'),
                     'nik'          => fake()->numerify('################'),
                     'npwp'         => fake()->numerify('##.###.###.#-###.###'),
-                    'office_id'    => $jkt->offices()->inRandomOrder()->value('id') ?? null,
+                    'office_id'    => Office::inRandomOrder()->value('id'),
                 ]
             );
         }

@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources\ShipmentResource\Pages;
 
-use App\Enums\ShipmentMode;
 use App\Filament\Resources\ShipmentResource;
+use App\Models\Shipment;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateShipment extends CreateRecord
@@ -14,7 +14,7 @@ class CreateShipment extends CreateRecord
     {
         // fallback code/doc (model juga handle)
         if (empty($data['code'])) {
-            $data['code'] = \App\Models\Shipment::generateCode($data['mode'] ?? null);
+            $data['code'] = Shipment::generateCode($data['mode'] ?? null);
         }
         if (($data['request_type'] ?? null) === 'walk_in' && empty($data['doc_number'])) {
             $data['doc_number'] = 'AUTO-' . now()->format('Ymd-His');
@@ -26,7 +26,7 @@ class CreateShipment extends CreateRecord
             default             => 'TC',
         };
         $priority = (string)($data['priority'] ?? 'normal');
-        $data['eta'] = \App\Models\Shipment::computeEta($modeCode, $priority)->toDateTimeString();
+        $data['eta'] = Shipment::computeEta($modeCode, $priority)->toDateTimeString();
 
         return $data;
     }

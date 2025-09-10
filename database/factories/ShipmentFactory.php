@@ -62,7 +62,7 @@ class ShipmentFactory extends Factory
 
             'pic_name'               => fake()->name(),
             'pic_phone'              => '08' . fake()->numerify('##########'),
-            'request_type'           => fake()->randomElement(['sppb', 'do', 'lain']),
+            'request_type'           => fake()->randomElement(['sppb/do', 'whatsapp/telp', 'walk-in']),
             'doc_number'             => fake()->boolean(70) ? strtoupper(fake()->bothify('DOC-########')) : null,
             'priority'               => fake()->randomElement(['normal', 'urgent']),
             'requested_at'           => fake()->dateTimeBetween('-7 days', 'now'),

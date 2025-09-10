@@ -8,6 +8,7 @@ use App\Enums\ShipmentStatus;
 use App\Enums\ShipmentMode;
 use App\Enums\ServiceType;
 use App\Enums\CargoType;
+use App\Enums\RequestType;
 use BackedEnum;
 use Illuminate\Support\Carbon;
 
@@ -18,6 +19,7 @@ class Shipment extends Model
     protected $fillable = [
         'code',
         'customer_id',
+        'receiver_id',
         'origin_office_id',
         'destination_office_id',
 
@@ -29,7 +31,6 @@ class Shipment extends Model
         'priority',
         'attachments',
 
-
         // B. Informasi Rute & Moda
         'mode',
         'route_from',
@@ -40,6 +41,8 @@ class Shipment extends Model
         'service_type',
         'service_option',
         'cargo_type',
+        'container_size',
+        'container_qty',
 
         // Laut
         'vessel_name',
@@ -60,7 +63,7 @@ class Shipment extends Model
         'status',
         'notes',
 
-        //Perubahan
+        // Perubahan
         'requested_at',
         'cancelled_at',
         'cancelled_by',
@@ -72,51 +75,61 @@ class Shipment extends Model
 
         // Lead Time TL
         'estimated_ready_at',
-
     ];
 
     protected $casts = [
-        'status'            => ShipmentStatus::class,
-        'mode'              => ShipmentMode::class,
-        'service_type'      => ServiceType::class,
-        'cargo_type'        => CargoType::class,
-        'requested_at'      => 'datetime',
-        'attachments'       => 'array',
-        'etd'               => 'datetime',
-        'eta'               => 'datetime',
-        'pickup_date'       => 'datetime',
+        'status'             => ShipmentStatus::class,
+        'mode'               => ShipmentMode::class,
+        'service_type'       => ServiceType::class,
+        'cargo_type'         => CargoType::class,
+        'request_type'       => RequestType::class,
+        'container_qty'      => 'integer',
+        'requested_at'       => 'datetime',
+        'attachments'        => 'array',
+        'etd'                => 'datetime',
+        'eta'                => 'datetime',
+        'pickup_date'        => 'datetime',
         'estimated_ready_at' => 'datetime',
-        'confirm_is_true'   => 'boolean',
-        'cancelled_at'      => 'datetime',
-        'edited_fields'     => 'array',
+        'confirm_is_true'    => 'boolean',
+        'cancelled_at'       => 'datetime',
+        'edited_fields'      => 'array',
     ];
 
     protected static function booted(): void
     {
         static::creating(function (Shipment $m) {
-            $mode = $m->mode instanceof \BackedEnum ? $m->mode->value : (string)$m->mode;
+            $mode = $m->mode instanceof BackedEnum ? $m->mode->value : (string) $m->mode;
 
             if (blank($m->code)) {
-                $m->code = self::generateCode($mode); // JSSMMYYSH/TC####
+                $m->code = self::generateCode($mode);
             }
 
-            if (($m->request_type ?? null) === 'walk_in' && blank($m->doc_number)) {
+            $reqType = $m->request_type instanceof BackedEnum ? $m->request_type->value : (string) $m->request_type;
+            if ($reqType !== RequestType::SPPB_DO->value && blank($m->doc_number)) {
                 $m->doc_number = 'AUTO-' . now()->format('Ymd-His');
             }
 
             if (blank($m->eta)) {
                 $modeCode = match (strtolower($mode)) {
                     'sea', 'sea_freight' => 'SH',
-                    default             => 'TC',
+                    default              => 'TC',
                 };
-                $m->eta = self::computeEta($modeCode, (string)($m->priority ?? 'normal'))->toDateTimeString();
+                $m->eta = self::computeEta($modeCode, (string) ($m->priority ?? 'normal'))->toDateTimeString();
             }
         });
 
         static::saving(function (Shipment $m) {
             if ($m->mode === ShipmentMode::Sea) {
                 $m->service_type   = ServiceType::SeaFreight;
-                $m->service_option = in_array($m->service_option, ['fcl', 'lcl'], true) ? $m->service_option : ($m->service_option ?: 'fcl');
+                $m->service_option = in_array($m->service_option, ['fcl', 'lcl'], true)
+                    ? $m->service_option
+                    : ($m->service_option ?: 'fcl');
+
+                // Jika bukan FCL, kosongkan info kontainer
+                if ($m->service_option !== 'fcl') {
+                    $m->container_size = null;
+                    $m->container_qty  = null;
+                }
 
                 // DARAT fields off
                 $m->vehicle_type = null;
@@ -134,9 +147,13 @@ class Shipment extends Model
                     'towing'      => 'towing',
                     default       => 'truck',
                 };
+
+                // Laut fields off (termasuk kontainer)
                 $m->vessel_name = $m->voyage = $m->pol = $m->pod = null;
                 $m->etd = null;
                 $m->schedule_id = null;
+                $m->container_size = null;
+                $m->container_qty  = null;
             }
 
             // Ringkasan rute
@@ -163,17 +180,14 @@ class Shipment extends Model
         });
     }
 
-
     public static function generateCode(?string $mode = null, ?int $year = null, ?int $month = null): string
     {
         $now   = now();
         $year  = $year ?: $now->year;
         $month = $month ?: $now->month;
 
-        // Prefix JSS + bulan + tahun → JSSMMYY
         $prefix = 'JSS' . str_pad($month, 2, '0', STR_PAD_LEFT) . substr($year, -2);
 
-        // Kode moda: SH = Sea, TC = Truck/Car (land)
         $modeCode = match (strtolower((string) $mode)) {
             'sea', 'sea_freight' => 'SH',
             'land', 'land_trucking', 'car_carrier', 'towing', 'truck' => 'TC',
@@ -182,7 +196,6 @@ class Shipment extends Model
 
         $prefix .= $modeCode;
 
-        // Cari last sequence bulan+mode ini
         $last = static::query()
             ->where('code', 'like', $prefix . '%')
             ->orderByDesc('code')
@@ -207,8 +220,6 @@ class Shipment extends Model
         return strtolower($priority) === 'urgent' ? $base->endOfDay() : $base->addDay()->endOfDay();
     }
 
-
-    // Helpers UI agar selalu string
     public function getStatusValueAttribute(): string
     {
         $s = $this->status;
@@ -233,14 +244,14 @@ class Shipment extends Model
     {
         return $this->belongsTo(Customer::class);
     }
+    public function receiver()
+    {
+        return $this->belongsTo(Customer::class, 'receiver_id');
+    }
     public function schedule()
     {
         return $this->belongsTo(FleetSchedule::class, 'schedule_id');
     }
-    // public function driver()
-    // {
-    //     return $this->belongsTo(\App\Models\Driver::class, 'driver_id');
-    // }
     public function cancelledBy()
     {
         return $this->belongsTo(User::class, 'cancelled_by');
@@ -249,7 +260,6 @@ class Shipment extends Model
     {
         return $this->belongsTo(User::class, 'last_edited_by');
     }
-
     public function originOffice()
     {
         return $this->belongsTo(Office::class, 'origin_office_id');
