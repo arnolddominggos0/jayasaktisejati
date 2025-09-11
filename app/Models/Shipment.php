@@ -174,7 +174,7 @@ class Shipment extends Model
             if ($changed) {
                 $m->forceFill([
                     'edited_fields'  => $changed,
-                    'last_edited_by' => auth()->id(),
+                    // 'last_edited_by' => auth()->id(),
                 ])->saveQuietly();
             }
         });

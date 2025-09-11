@@ -12,7 +12,6 @@ class CreateShipment extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // fallback code/doc (model juga handle)
         if (empty($data['code'])) {
             $data['code'] = Shipment::generateCode($data['mode'] ?? null);
         }
@@ -20,7 +19,6 @@ class CreateShipment extends CreateRecord
             $data['doc_number'] = 'AUTO-' . now()->format('Ymd-His');
         }
 
-        // fallback ETA rules (model juga handle)
         $modeCode = match (strtolower((string)($data['mode'] ?? 'land'))) {
             'sea','sea_freight' => 'SH',
             default             => 'TC',

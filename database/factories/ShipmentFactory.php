@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\CargoType;
+use App\Enums\RequestType;
 use App\Enums\ShipmentMode;
 use App\Enums\ShipmentStatus;
 use App\Enums\ServiceType;
@@ -32,6 +33,7 @@ class ShipmentFactory extends Factory
 
         $mode       = fake()->randomElement([ShipmentMode::Sea, ShipmentMode::Land]);
         $cargoType  = fake()->randomElement([CargoType::Vehicle, CargoType::General]);
+        $request_type = fake()->randomElement([RequestType::SPPB_DO, RequestType::WA_TELP, RequestType::WALK_IN]);
         $status     = fake()->randomElement([
             ShipmentStatus::Draft,
             ShipmentStatus::Pending,
@@ -59,10 +61,11 @@ class ShipmentFactory extends Factory
             'mode'                   => $mode->value,
             'cargo_type'             => $cargoType->value,
             'status'                 => $status->value,
+            'request_type'           => $request_type->value,
+
 
             'pic_name'               => fake()->name(),
             'pic_phone'              => '08' . fake()->numerify('##########'),
-            'request_type'           => fake()->randomElement(['sppb/do', 'whatsapp/telp', 'walk-in']),
             'doc_number'             => fake()->boolean(70) ? strtoupper(fake()->bothify('DOC-########')) : null,
             'priority'               => fake()->randomElement(['normal', 'urgent']),
             'requested_at'           => fake()->dateTimeBetween('-7 days', 'now'),
@@ -128,5 +131,4 @@ class ShipmentFactory extends Factory
             'eta'            => null,
         ];
     }
-    
 }

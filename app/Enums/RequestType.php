@@ -13,7 +13,7 @@ enum RequestType: string
         return match ($this) {
             self::SPPB_DO => 'SPPB/DO',
             self::WA_TELP => 'WA/TELP',
-            self::WALK_IN => 'WALK - IN',
+            self::WALK_IN => 'WALK-IN',
         };
     }
 }
