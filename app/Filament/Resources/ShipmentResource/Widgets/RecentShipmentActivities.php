@@ -16,13 +16,13 @@ class RecentShipmentActivities extends Widget
     {
         $events = [
             'created',
-            'updated',
+            'List',
             'status_changed',
             'route_updated',
             'cancelled',
             'uncancelled', 
             'deleted',
-            'restored',
+            'restored', 
         ];
 
         $activities = Activity::query()

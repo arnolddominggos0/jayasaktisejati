@@ -7,17 +7,25 @@ use Illuminate\Database\Eloquent\Model;
 class Customer extends Model
 {
     protected $fillable = [
-        'code',     
+        'code',
         'name',
         'email',
-        'phone_number',
         'nik',
         'npwp',
-        'office_id' 
-    ];
+        'pic_name',
+        'pic_phone',
+        'phone_number',
+        'city_id',
+        'address',
+        'postal_code',];
 
-    public function office()
+    public function city()
     {
-        return $this->belongsTo(Office::class);
+        return $this->belongsTo(City::class);
+    }
+
+    public function users()
+    {
+        return $this->hasMany(User::class);
     }
 }

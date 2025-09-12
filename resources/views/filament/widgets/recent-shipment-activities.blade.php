@@ -68,13 +68,9 @@
                             </div>
 
                             <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                @php
-                                    $ts = \Illuminate\Support\Carbon::parse($act->created_at)->locale('id');
-                                @endphp
-                                {{ $ts->diffForHumans() }}
+                                {{ \Illuminate\Support\Carbon::parse($act->created_at)->calendar() }}
                                 <span class="mx-1">•</span>
-                                {{ $ts->isoFormat('D MMM YYYY, HH:mm') }}
-
+                                {{ \Illuminate\Support\Carbon::parse($act->created_at)->isoFormat('D MMM YYYY, HH:mm') }}
                             </div>
                         </div>
                     </div>

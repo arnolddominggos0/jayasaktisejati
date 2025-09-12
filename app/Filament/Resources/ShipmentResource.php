@@ -12,8 +12,9 @@ use Filament\Forms\Components\{Checkbox, DatePicker, FileUpload, Grid, Group, Hi
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
-use Filament\Tables\Actions\{BulkActionGroup, DeleteBulkAction, EditAction};
+use Filament\Tables\Actions\{BulkAction, DeleteBulkAction, EditAction};
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Enums\FiltersLayout;
@@ -21,6 +22,7 @@ use Filament\Tables\Filters\{Filter, SelectFilter};
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -75,6 +77,7 @@ class ShipmentResource extends Resource
                     ->schema([
                         Select::make('customer_id')
                             ->label('Pengirim *')
+                            ->placeholder('Pilih Customer Pengirim')
                             ->relationship('customer', 'name')
                             ->searchable()
                             ->preload()
@@ -83,6 +86,7 @@ class ShipmentResource extends Resource
 
                         Select::make('receiver_id')
                             ->label('Penerima *')
+                            ->placeholder('Pilih Customer Penerima')
                             ->relationship('receiver', 'name')
                             ->searchable()
                             ->preload()
@@ -207,6 +211,7 @@ class ShipmentResource extends Resource
 
                         Select::make('origin_city_id')
                             ->label('Asal (Kota Asal) *')
+                            ->placeholder('Pilih Kota Asal')
                             ->relationship('originCity', 'name')
                             ->searchable()
                             ->preload()
@@ -216,6 +221,7 @@ class ShipmentResource extends Resource
 
                         Select::make('destination_city_id')
                             ->label('Tujuan (Kota Tujuan) *')
+                            ->placeholder('Pilih Kota Tujuan')
                             ->relationship('destinationCity', 'name')
                             ->searchable()
                             ->preload()
@@ -509,7 +515,12 @@ class ShipmentResource extends Resource
                                     ->columnSpan(4),
 
                                 TextInput::make('vehicle_plate')->label('No. Polisi Armada')->maxLength(20)->columnSpan(4),
-                                DatePicker::make('pickup_date')->label('Tanggal Pickup (estimasi)')->native(false)->columnSpan(4),
+                                DatePicker::make('pickup_date')
+                                ->label('Tanggal Pickup (estimasi)')
+                                ->required()
+                                ->native(false)
+                                ->prefixIcon('heroicon-m-calendar')
+                                ->columnSpan(4),
                             ]),
                     ]),
 
@@ -745,7 +756,94 @@ class ShipmentResource extends Resource
             ->filtersFormColumns(4)
             ->defaultSort('updated_at', 'desc')
             ->actions([EditAction::make()->label('Edit')])
-            ->bulkActions([BulkActionGroup::make([DeleteBulkAction::make()])]);
+            ->bulkActions([
+                BulkAction::make('export_selected')
+                    ->label('Export Terpilih (CSV)')
+                    ->icon('heroicon-m-arrow-down-tray')
+                    ->requiresConfirmation()
+                    ->action(function (Collection $records) {
+                        if ($records->isEmpty()) {
+                            Notification::make()->title('Tidak ada baris terpilih')->warning()->send();
+                            return;
+                        }
+
+                        $filename = 'shipments-selected-' . now()->format('Ymd-His') . '.csv';
+
+                        return response()->streamDownload(function () use ($records) {
+                            $out = fopen('php://output', 'w');
+                            fputcsv($out, [
+                                'Kode',
+                                'Pengirim',
+                                'Penerima',
+                                'Asal',
+                                'Tujuan',
+                                'Moda',
+                                'Layanan',
+                                'Opsi',
+                                'Cakupan',
+                                'Prioritas',
+                                'Muatan',
+                                'Koli',
+                                'CBM',
+                                'Berat (kg)',
+                                'Status',
+                                'ETD',
+                                'ETA',
+                                'Dibuat'
+                            ]);
+
+                            foreach ($records as $r) {
+                                $mode   = $r->mode?->label()         ?? (string) $r->mode;
+                                $stype  = $r->service_type?->label()  ?? (string) $r->service_type;
+                                $opt    = (string) $r->service_option ?: '-';
+                                $scope  = $r->delivery_scope?->label() ?? (string) $r->delivery_scope ?: '-';
+                                $prio   = $r->priority ? ucfirst($r->priority) : '-';
+                                $cargo  = $r->cargo_type?->label()    ?? (string) $r->cargo_type;
+                                $status = $r->status?->label()        ?? (string) $r->status;
+
+                                $cbm   = is_null($r->cbm_total)   ? null : number_format((float) $r->cbm_total, 3, '.', '');
+                                $wkg   = is_null($r->weight_total) ? null : number_format((float) $r->weight_total, 2, '.', '');
+                                $etd   = $r->etd ? Carbon::parse($r->etd)->format('d M Y H:i') : null;
+                                $eta   = $r->eta ? Carbon::parse($r->eta)->format('d M Y H:i') : null;
+                                $cdate = $r->created_at ? Carbon::parse($r->created_at)->format('d M Y H:i') : null;
+
+                                fputcsv($out, [
+                                    $r->code,
+                                    $r->customer->name    ?? '-',
+                                    $r->receiver->name    ?? '-',
+                                    $r->originCity->name  ?? '-',
+                                    $r->destinationCity->name ?? '-',
+                                    $mode,
+                                    $stype,
+                                    $opt,
+                                    $scope,
+                                    $prio,
+                                    $cargo,
+                                    $r->packages_total,
+                                    $cbm,
+                                    $wkg,
+                                    $status,
+                                    $etd,
+                                    $eta,
+                                    $cdate,
+                                ]);
+                            }
+
+                            fclose($out);
+                        }, $filename, ['Content-Type' => 'text/csv']);
+                    }),
+
+                DeleteBulkAction::make()
+                    ->label('Hapus Terpilih')
+                    ->icon('heroicon-m-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Hapus data terpilih?')
+                    ->modalDescription('Tindakan ini tidak dapat dibatalkan.')
+                    ->modalSubmitActionLabel('Ya, hapus')
+                    ->deselectRecordsAfterCompletion()
+                    ->successNotificationTitle('Data terpilih telah dihapus'),
+            ]);
     }
 
 

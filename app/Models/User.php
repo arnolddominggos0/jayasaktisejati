@@ -24,6 +24,7 @@ class User extends Authenticatable implements FilamentUser
         'email',
         'password',
         'branch_id',
+        'customer_id',
     ];
 
     /**
@@ -49,9 +50,14 @@ class User extends Authenticatable implements FilamentUser
         ];
     }
 
-    public function branch()    
+    public function branch()
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function customer()
+    {
+        return $this->belongsTo(Customer::class);
     }
 
     public function canAccessPanel(Panel $panel): bool
