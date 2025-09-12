@@ -11,32 +11,24 @@ return new class extends Migration
         Schema::create('customers', function (Blueprint $table) {
             $table->id();
 
-            // Identitas pelanggan
-            $table->string('code', 20)->unique();           // ex: CUST-2025-00001
+            $table->string('code', 20)->unique();          
             $table->string('name', 191);
 
-            // Email: boleh NULL, tapi jika diisi harus unik (Postgres mengizinkan banyak NULL pada UNIQUE)
             $table->string('email', 191)->nullable()->unique();
 
-            // NIK opsional (atau wajib jika bisnis mensyaratkan). Panjang 16, unik saat ada.
             $table->string('nik', 16)->nullable()->unique();
 
-            // NPWP opsional
             $table->string('npwp', 32)->nullable();
 
-            // Nomor telepon; gunakan string agar mudah di-validate (leading zero, tanda +62, dsb)
             $table->string('phone_number', 32)->nullable();
 
-            // Relasi ke kantor/depo
-            $table->foreignId('office_id')
-                ->constrained('offices')
-                ->cascadeOnDelete();
-
+            $table->foreignId('city_id')->nullable()->nullOnDelete();
+            $table->text('address')->nullable();
+            $table->string('postal_code', 10)->nullable();
             $table->timestampsTz();
 
-            // Index bantu pencarian
             $table->index(['name']);
-            $table->index(['office_id']);
+            $table->index(['city_id']);
         });
     }
 

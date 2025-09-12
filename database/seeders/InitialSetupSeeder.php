@@ -5,49 +5,26 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
-use App\Models\{Branch, Office, Customer, User};
+use App\Models\{Branch, City, Customer, User};
 use Illuminate\Support\Str;
 
 class InitialSetupSeeder extends Seeder
 {
     public function run(): void
     {
-        // Roles
         foreach (['super_admin', 'office_admin', 'field_coordinator', 'customer'] as $r) {
             Role::findOrCreate($r, 'web');
         }
 
-        // === Branches DULU ===
         $jkt = Branch::firstOrCreate(['code' => 'JKT'], ['name' => 'Jakarta']);
         $mdo = Branch::firstOrCreate(['code' => 'MDO'], ['name' => 'Manado']);
 
-        // === Offices ===
-        Office::firstOrCreate(
-            ['code' => 'OF-JAK-PRI'],
-            ['name' => 'Depo Tanjung Priok', 'city' => 'Jakarta', 'address' => 'Pelabuhan Tanjung Priok', 'branch_id' => $jkt->id]
-        );
-        Office::firstOrCreate(
-            ['code' => 'OF-JAK-CIK'],
-            ['name' => 'Depo Cakung', 'city' => 'Jakarta', 'address' => 'KBN Cakung', 'branch_id' => $jkt->id]
-        );
-        Office::firstOrCreate(
-            ['code' => 'OF-MDO-BIT'],
-            ['name' => 'Depo Bitung', 'city' => 'Manado', 'address' => 'Pelabuhan Bitung', 'branch_id' => $mdo->id]
-        );
-        Office::firstOrCreate(
-            ['code' => 'OF-MDO-KAI'],
-            ['name' => 'Depo Kairagi', 'city' => 'Manado', 'address' => 'Kairagi', 'branch_id' => $mdo->id]
-        );
-        Office::firstOrCreate(
-            ['code' => 'OF-SBY-PEK'],
-            ['name' => 'Depo Tanjung Perak', 'city' => 'Surabaya', 'address' => 'Pelabuhan Tanjung Perak', 'branch_id' => $jkt->id]
-        );
-        Office::firstOrCreate(
-            ['code' => 'OF-MKS-SOA'],
-            ['name' => 'Depo Soekarno-Hatta MKS', 'city' => 'Makassar', 'address' => 'Soekarno-Hatta', 'branch_id' => $mdo->id]
-        );
+        $cityNames = ['Jakarta', 'Manado', 'Surabaya', 'Makassar', 'Tobelo', 'Bitung', 'Ternate', 'Ambon'];
+        foreach ($cityNames as $name) {
+            City::firstOrCreate(['slug' => Str::slug($name)], ['name' => $name, 'country' => 'Indonesia']);
+        }
 
-        // === Super admin SESUDAH branch tersedia ===
+        // Super admin
         if (!User::where('email', 'admin@jss.local')->exists()) {
             $admin = User::create([
                 'name' => 'Super Admin',
@@ -58,7 +35,7 @@ class InitialSetupSeeder extends Seeder
             $admin->syncRoles(['super_admin']);
         }
 
-        // === Customers (dummy) ===
+        $cityIds = City::pluck('id')->all();
         $customers = [
             ['code' => 'CUST-IND-A01', 'name' => 'PT Indo Auto Prima'],
             ['code' => 'CUST-SML-A02', 'name' => 'PT Samudera Logistic'],
@@ -73,7 +50,7 @@ class InitialSetupSeeder extends Seeder
         ];
 
         foreach ($customers as $c) {
-            Customer::firstOrCreate(
+            \App\Models\Customer::firstOrCreate(
                 ['code' => $c['code']],
                 [
                     'name'         => $c['name'],
@@ -81,7 +58,7 @@ class InitialSetupSeeder extends Seeder
                     'phone_number' => '08' . fake()->numerify('##########'),
                     'nik'          => fake()->numerify('################'),
                     'npwp'         => fake()->numerify('##.###.###.#-###.###'),
-                    'office_id'    => Office::inRandomOrder()->value('id'),
+                    'city_id'      => $cityIds[array_rand($cityIds)], // <-- pindah ke city
                 ]
             );
         }

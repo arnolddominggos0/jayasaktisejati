@@ -39,7 +39,7 @@ return new class extends Migration {
             $table->string('cargo_type', 16)->nullable();     
 
             // FCL
-            $table->string('container_size', 10)->nullable();
+            $table->string('container_size', 32)->nullable();
             $table->unsignedInteger('container_qty')->nullable();
 
             // LCL totals yang disimpan
@@ -54,7 +54,7 @@ return new class extends Migration {
             $table->string('pod')->nullable();
             $table->dateTime('etd')->nullable();
             $table->dateTime('eta')->nullable();
-            $table->foreignId('schedule_id')->nullable()->constrained('fleet_schedules')->nullOnDelete();
+            $table->foreignId('schedule_id')->nullable();
 
             // Darat
             $table->string('vehicle_type')->nullable();

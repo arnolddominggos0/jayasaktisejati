@@ -4,29 +4,33 @@ namespace App\Enums;
 
 enum ContainerSize: string
 {
-    case FT20   = '20';
-    case FT40   = '40';
-    case FT40HC = '40HC';
-    case FT45HC = '45HC';
+    case COC_20_DRY    = 'coc_20_dry';
+    case COC_40_DRY_HC = 'coc_40_dry_hc';
+    case COC_40_DRY    = 'coc_40_dry';
+    case COC_21_DRY    = 'coc_21_dry';
 
     public function label(): string
     {
         return match ($this) {
-            self::FT20   => "20'",
-            self::FT40   => "40'",
-            self::FT40HC => "40' HC",
-            self::FT45HC => "45' HC",
+            self::COC_20_DRY    => 'COC 20 DRY',
+            self::COC_40_DRY_HC => 'COC 40 DRY HC',
+            self::COC_40_DRY    => 'COC 40 DRY',
+            self::COC_21_DRY    => 'COC 21 DRY',
         };
     }
 
-    /** Helper untuk option Filament */
     public static function options(): array
     {
         return [
-            self::FT20->value   => self::FT20->label(),
-            self::FT40->value   => self::FT40->label(),
-            self::FT40HC->value => self::FT40HC->label(),
-            self::FT45HC->value => self::FT45HC->label(),
+            self::COC_20_DRY->value    => self::COC_20_DRY->label(),
+            self::COC_40_DRY_HC->value => self::COC_40_DRY_HC->label(),
+            self::COC_40_DRY->value    => self::COC_40_DRY->label(),
+            self::COC_21_DRY->value    => self::COC_21_DRY->label(),
         ];
+    }
+
+    public static function tryLabel(?string $value): ?string
+    {
+        return self::tryFrom((string)$value)?->label();
     }
 }

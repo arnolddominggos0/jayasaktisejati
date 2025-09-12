@@ -14,10 +14,21 @@ class RecentShipmentActivities extends Widget
 
     protected function getViewData(): array
     {
+        $events = [
+            'created',
+            'updated',
+            'status_changed',
+            'route_updated',
+            'cancelled',
+            'uncancelled', 
+            'deleted',
+            'restored',
+        ];
+
         $activities = Activity::query()
             ->where('log_name', 'permintaan_pengiriman')
             ->where('subject_type', Shipment::class)
-            ->whereIn('event', ['created', 'status_changed'])
+            ->whereIn('event', $events)
             ->with(['causer', 'subject'])
             ->latest('created_at')
             ->limit(30)
@@ -30,8 +41,8 @@ class RecentShipmentActivities extends Widget
     {
         return match ($status) {
             'draft' => 'gray',
-            'pending','hold' => 'warning',
-            'pickup','transit' => 'info',
+            'pending', 'hold' => 'warning',
+            'pickup', 'transit' => 'info',
             'delivered' => 'success',
             'cancelled' => 'danger',
             default => 'gray',

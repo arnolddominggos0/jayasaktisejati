@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void {
         Schema::table('shipments', function (Blueprint $t) {
-            if (!Schema::hasColumn('shipments','container_size')) $t->string('container_size', 10)->nullable()->after('service_option'); 
+            if (!Schema::hasColumn('shipments','container_size')) $t->string('container_size', 32)->nullable()->after('service_option'); 
             if (!Schema::hasColumn('shipments','container_qty'))  $t->unsignedInteger('container_qty')->nullable()->after('container_size');
         });
     }

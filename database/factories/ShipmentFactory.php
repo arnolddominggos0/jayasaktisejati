@@ -2,8 +2,8 @@
 
 namespace Database\Factories;
 
-use App\Enums\{CargoType, RequestType, ShipmentMode, ShipmentStatus, ServiceType};
-use App\Models\{Shipment, Customer, Office};
+use App\Enums\{CargoType, DeliveryScope, RequestType, ShipmentMode, ShipmentStatus, ServiceType};
+use App\Models\{Shipment, Customer, City};
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 class ShipmentFactory extends Factory
@@ -12,25 +12,34 @@ class ShipmentFactory extends Factory
 
     public function definition(): array
     {
-        $officeIds = Office::query()->inRandomOrder()->limit(2)->pluck('id')->all();
-        if (count($officeIds) < 2) {
-            $officeIds = [Office::query()->inRandomOrder()->value('id'), Office::query()->inRandomOrder()->value('id')];
-            $officeIds = array_values(array_filter($officeIds));
+        $cityIds = City::query()->inRandomOrder()->limit(2)->pluck('id')->all();
+        if (count($cityIds) < 2) {
+            $created = City::factory()->count(2 - count($cityIds))->create()->pluck('id')->all();
+            $cityIds = array_merge($cityIds, $created);
         }
-        $originId = $officeIds[0] ?? null;
-        $destId   = $officeIds[1] ?? $officeIds[0];
+        $originCityId = $cityIds[0];
+        $destCityId   = $cityIds[1] ?? $cityIds[0];
 
-        if ($originId && $destId && $originId === $destId) {
-            $alt = Office::where('id', '!=', $originId)->inRandomOrder()->value('id');
-            if ($alt) $destId = $alt;
+        if ($originCityId === $destCityId) {
+            $alt = City::whereKeyNot($originCityId)->inRandomOrder()->value('id');
+            if ($alt) $destCityId = $alt;
         }
+        $deliveryScope = fake()->randomElement([
+            DeliveryScope::PortToPort,
+            DeliveryScope::DoorToPort,
+            DeliveryScope::PortToDoor,
+            DeliveryScope::DoorToDoor,
+        ]);
 
-        $customerId = Customer::inRandomOrder()->value('id') ?? Customer::first()?->id;
+        $originCity = City::find($originCityId);
+        $destCity   = City::find($destCityId);
 
-        $mode         = fake()->randomElement([ShipmentMode::Sea, ShipmentMode::Land]);
-        $cargoType    = fake()->randomElement([CargoType::Vehicle, CargoType::General]);
-        $requestType  = fake()->randomElement([RequestType::SPPB_DO, RequestType::WA_TELP, RequestType::WALK_IN]);
-        $status       = fake()->randomElement([
+        $customerId = Customer::inRandomOrder()->value('id') ?? Customer::factory()->create()->id;
+
+        $mode        = fake()->randomElement([ShipmentMode::Sea, ShipmentMode::Land]);
+        $cargoType   = fake()->randomElement([CargoType::Vehicle, CargoType::General]);
+        $requestType = fake()->randomElement([RequestType::SPPB_DO, RequestType::WA_TELP, RequestType::WALK_IN]);
+        $status      = fake()->randomElement([
             ShipmentStatus::Draft,
             ShipmentStatus::Pending,
             ShipmentStatus::Pickup,
@@ -39,56 +48,64 @@ class ShipmentFactory extends Factory
             ShipmentStatus::Hold,
         ]);
 
-        $originCity = Office::find($originId)?->city ?? fake()->city();
-        $destCity   = Office::find($destId)?->city ?? fake()->city();
+        $docNumber = match ($requestType) {
+            RequestType::SPPB_DO => strtoupper(fake()->bothify('SPPB-########')),
+            RequestType::WALK_IN => 'AUTO-' . now()->format('Ymd-His'),
+            default              => fake()->boolean(50) ? strtoupper(fake()->bothify('DOC-########')) : null,
+        };
 
-        $routeSummary = $originCity . ' → ' . $destCity;
+        $routeSummary = ($originCity->name ?? '-') . ' → ' . ($destCity->name ?? '-');
 
         $base = [
-            'code'                   => null,
-            'customer_id'            => $customerId,
-            'receiver_id'            => Customer::inRandomOrder()->value('id') ?? $customerId,
-            'origin_office_id'       => $originId,
-            'destination_office_id'  => $destId,
+            'code'                    => null, 
+            'customer_id'             => $customerId,
+            'receiver_id'             => Customer::inRandomOrder()->value('id') ?? $customerId,
 
-            'route_from'             => $originCity,
-            'route_to'               => $destCity,
-            'route_summary'          => $routeSummary,
+            'origin_city_id'          => $originCityId,
+            'destination_city_id'     => $destCityId,
 
-            'mode'                   => $mode->value,
-            'cargo_type'             => $cargoType->value,
-            'status'                 => $status->value,
-            'request_type'           => $requestType->value,
+            'route_from'              => $originCity->name ?? null,
+            'route_to'                => $destCity->name ?? null,
+            'route_summary'           => $routeSummary,
 
-            'pic_name'               => fake()->name(),
-            'pic_phone'              => '08' . fake()->numerify('##########'),
-            'doc_number'             => fake()->boolean(70) ? strtoupper(fake()->bothify('DOC-########')) : null,
-            'priority'               => fake()->randomElement(['normal', 'urgent']),
-            'requested_at'           => fake()->dateTimeBetween('-7 days', 'now'),
+            'mode'                    => $mode->value,
+            'cargo_type'              => $cargoType->value,
+            'status'                  => $status->value,
+            'request_type'            => $requestType->value,
 
-            'notes' => fake()->optional()->sentence(),
-            'confirm_is_true' => fake()->boolean(80),
+            'pic_name'                => fake()->name(),
+            'pic_phone'               => '08' . fake()->numerify('##########'),
+            'doc_number'              => $docNumber,
+            'priority'                => fake()->randomElement(['normal', 'urgent']),
+            'requested_at'            => fake()->dateTimeBetween('-7 days', 'now'),
+
+            'notes'                   => fake()->optional()->sentence(),
+            'confirm_is_true'         => fake()->boolean(85),
         ];
 
         if ($mode === ShipmentMode::Sea) {
             $serviceOption = fake()->randomElement(['fcl', 'lcl']);
-            $ports = [
-                'Jakarta'   => 'Tj. Priok',
-                'Surabaya'  => 'Tj. Perak',
-                'Manado'    => 'Bitung',
-                'Makassar'  => 'Soekarno-Hatta',
-            ];
-            $pol = $ports[$originCity] ?? 'Pelabuhan Asal';
-            $pod = $ports[$destCity]   ?? 'Pelabuhan Tujuan';
 
-            // Jika LCL dan General, isi total CBM/berat supaya kelihatan di tabel
+            $ports = [
+                'Jakarta'  => 'Tj. Priok',
+                'Surabaya' => 'Tj. Perak',
+                'Manado'   => 'Bitung',
+                'Makassar' => 'Soekarno-Hatta',
+                'Ambon'    => 'Yos Sudarso',
+                'Ternate'  => 'Ahmad Yani',
+                'Bitung'   => 'Bitung',
+            ];
+
+            $oName = $originCity->name ?? '';
+            $dName = $destCity->name ?? '';
+            $pol   = $ports[$oName] ?? 'Pelabuhan Asal';
+            $pod   = $ports[$dName] ?? 'Pelabuhan Tujuan';
+
             $packages = null; $cbm = null; $weight = null;
             if ($serviceOption === 'lcl' && $cargoType === CargoType::General) {
                 $packages = fake()->numberBetween(3, 30);
-                // CBM total wajar 0.5 - 12.0
-                $cbm = round(fake()->randomFloat(4, 0.5, 12.0), 3, PHP_ROUND_HALF_UP);
-                // berat total wajar 50 - 800 kg
-                $weight = round(fake()->randomFloat(4, 50, 800), 2, PHP_ROUND_HALF_UP);
+                $cbm      = round(fake()->randomFloat(4, 0.5, 12.0), 3, PHP_ROUND_HALF_UP);
+                $weight   = round(fake()->randomFloat(4, 50, 800), 2, PHP_ROUND_HALF_UP);
             }
 
             return $base + [
@@ -96,14 +113,16 @@ class ShipmentFactory extends Factory
                 'service_option' => $serviceOption,
 
                 // FCL opsional
-                'container_size' => $serviceOption === 'fcl' ? fake()->randomElement(['20', '40', '40HC']) : null,
+                'container_size' => $serviceOption === 'fcl' ? fake()->randomElement(['20', '40', '40HC', '45HC']) : null,
                 'container_qty'  => $serviceOption === 'fcl' ? fake()->numberBetween(1, 4) : null,
 
-                // LCL totals (jika ada)
+                // LCL totals (kalau ada)
                 'packages_total' => $packages,
                 'cbm_total'      => $cbm,
                 'weight_total'   => $weight,
+                'delivery_scope' => $deliveryScope,
 
+                // Data kapal
                 'vessel_name'    => fake()->company() . ' Lines',
                 'voyage'         => 'VY' . fake()->numberBetween(100, 999),
                 'pol'            => $pol,
@@ -141,7 +160,6 @@ class ShipmentFactory extends Factory
             'driver_name'    => fake()->name(),
             'driver_phone'   => '08' . fake()->numerify('##########'),
 
-            // Laut null
             'vessel_name'    => null,
             'voyage'         => null,
             'pol'            => null,
@@ -149,7 +167,6 @@ class ShipmentFactory extends Factory
             'etd'            => null,
             'eta'            => null,
 
-            // FCL/LCL totals null
             'container_size' => null,
             'container_qty'  => null,
             'packages_total' => null,

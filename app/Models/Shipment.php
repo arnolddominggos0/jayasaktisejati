@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Enums\{ShipmentStatus, ShipmentMode, ServiceType, CargoType, RequestType};
+use App\Enums\{ShipmentStatus, ShipmentMode, ServiceType, CargoType, DeliveryScope, RequestType};
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -16,6 +16,8 @@ class Shipment extends Model
         'code',
         'customer_id',
         'receiver_id',
+        'origin_city_id',
+        'destination_city_id',
         'origin_office_id',
         'destination_office_id',
 
@@ -36,6 +38,7 @@ class Shipment extends Model
         // Layanan & Muatan
         'service_type',
         'service_option',
+        'delivery_scope',
         'cargo_type',
         'container_size',
         'container_qty',
@@ -58,8 +61,7 @@ class Shipment extends Model
         'vehicle_type',
         'vehicle_plate',
         'pickup_date',
-        'driver_name',
-        'driver_phone',
+        'driver_id',
 
         // Umum
         'status',
@@ -85,11 +87,12 @@ class Shipment extends Model
         'service_type'       => ServiceType::class,
         'cargo_type'         => CargoType::class,
         'request_type'       => RequestType::class,
+        'delivery_scope'     => DeliveryScope::class,
 
         'container_qty'      => 'integer',
         'packages_total'     => 'integer',
-        'cbm_total'          => 'float',   // tampil rapi di Filament (format 3 desimal di UI)
-        'weight_total'       => 'float',   // kg (format 2 desimal di UI)
+        'cbm_total'          => 'decimal:3',
+        'weight_total'       => 'decimal:2',
 
         'requested_at'       => 'datetime',
         'attachments'        => 'array',
@@ -112,8 +115,10 @@ class Shipment extends Model
             }
 
             $reqType = $m->request_type?->value ?? (string) $m->request_type;
-            if ($reqType !== RequestType::SPPB_DO->value && blank($m->doc_number)) {
-                $m->doc_number = 'AUTO-' . now()->format('Ymd-His');
+            if (blank($m->doc_number)) {
+                $m->doc_number = $reqType === RequestType::SPPB_DO->value
+                    ? 'SPPB-' . now()->format('YmdHis')
+                    : 'AUTO-' . now()->format('Ymd-His');
             }
 
             if (blank($m->eta)) {
@@ -129,17 +134,14 @@ class Shipment extends Model
                     ? $m->service_option
                     : ($m->service_option ?: 'fcl');
 
-                // Jika bukan FCL, kosongkan info kontainer
                 if ($m->service_option !== 'fcl') {
                     $m->container_size = null;
                     $m->container_qty  = null;
                 }
 
-                // Matikan field darat
                 $m->vehicle_type = $m->vehicle_plate = $m->driver_name = $m->driver_phone = null;
                 $m->pickup_date = $m->estimated_ready_at = null;
             } else {
-                // DARAT
                 $m->service_type   = $m->vehicle_type === 'car_carrier'
                     ? ServiceType::CarCarrier
                     : ServiceType::LandTrucking;
@@ -150,7 +152,12 @@ class Shipment extends Model
                     default       => 'truck',
                 };
 
-                // Kosongkan field laut (termasuk FCL)
+                $base = $m->pickup_date ?: $m->requested_at ?: now();
+
+                $m->estimated_ready_at = strtolower((string) $m->priority) === 'urgent'
+                    ? Carbon::parse($base)->endOfDay()
+                    : Carbon::parse($base)->addDay()->endOfDay();
+
                 $m->vessel_name = $m->voyage = $m->pol = $m->pod = null;
                 $m->etd = null;
                 $m->schedule_id = null;
@@ -158,16 +165,17 @@ class Shipment extends Model
                 $m->container_qty  = null;
             }
 
-            // Ringkasan rute
             $middle = $m->mode === ShipmentMode::Sea
                 ? strtoupper((string)$m->service_option)
                 : ucfirst(str_replace('_', ' ', (string)$m->service_option));
 
+            $scope = DeliveryScope::short($m->delivery_scope) ? ' • ' . DeliveryScope::short($m->delivery_scope) : '';
+
             $m->route_summary = implode(' → ', array_filter([
-                optional($m->originOffice)->name,
+                optional($m->originCity ?? null)->name ?? '' . $m->route_from,
                 $middle,
-                optional($m->destinationOffice)->name,
-            ]));
+                optional($m->destinationCity ?? null)->name ?? '' . $m->route_to,
+            ])) . $scope;
         });
 
         static::updated(function (Shipment $m) {
@@ -223,14 +231,46 @@ class Shipment extends Model
             $days = strtolower($priority) === 'urgent' ? 17 : 19;
             return $base->addDays($days)->endOfDay();
         }
-        // DARAT
         return strtolower($priority) === 'urgent' ? $base->endOfDay() : $base->addDay()->endOfDay();
+    }
+
+    public function canCancel(): bool
+    {
+        return ! in_array($this->status, [ShipmentStatus::Delivered, ShipmentStatus::Cancelled], true);
+    }
+
+    public function cancel(?int $userId = null): void
+    {
+        if (! $this->canCancel()) {
+            throw new \DomainException('Pesanan tidak dapat dibatalkan (sudah terkirim / sudah dibatalkan).');
+        }
+
+        $this->status       = ShipmentStatus::Cancelled;
+        $this->cancelled_at = now();
+        $this->cancelled_by = $userId;
+        $this->save();
+    }
+
+    public function uncancel(?int $userId = null): void
+    {
+        if ($this->status !== ShipmentStatus::Cancelled) {
+            return;
+        }
+
+        $this->status       = ShipmentStatus::Pending;
+        $this->cancelled_at = null;
+        $this->cancelled_by = null;
+        $this->save();
     }
 
     // Relations
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+    public function driver()
+    {
+        return $this->belongsTo(Driver::class, 'driver_id');
     }
     public function receiver()
     {
@@ -247,6 +287,14 @@ class Shipment extends Model
     public function lastEditor()
     {
         return $this->belongsTo(User::class, 'last_edited_by');
+    }
+    public function originCity()
+    {
+        return $this->belongsTo(City::class, 'origin_city_id');
+    }
+    public function destinationCity()
+    {
+        return $this->belongsTo(City::class, 'destination_city_id');
     }
     public function originOffice()
     {
