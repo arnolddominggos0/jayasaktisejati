@@ -2,45 +2,25 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\ServiceType;
-use App\Enums\ShipmentMode;
-use App\Enums\ShipmentStatus;
-use App\Enums\CargoType;
-use App\Enums\RequestType;
+use App\Enums\{ServiceType, ShipmentMode, ShipmentStatus, CargoType, RequestType, ContainerSize};
 use App\Filament\Resources\ShipmentResource\Pages;
-use App\Filament\Resources\ShipmentResource\Widgets\RecentShipmentActivities;
-use App\Filament\Resources\ShipmentResource\Widgets\ShipmentStats;
 use App\Models\Shipment;
-use Filament\Tables\Actions\EditAction;
 use Filament\Forms;
-use Filament\Forms\Components\Checkbox;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Group;
-use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Section;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\ToggleButtons;
-use Filament\Forms\Components\ViewField;
+use Filament\Forms\Components\{Checkbox, DatePicker, FileUpload, Grid, Group, Hidden, Placeholder, Repeater, Section, Select, Textarea, TextInput, ToggleButtons, ViewField};
 use Filament\Forms\Form;
 use Filament\Forms\Get;
-use Filament\Resources\Resource;
 use Filament\Forms\Set;
-use Filament\Tables\Actions\BulkActionGroup;
-use Filament\Tables\Actions\DeleteBulkAction;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Actions\{BulkActionGroup, DeleteBulkAction, EditAction};
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Table;
 use Filament\Tables\Enums\FiltersLayout;
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\{Filter, SelectFilter};
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ShipmentResource extends Resource
 {
@@ -59,27 +39,31 @@ class ShipmentResource extends Resource
 
         $recalcLclTotals = function (Get $get, Set $set) {
             $rows = $get('lcl_items') ?? [];
-            $totalCbm = 0.0;
-            $totalPkg = 0;
-            $totalWgt = 0.0;
+            $sumCbm = 0.0;
+            $sumPkg = 0;
+            $sumItemKg = 0.0;
 
-            foreach ($rows as $row) {
-                $qty  = (int)   ($row['qty']       ?? 0);
-                $p    = (float) ($row['length_cm'] ?? 0);
-                $l    = (float) ($row['width_cm']  ?? 0);
-                $t    = (float) ($row['height_cm'] ?? 0);
-                $wpc  = (float) ($row['weight_kg'] ?? 0);
+            foreach ($rows as $r) {
+                $qty = (int)($r['qty'] ?? 0);
+                $p = (float)($r['length_cm'] ?? 0);
+                $l = (float)($r['width_cm'] ?? 0);
+                $t = (float)($r['height_cm'] ?? 0);
+                $w = (float)($r['weight_kg'] ?? 0);
 
-                $cbmItem = ($p * $l * $t * $qty) / 1_000_000;
-                $totalCbm += $cbmItem;
-                $totalPkg += $qty;
-                $totalWgt += ($wpc * $qty);
+                $sumCbm += ($p * $l * $t * $qty) / 1_000_000;
+                $sumPkg += $qty;
+                $sumItemKg += ($w * $qty);
             }
 
-            $cbmRounded = round($totalCbm, 3, PHP_ROUND_HALF_UP);
-            $set('cbm_total', $cbmRounded);
-            $set('packages_total', $totalPkg);
-            $set('weight_total', round($totalWgt, 2, PHP_ROUND_HALF_UP));
+            $set('cbm_total', round($sumCbm, 3, PHP_ROUND_HALF_UP));
+            $set('packages_total', $sumPkg);
+
+            $override = trim((string)($get('weight_total_input') ?? ''));
+            if ($override !== '' && is_numeric($override)) {
+                $set('weight_total', round((float)$override, 2, PHP_ROUND_HALF_UP)); // override admin
+            } else {
+                $set('weight_total', $sumItemKg > 0 ? round($sumItemKg, 2, PHP_ROUND_HALF_UP) : null);
+            }
         };
 
         return $form
@@ -98,11 +82,14 @@ class ShipmentResource extends Resource
                         Select::make('receiver_id')
                             ->label('Penerima *')
                             ->relationship('receiver', 'name')
-                            ->searchable()->preload()->required()->native(false)->columnSpan(4),
-
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->native(false)
+                            ->columnSpan(4),
 
                         TextInput::make('pic_name')
-                            ->label('PIC / Contact *')
+                            ->label('PIC / Kontak *')
                             ->required()
                             ->maxLength(100)
                             ->columnSpan(4),
@@ -116,10 +103,7 @@ class ShipmentResource extends Resource
 
                         Select::make('request_type')
                             ->label('Tipe Permintaan')
-                            ->options(
-                                collect(RequestType::cases())
-                                    ->mapWithKeys(fn($case) => [$case->value => $case->label()])
-                            )
+                            ->options(collect(RequestType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))
                             ->default(RequestType::SPPB_DO->value)
                             ->required()
                             ->live()
@@ -128,8 +112,8 @@ class ShipmentResource extends Resource
 
                         TextInput::make('doc_number')
                             ->label('No. Dokumen (SPPB/DO)')
-                            ->required(fn(Forms\Get $get) => $get('request_type') === RequestType::SPPB_DO->value)
-                            ->hidden(fn(Forms\Get $get) => $get('request_type') !== RequestType::SPPB_DO->value)
+                            ->required(fn(Get $get) => $get('request_type') === RequestType::SPPB_DO->value)
+                            ->hidden(fn(Get $get) => $get('request_type') !== RequestType::SPPB_DO->value)
                             ->placeholder('Input No Dokumen SPPB/DO')
                             ->maxLength(64)
                             ->columnSpan(3),
@@ -175,7 +159,7 @@ class ShipmentResource extends Resource
                             ->label('Moda Pengiriman *')
                             ->options([
                                 ShipmentMode::Sea->value  => 'Laut',
-                                ShipmentMode::Land->value => 'Darat (CC/Towing)',
+                                ShipmentMode::Land->value => 'Darat',
                             ])
                             ->colors([
                                 ShipmentMode::Sea->value  => 'primary',
@@ -189,20 +173,33 @@ class ShipmentResource extends Resource
                             ->required()
                             ->live()
                             ->afterStateUpdated(function (Set $set) {
-                                $set('vessel_name', null);
-                                $set('voyage', null);
-                                $set('pol', null);
-                                $set('pod', null);
-                                $set('etd', null);
-                                $set('eta', null);
-                                $set('vehicle_type', null);
-                                $set('vehicle_plate', null);
-                                $set('driver_name', null);
-                                $set('driver_phone', null);
-                                $set('pickup_date', null);
-                                $set('service_option', null);
-                                $set('schedule_id', null);
-                                $set('driver_id', null);
+                                foreach (
+                                    [
+                                        'vessel_name',
+                                        'voyage',
+                                        'pol',
+                                        'pod',
+                                        'etd',
+                                        'eta',
+                                        'vehicle_type',
+                                        'vehicle_plate',
+                                        'driver_name',
+                                        'driver_phone',
+                                        'pickup_date',
+                                        'service_option',
+                                        'schedule_id',
+                                        'driver_id',
+                                        'lcl_items',
+                                        'cbm_total',
+                                        'packages_total',
+                                        'weight_total',
+                                        'weight_total_input',
+                                        'container_size',
+                                        'container_qty',
+                                        'container_size_vehicle',
+                                        'container_qty_vehicle',
+                                    ] as $f
+                                ) $set($f, null);
                             })
                             ->columnSpan(12),
 
@@ -227,14 +224,14 @@ class ShipmentResource extends Resource
                         ToggleButtons::make('cargo_type')
                             ->label('Jenis Muatan')
                             ->options([
-                                CargoType::Vehicle->value => 'Unit Kendaraan',
-                                CargoType::General->value => 'General Cargo',
+                                CargoType::Vehicle->value => CargoType::Vehicle->label(),
+                                CargoType::General->value => CargoType::General->label(),
                             ])
                             ->inline()
                             ->required()
                             ->columnSpan(12),
 
-                        // SEA
+                        // === LAUT ===
                         Group::make()
                             ->columnSpan(12)
                             ->columns(12)
@@ -251,71 +248,39 @@ class ShipmentResource extends Resource
                                     ->required()
                                     ->live()
                                     ->afterStateUpdated(function ($state, Set $set) {
-                                        if ($state !== 'fcl') {
-                                            $set('container_size', null);
-                                            $set('container_qty', null);
-                                        }
-                                        if ($state !== 'lcl') {
-                                            $set('lcl_items', null);
-                                            $set('cbm_total', null);
-                                            $set('packages_total', null);
-                                            $set('weight_total', null);
-                                        }
-                                        if ($state !== 'lcl') {
-                                            foreach (['lcl_items', 'cbm_total', 'packages_total', 'weight_total'] as $f) {
+                                        if ($state === 'fcl') {
+                                            foreach (['lcl_items', 'cbm_total', 'packages_total', 'weight_total', 'weight_total_input'] as $f) {
                                                 $set($f, null);
                                             }
-                                            $set('weight_unit', 'kg');
+                                        } else { // lcl
+                                            foreach (['container_size', 'container_qty', 'container_size_vehicle', 'container_qty_vehicle'] as $f) {
+                                                $set($f, null);
+                                            }
                                         }
                                     })
-
                                     ->columnSpan(12),
+
+                                // FCL (General)
                                 Select::make('container_size')
-                                    ->label("Size Kontainer (FCL • General)")
-                                    ->options([
-                                        '20'   => "20'",
-                                        '40'   => "40'",
-                                        '40HC' => "40' HC",
-                                        '45HC' => "45' HC",
-                                    ])
+                                    ->label("Ukuran Kontainer (FCL • General)")
+                                    ->options(ContainerSize::options())
                                     ->native(false)
                                     ->searchable()
-                                    ->visible(
-                                        fn(Get $get) =>
-                                        $get('service_option') === 'fcl' &&
-                                            $get('cargo_type') === CargoType::General->value
-                                    )
-                                    ->required(
-                                        fn(Get $get) =>
-                                        $get('service_option') === 'fcl' &&
-                                            $get('cargo_type') === CargoType::General->value
-                                    )
+                                    ->visible(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
+                                    ->required(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
                                     ->columnSpan(4),
 
                                 TextInput::make('container_qty')
                                     ->label('Jumlah Kontainer (FCL • General)')
-                                    ->numeric()
-                                    ->minValue(1)
-                                    ->default(1)
-                                    ->visible(
-                                        fn(Get $get) =>
-                                        $get('service_option') === 'fcl' &&
-                                            $get('cargo_type') === CargoType::General->value
-                                    )
-                                    ->required(
-                                        fn(Get $get) =>
-                                        $get('service_option') === 'fcl' &&
-                                            $get('cargo_type') === CargoType::General->value
-                                    )
+                                    ->numeric()->minValue(1)->default(1)
+                                    ->visible(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
+                                    ->required(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
                                     ->columnSpan(4),
 
+                                // LCL → hitung volume
                                 Repeater::make('lcl_items')
                                     ->label('Rincian Volume (LCL • General Cargo)')
-                                    ->visible(
-                                        fn(Get $get) =>
-                                        $get('service_option') === 'lcl' &&
-                                            $get('cargo_type') === CargoType::General->value
-                                    )
+                                    ->visible(fn(Get $get) => $get('service_option') === 'lcl' && $get('cargo_type') === CargoType::General->value)
                                     ->columns(12)
                                     ->schema([
                                         TextInput::make('description')->label('Deskripsi')->maxLength(120)->columnSpan(3),
@@ -324,16 +289,17 @@ class ShipmentResource extends Resource
                                         TextInput::make('height_cm')->label('T (cm)')->numeric()->minValue(0.01)->live(onBlur: true)->columnSpan(2),
                                         TextInput::make('qty')->label('Koli')->numeric()->minValue(1)->default(1)->live(onBlur: true)->columnSpan(1),
                                         TextInput::make('weight_kg')->label('Berat/pcs (kg)')->numeric()->minValue(0)->live(onBlur: true)->columnSpan(2),
+
                                         TextInput::make('cbm_item')->label('CBM')
-                                            ->disabled()->dehydrated(false)
+                                            ->disabled()
+                                            ->dehydrated(false)
                                             ->afterStateHydrated(function (Get $get, Set $set) {
                                                 $p = (float)($get('length_cm') ?? 0);
                                                 $l = (float)($get('width_cm') ?? 0);
                                                 $t = (float)($get('height_cm') ?? 0);
                                                 $q = (int)  ($get('qty') ?? 0);
                                                 $cbm = ($p * $l * $t * $q) / 1_000_000;
-                                                $rounded = round($cbm, 3, PHP_ROUND_HALF_UP);
-                                                $set('cbm_item', $rounded > 0 ? number_format($rounded, 3, '.', '') : null);
+                                                $set('cbm_item', $cbm > 0 ? number_format(round($cbm, 3, PHP_ROUND_HALF_UP), 3, '.', '') : null);
                                             })
                                             ->columnSpan(2),
                                     ])
@@ -345,8 +311,7 @@ class ShipmentResource extends Resource
                                             $t = (float)($row['height_cm'] ?? 0);
                                             $q = (int)  ($row['qty'] ?? 0);
                                             $cbm = ($p * $l * $t * $q) / 1_000_000;
-                                            $rounded = round($cbm, 3, PHP_ROUND_HALF_UP);
-                                            $rows[$i]['cbm_item'] = $rounded > 0 ? number_format($rounded, 3, '.', '') : null;
+                                            $rows[$i]['cbm_item'] = $cbm > 0 ? number_format(round($cbm, 3, PHP_ROUND_HALF_UP), 3, '.', '') : null;
                                         }
                                         $set('lcl_items', $rows);
                                         $recalcLclTotals($get, $set);
@@ -354,38 +319,60 @@ class ShipmentResource extends Resource
                                     ->addActionLabel('Tambah Item')
                                     ->columnSpan(12),
 
-                                Group::make()->columns(12)
+                                Section::make('Detail LCL (General)')
                                     ->visible(
                                         fn(Get $get) =>
-                                        $get('service_option') === 'lcl' &&
-                                            $get('cargo_type') === CargoType::General->value
+                                        $get('service_option') === 'lcl'
+                                            && $get('cargo_type') === \App\Enums\CargoType::General->value
                                     )
+                                    ->columns(12)
                                     ->schema([
-                                        Placeholder::make('sum_packages')
-                                            ->label('Total Koli')
-                                            ->content(fn(Get $get) => (string)($get('packages_total') ?? 0))
-                                            ->columnSpan(2),
-                                        Placeholder::make('sum_cbm')
-                                            ->label('Total CBM')
-                                            ->content(fn(Get $get) => number_format((float)($get('cbm_total') ?? 0), 3, '.', ''))
-                                            ->columnSpan(2),
 
-                                        Placeholder::make('sum_weight')
-                                            ->label('Total Berat (kg)')
-                                            ->content(fn(Get $get) => number_format((float)($get('weight_total') ?? 0), 2, '.', ''))
-                                            ->columnSpan(4),
+                                        // Input opsional di baris pertama
+                                        TextInput::make('weight_total_input')
+                                            ->label('Total Berat (opsional)')
+                                            ->suffix('kg')
+                                            ->numeric()
+                                            ->minValue(0)
+                                            ->placeholder('Total (kg)')
+                                            ->dehydrated(false)
+                                            ->live(onBlur: true)
+                                            ->afterStateUpdated(function ($state, Set $set, Get $get) use ($recalcLclTotals) {
+                                                $recalcLclTotals($get, $set);
+                                            })
+                                            ->columnSpan(6),
+
+                                        Grid::make(12)
+                                            ->columnSpanFull()
+                                            ->schema([
+                                                Placeholder::make('sum_packages')
+                                                    ->label('Total Koli')
+                                                    ->content(fn(Get $get) => (string) ($get('packages_total') ?? 0))
+                                                    ->columnSpan(4),
+
+                                                Placeholder::make('sum_cbm')
+                                                    ->label('Total CBM')
+                                                    ->content(fn(Get $get) => number_format((float) ($get('cbm_total') ?? 0), 3, '.', ''))
+                                                    ->columnSpan(4),
+
+                                                Placeholder::make('sum_weight')
+                                                    ->label('Total Berat (kg)')
+                                                    ->content(function (Get $get) {
+                                                        $w = $get('weight_total');
+                                                        return is_null($w) ? '—' : number_format((float) $w, 2, '.', '');
+                                                    })
+                                                    ->columnSpan(4),
+                                            ]),
+
+                                        Hidden::make('cbm_total')->dehydrated(),
+                                        Hidden::make('packages_total')->dehydrated(),
+                                        Hidden::make('weight_total')->dehydrated(),
                                     ]),
 
-                                Hidden::make('cbm_total')->dehydrated(),
-                                Hidden::make('packages_total')->dehydrated(),
-                                Hidden::make('weight_total')->dehydrated(),
-
+                                // Unit Kendaraan (Laut) — tetap ada bila muatan vehicle
                                 Repeater::make('units')
                                     ->label('Unit Kendaraan (Laut)')
-                                    ->visible(
-                                        fn(Get $get) =>
-                                        $get('cargo_type') === CargoType::Vehicle->value
-                                    )
+                                    ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
                                     ->columns(12)
                                     ->schema([
                                         TextInput::make('model_no')->label('Model No.')->maxLength(60)->columnSpan(3),
@@ -394,53 +381,21 @@ class ShipmentResource extends Resource
                                         TextInput::make('engine_no')->label('Mesin No.')->maxLength(60)->columnSpan(2),
                                         TextInput::make('color')->label('Warna')->maxLength(30)->columnSpan(1),
                                         TextInput::make('do_number')->label('No. DO')->maxLength(60)->columnSpan(2),
-
-                                        Checkbox::make('is_rack')->label('Rack')->inline(false)->columnSpan(2),
+                                        Forms\Components\Checkbox::make('is_rack')->label('Rack')->inline(false)->columnSpan(2),
                                         TextInput::make('qty')->label('Qty')->numeric()->minValue(1)->default(1)->columnSpan(1),
                                         TextInput::make('notes')->label('Ket')->maxLength(120)->columnSpan(5),
                                     ])
                                     ->addActionLabel('Tambah Unit')
                                     ->columnSpan(12),
 
-                                Select::make('container_size_vehicle')
-                                    ->label("Size Kontainer (FCL • Unit Kendaraan)")
-                                    ->options([
-                                        '20'   => "20'",
-                                        '40'   => "40'",
-                                        '40HC' => "40' HC",
-                                        '45HC' => "45' HC",
-                                    ])
-                                    ->native(false)
-                                    ->searchable()
-                                    ->visible(
-                                        fn(Get $get) =>
-                                        $get('service_option') === 'fcl' &&
-                                            $get('cargo_type') === CargoType::Vehicle->value
-                                    )
-                                    ->required(false)
-                                    ->columnSpan(4),
-
-
-                                TextInput::make('container_qty_vehicle')
-                                    ->label('Jumlah Kontainer (FCL • Unit)')
-                                    ->numeric()->minValue(1)
-                                    ->visible(
-                                        fn(Get $get) =>
-                                        $get('service_option') === 'fcl' &&
-                                            $get('cargo_type') === CargoType::Vehicle->value
-                                    )
-                                    ->required(false)
-                                    ->columnSpan(4),
-
+                                // Jadwal Kapal (opsional pakai tabel fleet_schedules)
                                 Select::make('schedule_id')
                                     ->label('Jadwal Kapal')
                                     ->searchable()
                                     ->preload()
                                     ->options(function () use ($hasFleetSchedules) {
-                                        if (! $hasFleetSchedules) return [];
-                                        return DB::table('fleet_schedules')
-                                            ->orderByDesc('etd')
-                                            ->limit(200)
+                                        if (!$hasFleetSchedules) return [];
+                                        return DB::table('fleet_schedules')->orderByDesc('etd')->limit(200)
                                             ->get()
                                             ->mapWithKeys(function ($s) {
                                                 $label = sprintf(
@@ -452,14 +407,13 @@ class ShipmentResource extends Resource
                                                     $s->pod ?? '-',
                                                 );
                                                 return [$s->id => $label];
-                                            })
-                                            ->toArray();
+                                            })->toArray();
                                     })
                                     ->required(fn() => $hasFleetSchedules)
-                                    ->hidden(fn() => ! $hasFleetSchedules)
+                                    ->hidden(fn() => !$hasFleetSchedules)
                                     ->live()
-                                    ->afterStateUpdated(function ($state, Forms\Set $set) use ($hasFleetSchedules) {
-                                        if (! $hasFleetSchedules || ! $state) {
+                                    ->afterStateUpdated(function ($state, Set $set) use ($hasFleetSchedules) {
+                                        if (!$hasFleetSchedules || !$state) {
                                             foreach (['vessel_name', 'voyage', 'pol', 'pod'] as $f) $set($f, null);
                                             $set('etd', null);
                                             $set('eta', null);
@@ -467,8 +421,8 @@ class ShipmentResource extends Resource
                                         }
                                         $s = DB::table('fleet_schedules')->where('id', $state)->first();
                                         foreach (['vessel_name', 'voyage', 'pol', 'pod'] as $f) $set($f, $s?->$f);
-                                        $set('etd', $s?->etd ? \Illuminate\Support\Carbon::parse($s->etd)->toDateTimeString() : null);
-                                        $set('eta', $s?->eta ? \Illuminate\Support\Carbon::parse($s->eta)->toDateTimeString() : null);
+                                        $set('etd', $s?->etd ? Carbon::parse($s->etd)->toDateTimeString() : null);
+                                        $set('eta', $s?->eta ? Carbon::parse($s->eta)->toDateTimeString() : null);
                                     })
                                     ->columnSpan(12),
 
@@ -480,13 +434,8 @@ class ShipmentResource extends Resource
                                     ->disabled(fn() => $hasFleetSchedules)->dehydrated()
                                     ->columnSpan(4),
 
-                                DatePicker::make('etd')->label('ETD')
-                                    ->native(false)->disabled(fn() => $hasFleetSchedules)->dehydrated()
-                                    ->columnSpan(4),
-
-                                DatePicker::make('eta')->label('ETA')
-                                    ->native(false)->disabled(fn() => $hasFleetSchedules)->dehydrated()
-                                    ->columnSpan(4),
+                                DatePicker::make('etd')->label('ETD')->native(false)->disabled(fn() => $hasFleetSchedules)->dehydrated()->columnSpan(4),
+                                DatePicker::make('eta')->label('ETA')->native(false)->disabled(fn() => $hasFleetSchedules)->dehydrated()->columnSpan(4),
 
                                 TextInput::make('pol')->label('POL — Pelabuhan Muat')
                                     ->disabled(fn() => $hasFleetSchedules)->dehydrated()
@@ -497,15 +446,13 @@ class ShipmentResource extends Resource
                                     ->columnSpan(4),
                             ]),
 
-                        // LAND
+                        // === DARAT (tetap tersedia, tapi fokus utama laut) ===
                         Group::make()
                             ->columnSpan(12)
                             ->columns(12)
                             ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Land->value)
                             ->schema([
-                                ViewField::make('mode_badge_land')
-                                    ->view('filament.forms.fields.mode-badge-land')
-                                    ->columnSpan(12),
+                                ViewField::make('mode_badge_land')->view('filament.forms.fields.mode-badge-land')->columnSpan(12),
 
                                 Select::make('vehicle_type')
                                     ->label('Jenis Armada')
@@ -529,36 +476,8 @@ class ShipmentResource extends Resource
                                 TextInput::make('vehicle_plate')->label('No. Polisi Armada')->maxLength(20)->columnSpan(4),
                                 DatePicker::make('pickup_date')->label('Tanggal Pickup (estimasi)')->native(false)->columnSpan(4),
 
-                                Select::make('driver_id')
-                                    ->label('Nama Supir')
-                                    ->options(function () use ($hasDrivers) {
-                                        if (! $hasDrivers) return [];
-                                        return DB::table('drivers')->orderBy('name')
-                                            ->pluck('name', 'id')->toArray();
-                                    })
-                                    ->searchable()
-                                    ->preload()
-                                    ->live()
-                                    ->afterStateUpdated(function ($state, Forms\Set $set) use ($hasDrivers) {
-                                        if (! $hasDrivers || ! $state) return;
-                                        $d = DB::table('drivers')->where('id', $state)->first();
-                                        if ($d) {
-                                            $set('driver_name',  $d->name ?? null);
-                                            $set('driver_phone', $d->phone ?? null);
-                                        }
-                                    })
-                                    ->hidden(fn() => ! $hasDrivers)
-                                    ->columnSpan(6),
-
-                                // snapshot supir (manual fallback / tetap tampil)
-                                TextInput::make('driver_name')->label('Nama Supir (snapshot)')
-                                    ->placeholder($hasDrivers ? 'Otomatis saat pilih supir' : 'Isi manual')
-                                    ->columnSpan(3),
-
-                                TextInput::make('driver_phone')->label('HP Supir (snapshot)')
-                                    ->tel()
-                                    ->placeholder($hasDrivers ? 'Otomatis saat pilih supir' : 'Isi manual')
-                                    ->columnSpan(3),
+                                TextInput::make('driver_name')->label('Nama Supir')->columnSpan(3),
+                                TextInput::make('driver_phone')->label('HP Supir')->tel()->columnSpan(3),
                             ]),
                     ]),
 
@@ -580,90 +499,35 @@ class ShipmentResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('code')
-                    ->label('Kode')
-                    ->badge()
-                    ->copyable()
-                    ->searchable()
-                    ->sortable(),
+                TextColumn::make('code')->label('Kode')->badge()->copyable()->searchable()->sortable(),
 
-                TextColumn::make('customer.name')
-                    ->label('Pengirim')
-                    ->badge()
-                    ->searchable()
-                    ->sortable(),
+                TextColumn::make('customer.name')->label('Pengirim')->badge()->searchable()->sortable(),
+                TextColumn::make('receiver.name')->label('Penerima')->badge()->searchable()->sortable(),
 
-                TextColumn::make('receiver.name')
-                    ->label('Penerima')
-                    ->badge()
-                    ->searchable()
-                    ->sortable(),
+                TextColumn::make('route')->label('Rute')->html()->getStateUsing(function (Shipment $r): string {
+                    $oCity = $r->originOffice->city ?? '-';
+                    $dCity = $r->destinationOffice->city ?? '-';
+                    $oName = $r->originOffice->name ?? null;
+                    $dName = $r->destinationOffice->name ?? null;
 
-                TextColumn::make('route')
-                    ->label('Rute')
-                    ->html()
-                    ->getStateUsing(function (Shipment $r): string {
-                        $oCity = $r->originOffice->city ?? '-';
-                        $dCity = $r->destinationOffice->city ?? '-';
-                        $oName = $r->originOffice->name ?? null;
-                        $dName = $r->destinationOffice->name ?? null;
+                    $line1 = "<div class='font-medium'>{$oCity} &rarr; {$dCity}</div>";
+                    $sub   = array_filter([$oName ? "Asal: {$oName}" : null, $dName ? "Tujuan: {$dName}" : null]);
+                    $line2 = $sub ? "<div class='text-xs opacity-70'>" . implode(' • ', $sub) . "</div>" : "";
 
-                        $line1 = "<div class='font-medium'>{$oCity} &rarr; {$dCity}</div>";
-                        $sub   = array_filter([$oName ? "Asal: {$oName}" : null, $dName ? "Tujuan: {$dName}" : null]);
-                        $line2 = $sub ? "<div class='text-xs opacity-70'>" . implode(' • ', $sub) . "</div>" : "";
-
-                        return $line1 . $line2;
-                    })
-                    ->toggleable(),
-
-                TextColumn::make('parties')
-                    ->label('Pengirim → Penerima')
-                    ->html()
-                    ->getStateUsing(function (\App\Models\Shipment $r): string {
-                        $sender   = $r->customer->name ?? '—';
-                        $receiver = $r->receiver?->name ?? '—';
-                        $oCity    = $r->originOffice->city ?? '-';
-                        $dCity    = $r->destinationOffice->city ?? '-';
-                        return "<div class='font-medium'>{$sender} &rarr; {$receiver}</div>"
-                            . "<div class='text-xs opacity-70'>{$oCity} &rarr; {$dCity}</div>";
-                    })
-                    ->toggleable(),
-
-                TextColumn::make('originOffice.name')
-                    ->label('Asal')
-                    ->badge()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-
-                TextColumn::make('destinationOffice.name')
-                    ->label('Tujuan')
-                    ->badge()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    return $line1 . $line2;
+                })->toggleable(),
 
                 TextColumn::make('service_type')
                     ->label('Layanan')
-                    ->getStateUsing(
-                        fn($record) =>
-                        $record->service_type instanceof ServiceType
-                            ? $record->service_type->value
-                            : (string) $record->service_type
-                    )
-                    ->formatStateUsing(fn(string $state) => match ($state) {
-                        ServiceType::SeaFreight->value   => 'Sea Freight',
-                        ServiceType::LandTrucking->value => 'Trucking',
-                        ServiceType::CarCarrier->value   => 'Car Carrier / Towing',
-                        default => $state,
-                    })
+                    ->getStateUsing(fn($r) => $r->service_type?->label() ?? (is_string($r->service_type) ? $r->service_type : '-'))
                     ->badge()
                     ->colors([
-                        'info'    => [ServiceType::SeaFreight->value],
-                        'warning' => [ServiceType::LandTrucking->value, ServiceType::CarCarrier->value],
+                        'info'    => [ServiceType::SeaFreight->label()],
+                        'warning' => [ServiceType::LandTrucking->label(), ServiceType::CarCarrier->label()],
                     ])
                     ->sortable(),
 
-                TextColumn::make('service_option')
-                    ->label('Opsi')
+                TextColumn::make('service_option')->label('Opsi')
                     ->formatStateUsing(function (?string $state, Shipment $r) {
                         $label = match ($state) {
                             'fcl'         => 'FCL',
@@ -692,135 +556,56 @@ class ShipmentResource extends Resource
                     ->badge()
                     ->toggleable(),
 
-                TextColumn::make('cargo_type')
-                    ->label('Muatan')
-                    ->getStateUsing(
-                        fn($record) =>
-                        $record->cargo_type instanceof CargoType
-                            ? $record->cargo_type->value
-                            : (string) $record->cargo_type
-                    )
-                    ->formatStateUsing(fn(?string $state) => match ($state) {
-                        CargoType::Vehicle->value => 'Unit Kendaraan',
-                        CargoType::General->value => 'General Cargo',
-                        default => $state ?: '-',
-                    })
+                TextColumn::make('cargo_type')->label('Muatan')
+                    ->getStateUsing(fn($r) => $r->cargo_type?->label() ?? (is_string($r->cargo_type) ? $r->cargo_type : '-'))
                     ->badge()
                     ->toggleable(),
 
-                TextColumn::make('status')
-                    ->label('Status')
-                    ->badge()
-                    ->getStateUsing(
-                        fn($record) =>
-                        $record->status instanceof ShipmentStatus
-                            ? $record->status->value
-                            : (string) $record->status
-                    )
-                    ->formatStateUsing(fn(?string $state) => match ($state) {
-                        'draft'     => 'Draft',
-                        'pending'   => 'Pending',
-                        'pickup'    => 'Pickup',
-                        'transit'   => 'Transit',
-                        'delivered' => 'Delivered',
-                        'hold'      => 'Hold',
-                        'cancelled' => 'Cancelled',
-                        default     => $state ? ucfirst($state) : '-',
-                    })
+                // Output tracking: Koli, CBM, Berat
+                TextColumn::make('packages_total')->label('Koli')->sortable()->toggleable(),
+                TextColumn::make('cbm_total')->label('CBM')
+                    ->formatStateUsing(fn($v) => is_null($v) ? '—' : number_format((float)$v, 3, '.', ''))
+                    ->sortable()
+                    ->toggleable(),
+                TextColumn::make('weight_total')->label('Berat (kg)')
+                    ->formatStateUsing(fn($v) => is_null($v) ? '—' : number_format((float)$v, 2, '.', ''))
+                    ->sortable()
+                    ->toggleable(),
+
+                TextColumn::make('status')->label('Status')->badge()
+                    ->getStateUsing(fn($r) => $r->status?->label() ?? (is_string($r->status) ? $r->status : '-'))
                     ->colors([
-                        'gray'    => ['draft'],
-                        'warning' => ['pending', 'hold'],
-                        'info'    => ['pickup', 'transit'],
-                        'success' => ['delivered'],
-                        'danger'  => ['cancelled'],
+                        'gray'    => ['Draf'],
+                        'warning' => ['Menunggu', 'Ditahan'],
+                        'info'    => ['Penjemputan', 'Dalam Perjalanan'],
+                        'success' => ['Terkirim'],
+                        'danger'  => ['Dibatalkan'],
                     ])
                     ->sortable(),
 
                 TextColumn::make('etd')->label('ETD')->dateTime('d M Y H:i')->sortable(),
                 TextColumn::make('eta')->label('ETA')->dateTime('d M Y H:i')->sortable(),
 
-                TextColumn::make('updated_at')
-                    ->label('Diubah')
-                    ->since()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-
-                TextColumn::make('created_at')
-                    ->label('Dibuat')
-                    ->dateTime('d M Y H:i')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('updated_at')->label('Diubah')->since()->sortable()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('created_at')->label('Dibuat')->dateTime('d M Y H:i')->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('status')
-                    ->label('Status')
-                    ->options([
-                        'draft'     => 'Draft',
-                        'pending'   => 'Pending',
-                        'pickup'    => 'Pickup',
-                        'transit'   => 'Transit',
-                        'delivered' => 'Delivered',
-                        'hold'      => 'Hold',
-                        'cancelled' => 'Cancelled',
-                    ])
-                    ->native(false),
-
-                SelectFilter::make('customer_id')
-                    ->label('Pengirim')
-                    ->relationship('customer', 'name')
-                    ->searchable()
-                    ->preload(),
-
-                SelectFilter::make('receiver_id')
-                    ->label('Penerima')
-                    ->relationship('receiver', 'name')
-                    ->searchable()
-                    ->preload(),
-
-                Filter::make('in_progress')
-                    ->label('In Progress')
-                    ->query(fn(Builder $q) => $q->whereIn('status', ['pending', 'pickup', 'transit']))
-                    ->toggle(),
-
-                SelectFilter::make('service_type')
-                    ->label('Jenis Layanan')
-                    ->options([
-                        ServiceType::SeaFreight->value   => 'Sea Freight',
-                        ServiceType::LandTrucking->value => 'Trucking Darat',
-                        ServiceType::CarCarrier->value   => 'Car Carrier / Towing',
-                    ])
-                    ->native(false),
-
-                SelectFilter::make('origin_office_id')
-                    ->label('Kantor Asal')
-                    ->relationship('originOffice', 'name')
-                    ->searchable()
-                    ->preload(),
-
-                SelectFilter::make('destination_office_id')
-                    ->label('Kantor Tujuan')
-                    ->relationship('destinationOffice', 'name')
-                    ->searchable()
-                    ->preload(),
+                SelectFilter::make('status')->label('Status')->options(collect(ShipmentStatus::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))->native(false),
+                SelectFilter::make('customer_id')->label('Pengirim')->relationship('customer', 'name')->searchable()->preload(),
+                SelectFilter::make('receiver_id')->label('Penerima')->relationship('receiver', 'name')->searchable()->preload(),
+                Filter::make('in_progress')->label('Sedang Berjalan')->query(fn(Builder $q) => $q->whereIn('status', array_map(fn($e) => $e->value, ShipmentStatus::inProgress())))->toggle(),
+                SelectFilter::make('service_type')->label('Jenis Layanan')->options([
+                    ServiceType::SeaFreight->value   => ServiceType::SeaFreight->label(),
+                    ServiceType::LandTrucking->value => ServiceType::LandTrucking->label(),
+                    ServiceType::CarCarrier->value   => ServiceType::CarCarrier->label(),
+                ])->native(false),
+                SelectFilter::make('origin_office_id')->label('Kantor Asal')->relationship('originOffice', 'name')->searchable()->preload(),
+                SelectFilter::make('destination_office_id')->label('Kantor Tujuan')->relationship('destinationOffice', 'name')->searchable()->preload(),
             ], layout: FiltersLayout::AboveContent)
             ->filtersFormColumns(4)
             ->defaultSort('updated_at', 'desc')
-            ->actions([
-                EditAction::make()->label('Edit'),
-            ])
-            ->bulkActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
-            ]);
-    }
-
-    public static function getWidgets(): array
-    {
-        return [
-            ShipmentStats::class,
-            RecentShipmentActivities::class,
-        ];
+            ->actions([EditAction::make()->label('Edit')])
+            ->bulkActions([BulkActionGroup::make([DeleteBulkAction::make(),])]);
     }
 
     public static function getRelations(): array

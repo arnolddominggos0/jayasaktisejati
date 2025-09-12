@@ -4,13 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Enums\ShipmentStatus;
-use App\Enums\ShipmentMode;
-use App\Enums\ServiceType;
-use App\Enums\CargoType;
-use App\Enums\RequestType;
-use BackedEnum;
+use App\Enums\{ShipmentStatus, ShipmentMode, ServiceType, CargoType, RequestType};
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 
 class Shipment extends Model
 {
@@ -44,6 +40,11 @@ class Shipment extends Model
         'container_size',
         'container_qty',
 
+        // Totals LCL
+        'packages_total',
+        'cbm_total',
+        'weight_total',
+
         // Laut
         'vessel_name',
         'voyage',
@@ -51,6 +52,7 @@ class Shipment extends Model
         'pod',
         'etd',
         'eta',
+        'schedule_id',
 
         // Darat
         'vehicle_type',
@@ -83,7 +85,12 @@ class Shipment extends Model
         'service_type'       => ServiceType::class,
         'cargo_type'         => CargoType::class,
         'request_type'       => RequestType::class,
+
         'container_qty'      => 'integer',
+        'packages_total'     => 'integer',
+        'cbm_total'          => 'float',   // tampil rapi di Filament (format 3 desimal di UI)
+        'weight_total'       => 'float',   // kg (format 2 desimal di UI)
+
         'requested_at'       => 'datetime',
         'attachments'        => 'array',
         'etd'                => 'datetime',
@@ -98,22 +105,19 @@ class Shipment extends Model
     protected static function booted(): void
     {
         static::creating(function (Shipment $m) {
-            $mode = $m->mode instanceof BackedEnum ? $m->mode->value : (string) $m->mode;
+            $mode = $m->mode?->value ?? (string) $m->mode;
 
             if (blank($m->code)) {
                 $m->code = self::generateCode($mode);
             }
 
-            $reqType = $m->request_type instanceof BackedEnum ? $m->request_type->value : (string) $m->request_type;
+            $reqType = $m->request_type?->value ?? (string) $m->request_type;
             if ($reqType !== RequestType::SPPB_DO->value && blank($m->doc_number)) {
                 $m->doc_number = 'AUTO-' . now()->format('Ymd-His');
             }
 
             if (blank($m->eta)) {
-                $modeCode = match (strtolower($mode)) {
-                    'sea', 'sea_freight' => 'SH',
-                    default              => 'TC',
-                };
+                $modeCode = in_array(strtolower($mode), ['sea', 'sea_freight'], true) ? 'SH' : 'TC';
                 $m->eta = self::computeEta($modeCode, (string) ($m->priority ?? 'normal'))->toDateTimeString();
             }
         });
@@ -131,24 +135,22 @@ class Shipment extends Model
                     $m->container_qty  = null;
                 }
 
-                // DARAT fields off
-                $m->vehicle_type = null;
-                $m->vehicle_plate = null;
-                $m->driver_name = null;
-                $m->driver_phone = null;
-                $m->pickup_date = null;
-                $m->estimated_ready_at = null;
-            } else { // LAND
+                // Matikan field darat
+                $m->vehicle_type = $m->vehicle_plate = $m->driver_name = $m->driver_phone = null;
+                $m->pickup_date = $m->estimated_ready_at = null;
+            } else {
+                // DARAT
                 $m->service_type   = $m->vehicle_type === 'car_carrier'
                     ? ServiceType::CarCarrier
                     : ServiceType::LandTrucking;
+
                 $m->service_option = match ($m->vehicle_type) {
                     'car_carrier' => 'car_carrier',
                     'towing'      => 'towing',
                     default       => 'truck',
                 };
 
-                // Laut fields off (termasuk kontainer)
+                // Kosongkan field laut (termasuk FCL)
                 $m->vessel_name = $m->voyage = $m->pol = $m->pod = null;
                 $m->etd = null;
                 $m->schedule_id = null;
@@ -160,6 +162,7 @@ class Shipment extends Model
             $middle = $m->mode === ShipmentMode::Sea
                 ? strtoupper((string)$m->service_option)
                 : ucfirst(str_replace('_', ' ', (string)$m->service_option));
+
             $m->route_summary = implode(' → ', array_filter([
                 optional($m->originOffice)->name,
                 $middle,
@@ -171,11 +174,15 @@ class Shipment extends Model
             $changed = array_keys($m->getChanges());
             $ignore  = ['updated_at', 'created_at', 'edited_fields', 'last_edited_by'];
             $changed = array_values(array_diff($changed, $ignore));
+
             if ($changed) {
-                $m->forceFill([
-                    'edited_fields'  => $changed,
-                    // 'last_edited_by' => auth()->id(),
-                ])->saveQuietly();
+                $editorId = Auth::id();
+                $payload = ['edited_fields' => $changed];
+                if ($editorId) {
+                    $payload['last_edited_by'] = $editorId;
+                }
+
+                $m->forceFill($payload)->saveQuietly();
             }
         });
     }
@@ -218,25 +225,6 @@ class Shipment extends Model
         }
         // DARAT
         return strtolower($priority) === 'urgent' ? $base->endOfDay() : $base->addDay()->endOfDay();
-    }
-
-    public function getStatusValueAttribute(): string
-    {
-        $s = $this->status;
-        return $s instanceof BackedEnum ? $s->value : (string) $s;
-    }
-    public function getModeValueAttribute(): ?string
-    {
-        return $this->mode instanceof BackedEnum ? $this->mode->value : ($this->mode ?: null);
-    }
-    public function getServiceTypeValueAttribute(): ?string
-    {
-        return $this->service_type instanceof BackedEnum ? $this->service_type->value : ($this->service_type ?: null);
-    }
-
-    public function scopeInProgress($q)
-    {
-        return $q->whereIn('status', ShipmentStatus::inProgress());
     }
 
     // Relations

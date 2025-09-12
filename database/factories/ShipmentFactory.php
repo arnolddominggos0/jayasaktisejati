@@ -2,11 +2,7 @@
 
 namespace Database\Factories;
 
-use App\Enums\CargoType;
-use App\Enums\RequestType;
-use App\Enums\ShipmentMode;
-use App\Enums\ShipmentStatus;
-use App\Enums\ServiceType;
+use App\Enums\{CargoType, RequestType, ShipmentMode, ShipmentStatus, ServiceType};
 use App\Models\{Shipment, Customer, Office};
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -31,10 +27,10 @@ class ShipmentFactory extends Factory
 
         $customerId = Customer::inRandomOrder()->value('id') ?? Customer::first()?->id;
 
-        $mode       = fake()->randomElement([ShipmentMode::Sea, ShipmentMode::Land]);
-        $cargoType  = fake()->randomElement([CargoType::Vehicle, CargoType::General]);
-        $request_type = fake()->randomElement([RequestType::SPPB_DO, RequestType::WA_TELP, RequestType::WALK_IN]);
-        $status     = fake()->randomElement([
+        $mode         = fake()->randomElement([ShipmentMode::Sea, ShipmentMode::Land]);
+        $cargoType    = fake()->randomElement([CargoType::Vehicle, CargoType::General]);
+        $requestType  = fake()->randomElement([RequestType::SPPB_DO, RequestType::WA_TELP, RequestType::WALK_IN]);
+        $status       = fake()->randomElement([
             ShipmentStatus::Draft,
             ShipmentStatus::Pending,
             ShipmentStatus::Pickup,
@@ -51,6 +47,7 @@ class ShipmentFactory extends Factory
         $base = [
             'code'                   => null,
             'customer_id'            => $customerId,
+            'receiver_id'            => Customer::inRandomOrder()->value('id') ?? $customerId,
             'origin_office_id'       => $originId,
             'destination_office_id'  => $destId,
 
@@ -61,8 +58,7 @@ class ShipmentFactory extends Factory
             'mode'                   => $mode->value,
             'cargo_type'             => $cargoType->value,
             'status'                 => $status->value,
-            'request_type'           => $request_type->value,
-
+            'request_type'           => $requestType->value,
 
             'pic_name'               => fake()->name(),
             'pic_phone'              => '08' . fake()->numerify('##########'),
@@ -75,19 +71,39 @@ class ShipmentFactory extends Factory
         ];
 
         if ($mode === ShipmentMode::Sea) {
+            $serviceOption = fake()->randomElement(['fcl', 'lcl']);
             $ports = [
                 'Jakarta'   => 'Tj. Priok',
                 'Surabaya'  => 'Tj. Perak',
                 'Manado'    => 'Bitung',
                 'Makassar'  => 'Soekarno-Hatta',
             ];
-
             $pol = $ports[$originCity] ?? 'Pelabuhan Asal';
             $pod = $ports[$destCity]   ?? 'Pelabuhan Tujuan';
 
+            // Jika LCL dan General, isi total CBM/berat supaya kelihatan di tabel
+            $packages = null; $cbm = null; $weight = null;
+            if ($serviceOption === 'lcl' && $cargoType === CargoType::General) {
+                $packages = fake()->numberBetween(3, 30);
+                // CBM total wajar 0.5 - 12.0
+                $cbm = round(fake()->randomFloat(4, 0.5, 12.0), 3, PHP_ROUND_HALF_UP);
+                // berat total wajar 50 - 800 kg
+                $weight = round(fake()->randomFloat(4, 50, 800), 2, PHP_ROUND_HALF_UP);
+            }
+
             return $base + [
                 'service_type'   => ServiceType::SeaFreight->value,
-                'service_option' => fake()->randomElement(['fcl', 'lcl']),
+                'service_option' => $serviceOption,
+
+                // FCL opsional
+                'container_size' => $serviceOption === 'fcl' ? fake()->randomElement(['20', '40', '40HC']) : null,
+                'container_qty'  => $serviceOption === 'fcl' ? fake()->numberBetween(1, 4) : null,
+
+                // LCL totals (jika ada)
+                'packages_total' => $packages,
+                'cbm_total'      => $cbm,
+                'weight_total'   => $weight,
+
                 'vessel_name'    => fake()->company() . ' Lines',
                 'voyage'         => 'VY' . fake()->numberBetween(100, 999),
                 'pol'            => $pol,
@@ -95,6 +111,7 @@ class ShipmentFactory extends Factory
                 'etd'            => fake()->dateTimeBetween('now', '+5 days'),
                 'eta'            => fake()->dateTimeBetween('+6 days', '+16 days'),
 
+                // Darat null
                 'vehicle_type'   => null,
                 'vehicle_plate'  => null,
                 'pickup_date'    => null,
@@ -103,6 +120,7 @@ class ShipmentFactory extends Factory
             ];
         }
 
+        // Mode Darat
         $vehicleType = fake()->randomElement(['car_carrier', 'towing', 'truck']);
         $serviceOpt  = match ($vehicleType) {
             'car_carrier' => 'car_carrier',
@@ -123,12 +141,20 @@ class ShipmentFactory extends Factory
             'driver_name'    => fake()->name(),
             'driver_phone'   => '08' . fake()->numerify('##########'),
 
+            // Laut null
             'vessel_name'    => null,
             'voyage'         => null,
             'pol'            => null,
             'pod'            => null,
             'etd'            => null,
             'eta'            => null,
+
+            // FCL/LCL totals null
+            'container_size' => null,
+            'container_qty'  => null,
+            'packages_total' => null,
+            'cbm_total'      => null,
+            'weight_total'   => null,
         ];
     }
 }

@@ -11,8 +11,8 @@ enum ServiceType: string
     public function label(): string
     {
         return match ($this) {
-            self::SeaFreight   => 'Pengiriman Laut',
-            self::LandTrucking => 'Pengiriman Darat (Trucking)',
+            self::SeaFreight   => 'Angkutan Laut',
+            self::LandTrucking => 'Trucking Darat',
             self::CarCarrier   => 'Car Carrier / Towing',
         };
     }

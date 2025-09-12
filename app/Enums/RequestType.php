@@ -11,9 +11,9 @@ enum RequestType: string
     public function label(): string
     {
         return match ($this) {
-            self::SPPB_DO => 'SPPB/DO',
-            self::WA_TELP => 'WA/TELP',
-            self::WALK_IN => 'WALK-IN',
+            self::SPPB_DO => 'SPPB / DO',
+            self::WA_TELP => 'WA / Telepon',
+            self::WALK_IN => 'Datang Langsung',
         };
     }
 }
