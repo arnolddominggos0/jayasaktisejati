@@ -27,8 +27,7 @@ class UserResource extends Resource
 
     public static function canViewAny(): bool
     {
-        $user = auth()->user();
-        return $user?->hasAnyRole(['super_admin','office_admin']);
+        return auth_user()?->hasAnyRole('super_admin', 'office_admin') ?? false;
     }
 
     public static function form(Form $form): Form
@@ -54,8 +53,8 @@ class UserResource extends Resource
                             ->label('Password (kosongkan jika tidak diubah)')
                             ->password()
                             ->revealable()
-                            ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
-                            ->dehydrated(fn ($state) => filled($state))
+                            ->dehydrateStateUsing(fn($state) => filled($state) ? Hash::make($state) : null)
+                            ->dehydrated(fn($state) => filled($state))
                             ->maxLength(100),
                     ])->columns(2),
 
@@ -90,7 +89,7 @@ class UserResource extends Resource
                             ->multiple()
                             ->preload()
                             ->searchable()
-                            ->options(fn () => Role::query()->orderBy('name')->pluck('name', 'name'))
+                            ->options(fn() => Role::query()->orderBy('name')->pluck('name', 'name'))
                             ->helperText('Pilih satu atau lebih role: super_admin, office_admin, field_coordinator, customer.')
                             ->required(),
                     ]),
@@ -111,19 +110,23 @@ class UserResource extends Resource
                     ->badge()
                     ->separator(', ')
                     ->sortable()
-                    ->formatStateUsing(fn ($state) => is_array($state) ? implode(', ', $state) : $state),
+                    ->formatStateUsing(fn($state) => is_array($state) ? implode(', ', $state) : $state),
                 Tables\Columns\TextColumn::make('updated_at')->label('Diubah')->since()->sortable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('roles')
                     ->label('Filter Role')
                     ->multiple()
-                    ->options(fn () => Role::query()->orderBy('name')->pluck('name', 'name')),
+                    ->options(fn() => Role::query()->orderBy('name')->pluck('name', 'name')),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()->label('Ubah'),
                 Tables\Actions\DeleteAction::make()->label('Hapus')
-                    ->visible(fn ($record) => ! $record->hasRole('super_admin') || auth()->user()?->hasRole('super_admin')),
+                    ->visible(
+                        fn($record) => (auth_user()?->hasRole('super_admin') ?? false)
+                            && ! $record->hasRole('super_admin')
+                            && ($record->id !== auth_user()?->id)
+                    ),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

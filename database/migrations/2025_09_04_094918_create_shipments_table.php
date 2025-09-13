@@ -15,6 +15,7 @@ return new class extends Migration {
 
             $table->foreignId('customer_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('receiver_id')->nullable()->constrained('customers')->nullOnDelete();
+            $table->foreignId('receiver_name', 100)->nullable();
 
             $table->foreignId('origin_office_id')->nullable()->constrained('offices')->nullOnDelete();
             $table->foreignId('destination_office_id')->nullable()->constrained('offices')->nullOnDelete();

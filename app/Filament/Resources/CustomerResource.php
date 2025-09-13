@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\CustomerType;
 use App\Filament\Resources\CustomerResource\Pages;
 use App\Models\Customer;
 use Filament\Forms\Form;
@@ -11,6 +12,8 @@ use Filament\Forms\Components\Group;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ToggleButtons;
+use Filament\Forms\Get;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -28,8 +31,7 @@ class CustomerResource extends Resource
 
     public static function canViewAny(): bool
     {
-        $u = auth()->user();
-        return $u?->hasAnyRole(['super_admin','office_admin']);
+        return auth_user()?->hasAnyRole('super_admin', 'office_admin') ?? false;
     }
 
     public static function form(Form $form): Form
@@ -39,6 +41,24 @@ class CustomerResource extends Resource
                 ->schema([
                     Section::make('Data Customer')
                         ->schema([
+                            ToggleButtons::make('type')
+                                ->label('Tipe Customer')
+                                ->options([
+                                    CustomerType::Individual->value => CustomerType::Individual->label(),
+                                    CustomerType::Company->value    => CustomerType::Company->label(),
+                                ])
+                                ->icons([
+                                    CustomerType::Individual->value => 'heroicon-m-user',
+                                    CustomerType::Company->value    => 'heroicon-m-building-office-2',
+                                ])
+                                ->colors([
+                                    CustomerType::Individual->value => 'primary',
+                                    CustomerType::Company->value    => 'success',
+                                ])
+                                ->inline()
+                                ->required()
+                                ->default(CustomerType::Individual->value),
+
                             TextInput::make('code')
                                 ->label('Kode Customer')
                                 ->placeholder('CTM-0001')
@@ -47,8 +67,8 @@ class CustomerResource extends Resource
                                 ->maxLength(20),
 
                             TextInput::make('name')
-                                ->label('Nama Customer / Perusahaan')
-                                ->placeholder('PT Contoh Sejahtera')
+                                ->label(fn(Get $get) => $get('type') === CustomerType::Company->value ? 'Nama Perusahaan' : 'Nama Lengkap')
+                                ->placeholder(fn(Get $get) => $get('type') === CustomerType::Company->value ? 'PT Contoh Sejahtera' : 'Budi Santoso')
                                 ->required()
                                 ->maxLength(150),
 
@@ -63,8 +83,16 @@ class CustomerResource extends Resource
                                 ->placeholder('0812xxxxxxx')
                                 ->maxLength(30),
 
+                            // NIK hanya untuk perorangan
+                            TextInput::make('nik')
+                                ->label('NIK')
+                                ->visible(fn(Get $get) => $get('type') === CustomerType::Individual->value)
+                                ->maxLength(16),
+
+                            // NPWP hanya untuk perusahaan
                             TextInput::make('npwp')
                                 ->label('NPWP')
+                                ->visible(fn(Get $get) => $get('type') === CustomerType::Company->value)
                                 ->maxLength(32),
                         ])->columns(2),
 
@@ -78,16 +106,15 @@ class CustomerResource extends Resource
                                 ->label('No. PIC')
                                 ->maxLength(30),
 
+                            TextInput::make('pic_email')
+                                ->label('Email PIC')
+                                ->email()
+                                ->maxLength(150),
+
                             Textarea::make('address')
                                 ->label('Alamat')
                                 ->rows(3)
-                                ->columnSpanFull(),
-
-                            TextInput::make('branch_id')
-                                ->label('Cabang (Opsional)')
-                                ->placeholder('ID Cabang, jika ada')
-                                ->numeric()
-                                ->minValue(1),
+                                ->columnSpanFull()
                         ])->columns(2),
                 ])->columnSpan(['lg' => 2]),
         ]);
@@ -98,6 +125,21 @@ class CustomerResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('code')->label('Kode')->badge()->searchable()->sortable()->copyable(),
+                TextColumn::make('type')
+                    ->label('Tipe')
+                    ->badge()
+                    ->formatStateUsing(function ($state) {
+                        $enum = $state instanceof CustomerType
+                            ? $state
+                            : CustomerType::tryFrom((string) $state);
+                        return $enum?->label() ?? '-';
+                    })
+                    ->colors([
+                        'success' => fn($state) => ($state instanceof CustomerType ? $state->value : (string) $state) === CustomerType::Company->value,
+                        'primary' => fn($state) => ($state instanceof CustomerType ? $state->value : (string) $state) === CustomerType::Individual->value,
+                    ])
+                    ->sortable(),
+
                 TextColumn::make('name')->label('Nama')->searchable()->sortable(),
                 TextColumn::make('email')->label('Email')->toggleable(),
                 TextColumn::make('phone')->label('Telepon')->toggleable(),

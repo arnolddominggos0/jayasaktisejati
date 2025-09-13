@@ -23,8 +23,6 @@ return new class extends Migration
             $table->string('pic_name', 100)->nullable();
             $table->string('pic_phone', 191)->nullable();
 
-            $table->string('phone_number', 32)->nullable();
-
             $table->foreignId('city_id')->nullable()->nullOnDelete();
             $table->text('address')->nullable();
             $table->string('postal_code', 10)->nullable();

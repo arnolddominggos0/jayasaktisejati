@@ -50,15 +50,19 @@ class InitialSetupSeeder extends Seeder
         ];
 
         foreach ($customers as $c) {
-            \App\Models\Customer::firstOrCreate(
+            Customer::firstOrCreate(
                 ['code' => $c['code']],
                 [
+                    'code'         =>$c['code'],
                     'name'         => $c['name'],
                     'email'        => Str::slug($c['name'], '.') . '@demo.local',
-                    'phone_number' => '08' . fake()->numerify('##########'),
                     'nik'          => fake()->numerify('################'),
                     'npwp'         => fake()->numerify('##.###.###.#-###.###'),
-                    'city_id'      => $cityIds[array_rand($cityIds)], // <-- pindah ke city
+                    'city_id'      => $cityIds[array_rand($cityIds)], 
+                    'address'      =>fake()->address(),
+                    'pic_name'     => fake()->name(),
+                    'pic_phone'    => '08' . fake()->numerify('##########'),
+                    'postal_code'  => fake()->numerify('####')
                 ]
             );
         }

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\CustomerResource\Pages;
 
 use App\Filament\Resources\CustomerResource;
+use App\Models\Customer;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateCustomer extends CreateRecord
@@ -12,7 +13,7 @@ class CreateCustomer extends CreateRecord
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         if (empty($data['code'])) {
-            $next = str_pad((string)(\App\Models\Customer::max('id') + 1), 4, '0', STR_PAD_LEFT);
+            $next = str_pad((string)(Customer::max('id') + 1), 4, '0', STR_PAD_LEFT);
             $data['code'] = "CTM-{$next}";
         }
         return $data;

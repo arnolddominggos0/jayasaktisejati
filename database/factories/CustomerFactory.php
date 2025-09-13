@@ -21,8 +21,9 @@ class CustomerFactory extends Factory
             'email'        => fake()->unique()->safeEmail(),
             'nik'          => fake()->boolean(40) ? fake()->unique()->numerify('################') : null,
             'npwp'         => fake()->boolean(60) ? fake()->bothify('##.###.###.#-###.###') : null,
-            'phone_number' => '08' . fake()->numerify('##########'),
             'city_id'      => $cityId,
+            'pic_name'     => fake('id_ID')->name(),
+            'pic_phone'    => '08' . fake()->numerify('##########'),
             'address'      => fake('id_ID')->address(),
             'postal_code'  => fake()->numerify('#####'),
         ];
