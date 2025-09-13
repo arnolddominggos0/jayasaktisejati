@@ -14,6 +14,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -37,86 +38,113 @@ class CustomerResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Group::make()
-                ->schema([
-                    Section::make('Data Customer')
-                        ->schema([
-                            ToggleButtons::make('type')
-                                ->label('Tipe Customer')
-                                ->options([
-                                    CustomerType::Individual->value => CustomerType::Individual->label(),
-                                    CustomerType::Company->value    => CustomerType::Company->label(),
-                                ])
-                                ->icons([
-                                    CustomerType::Individual->value => 'heroicon-m-user',
-                                    CustomerType::Company->value    => 'heroicon-m-building-office-2',
-                                ])
-                                ->colors([
-                                    CustomerType::Individual->value => 'primary',
-                                    CustomerType::Company->value    => 'success',
-                                ])
-                                ->inline()
-                                ->required()
-                                ->default(CustomerType::Individual->value),
+            Group::make()->schema([
+                Section::make('Data Customer')
+                    ->schema([
+                        ToggleButtons::make('type')
+                            ->label('Tipe Customer')
+                            ->options([
+                                CustomerType::Individual->value => CustomerType::Individual->label(),
+                                CustomerType::Company->value    => CustomerType::Company->label(),
+                            ])
+                            ->icons([
+                                CustomerType::Individual->value => 'heroicon-m-user',
+                                CustomerType::Company->value    => 'heroicon-m-building-office-2',
+                            ])
+                            ->colors([
+                                CustomerType::Individual->value => 'primary',
+                                CustomerType::Company->value    => 'success',
+                            ])
+                            ->inline()
+                            ->required()
+                            ->default(CustomerType::Individual->value)
+                            ->live() // penting: memicu field lain update
+                            ->afterStateUpdated(function ($state, Set $set) {
+                                // Saat ganti tipe, kosongkan field yang tidak relevan biar data bersih
+                                if ($state === CustomerType::Company->value) {
+                                    $set('nik', null);
+                                } else {
+                                    $set('npwp', null);
+                                }
+                            }),
 
-                            TextInput::make('code')
-                                ->label('Kode Customer')
-                                ->placeholder('CTM-0001')
-                                ->required()
-                                ->unique(ignoreRecord: true)
-                                ->maxLength(20),
+                        TextInput::make('code')
+                            ->label('Kode Customer')
+                            ->placeholder('CTM-0001')
+                            ->required()
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(20),
 
-                            TextInput::make('name')
-                                ->label(fn(Get $get) => $get('type') === CustomerType::Company->value ? 'Nama Perusahaan' : 'Nama Lengkap')
-                                ->placeholder(fn(Get $get) => $get('type') === CustomerType::Company->value ? 'PT Contoh Sejahtera' : 'Budi Santoso')
-                                ->required()
-                                ->maxLength(150),
+                        TextInput::make('name')
+                            ->label(
+                                fn(Get $get) =>
+                                $get('type') === CustomerType::Company->value ? 'Nama Perusahaan' : 'Nama Lengkap'
+                            )
+                            ->placeholder(
+                                fn(Get $get) =>
+                                $get('type') === CustomerType::Company->value ? 'PT Contoh Sejahtera' : 'Budi Santoso'
+                            )
+                            ->required()
+                            ->maxLength(150),
 
-                            TextInput::make('email')
-                                ->label('Email')
-                                ->email()
-                                ->placeholder('customer@example.com')
-                                ->maxLength(150),
+                        TextInput::make('email')
+                            ->label('Email')
+                            ->email()
+                            ->maxLength(150),
 
-                            TextInput::make('phone')
-                                ->label('No. Telepon')
-                                ->placeholder('0812xxxxxxx')
-                                ->maxLength(30),
+                        TextInput::make('phone')
+                            ->label('No. Telepon')
+                            ->maxLength(30),
 
-                            // NIK hanya untuk perorangan
-                            TextInput::make('nik')
-                                ->label('NIK')
-                                ->visible(fn(Get $get) => $get('type') === CustomerType::Individual->value)
-                                ->maxLength(16),
+                        TextInput::make('nik')
+                            ->label('NIK')
+                            ->visible(
+                                fn(Get $get) =>
+                                $get('type') === CustomerType::Individual->value
+                            )
+                            ->required(
+                                fn(Get $get) =>
+                                $get('type') === CustomerType::Individual->value
+                            )
+                            ->rule(
+                                fn(Get $get) =>
+                                $get('type') === CustomerType::Individual->value
+                                    ? 'digits:16'
+                                    : 'nullable'
+                            )
+                            // Simpan hanya angka
+                            ->mutateDehydratedStateUsing(fn($state) => $state ? preg_replace('/\D+/', '', (string) $state) : null)
+                            ->maxLength(16),
 
-                            // NPWP hanya untuk perusahaan
-                            TextInput::make('npwp')
-                                ->label('NPWP')
-                                ->visible(fn(Get $get) => $get('type') === CustomerType::Company->value)
-                                ->maxLength(32),
-                        ])->columns(2),
+                        // === Kondisional: NPWP untuk Company ===
+                        TextInput::make('npwp')
+                            ->label('NPWP')
+                            ->visible(
+                                fn(Get $get) =>
+                                $get('type') === CustomerType::Company->value
+                            )
+                            ->required(
+                                fn(Get $get) =>
+                                $get('type') === CustomerType::Company->value
+                            )
+                            ->rule(
+                                fn(Get $get) =>
+                                $get('type') === CustomerType::Company->value
+                                    ? 'max:32'
+                                    : 'nullable'
+                            )
+                            ->mutateDehydratedStateUsing(fn($state) => $state ? trim((string) $state) : null)
+                            ->maxLength(32),
+                    ])->columns(2),
 
-                    Section::make('Kontak & Alamat')
-                        ->schema([
-                            TextInput::make('pic_name')
-                                ->label('Nama PIC')
-                                ->maxLength(100),
+                Section::make('Kontak & Alamat')->schema([
+                    TextInput::make('pic_name')->label('Nama PIC')->maxLength(100),
+                    TextInput::make('pic_phone')->label('No. PIC')->maxLength(30),
+                    TextInput::make('pic_email')->label('Email PIC')->email()->maxLength(150),
 
-                            TextInput::make('pic_phone')
-                                ->label('No. PIC')
-                                ->maxLength(30),
-
-                            TextInput::make('pic_email')
-                                ->label('Email PIC')
-                                ->email()
-                                ->maxLength(150),
-
-                            Textarea::make('address')
-                                ->label('Alamat')
-                                ->rows(3)
-                                ->columnSpanFull()
-                        ])->columns(2),
-                ])->columnSpan(['lg' => 2]),
+                    Textarea::make('address')->label('Alamat')->rows(3)->columnSpanFull(),
+                ])->columns(2),
+            ])->columnSpan(['lg' => 2]),
         ]);
     }
 
@@ -125,13 +153,12 @@ class CustomerResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('code')->label('Kode')->badge()->searchable()->sortable()->copyable(),
+
                 TextColumn::make('type')
                     ->label('Tipe')
                     ->badge()
                     ->formatStateUsing(function ($state) {
-                        $enum = $state instanceof CustomerType
-                            ? $state
-                            : CustomerType::tryFrom((string) $state);
+                        $enum = $state instanceof CustomerType ? $state : CustomerType::tryFrom((string) $state);
                         return $enum?->label() ?? '-';
                     })
                     ->colors([

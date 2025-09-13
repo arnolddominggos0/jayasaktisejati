@@ -2,11 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Enums\CustomerType;
+use App\Models\{Branch, City, Customer, User};
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-use Spatie\Permission\Models\Role;
-use App\Models\{Branch, City, Customer, User};
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
 class InitialSetupSeeder extends Seeder
 {
@@ -17,26 +18,32 @@ class InitialSetupSeeder extends Seeder
         }
 
         $jkt = Branch::firstOrCreate(['code' => 'JKT'], ['name' => 'Jakarta']);
-        $mdo = Branch::firstOrCreate(['code' => 'MDO'], ['name' => 'Manado']);
+        Branch::firstOrCreate(['code' => 'MDO'], ['name' => 'Manado']);
 
         $cityNames = ['Jakarta', 'Manado', 'Surabaya', 'Makassar', 'Tobelo', 'Bitung', 'Ternate', 'Ambon'];
         foreach ($cityNames as $name) {
-            City::firstOrCreate(['slug' => Str::slug($name)], ['name' => $name, 'country' => 'Indonesia']);
+            City::firstOrCreate(
+                ['slug' => Str::slug($name)],
+                ['name' => $name, 'country' => 'Indonesia']
+            );
         }
+        $cityIds = City::pluck('id')->all();
 
-        // Super admin
-        if (!User::where('email', 'admin@jss.local')->exists()) {
+        if (! User::where('email', 'admin@jss.local')->exists()) {
             $admin = User::create([
-                'name' => 'Super Admin',
-                'email' => 'admin@jss.local',
-                'password' => Hash::make('Admin#12345'),
+                'name'      => 'Super Admin',
+                'email'     => 'admin@jss.local',
+                'password'  => Hash::make('Admin#12345'),
                 'branch_id' => $jkt->id,
             ]);
             $admin->syncRoles(['super_admin']);
         }
 
-        $cityIds = City::pluck('id')->all();
-        $customers = [
+        // Faker untuk seed
+        $faker   = \Faker\Factory::create();      // default
+        $fakerId = \Faker\Factory::create('id_ID');
+
+        $companies = [
             ['code' => 'CUST-IND-A01', 'name' => 'PT Indo Auto Prima'],
             ['code' => 'CUST-SML-A02', 'name' => 'PT Samudera Logistic'],
             ['code' => 'CUST-TRK-A03', 'name' => 'CV Truk Mandiri'],
@@ -49,22 +56,33 @@ class InitialSetupSeeder extends Seeder
             ['code' => 'CUST-PTA-A10', 'name' => 'PT Putra Transport'],
         ];
 
-        foreach ($customers as $c) {
+        foreach ($companies as $c) {
+            $cityId  = $cityIds[array_rand($cityIds)];
+            $picName = $fakerId->name();
+
             Customer::firstOrCreate(
                 ['code' => $c['code']],
                 [
-                    'code'         =>$c['code'],
-                    'name'         => $c['name'],
-                    'email'        => Str::slug($c['name'], '.') . '@demo.local',
-                    'nik'          => fake()->numerify('################'),
-                    'npwp'         => fake()->numerify('##.###.###.#-###.###'),
-                    'city_id'      => $cityIds[array_rand($cityIds)], 
-                    'address'      =>fake()->address(),
-                    'pic_name'     => fake()->name(),
-                    'pic_phone'    => '08' . fake()->numerify('##########'),
-                    'postal_code'  => fake()->numerify('####')
+                    'code'        => $c['code'],
+                    'type'        => CustomerType::Company->value,
+                    'name'        => $c['name'],
+                    'email'       => Str::slug($c['name'], '.') . '@demo.local',
+                    'phone'       => '08' . $faker->numerify('##########'),
+
+                    'nik'         => null,
+                    'npwp'        => $faker->bothify('##.###.###.#-###.###'),
+
+                    'city_id'     => $cityId,
+                    'address'     => $fakerId->address(),
+                    'postal_code' => $faker->numerify('#####'),
+
+                    'pic_name'    => $picName,
+                    'pic_phone'   => '08' . $faker->numerify('##########'),
+                    'pic_email'   => Str::slug($picName, '.') . '@demo.local',
                 ]
             );
         }
+
+        Customer::factory()->count(20)->create();
     }
 }

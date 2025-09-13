@@ -516,11 +516,11 @@ class ShipmentResource extends Resource
 
                                 TextInput::make('vehicle_plate')->label('No. Polisi Armada')->maxLength(20)->columnSpan(4),
                                 DatePicker::make('pickup_date')
-                                ->label('Tanggal Pickup (estimasi)')
-                                ->required()
-                                ->native(false)
-                                ->prefixIcon('heroicon-m-calendar')
-                                ->columnSpan(4),
+                                    ->label('Tanggal Pickup (estimasi)')
+                                    ->required()
+                                    ->native(false)
+                                    ->prefixIcon('heroicon-m-calendar')
+                                    ->columnSpan(4),
                             ]),
                     ]),
 
@@ -691,12 +691,20 @@ class ShipmentResource extends Resource
                     ->toggleable(),
 
                 TextColumn::make('packages_total')->label('Koli')->sortable()->toggleable(),
-                TextColumn::make('cbm_total')->label('CBM')
-                    ->formatStateUsing(fn($v) => is_null($v) ? '—' : number_format((float) $v, 3, '.', ''))
-                    ->sortable()->toggleable(),
-                TextColumn::make('weight_total')->label('Berat (kg)')
-                    ->formatStateUsing(fn($v) => is_null($v) ? '—' : number_format((float) $v, 2, '.', ''))
-                    ->sortable()->toggleable(),
+                TextColumn::make('cbm_total')
+                    ->label('CBM')
+                    ->numeric(decimalPlaces: 3, decimalSeparator: '.', thousandsSeparator: ',')
+                    ->placeholder('—') 
+                    ->sortable()
+                    ->toggleable(),
+
+                TextColumn::make('weight_total')
+                    ->label('Berat (kg)')
+                    ->numeric(decimalPlaces: 2, decimalSeparator: '.', thousandsSeparator: ',')
+                    ->placeholder('—')
+                    ->sortable()
+                    ->toggleable(),
+
 
                 TextColumn::make('status')
                     ->label('Status')

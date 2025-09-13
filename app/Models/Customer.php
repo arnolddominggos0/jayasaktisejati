@@ -6,9 +6,12 @@ use App\Enums\CustomerType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Customer extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'code','type','name','email','phone','nik','npwp',
         'pic_name','pic_phone','pic_email',

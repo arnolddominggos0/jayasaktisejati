@@ -5,7 +5,7 @@
             <div class="flex items-center justify-between">
                 <span>Aktivitas Terbaru</span>
                 <a class="text-sm text-primary-600 hover:underline"
-                    href="{{ route('filament.admin.resources.shipments.index') }}">
+                   href="{{ route('filament.admin.resources.shipments.index') }}">
                     Lihat semua
                 </a>
             </div>
@@ -15,31 +15,54 @@
             <div class="divide-y divide-gray-100 dark:divide-gray-800">
                 @forelse ($activities as $act)
                     @php
+                        /** @var \Spatie\Activitylog\Models\Activity $act */
                         $shipment = $act->subject instanceof \App\Models\Shipment ? $act->subject : null;
-                        $props = $act->properties?->toArray() ?? [];
-                        $code = $shipment?->code ?? ($props['code'] ?? '-');
-                        $user = $act->causer?->name ?? 'Sistem';
-                        $event = $act->event;
+                        $props    = $act->properties?->toArray() ?? [];
+                        $code     = $shipment?->code ?? ($props['code'] ?? '-');
+                        $user     = $act->causer?->name ?? 'Sistem';
+                        $event    = $act->event;
 
                         $meta = [
-                            'created' => ['dibuat', 'bg-emerald-500'],
-                            'updated' => ['diubah', 'bg-sky-500'],
+                            'created'        => ['dibuat', 'bg-emerald-500'],
+                            'updated'        => ['diubah', 'bg-sky-500'],
                             'status_changed' => ['status diubah', 'bg-indigo-500'],
-                            'route_updated' => ['rute diubah', 'bg-violet-500'],
-                            'cancelled' => ['dibatalkan', 'bg-rose-500'],
-                            'uncancelled' => ['dipulihkan', 'bg-zinc-400'],
-                            'deleted' => ['dihapus', 'bg-red-500'],
-                            'restored' => ['dipulihkan', 'bg-green-500'],
+                            'route_updated'  => ['rute diubah', 'bg-violet-500'],
+                            'cancelled'      => ['dibatalkan', 'bg-rose-500'],
+                            'uncancelled'    => ['dipulihkan', 'bg-zinc-400'],
+                            'deleted'        => ['dihapus', 'bg-red-500'],
+                            'restored'       => ['dipulihkan', 'bg-green-500'],
                         ];
                         [$label, $dot] = $meta[$event] ?? ['diperbarui', 'bg-gray-400'];
 
                         $initial = \Illuminate\Support\Str::of($user)->trim()->substr(0, 1)->upper();
 
                         $editUrl = $shipment
-                            ? \App\Filament\Resources\ShipmentResource::getUrl('edit', [
-                                'record' => $shipment->getKey(),
-                            ])
+                            ? \App\Filament\Resources\ShipmentResource::getUrl('edit', ['record' => $shipment->getKey()])
                             : route('filament.admin.resources.shipments.index');
+
+                        // --- Status badge (to/from) ---
+                        $statusTo   = $props['to']      ?? ($props['status'] ?? null);
+                        $statusFrom = $props['from']    ?? null;
+
+                        $statusToLabel = $props['to_label']
+                            ?? (\App\Enums\ShipmentStatus::tryFrom((string) $statusTo)?->label() ?? ($statusTo ? strtoupper((string) $statusTo) : null));
+
+                        $statusFromLabel = $props['from_label']
+                            ?? (\App\Enums\ShipmentStatus::tryFrom((string) $statusFrom)?->label() ?? ($statusFrom ? strtoupper((string) $statusFrom) : null));
+
+                        $showStatusBadge = in_array($event, ['created','status_changed','cancelled','uncancelled'], true) && $statusTo;
+
+                        $colorKey = \App\Filament\Resources\ShipmentResource\Widgets\RecentShipmentActivities::badgeColor($statusTo);
+                        $badgeClass = match ($colorKey) {
+                            'danger'  => 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                            'success' => 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+                            'warning' => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+                            'info'    => 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+                            default   => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+                        };
+
+                        // Field changes (untuk event 'updated')
+                        $changedFields = $props['changed_fields'] ?? [];
                     @endphp
 
                     <div class="flex items-start gap-3 py-2.5 px-4 hover:bg-gray-50 dark:hover:bg-gray-800/30">
@@ -48,7 +71,7 @@
                         <div class="flex-1 min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
                                 <a href="{{ $editUrl }}" target="_blank" rel="noopener"
-                                    class="font-mono text-xs px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/60">
+                                   class="font-mono text-xs px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800/60">
                                     {{ $code }}
                                 </a>
 
@@ -56,15 +79,29 @@
                                     {{ $label }} oleh
                                 </span>
 
-                                <span
-                                    class="inline-flex items-center gap-1.5 pl-1.5 pr-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700">
-                                    <span
-                                        class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-[10px] text-gray-800 dark:text-gray-200">
+                                <span class="inline-flex items-center gap-1.5 pl-1.5 pr-2 py-0.5 rounded-full border border-gray-200 dark:border-gray-700">
+                                    <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 dark:bg-gray-700 text-[10px] text-gray-800 dark:text-gray-200">
                                         {{ $initial }}
                                     </span>
-                                    <span
-                                        class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $user }}</span>
+                                    <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ $user }}</span>
                                 </span>
+
+                                @if ($showStatusBadge)
+                                    <span class="text-[11px] ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full {{ $badgeClass }}">
+                                        {{ $statusToLabel }}
+                                    </span>
+
+                                    @if (in_array($event, ['status_changed','cancelled','uncancelled'], true) && $statusFromLabel)
+                                        <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                                        </span>
+                                    @endif
+                                @endif
+
+                                @if ($event === 'updated' && !empty($changedFields))
+                                    <span class="text-[11px] text-gray-500 dark:text-gray-400">
+                                        • Field: {{ implode(', ', array_slice($changedFields, 0, 6)) }}@if (count($changedFields) > 6), …@endif
+                                    </span>
+                                @endif
                             </div>
 
                             <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -77,7 +114,6 @@
                 @empty
                     <div class="py-3 px-4 text-sm text-gray-500">Belum ada aktivitas.</div>
                 @endforelse
-
             </div>
         </div>
     </x-filament::section>
