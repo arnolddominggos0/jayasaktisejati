@@ -34,7 +34,7 @@ class ShipmentResource extends Resource
     protected static ?string $navigationLabel = 'Permintaan Pengiriman';
     protected static ?string $modelLabel = 'Permintaan Pengiriman';
     protected static ?string $pluralModelLabel = 'Permintaan Pengiriman';
-    protected static ?string $navigationIcon = 'heroicon-o-truck';
+    protected static ?string $navigationIcon = 'heroicon-m-archive-box';
 
     public static function form(Form $form): Form
     {
