@@ -2,25 +2,22 @@
 
 namespace App\Models;
 
+use App\Enums\MPDomain;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use App\Enums\ManpowerRole;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Manpower extends Model
 {
-    use HasFactory;
     protected $fillable = [
-        'name',
-        'role',
-        'phone',
-        'license_number',
-        'branch_id'
+        'name','domain','skills','certs','phone','license_number','branch_id','depot_id','active'
     ];
 
     protected $casts = [
-        'role' => ManpowerRole::class,
+        'domain' => MPDomain::class,
+        'skills' => 'array',
+        'certs'  => 'array',
+        'active' => 'bool',
     ];
 
     public function branch(): BelongsTo
@@ -28,8 +25,18 @@ class Manpower extends Model
         return $this->belongsTo(Branch::class);
     }
 
-    public function armadas(): BelongsToMany
+    public function depot(): BelongsTo
     {
-        return $this->belongsToMany(Armada::class)->withTimestamps();
+        return $this->belongsTo(Depot::class);
+    }
+
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(ManpowerAttendance::class);
+    }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(ManpowerAssignment::class);
     }
 }

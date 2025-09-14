@@ -2,31 +2,21 @@
 
 namespace App\Models;
 
+use App\Enums\ArmadaStatus;
 use App\Enums\ArmadaType;
-use App\Models\Branch;
-use App\Models\Manpower;
-use App\Models\ShipSchedule;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Armada extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
-        'code',
-        'type',
-        'plate_number',
-        'name',
-        'capacity',
-        'branch_id'
+        'code','type','plate_number','capacity','status','branch_id','depot_id','notes'
     ];
 
     protected $casts = [
-        'type' => ArmadaType::class,
+        'type'   => ArmadaType::class,
+        'status' => ArmadaStatus::class,
     ];
 
     public function branch(): BelongsTo
@@ -34,13 +24,18 @@ class Armada extends Model
         return $this->belongsTo(Branch::class);
     }
 
-    public function manpowers(): BelongsToMany
+    public function depot(): BelongsTo
     {
-        return $this->belongsToMany(Manpower::class)->withTimestamps();
+        return $this->belongsTo(Depot::class);
     }
 
-    public function shipSchedules(): HasMany
+    public function maintenances(): HasMany
     {
-        return $this->hasMany(ShipSchedule::class);
+        return $this->hasMany(ArmadaMaintenance::class);
+    }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(ArmadaAssignment::class);
     }
 }
