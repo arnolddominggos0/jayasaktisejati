@@ -15,9 +15,12 @@ use Filament\Tables;
 class ArmadaResource extends Resource
 {
     protected static ?string $model = Armada::class;
+
     protected static ?string $navigationGroup = 'Manajemen Armada & MP';
-    protected static ?string $navigationIcon = 'heroicon-m-truck';
+    protected static ?string $navigationLabel = 'Armada';
     protected static ?string $modelLabel = 'Armada';
+    protected static ?string $pluralModelLabel = 'Armada';
+    protected static ?string $navigationIcon = 'heroicon-m-truck';
 
     public static function form(Forms\Form $form): Forms\Form
     {

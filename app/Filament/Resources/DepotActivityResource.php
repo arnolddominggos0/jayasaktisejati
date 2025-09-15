@@ -11,14 +11,18 @@ use Filament\Tables;
 class DepotActivityResource extends Resource
 {
     protected static ?string $model = DepotActivity::class;
+
     protected static ?string $navigationGroup = 'Manajemen Armada & MP';
+    protected static ?string $navigationLabel = 'Aktivitas Depo';
+    protected static ?string $pluralLabel = 'Aktivitas Depo';
+    protected static ?string $modelLabel = 'Aktivitas Depo';
     protected static ?string $navigationIcon = 'heroicon-m-chart-bar';
 
     public static function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([
             Forms\Components\DatePicker::make('date')->label('Tanggal')->required(),
-            Forms\Components\Select::make('depot_id')->relationship('depot','name')->label('Depot')->required(),
+            Forms\Components\Select::make('depot_id')->relationship('depot', 'name')->label('Depot')->required(),
             Forms\Components\TextInput::make('metric')->label('Metrik')->required(),
             Forms\Components\TextInput::make('value')->numeric()->label('Nilai')->default(0),
             Forms\Components\TextInput::make('remark')->label('Catatan'),

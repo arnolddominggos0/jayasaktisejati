@@ -12,9 +12,12 @@ use Filament\Tables;
 class DepotResource extends Resource
 {
     protected static ?string $model = Depot::class;
+
     protected static ?string $navigationGroup = 'Manajemen Armada & MP';
+    protected static ?string $navigationLabel = 'Depo';
+    protected static ?string $pluralLabel = 'Depo';
     protected static ?string $navigationIcon = 'heroicon-m-building-office-2';
-    protected static ?string $modelLabel = 'Depot';
+    protected static ?string $modelLabel = 'Depo';
 
     public static function form(Forms\Form $form): Forms\Form
     {

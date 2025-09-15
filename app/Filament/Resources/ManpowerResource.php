@@ -12,9 +12,12 @@ use Filament\Tables;
 class ManpowerResource extends Resource
 {
     protected static ?string $model = Manpower::class;
+
     protected static ?string $navigationGroup = 'Manajemen Armada & MP';
+    protected static ?string $navigationLabel = 'Tenaga Kerja (MP)';
+    protected static ?string $pluralLabel = 'Tenaga Kerja (MP)';
     protected static ?string $navigationIcon = 'heroicon-m-user-group';
-    protected static ?string $modelLabel = 'Manpower';
+    protected static ?string $modelLabel = 'Tenaga Kerja (MP)';
 
     public static function form(Forms\Form $form): Forms\Form
     {

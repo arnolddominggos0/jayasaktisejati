@@ -68,7 +68,7 @@ class FleetMpSeeder extends Seeder
         ]);
 
         Armada::firstOrCreate(['code' => 'ARM-CCTW-001'], [
-            'type'      => ArmadaType::CcTw->value,
+            'type'      => ArmadaType::CarCarrier->value,
             'plate_number' => 'B 8899 JSS',
             'capacity'  => 5,
             'status'    => ArmadaStatus::Standby->value,

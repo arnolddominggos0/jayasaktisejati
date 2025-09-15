@@ -14,7 +14,10 @@ use Filament\Tables;
 class BriefingSessionResource extends Resource
 {
     protected static ?string $model = BriefingSession::class;
+
     protected static ?string $navigationGroup = 'Manajemen Armada & MP';
+    protected static ?string $navigationLabel = 'Sesi Briefing';
+    protected static ?string $pluralLabel = 'Sesi Briefing';
     protected static ?string $navigationIcon = 'heroicon-m-clipboard-document-check';
     protected static ?string $modelLabel = 'Sesi Briefing';
 
