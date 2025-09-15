@@ -4,8 +4,14 @@ namespace App\Filament\Resources\SeaBookingResource\RelationManagers;
 
 use App\Enums\ContainerSize;
 use App\Enums\ContainerStatus;
+use Filament\Actions\CreateAction;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\EditAction;
 use Filament\Forms;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Tables\Columns\TextColumn;
 
 class ContainersRelationManager extends RelationManager
 {
@@ -15,32 +21,32 @@ class ContainersRelationManager extends RelationManager
     public function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([
-            Forms\Components\Select::make('size_type')->label('Size/Type')
+           Select::make('size_type')->label('Size/Type')
                 ->options(collect(ContainerSize::cases())->mapWithKeys(fn($c)=>[$c->value=>$c->label()]))->required(),
-            Forms\Components\TextInput::make('container_no')->label('Container No'),
-            Forms\Components\TextInput::make('seal_no')->label('Seal No'),
-            Forms\Components\Select::make('status')->label('Status')
+            TextInput::make('container_no')->label('Container No'),
+            TextInput::make('seal_no')->label('Seal No'),
+           Select::make('status')->label('Status')
                 ->options(collect(ContainerStatus::cases())->mapWithKeys(fn($c)=>[$c->value=>$c->label()]))->required(),
-            Forms\Components\TextInput::make('gross_weight')->numeric()->label('Gross (kg)'),
+            TextInput::make('gross_weight')->numeric()->label('Gross (kg)'),
         ])->columns(2);
     }
 
     public function table(\Filament\Tables\Table $table): \Filament\Tables\Table
     {
         return $table->columns([
-            \Filament\Tables\Columns\TextColumn::make('size_type')->badge()->label('Size/Type')
+            TextColumn::make('size_type')->badge()->label('Size/Type')
                 ->state(fn($record) => $record->size_type?->label() ?? (string)$record->size_type),
-            \Filament\Tables\Columns\TextColumn::make('container_no')->label('Container'),
-            \Filament\Tables\Columns\TextColumn::make('seal_no')->label('Seal'),
-            \Filament\Tables\Columns\TextColumn::make('status')->badge()->label('Status')
+            TextColumn::make('container_no')->label('Container'),
+            TextColumn::make('seal_no')->label('Seal'),
+            TextColumn::make('status')->badge()->label('Status')
                 ->state(fn($record) => $record->status?->label() ?? (string)$record->status)
                 ->color(fn($record) => $record->status?->color() ?? 'gray'),
-            \Filament\Tables\Columns\TextColumn::make('gross_weight')->label('Gross (kg)')->numeric(),
+            TextColumn::make('gross_weight')->label('Gross (kg)')->numeric(),
         ])->headerActions([
-            \Filament\Tables\Actions\CreateAction::make()->label('Tambah'),
+            CreateAction::make()->label('Tambah'),
         ])->actions([
-            \Filament\Tables\Actions\EditAction::make()->label('Ubah'),
-            \Filament\Tables\Actions\DeleteAction::make()->label('Hapus'),
+            EditAction::make()->label('Ubah'),
+            DeleteAction::make()->label('Hapus'),
         ]);
     }
 }

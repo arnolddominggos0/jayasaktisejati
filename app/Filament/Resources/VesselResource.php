@@ -7,6 +7,7 @@ use App\Models\Vessel;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
 
 class VesselResource extends Resource
 {
@@ -29,9 +30,9 @@ class VesselResource extends Resource
     public static function table(Tables\Table $table): Tables\Table
     {
         return $table->columns([
-            Tables\Columns\TextColumn::make('name')->label('Nama Kapal')->searchable(),
-            Tables\Columns\TextColumn::make('shippingLine.name')->label('Shipping Line'),
-            Tables\Columns\TextColumn::make('imo')->label('IMO'),
+            TextColumn::make('name')->label('Nama Kapal')->searchable(),
+            TextColumn::make('shippingLine.name')->label('Shipping Line'),
+            TextColumn::make('imo')->label('IMO'),
         ])->actions([
             Tables\Actions\EditAction::make()->label('Ubah'),
         ])->bulkActions([

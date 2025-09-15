@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class Port extends Model
 {
-    protected $fillable = ['code','name','city','country'];
+    protected $fillable = ['code', 'name', 'city', 'country'];
 }

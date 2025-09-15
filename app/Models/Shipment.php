@@ -304,4 +304,11 @@ class Shipment extends Model
     {
         return $this->belongsTo(Office::class, 'destination_office_id');
     }
+    public function tracks()
+    {
+        return $this->hasMany(ShipmentTrack::class)->orderByDesc('tracked_at');
+    }
+    public function latestTrack() {
+        return $this->hasOne(ShipmentTrack::class)->latestOfMany('tracked_at');
+    }
 }

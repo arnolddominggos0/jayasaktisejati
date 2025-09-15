@@ -6,7 +6,9 @@ use App\Enums\{ServiceType, ShipmentMode, ShipmentStatus, CargoType, RequestType
 use App\Filament\Resources\ShipmentResource\Pages\CreateShipment;
 use App\Filament\Resources\ShipmentResource\Pages\EditShipment;
 use App\Filament\Resources\ShipmentResource\Pages\ListShipments;
+use App\Filament\Resources\ShipmentResource\RelationManagers\ShipmentTracksRelationManager;
 use App\Models\Shipment;
+use App\Models\Voyage;
 use Filament\Forms;
 use Filament\Forms\Components\{Checkbox, DatePicker, FileUpload, Grid, Group, Hidden, Placeholder, Repeater, Section, Select, Textarea, TextInput, ToggleButtons, ViewField};
 use Filament\Forms\Form;
@@ -38,8 +40,8 @@ class ShipmentResource extends Resource
 
     public static function form(Form $form): Form
     {
-        $hasFleetSchedules = Schema::hasTable('fleet_schedules');
-        $hasDrivers        = Schema::hasTable('drivers');
+        $hasVoyages = Schema::hasTable('fleet_schedules') && Voyage::query()->exists();
+        $hasDrivers = Schema::hasTable('drivers');
 
         $recalcLclTotals = function (Get $get, Set $set) {
             $rows = $get('lcl_items') ?? [];
@@ -405,60 +407,72 @@ class ShipmentResource extends Resource
                                     ->addActionLabel('Tambah Unit')
                                     ->columnSpan(12),
 
-                                Select::make('schedule_id')
+                                Select::make('vessel_id')
                                     ->label('Jadwal Kapal')
                                     ->searchable()
                                     ->preload()
-                                    ->options(function () use ($hasFleetSchedules) {
-                                        if (!$hasFleetSchedules) return [];
-                                        return DB::table('fleet_schedules')->orderByDesc('etd')->limit(200)
+                                    ->options(function () use ($hasVoyages) {
+                                        if (! $hasVoyages) return [];
+                                        return Voyage::query()
+                                            ->with(['vessel', 'portFrom', 'portTo'])
+                                            ->orderByDesc('etd')
+                                            ->limit(300)
                                             ->get()
-                                            ->mapWithKeys(function ($state) {
-                                                $label = sprintf(
-                                                    '%state / %state — %state (%state → %state)',
-                                                    $state->vessel_name,
-                                                    $state->voyage ?? '-',
-                                                    $state->etd ? Carbon::parse($state->etd)->format('d M Y') : '-',
-                                                    $state->pol ?? '-',
-                                                    $state->pod ?? '-',
-                                                );
-                                                return [$state->id => $label];
-                                            })->toArray();
+                                            ->mapWithKeys(function (Voyage $v) {
+                                                $vessel = $v->vessel?->name ?: '-';
+                                                $voy    = $v->voyage_no ?: '-';
+                                                $etd    = $v->etd ? Carbon::parse($v->etd)->format('d M Y') : '-';
+                                                $pol    = $v->portFrom?->code ?: ($v->portFrom?->name ?: '-');
+                                                $pod    = $v->portTo?->code   ?: ($v->portTo?->name   ?: '-');
+                                                $label  = sprintf('%s / %s — %s (%s → %s)', $vessel, $voy, $etd, $pol, $pod);
+                                                return [$v->id => $label];
+                                            })
+                                            ->toArray();
                                     })
-                                    ->required(fn() => $hasFleetSchedules)
-                                    ->hidden(fn() => !$hasFleetSchedules)
+                                    ->required(fn() => $hasVoyages)
+                                    ->hidden(fn() => ! $hasVoyages)
                                     ->live()
-                                    ->afterStateUpdated(function ($state, Set $set) use ($hasFleetSchedules) {
-                                        if (!$hasFleetSchedules || !$state) {
+                                    ->afterStateUpdated(function ($state, Set $set) use ($hasVoyages) {
+                                        if (! $hasVoyages || ! $state) {
                                             foreach (['vessel_name', 'voyage', 'pol', 'pod'] as $f) $set($f, null);
                                             $set('etd', null);
                                             $set('eta', null);
                                             return;
                                         }
-                                        $state = DB::table('fleet_schedules')->where('id', $state)->first();
-                                        foreach (['vessel_name', 'voyage', 'pol', 'pod'] as $f) $set($f, $state?->$f);
-                                        $set('etd', $state?->etd ? Carbon::parse($state->etd)->toDateTimeString() : null);
-                                        $set('eta', $state?->eta ? Carbon::parse($state->eta)->toDateTimeString() : null);
+                                        /** @var Voyage|null $v */
+                                        $v = Voyage::query()->with(['vessel', 'portFrom', 'portTo'])->find($state);
+                                        if (! $v) {
+                                            foreach (['vessel_name', 'voyage', 'pol', 'pod'] as $f) $set($f, null);
+                                            $set('etd', null);
+                                            $set('eta', null);
+                                            return;
+                                        }
+                                        $set('vessel_name', $v->vessel?->name);
+                                        $set('voyage', $v->voyage_no);
+                                        $set('pol', $v->portFrom?->code ?: $v->portFrom?->name);
+                                        $set('pod', $v->portTo?->code   ?: $v->portTo?->name);
+                                        $set('etd', $v->etd ? Carbon::parse($v->etd)->toDateTimeString() : null);
+                                        $set('eta', $v->eta ? Carbon::parse($v->eta)->toDateTimeString() : null);
                                     })
                                     ->columnSpan(12),
 
                                 TextInput::make('vessel_name')->label('Nama Kapal')
-                                    ->disabled(fn() => $hasFleetSchedules)->dehydrated()
+                                    ->disabled(fn() => $hasVoyages)->dehydrated()
                                     ->columnSpan(4),
 
                                 TextInput::make('voyage')->label('Voyage/Trip')
-                                    ->disabled(fn() => $hasFleetSchedules)->dehydrated()
+                                    ->disabled(fn() => $hasVoyages)->dehydrated()
                                     ->columnSpan(4),
 
-                                DatePicker::make('etd')->label('ETD')->native(false)->disabled(fn() => $hasFleetSchedules)->dehydrated()->columnSpan(4),
-                                DatePicker::make('eta')->label('ETA')->native(false)->disabled(fn() => $hasFleetSchedules)->dehydrated()->columnSpan(4),
+                                DatePicker::make('etd')->label('ETD')->native(false)->disabled(fn() => $hasVoyages)->dehydrated()->columnSpan(4),
+                                DatePicker::make('eta')->label('ETA')->native(false)->disabled(fn() => $hasVoyages)->dehydrated()->columnSpan(4),
 
                                 TextInput::make('pol')->label('POL — Pelabuhan Muat')
-                                    ->disabled(fn() => $hasFleetSchedules)->dehydrated()
+                                    ->disabled(fn() => $hasVoyages)->dehydrated()
                                     ->columnSpan(4),
 
                                 TextInput::make('pod')->label('POD — Pelabuhan Bongkar')
-                                    ->disabled(fn() => $hasFleetSchedules)->dehydrated()
+                                    ->disabled(fn() => $hasVoyages)->dehydrated()
                                     ->columnSpan(4),
                             ]),
 
@@ -694,7 +708,7 @@ class ShipmentResource extends Resource
                 TextColumn::make('cbm_total')
                     ->label('CBM')
                     ->numeric(decimalPlaces: 3, decimalSeparator: '.', thousandsSeparator: ',')
-                    ->placeholder('—') 
+                    ->placeholder('—')
                     ->sortable()
                     ->toggleable(),
 
@@ -857,7 +871,9 @@ class ShipmentResource extends Resource
 
     public static function getRelations(): array
     {
-        return [];
+        return [
+            \App\Filament\Resources\ShipmentResource\RelationManagers\ShipmentTracksRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

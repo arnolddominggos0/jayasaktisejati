@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\DepotMetric;
 use App\Filament\Resources\DepotActivityResource\Pages;
 use App\Models\DepotActivity;
 use Filament\Forms;
+use Filament\Forms\Components\Select;
 use Filament\Resources\Resource;
 use Filament\Tables;
 
@@ -23,7 +25,14 @@ class DepotActivityResource extends Resource
         return $form->schema([
             Forms\Components\DatePicker::make('date')->label('Tanggal')->required(),
             Forms\Components\Select::make('depot_id')->relationship('depot', 'name')->label('Depot')->required(),
-            Forms\Components\TextInput::make('metric')->label('Metrik')->required(),
+            Select::make('metric')
+                ->label('Metrik')
+                ->options(
+                    collect(DepotMetric::cases())
+                        ->mapWithKeys(fn($c) => [$c->value => $c->label()])
+                )
+                ->required()
+                ->native(false),
             Forms\Components\TextInput::make('value')->numeric()->label('Nilai')->default(0),
             Forms\Components\TextInput::make('remark')->label('Catatan'),
         ]);
