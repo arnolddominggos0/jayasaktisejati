@@ -70,6 +70,7 @@ class ShipmentTrackingResource extends Resource
             'index'  => Pages\ListShipmentTrackings::route('/'),
             'create' => Pages\CreateShipmentTracking::route('/create'),
             'edit'   => Pages\EditShipmentTracking::route('/{record}/edit'),
+            'dashboard' => Pages\TrackingDashboard::route('/dashboard'),
         ];
     }
 

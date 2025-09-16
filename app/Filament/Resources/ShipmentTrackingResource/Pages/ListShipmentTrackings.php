@@ -13,7 +13,13 @@ class ListShipmentTrackings extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            \Filament\Actions\Action::make('dashboard')
+                ->label('Pelacakan (Dashboard)')
+                ->icon('heroicon-m-map-pin')
+                ->color('gray')
+                ->url(static::getResource()::getUrl('dashboard')),
+
+            \Filament\Actions\CreateAction::make(),
         ];
     }
 }
