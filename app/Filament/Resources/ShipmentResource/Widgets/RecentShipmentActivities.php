@@ -15,14 +15,13 @@ class RecentShipmentActivities extends Widget
     protected function getViewData(): array
     {
         $events = [
-            'created',
-            'List',
-            'status_changed',
-            'route_updated',
-            'cancelled',
-            'uncancelled', 
-            'deleted',
-            'restored', 
+            'track_created',
+            'track_status_changed',
+            'track_location_changed',
+            'track_eta_changed',
+            'track_updated',
+            'track_deleted',
+            'track_restored',
         ];
 
         $activities = Activity::query()

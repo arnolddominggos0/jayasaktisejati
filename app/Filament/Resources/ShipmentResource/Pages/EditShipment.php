@@ -4,6 +4,8 @@ namespace App\Filament\Resources\ShipmentResource\Pages;
 
 use App\Enums\ShipmentStatus;
 use App\Filament\Resources\ShipmentResource;
+use App\Filament\Resources\ShipmentResource\Widgets\RecentShipmentActivities;
+use App\Filament\Resources\ShipmentTrackingResource\Widgets\RecentTrackingActivities;
 use Filament\Actions;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -21,6 +23,8 @@ class EditShipment extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            RecentShipmentActivities::class,
+            RecentTrackingActivities::make(),
             Actions\Action::make('cancel')
                 ->label('Batalkan')
                 ->icon('heroicon-m-x-circle')
@@ -45,7 +49,6 @@ class EditShipment extends EditRecord
         ];
     }
 
-    // === HANDLERS ===
 
     public function cancelShipment(): void
     {

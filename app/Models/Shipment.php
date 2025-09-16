@@ -20,6 +20,7 @@ class Shipment extends Model
         'destination_city_id',
         'origin_office_id',
         'destination_office_id',
+        'branch_id',
 
         // A. Data Customer & Dokumen
         'pic_name',
@@ -227,7 +228,7 @@ class Shipment extends Model
     public static function computeEta(string $modeCode, string $priority, ?Carbon $base = null): Carbon
     {
         $base = $base?->copy() ?? now();
-        if ($modeCode === 'SH') { // LAUT
+        if ($modeCode === 'SH') { 
             $days = strtolower($priority) === 'urgent' ? 17 : 19;
             return $base->addDays($days)->endOfDay();
         }
@@ -306,9 +307,11 @@ class Shipment extends Model
     }
     public function tracks()
     {
-        return $this->hasMany(ShipmentTrack::class)->orderByDesc('tracked_at');
+        return $this->hasMany(ShipmentTrack::class, 'shipment_id', 'id');
     }
-    public function latestTrack() {
-        return $this->hasOne(ShipmentTrack::class)->latestOfMany('tracked_at');
+    public function latestTrack()
+    {
+        return $this->hasOne(ShipmentTrack::class, 'shipment_id', 'id')
+            ->latestOfMany('tracked_at');
     }
 }

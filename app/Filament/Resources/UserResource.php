@@ -3,12 +3,14 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
+use App\Models\Branch;
 use App\Models\User;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Table;
 use Filament\Forms;
 use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Tables;
 use Illuminate\Support\Facades\Hash;
@@ -22,7 +24,7 @@ class UserResource extends Resource
     protected static ?string $navigationLabel = 'User';
     protected static ?string $pluralModelLabel = 'User';
     protected static ?string $modelLabel = 'User';
-    protected static ?string $navigationGroup = 'Manajemen Data';
+    protected static ?string $navigationGroup = 'Manajemen Pengguna';
     protected static ?int $navigationSort = 5;
 
     public static function canViewAny(): bool
@@ -60,15 +62,16 @@ class UserResource extends Resource
 
                 Section::make('Atribusi')
                     ->schema([
-                        Section::make('branch_id')
+                        Select::make('branch_id')
                             ->label('Cabang')
                             ->placeholder('Pilih cabang')
                             ->options(
-                                \App\Models\Branch::query()
+                                Branch::query()
                                     ->orderBy('name')
                                     ->pluck('name', 'id')
                             )
-                            ->searchable(),
+                            ->searchable()
+                            ->required(),
 
                         Section::make('customer_id')
                             ->label('Customer (opsional, untuk akun portal)')

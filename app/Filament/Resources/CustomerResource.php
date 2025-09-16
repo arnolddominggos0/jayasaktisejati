@@ -27,7 +27,7 @@ class CustomerResource extends Resource
     protected static ?string $navigationLabel = 'Pelanggan';
     protected static ?string $pluralModelLabel = 'Pelanggan';
     protected static ?string $modelLabel = 'Pelanggan';
-    protected static ?string $navigationGroup = 'Manajemen Data';
+    protected static ?string $navigationGroup = 'Manajemen Pengguna';
     protected static ?int $navigationSort = 10;
 
     public static function canViewAny(): bool

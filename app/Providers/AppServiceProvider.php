@@ -4,7 +4,9 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use App\Models\Shipment;
+use App\Models\ShipmentTrack;
 use App\Observers\ShipmentObserver;
+use App\Observers\ShipmentTrackObserver;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 
@@ -26,10 +28,12 @@ class AppServiceProvider extends ServiceProvider
         $tr = Carbon::getTranslator();
         if (method_exists($tr, 'setTranslations')) {
             $tr->setTranslations([
-                'ago'      => ':time lalu',
+                'ago'      => ':time lalu', 
                 'from_now' => 'dalam :time',
             ]);
-            Shipment::observe(ShipmentObserver::class);
         }
+
+        Shipment::observe(ShipmentObserver::class);
+        ShipmentTrack::observe(ShipmentTrackObserver::class);
     }
 }

@@ -61,7 +61,6 @@
                             default   => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
                         };
 
-                        // Field changes (untuk event 'updated')
                         $changedFields = $props['changed_fields'] ?? [];
                     @endphp
 
