@@ -34,4 +34,13 @@ enum ShipmentStatus: string
     {
         return [self::Pending, self::Pickup, self::Transit];
     }
+
+    public static function notInProgress(): array
+    {
+        return [self::Draft, self::Delivered, self::Hold, self::Cancelled];
+    }
+    public static function completed(): array
+    {
+        return [self::Delivered, self::Cancelled];
+    }
 }

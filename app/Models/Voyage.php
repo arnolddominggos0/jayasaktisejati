@@ -15,19 +15,24 @@ class Voyage extends Model
         'port_to_id',
         'etd',
         'eta',
-        'service'
+        'service',
     ];
 
-    protected $casts = ['etd' => 'date', 'eta' => 'date'];
+    protected $casts = [
+        'etd' => 'date',
+        'eta' => 'date',
+    ];
+
+    public function vessel(): BelongsTo
+    {
+        return $this->belongsTo(Vessel::class);
+    }
 
     public function shippingLine(): BelongsTo
     {
         return $this->belongsTo(ShippingLine::class);
     }
-    public function vessel(): BelongsTo
-    {
-        return $this->belongsTo(Vessel::class);
-    }
+
     public function portFrom(): BelongsTo
     {
         return $this->belongsTo(Port::class, 'port_from_id');

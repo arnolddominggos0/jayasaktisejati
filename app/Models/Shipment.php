@@ -143,6 +143,7 @@ class Shipment extends Model
                 $m->vehicle_type = $m->vehicle_plate = $m->driver_name = $m->driver_phone = null;
                 $m->pickup_date = $m->estimated_ready_at = null;
             } else {
+                $m->voyage_id = null;
                 $m->service_type   = $m->vehicle_type === 'car_carrier'
                     ? ServiceType::CarCarrier
                     : ServiceType::LandTrucking;
@@ -228,7 +229,7 @@ class Shipment extends Model
     public static function computeEta(string $modeCode, string $priority, ?Carbon $base = null): Carbon
     {
         $base = $base?->copy() ?? now();
-        if ($modeCode === 'SH') { 
+        if ($modeCode === 'SH') {
             $days = strtolower($priority) === 'urgent' ? 17 : 19;
             return $base->addDays($days)->endOfDay();
         }
@@ -281,6 +282,11 @@ class Shipment extends Model
     {
         return $this->belongsTo(FleetSchedule::class, 'schedule_id');
     }
+    public function voyage()
+    {
+        return $this->belongsTo(\App\Models\Voyage::class, 'voyage_id');
+    }
+
     public function cancelledBy()
     {
         return $this->belongsTo(User::class, 'cancelled_by');

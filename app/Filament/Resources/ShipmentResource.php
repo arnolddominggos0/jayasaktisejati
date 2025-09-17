@@ -7,6 +7,7 @@ use App\Filament\Resources\ShipmentResource\Pages\CreateShipment;
 use App\Filament\Resources\ShipmentResource\Pages\EditShipment;
 use App\Filament\Resources\ShipmentResource\Pages\ListShipments;
 use App\Filament\Resources\ShipmentResource\RelationManagers\ShipmentTracksRelationManager;
+use App\Models\FleetSchedule;
 use App\Models\Shipment;
 use App\Models\Voyage;
 use Filament\Forms;
@@ -40,7 +41,6 @@ class ShipmentResource extends Resource
 
     public static function form(Form $form): Form
     {
-        $hasVoyages = Schema::hasTable('fleet_schedules') && Voyage::query()->exists();
         $hasDrivers = Schema::hasTable('drivers');
 
         $recalcLclTotals = function (Get $get, Set $set) {
@@ -195,7 +195,7 @@ class ShipmentResource extends Resource
                                         'driver_phone',
                                         'pickup_date',
                                         'service_option',
-                                        'schedule_id',
+                                        'voyage_id',
                                         'driver_id',
                                         'lcl_items',
                                         'cbm_total',
@@ -407,73 +407,71 @@ class ShipmentResource extends Resource
                                     ->addActionLabel('Tambah Unit')
                                     ->columnSpan(12),
 
-                                Select::make('vessel_id')
-                                    ->label('Jadwal Kapal')
+                                Select::make('voyage_id')
+                                    ->label('Jadwal Kapal *')
                                     ->searchable()
-                                    ->preload()
-                                    ->options(function () use ($hasVoyages) {
-                                        if (! $hasVoyages) return [];
-                                        return Voyage::query()
+                                    ->native(false)
+                                    ->required(fn(Get $get) => $get('mode') === \App\Enums\ShipmentMode::Sea->value)
+                                    ->hidden(fn(Get $get) => $get('mode') !== \App\Enums\ShipmentMode::Sea->value)
+                                    ->getSearchResultsUsing(function (string $search) {
+                                        return \App\Models\Voyage::query()
                                             ->with(['vessel', 'portFrom', 'portTo'])
-                                            ->orderByDesc('etd')
-                                            ->limit(300)
-                                            ->get()
-                                            ->mapWithKeys(function (Voyage $v) {
-                                                $vessel = $v->vessel?->name ?: '-';
-                                                $voy    = $v->voyage_no ?: '-';
-                                                $etd    = $v->etd ? Carbon::parse($v->etd)->format('d M Y') : '-';
-                                                $pol    = $v->portFrom?->code ?: ($v->portFrom?->name ?: '-');
-                                                $pod    = $v->portTo?->code   ?: ($v->portTo?->name   ?: '-');
-                                                $label  = sprintf('%s / %s — %s (%s → %s)', $vessel, $voy, $etd, $pol, $pod);
-                                                return [$v->id => $label];
+                                            ->when($search, function ($q) use ($search) {
+                                                $q->where('voyage_no', 'ilike', "%{$search}%")
+                                                    ->orWhereHas('vessel', fn($qq) => $qq->where('name', 'ilike', "%{$search}%"))
+                                                    ->orWhereHas('portFrom', fn($qq) => $qq->where('code', 'ilike', "%{$search}%")->orWhere('name', 'ilike', "%{$search}%"))
+                                                    ->orWhereHas('portTo',   fn($qq) => $qq->where('code', 'ilike', "%{$search}%")->orWhere('name', 'ilike', "%{$search}%"));
                                             })
-                                            ->toArray();
+                                            ->orderByDesc('etd')
+                                            ->limit(50)
+                                            ->get()
+                                            ->mapWithKeys(function ($v) {
+                                                $label = sprintf(
+                                                    '%s / %s — %s (%s → %s)',
+                                                    $v->vessel?->name ?: '-',
+                                                    $v->voyage_no ?: '-',
+                                                    optional($v->etd)->format('d M Y') ?: '-',
+                                                    $v->portFrom?->code ?: $v->portFrom?->name ?: '-',
+                                                    $v->portTo?->code   ?: $v->portTo?->name   ?: '-',
+                                                );
+                                                return [$v->id => $label];
+                                            })->toArray();
                                     })
-                                    ->required(fn() => $hasVoyages)
-                                    ->hidden(fn() => ! $hasVoyages)
+                                    ->getOptionLabelUsing(function ($value) {
+                                        $v = \App\Models\Voyage::with(['vessel', 'portFrom', 'portTo'])->find($value);
+                                        return $v ? sprintf(
+                                            '%s / %s — %s (%s → %s)',
+                                            $v->vessel?->name ?: '-',
+                                            $v->voyage_no ?: '-',
+                                            optional($v->etd)->format('d M Y') ?: '-',
+                                            $v->portFrom?->code ?: $v->portFrom?->name ?: '-',
+                                            $v->portTo?->code   ?: $v->portTo?->name   ?: '-'
+                                        ) : null;
+                                    })
                                     ->live()
-                                    ->afterStateUpdated(function ($state, Set $set) use ($hasVoyages) {
-                                        if (! $hasVoyages || ! $state) {
-                                            foreach (['vessel_name', 'voyage', 'pol', 'pod'] as $f) $set($f, null);
-                                            $set('etd', null);
-                                            $set('eta', null);
+                                    ->afterStateUpdated(function ($state, Set $set) {
+                                        if (! $state) {
+                                            foreach (['vessel_name', 'voyage', 'pol', 'pod', 'etd', 'eta'] as $f) $set($f, null);
                                             return;
                                         }
-                                        /** @var Voyage|null $v */
-                                        $v = Voyage::query()->with(['vessel', 'portFrom', 'portTo'])->find($state);
-                                        if (! $v) {
-                                            foreach (['vessel_name', 'voyage', 'pol', 'pod'] as $f) $set($f, null);
-                                            $set('etd', null);
-                                            $set('eta', null);
-                                            return;
+                                        if ($v = \App\Models\Voyage::with(['vessel', 'portFrom', 'portTo'])->find($state)) {
+                                            $set('vessel_name', $v->vessel?->name);
+                                            $set('voyage',      $v->voyage_no);
+                                            $set('pol',         $v->portFrom?->code ?: $v->portFrom?->name);
+                                            $set('pod',         $v->portTo?->code   ?: $v->portTo?->name);
+                                            $set('etd',         optional($v->etd)->toDateString());
+                                            $set('eta',         optional($v->eta)->toDateString());
                                         }
-                                        $set('vessel_name', $v->vessel?->name);
-                                        $set('voyage', $v->voyage_no);
-                                        $set('pol', $v->portFrom?->code ?: $v->portFrom?->name);
-                                        $set('pod', $v->portTo?->code   ?: $v->portTo?->name);
-                                        $set('etd', $v->etd ? Carbon::parse($v->etd)->toDateTimeString() : null);
-                                        $set('eta', $v->eta ? Carbon::parse($v->eta)->toDateTimeString() : null);
                                     })
                                     ->columnSpan(12),
 
-                                TextInput::make('vessel_name')->label('Nama Kapal')
-                                    ->disabled(fn() => $hasVoyages)->dehydrated()
-                                    ->columnSpan(4),
+                                TextInput::make('vessel_name')->disabled()->dehydrated()->columnSpan(4),
+                                TextInput::make('voyage')->disabled()->dehydrated()->columnSpan(4),
+                                DatePicker::make('etd')->disabled()->dehydrated()->columnSpan(4),
+                                DatePicker::make('eta')->disabled()->dehydrated()->columnSpan(4),
+                                TextInput::make('pol')->disabled()->dehydrated()->columnSpan(4),
+                                TextInput::make('pod')->disabled()->dehydrated()->columnSpan(4),
 
-                                TextInput::make('voyage')->label('Voyage/Trip')
-                                    ->disabled(fn() => $hasVoyages)->dehydrated()
-                                    ->columnSpan(4),
-
-                                DatePicker::make('etd')->label('ETD')->native(false)->disabled(fn() => $hasVoyages)->dehydrated()->columnSpan(4),
-                                DatePicker::make('eta')->label('ETA')->native(false)->disabled(fn() => $hasVoyages)->dehydrated()->columnSpan(4),
-
-                                TextInput::make('pol')->label('POL — Pelabuhan Muat')
-                                    ->disabled(fn() => $hasVoyages)->dehydrated()
-                                    ->columnSpan(4),
-
-                                TextInput::make('pod')->label('POD — Pelabuhan Bongkar')
-                                    ->disabled(fn() => $hasVoyages)->dehydrated()
-                                    ->columnSpan(4),
                             ]),
 
                         // === DARAT ===
@@ -516,11 +514,11 @@ class ShipmentResource extends Resource
                                     ->searchable()
                                     ->preload()
                                     ->live()
-                                    ->afterStateUpdated(function ($state, Set $set) use ($hasDrivers) {
-                                        if (!$hasDrivers || !$state) {
-                                            $set('driver_name', null);
-                                            $set('driver_phone', null);
-                                            return;
+                                    ->afterStateUpdated(function (Set $set, $state) {
+                                        $isSea = $state === ShipmentMode::Sea->value;
+                                        if (! $isSea) {
+                                            $set('voyage_id', null);
+                                            foreach (['vessel_name', 'voyage', 'pol', 'pod', 'etd', 'eta'] as $f) $set($f, null);
                                         }
                                         $d = DB::table('drivers')->where('id', $state)->first();
                                         $set('driver_name', $d?->name);

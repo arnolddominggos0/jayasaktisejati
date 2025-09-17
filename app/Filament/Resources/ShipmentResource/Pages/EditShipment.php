@@ -20,20 +20,26 @@ class EditShipment extends EditRecord
         return ShipmentResource::getUrl('index');
     }
 
-    protected function getHeaderActions(): array
+    protected function getHeaderWidgets(): array
     {
         return [
             RecentShipmentActivities::class,
-            RecentTrackingActivities::make(),
+        ];
+    }
+
+
+    protected function getHeaderActions(): array
+    {
+        return [
             Actions\Action::make('cancel')
                 ->label('Batalkan')
                 ->icon('heroicon-m-x-circle')
                 ->color('danger')
                 ->visible(fn () => ($this->record->status instanceof ShipmentStatus)
                     ? $this->record->status !== ShipmentStatus::Cancelled
-                    : (string)$this->record->status !== ShipmentStatus::Cancelled->value)
+                    : (string) $this->record->status !== ShipmentStatus::Cancelled->value)
                 ->requiresConfirmation()
-                ->action('cancelShipment'),    
+                ->action('cancelShipment'),
 
             Actions\Action::make('uncancel')
                 ->label('Pulihkan')
@@ -41,14 +47,13 @@ class EditShipment extends EditRecord
                 ->color('gray')
                 ->visible(fn () => ($this->record->status instanceof ShipmentStatus)
                     ? $this->record->status === ShipmentStatus::Cancelled
-                    : (string)$this->record->status === ShipmentStatus::Cancelled->value)
+                    : (string) $this->record->status === ShipmentStatus::Cancelled->value)
                 ->requiresConfirmation()
-                ->action('uncancelShipment'),  
+                ->action('uncancelShipment'),
 
             ...parent::getHeaderActions(),
         ];
     }
-
 
     public function cancelShipment(): void
     {

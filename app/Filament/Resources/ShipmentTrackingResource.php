@@ -27,11 +27,10 @@ class ShipmentTrackingResource extends Resource
         return auth_user()?->hasRole('super_admin') === true;
     }
 
-
     public static function table(Table $table): Table
     {
         return $table
-            ->query(fn() => static::getEloquentQuery())
+            ->query(fn () => static::getEloquentQuery())
             ->columns([
                 TextColumn::make('code')
                     ->label('Kode')->badge()->copyable()
@@ -40,32 +39,39 @@ class ShipmentTrackingResource extends Resource
 
                 IconColumn::make('mode')
                     ->label('Moda')
-                    ->icon(fn($state) => ($state?->value ?? $state) === 'sea' ? 'heroicon-m-cog-8-tooth' : 'heroicon-m-truck')
-                    ->color(fn($state) => ($state?->value ?? $state) === 'sea' ? 'primary' : 'warning')
-                    ->tooltip(fn($state) => ($state?->value ?? $state) === 'sea' ? 'Laut' : 'Darat')
+                    ->icon(fn ($state) => ($state?->value ?? $state) === 'sea' ? 'heroicon-m-cog-8-tooth' : 'heroicon-m-truck')
+                    ->color(fn ($state) => ($state?->value ?? $state) === 'sea' ? 'primary' : 'warning')
+                    ->tooltip(fn ($state) => ($state?->value ?? $state) === 'sea' ? 'Laut' : 'Darat')
                     ->toggleable(),
 
                 TextColumn::make('customer.name')->label('Customer')->badge()->toggleable(),
-                TextColumn::make('route_summary')->label('Rute')->html()->getStateUsing(function (Shipment $record): string {
-                    $oCity = $record->originCity->name ?? '-';
-                    $dCity = $record->destinationCity->name ?? '-';
-                        $line1 = "<div class='font-medium'>{$oCity} &rarr; {$dCity}</div>";
-                        return $line1;
+
+                TextColumn::make('route_summary')->label('Rute')->html()
+                    ->getStateUsing(function (Shipment $record): string {
+                        $oCity = $record->originCity->name ?? '-';
+                        $dCity = $record->destinationCity->name ?? '-';
+                        return "<div class='font-medium'>{$oCity} &rarr; {$dCity}</div>";
                     })
                     ->toggleable(),
 
                 TextColumn::make('progress_count')
                     ->label('Progress')
-                    ->state(function ($record) {
+                    ->state(function (Shipment $record) {
                         $order = TrackStatus::order();
                         $raw   = $record->latestTrack?->status;
                         $last  = $raw instanceof \BackedEnum ? $raw->value : $raw;
-                        $idx   = $last ? array_search(TrackStatus::from($last), $order, true) : -1;
+
+                        $idx = -1;
+                        if ($last) {
+                            $current = TrackStatus::tryFrom((string) $last);
+                            if ($current) {
+                                $idx = array_search($current, $order, true);
+                            }
+                        }
                         return ($idx + 1) . '/' . count($order);
                     })
                     ->badge()
                     ->icon('heroicon-m-bolt')
-
                     ->toggleable(),
 
                 ViewColumn::make('progress_stepper')
@@ -74,18 +80,16 @@ class ShipmentTrackingResource extends Resource
 
                 TextColumn::make('latestTrack.status')
                     ->label('Status')
-                    ->formatStateUsing(function ($state) {
-                        return $state?->label() ?? 'Belum dimulai';
-                    })
+                    ->formatStateUsing(fn ($state) => $state?->label() ?? 'Belum dimulai')
                     ->badge()
                     ->color(function ($state) {
-                        if (!$state) return 'gray';
+                        if (! $state) return 'gray';
                         $val = $state instanceof \BackedEnum ? $state->value : (string) $state;
                         return match ($val) {
-                            'delivered' => 'success',
-                            'hold'      => 'warning',
-                            'cancelled' => 'danger',
-                            default     => 'primary',
+                            TrackStatus::Delivered->value => 'success',
+                            TrackStatus::Hold->value      => 'warning',
+                            TrackStatus::Cancelled->value => 'danger',
+                            default                       => 'primary',
                         };
                     })
                     ->toggleable(),
@@ -98,21 +102,32 @@ class ShipmentTrackingResource extends Resource
                     ->label('Sudah ditrack?')
                     ->placeholder('Semua')
                     ->trueLabel('Ya')->falseLabel('Belum')
-                    ->queries(function (Builder $query) {
-                        return $query->whereHas('tracks');
-                    }, function (Builder $query) {
-                        return $query->whereDoesntHave('tracks');
+                    ->queries(
+                        fn (Builder $q) => $q->whereHas('tracks'),
+                        fn (Builder $q) => $q->whereDoesntHave('tracks'),
+                    ),
+
+                Tables\Filters\SelectFilter::make('latest_track_status')
+                    ->label('Status Tracking')
+                    ->options(
+                        collect(TrackStatus::order())
+                            ->mapWithKeys(fn (TrackStatus $s) => [$s->value => $s->label()])
+                            ->toArray()
+                        + [
+                            TrackStatus::Hold->value      => TrackStatus::Hold->label(),
+                            TrackStatus::Cancelled->value => TrackStatus::Cancelled->label(),
+                        ]
+                    )
+                    ->query(function (Builder $q, array $data) {
+                        if (! empty($data['value'])) {
+                            $q->whereHas('latestTrack', fn ($tq) => $tq->where('status', $data['value']));
+                        }
                     }),
-                Tables\Filters\SelectFilter::make('mode')
-                    ->options([
-                        'sea' => 'Laut',
-                        'land' => 'Darat',
-                    ]),
             ])
             ->actions([
                 Tables\Actions\Action::make('lihat')
                     ->label('Lihat')
-                    ->url(fn($record) => route('filament.admin.resources.shipments.edit', $record))
+                    ->url(fn ($record) => route('filament.admin.resources.shipments.edit', $record))
                     ->icon('heroicon-m-eye'),
             ])
             ->bulkActions([])

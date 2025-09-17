@@ -35,16 +35,18 @@ return new class extends Migration {
         ");
 
 
-        foreach ([
-            ['shipments_status_index',               'CREATE INDEX shipments_status_index               ON shipments (status)'],
-            ['shipments_mode_index',                 'CREATE INDEX shipments_mode_index                 ON shipments (mode)'],
-            ['shipments_service_type_option_index',  'CREATE INDEX shipments_service_type_option_index  ON shipments (service_type, service_option)'],
-            ['shipments_customer_receiver_index',    'CREATE INDEX shipments_customer_receiver_index    ON shipments (customer_id, receiver_id)'],
-            ['shipments_offices_index',              'CREATE INDEX shipments_offices_index              ON shipments (origin_office_id, destination_office_id)'],
-            ['shipments_schedule_index',             'CREATE INDEX shipments_schedule_index             ON shipments (schedule_id)'],
-            ['shipments_eta_index',                  'CREATE INDEX shipments_eta_index                  ON shipments (eta)'],
-            ['shipments_updated_at_index',           'CREATE INDEX shipments_updated_at_index           ON shipments (updated_at)'],
-        ] as [$name, $sql]) {
+        foreach (
+            [
+                ['shipments_status_index',               'CREATE INDEX shipments_status_index               ON shipments (status)'],
+                ['shipments_mode_index',                 'CREATE INDEX shipments_mode_index                 ON shipments (mode)'],
+                ['shipments_service_type_option_index',  'CREATE INDEX shipments_service_type_option_index  ON shipments (service_type, service_option)'],
+                ['shipments_customer_receiver_index',    'CREATE INDEX shipments_customer_receiver_index    ON shipments (customer_id, receiver_id)'],
+                ['shipments_offices_index',              'CREATE INDEX shipments_offices_index              ON shipments (origin_office_id, destination_office_id)'],
+                ['shipments_schedule_index',             'CREATE INDEX shipments_schedule_index             ON shipments (fleet_schedule_id)'],
+                ['shipments_eta_index',                  'CREATE INDEX shipments_eta_index                  ON shipments (eta)'],
+                ['shipments_updated_at_index',           'CREATE INDEX shipments_updated_at_index           ON shipments (updated_at)'],
+            ] as [$name, $sql]
+        ) {
             DB::statement("
                 DO $$
                 BEGIN
@@ -63,19 +65,24 @@ return new class extends Migration {
 
     public function down(): void
     {
-        foreach ([
-            "ALTER TABLE shipments DROP CONSTRAINT IF EXISTS shipments_doc_required_on_sppb_do",
-            "ALTER TABLE shipments DROP CONSTRAINT IF EXISTS shipments_code_unique",
-            "DROP INDEX IF EXISTS shipments_status_index",
-            "DROP INDEX IF EXISTS shipments_mode_index",
-            "DROP INDEX IF EXISTS shipments_service_type_option_index",
-            "DROP INDEX IF EXISTS shipments_customer_receiver_index",
-            "DROP INDEX IF EXISTS shipments_offices_index",
-            "DROP INDEX IF EXISTS shipments_schedule_index",
-            "DROP INDEX IF EXISTS shipments_eta_index",
-            "DROP INDEX IF EXISTS shipments_updated_at_index",
-        ] as $sql) {
-            try { DB::statement($sql); } catch (\Throwable $e) {}
+        foreach (
+            [
+                "ALTER TABLE shipments DROP CONSTRAINT IF EXISTS shipments_doc_required_on_sppb_do",
+                "ALTER TABLE shipments DROP CONSTRAINT IF EXISTS shipments_code_unique",
+                "DROP INDEX IF EXISTS shipments_status_index",
+                "DROP INDEX IF EXISTS shipments_mode_index",
+                "DROP INDEX IF EXISTS shipments_service_type_option_index",
+                "DROP INDEX IF EXISTS shipments_customer_receiver_index",
+                "DROP INDEX IF EXISTS shipments_offices_index",
+                "DROP INDEX IF EXISTS shipments_schedule_index",
+                "DROP INDEX IF EXISTS shipments_eta_index",
+                "DROP INDEX IF EXISTS shipments_updated_at_index",
+            ] as $sql
+        ) {
+            try {
+                DB::statement($sql);
+            } catch (\Throwable $e) {
+            }
         }
     }
 };

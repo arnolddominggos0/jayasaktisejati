@@ -10,10 +10,27 @@ class ShipmentObserver
 {
     private function normalize(mixed $v): ?string
     {
-        if ($v instanceof BackedEnum) return (string) $v->value;
-        if (is_null($v)) return null;
+        if ($v instanceof BackedEnum) {
+            return (string) $v->value;
+        }
+
+        if (is_null($v)) {
+            return null;
+        }
+
+        if (is_array($v)) {
+            return json_encode($v, JSON_UNESCAPED_UNICODE);
+        }
+
+        if (is_object($v)) {
+            return method_exists($v, '__toString')
+                ? (string) $v
+                : json_encode($v, JSON_UNESCAPED_UNICODE);
+        }
+
         return (string) $v;
     }
+
 
     private function statusLabel(?string $code): ?string
     {
@@ -30,6 +47,7 @@ class ShipmentObserver
             ->log($event);
     }
 
+
     public function created(Shipment $s): void
     {
         $status = $this->normalize($s->status);
@@ -40,7 +58,7 @@ class ShipmentObserver
     }
 
 
-     public function updated(Shipment $s): void
+    public function updated(Shipment $s): void
     {
         $fromStatus = $this->normalize($s->getOriginal('status'));
         $toStatus   = $this->normalize($s->status);
@@ -72,9 +90,8 @@ class ShipmentObserver
                 ]);
             }
 
-            $changes = array_values(array_diff($changes, ['status','cancelled_at','cancelled_by']));
-        }
-        elseif ($statusChanged) {
+            $changes = array_values(array_diff($changes, ['status', 'cancelled_at', 'cancelled_by']));
+        } elseif ($statusChanged) {
             $this->log('status_changed', $s, [
                 'from'       => $fromStatus,
                 'to'         => $toStatus,
@@ -93,7 +110,10 @@ class ShipmentObserver
         }
 
         $other = array_values(array_diff($changes, [
-            'updated_at','created_at','edited_fields','last_edited_by',
+            'updated_at',
+            'created_at',
+            'edited_fields',
+            'last_edited_by',
         ]));
 
         if (!empty($other)) {

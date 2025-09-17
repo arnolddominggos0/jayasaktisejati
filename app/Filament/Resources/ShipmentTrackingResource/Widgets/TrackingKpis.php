@@ -18,24 +18,30 @@ class TrackingKpis extends BaseWidget
 
     protected function getStats(): array
     {
-        $base = Shipment::query();
+        $withTrack = Shipment::query()->whereHas('tracks');
 
-        $allActive = (clone $base)->where('status', '!=', TrackStatus::Cancelled)->count();
-
-        $inTransit = (clone $base)
-            ->whereNotIn('status', [TrackStatus::Delivered, TrackStatus::Cancelled])
+        $delivered = (clone $withTrack)
+            ->whereHas('latestTrack', function ($q) {
+                $q->where('status', TrackStatus::Delivered->value);
+            })
             ->count();
 
-        $delivered = (clone $base)->where('status', TrackStatus::Delivered)->count();
+        $inTransit = (clone $withTrack)
+            ->whereHas('latestTrack', function ($q) {
+                $q->whereNotIn('status', array_map(fn($e) => $e->value, TrackStatus::finished()));
+            })
+            ->count();
+
+        $allActive = (clone $withTrack)->count();
 
         return [
-            Stat::make('Semua', number_format($allActive))
-                ->description('Pengiriman berjalan')
+            Stat::make('Semua Ditacking', number_format($allActive))
+                ->description('Pengiriman memiliki progres tracking')
                 ->descriptionIcon('heroicon-m-cube')
                 ->color('primary'),
 
             Stat::make('Dalam Proses', number_format($inTransit))
-                ->description('Proses Pengiriman')
+                ->description('Belum selesai')
                 ->descriptionIcon('heroicon-m-truck')
                 ->color('warning'),
 

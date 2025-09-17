@@ -35,9 +35,9 @@ return new class extends Migration {
             $table->string('route_summary')->nullable();
 
             // Layanan & Muatan
-            $table->string('service_type', 32)->nullable();   
-            $table->string('service_option', 32)->nullable(); 
-            $table->string('cargo_type', 16)->nullable();     
+            $table->string('service_type', 32)->nullable();
+            $table->string('service_option', 32)->nullable();
+            $table->string('cargo_type', 16)->nullable();
 
             // FCL
             $table->string('container_size', 32)->nullable();
@@ -46,7 +46,7 @@ return new class extends Migration {
             // LCL totals yang disimpan
             $table->unsignedInteger('packages_total')->nullable();
             $table->decimal('cbm_total', 10, 3)->nullable();
-            $table->decimal('weight_total', 10, 2)->nullable(); 
+            $table->decimal('weight_total', 10, 2)->nullable();
 
             // Laut
             $table->string('vessel_name')->nullable();
@@ -55,7 +55,7 @@ return new class extends Migration {
             $table->string('pod')->nullable();
             $table->dateTime('etd')->nullable();
             $table->dateTime('eta')->nullable();
-            $table->foreignId('schedule_id')->nullable();
+            $table->foreignId('voyage_id')->nullable()->constrained('voyages')->nullOnDelete();
 
             // Darat
             $table->string('vehicle_type')->nullable();

@@ -15,8 +15,8 @@ return new class extends Migration
             DB::statement('ALTER TABLE shipments DROP CONSTRAINT IF EXISTS shipments_schedule_id_foreign');
             DB::statement('ALTER TABLE shipments DROP CONSTRAINT IF EXISTS shipments_driver_id_foreign');
 
-            if (Schema::hasTable('fleet_schedules') && Schema::hasColumn('shipments', 'schedule_id')) {
-                $t->foreign('schedule_id')
+            if (Schema::hasTable('fleet_schedules') && Schema::hasColumn('shipments', 'fleet_schedule_id')) {
+                $t->foreign('fleet_schedule_id')
                   ->references('id')->on('fleet_schedules')
                   ->nullOnDelete();
             }
