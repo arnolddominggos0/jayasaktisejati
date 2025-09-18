@@ -28,6 +28,7 @@ class TrackingKpis extends BaseWidget
 
         $inTransit = (clone $withTrack)
             ->whereHas('latestTrack', function ($q) {
+                
                 $q->whereNotIn('status', array_map(fn($e) => $e->value, TrackStatus::finished()));
             })
             ->count();

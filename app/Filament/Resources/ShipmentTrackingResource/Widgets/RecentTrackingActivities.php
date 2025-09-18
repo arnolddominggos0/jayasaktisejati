@@ -11,7 +11,8 @@ class RecentTrackingActivities extends Widget
 {
     protected static string $view = 'filament.widgets.recent-tracking-activities';
     protected int|string|array $columnSpan = 'full';
-    protected static ?string $pollingInterval = '30s';
+    protected static ?string $pollingInterval = null;
+    protected static bool $isLazy = false;
 
     public ?int $shipmentId = null;
 
@@ -34,15 +35,15 @@ class RecentTrackingActivities extends Widget
                 $q->whereHasMorph(
                     'subject',
                     [ShipmentTrack::class],
-                    fn ($sq) => $sq->where('shipment_id', $this->shipmentId)
+                    fn($sq) => $sq->where('shipment_id', $this->shipmentId)
                 );
             })
             ->with([
                 'causer',
-                'subject' => fn ($morph) =>
-                    $morph->morphWith([
-                        ShipmentTrack::class => ['shipment'],
-                    ]),
+                'subject' => fn($morph) =>
+                $morph->morphWith([
+                    ShipmentTrack::class => ['shipment'],
+                ]),
             ])
             ->latest('created_at')
             ->limit(30)
@@ -71,7 +72,7 @@ class RecentTrackingActivities extends Widget
             TrackStatus::VesselArrival->value,
             TrackStatus::Unloading->value,
             TrackStatus::DeliveryToCustomer->value
-                => 'info',
+            => 'info',
 
             default => 'gray',
         };

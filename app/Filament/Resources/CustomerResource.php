@@ -58,9 +58,8 @@ class CustomerResource extends Resource
                             ->inline()
                             ->required()
                             ->default(CustomerType::Individual->value)
-                            ->live() // penting: memicu field lain update
+                            ->live()
                             ->afterStateUpdated(function ($state, Set $set) {
-                                // Saat ganti tipe, kosongkan field yang tidak relevan biar data bersih
                                 if ($state === CustomerType::Company->value) {
                                     $set('nik', null);
                                 } else {

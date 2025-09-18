@@ -4,21 +4,15 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 
-class AuthServiceProvider extends ServiceProvider
+class AuthServiceProvider extends \Illuminate\Foundation\Support\Providers\AuthServiceProvider
 {
-    /**
-     * Register services.
-     */
-    public function register(): void
-    {
-        //
-    }
+    protected $policies = [
+        \App\Models\Shipment::class      => \App\Policies\ShipmentPolicy::class,
+        \App\Models\ShipmentTrack::class => \App\Policies\ShipmentTrackPolicy::class,
+    ];
 
-    /**
-     * Bootstrap services.
-     */
     public function boot(): void
     {
-        //
+        $this->registerPolicies();
     }
 }

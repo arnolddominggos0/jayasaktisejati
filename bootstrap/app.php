@@ -37,7 +37,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Illuminate\Foundation\Configuration\Exceptions $exceptions) {
         $exceptions->render(function (Throwable $e, Illuminate\Http\Request $request) {
             if (! $request->is('api/*')) {
-                return null; // biarkan default untuk non-API
+                return null; 
             }
 
             if ($e instanceof Illuminate\Validation\ValidationException) {

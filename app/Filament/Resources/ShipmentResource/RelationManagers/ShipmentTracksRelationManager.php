@@ -3,11 +3,13 @@
 namespace App\Filament\Resources\ShipmentResource\RelationManagers;
 
 use App\Enums\TrackStatus;
+use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
@@ -26,7 +28,7 @@ class ShipmentTracksRelationManager extends RelationManager
                 ->label('Status')
                 ->options(
                     collect(TrackStatus::order())
-                        ->mapWithKeys(fn(TrackStatus $s) => [$s->value => $s->label()])
+                        ->mapWithKeys(fn(TrackStatus $state) => [$state->value => $state->label()])
                 )
                 ->afterStateHydrated(function ($component, $state) {
                     $component->state($state instanceof TrackStatus ? $state->value : $state);
@@ -42,27 +44,38 @@ class ShipmentTracksRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table->columns([
-            TextColumn::make('status')
-                ->label('Status')->badge()
-                ->formatStateUsing(function ($state) {
-                    return $state?->label() ?? (string)$state;
-                }),
-            TextColumn::make('location')->label('Lokasi'),
-            TextColumn::make('note')->label('Catatan')->limit(40),
-            TextColumn::make('tracked_at')->dateTime()->label('Waktu'),
-            TextColumn::make('user.name')->label('Diupdate oleh'),
-        ])
+        return $table
+            ->columns([
+                TextColumn::make('status')->label('Status')->badge()
+                    ->formatStateUsing(fn($state) => $state?->label() ?? (string) $state),
+                TextColumn::make('location')->label('Lokasi'),
+                TextColumn::make('note')->label('Catatan')->limit(80),
+                TextColumn::make('tracked_at')->label('Waktu')->dateTime('d M Y H:i'),
+                TextColumn::make('user.name')->label('Diupdate oleh'),
+            ])
             ->defaultSort('tracked_at', 'desc')
+            ->paginated(false)
+            ->emptyStateHeading('Belum ada timeline.')
+            ->emptyStateDescription('Tambah status pertama untuk mulai melacak.')
             ->headerActions([
                 Tables\Actions\CreateAction::make()
-                    ->visible(fn() => auth_user()?->hasRole('super_admin')),
+                    ->label('Tambah status')
+                    ->icon('heroicon-m-plus')
+                    ->slideOver()
+                    ->mutateFormDataUsing(function (array $data): array {
+                        $userId = Filament::auth()->id() ?? auth()->id();
+
+                        $data['created_by'] = $userId;
+                        $data['tracked_at'] = $data['tracked_at'] ?? now();
+
+                        return $data;
+                    }),
             ])
             ->actions([
-                Tables\Actions\EditAction::make()
-                    ->visible(fn() => auth_user()?->hasRole('super_admin')),
-                Tables\Actions\DeleteAction::make()
-                    ->visible(fn() => auth_user()?->hasRole('super_admin')),
+                ActionGroup::make([
+                    Tables\Actions\EditAction::make()->slideOver(),
+                    Tables\Actions\DeleteAction::make()->requiresConfirmation(),
+                ])->icon('heroicon-m-ellipsis-horizontal'),
             ]);
     }
 }

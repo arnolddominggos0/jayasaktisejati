@@ -13,16 +13,13 @@ class CreateShipment extends CreateRecord
 {
     protected static string $resource = ShipmentResource::class;
 
-    // Matikan "Create & create another" (HARUS static di v3)
     protected static bool $canCreateAnother = false;
 
-    // Setelah create → kembali ke index
     protected function getRedirectUrl(): string
     {
         return ShipmentResource::getUrl('index');
     }
 
-    // (opsional) tombol Batal diarahkan ke index
     protected function getFormActions(): array
     {
         return [

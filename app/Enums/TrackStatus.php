@@ -28,7 +28,7 @@ enum TrackStatus: string
             self::Stuffing           => 'Stuffing & Segel',
             self::DeliveryToPort     => 'Antar ke Pelabuhan',
             self::Stacking           => 'Stacking (Terminal)',
-            self::UnitLoading        => 'Naik Kapal',
+            self::UnitLoading        => 'Dimuat di Kapal',
             self::OnShip             => 'On Ship',
             self::VesselDepart       => 'Kapal Berangkat',
             self::VesselArrival      => 'Kapal Tiba',

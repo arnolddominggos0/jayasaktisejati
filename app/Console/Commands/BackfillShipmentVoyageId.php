@@ -1,13 +1,11 @@
 <?php
 
-// app/Console/Commands/BackfillShipmentVoyageId.php
 namespace App\Console\Commands;
 
 use App\Models\Shipment;
 use App\Models\Voyage;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
-use Illuminate\Support\Str;
 
 class BackfillShipmentVoyageId extends Command
 {

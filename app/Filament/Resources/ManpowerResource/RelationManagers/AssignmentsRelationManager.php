@@ -30,7 +30,6 @@ class AssignmentsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('title'),
             ])
             ->filters([
-                //
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make(),

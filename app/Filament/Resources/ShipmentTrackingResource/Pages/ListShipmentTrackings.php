@@ -11,17 +11,11 @@ class ListShipmentTrackings extends ListRecords
 {
     protected static string $resource = ShipmentTrackingResource::class;
 
-    /**
-     * Hilangkan tombol Create di header.
-     */
     protected function getHeaderActions(): array
     {
         return [];
     }
 
-    /**
-     * Widget KPI & aktivitas terbaru (opsional, jika sudah ada).
-     */
     protected function getHeaderWidgets(): array
     {
         return [
@@ -30,13 +24,8 @@ class ListShipmentTrackings extends ListRecords
         ];
     }
 
-    /**
-     * Layout kolom widget header.
-     */
     public function getHeaderWidgetsColumns(): int|array
     {
-        return [
-            3
-        ];
+        return 3;
     }
 }

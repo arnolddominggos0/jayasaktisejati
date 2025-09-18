@@ -869,9 +869,7 @@ class ShipmentResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            \App\Filament\Resources\ShipmentResource\RelationManagers\ShipmentTracksRelationManager::class,
-        ];
+        return [];
     }
 
     public static function getPages(): array

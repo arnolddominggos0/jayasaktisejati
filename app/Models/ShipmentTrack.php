@@ -42,8 +42,8 @@ class ShipmentTrack extends Model
 
     protected static function booted(): void
     {
-        static::creating(function ($track) {
-            $uid = \Filament\Facades\Filament::auth()?->id() ?: (auth()->check() ? auth()->id() : null);
+        static::creating(function (ShipmentTrack $track) {
+            $uid = Filament::auth()?->id() ?: (auth()->check() ? auth()->id() : null);
             if ($uid) {
                 $track->created_by ??= $uid;
                 $track->updated_by ??= $uid;
@@ -51,9 +51,11 @@ class ShipmentTrack extends Model
             $track->tracked_at ??= now();
         });
 
-        static::updating(function ($track) {
-            $uid = \Filament\Facades\Filament::auth()?->id() ?: (auth()->check() ? auth()->id() : null);
-            if ($uid) $track->updated_by = $uid;
+        static::updating(function (ShipmentTrack $track) {
+            $uid = Filament::auth()?->id() ?: (auth()->check() ? auth()->id() : null);
+            if ($uid) {
+                $track->updated_by = $uid;
+            }
         });
     }
 }
