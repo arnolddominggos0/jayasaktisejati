@@ -40,7 +40,6 @@ enum TrackStatus: string
         };
     }
 
-    /** Urutan tahapan normal (progress bar pelanggan) */
     public static function order(): array
     {
         return [
@@ -57,6 +56,26 @@ enum TrackStatus: string
             self::DeliveryToCustomer,
             self::Delivered,
         ];
+    }
+
+    public function toShipmentStatus(): ?\App\Enums\ShipmentStatus
+    {
+        return match ($this) {
+            self::Pickup             => \App\Enums\ShipmentStatus::Pickup,
+            self::Handover,
+            self::Stuffing,
+            self::DeliveryToPort,
+            self::Stacking,
+            self::UnitLoading,
+            self::OnShip,
+            self::VesselDepart,
+            self::VesselArrival,
+            self::Unloading,
+            self::DeliveryToCustomer => \App\Enums\ShipmentStatus::Transit,
+            self::Delivered          => \App\Enums\ShipmentStatus::Delivered,
+            self::Hold               => \App\Enums\ShipmentStatus::Hold,
+            self::Cancelled          => \App\Enums\ShipmentStatus::Cancelled,
+        };
     }
 
     public static function finished(): array

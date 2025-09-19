@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 
 if (! function_exists('auth_user')) {
     /**
@@ -11,5 +12,16 @@ if (! function_exists('auth_user')) {
         /** @var \App\Models\User|null $u */
         $u = Auth::user();
         return $u;
+    }
+
+    if (! function_exists('schema_has_column')) {
+        function schema_has_column(string $table, string $column): bool
+        {
+            try {
+                return Schema::hasColumn($table, $column);
+            } catch (\Throwable $e) {
+                return false;
+            }
+        }
     }
 }

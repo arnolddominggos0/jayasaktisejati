@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Pages;
+namespace App\Filament\Pages\Dashboard;
 
 use Filament\Pages\Page;
 use Filament\Facades\Filament;
@@ -14,10 +14,7 @@ class DashboardHome extends Page
     protected static ?string $slug = 'dashboard';
     protected static ?string $navigationLabel = 'Dashboard';
     protected static ?int $navigationSort = -2;
-
-
     protected static string $view = 'filament.pages.dashboard-home';
-
 
     public static function getNavigationLabel(): string
     {
@@ -34,29 +31,29 @@ class DashboardHome extends Page
     }
 
     /**
-     * @return array<class-string<Widget> | WidgetConfiguration>
+     * @return array<class-string<Widget>|WidgetConfiguration>
      */
     public function getWidgets(): array
     {
-        return Filament::getWidgets();
+        return [
+            \App\Filament\Pages\Dashboard\Widgets\KpiOverview::class,
+            \App\Filament\Pages\Dashboard\Widgets\ShipmentsByStatusChart::class,
+            \App\Filament\Pages\Dashboard\Widgets\ShipmentsTrendChart::class,
+            \App\Filament\Pages\Dashboard\Widgets\TrackingActivityTable::class,
+            \App\Filament\Pages\Dashboard\Widgets\TodayManpowerWidget::class,
+            \App\Filament\Pages\Dashboard\Widgets\ActiveArmadaWidget::class,
+            // \App\Filament\Pages\Dashboard\Widgets\LeadTimeCustomerWidget::class,
+        ];
     }
 
     /**
-     * @return array<class-string<Widget> | WidgetConfiguration>
-     */
-    public function getVisibleWidgets(): array
-    {
-        return $this->filterVisibleWidgets($this->getWidgets());
-    }
-
-    /**
-     * @return int | string | array<string, int | string | null>
+     * @return array<string, int|string|null>|int|string
      */
     public function getColumns(): int | string | array
     {
-        return 2;
+        // 12-grid:  -> kita atur di blade via CSS grid responsive
+        return 3;
     }
-
 
     public function getTitle(): string | Htmlable
     {

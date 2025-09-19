@@ -125,7 +125,6 @@
                             @endif
                         </div>
 
-                        {{-- waktu ringkas + tooltip --}}
                         <time datetime="{{ $ts->toIso8601String() }}" title="{{ $full }}"
                             class="text-xs text-gray-500 dark:text-gray-400 mt-1 block">
                             {{ $text }}

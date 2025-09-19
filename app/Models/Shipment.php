@@ -57,6 +57,7 @@ class Shipment extends Model
         'etd',
         'eta',
         'schedule_id',
+        'voyage_id',
 
         // Darat
         'vehicle_type',
@@ -284,7 +285,7 @@ class Shipment extends Model
     }
     public function voyage()
     {
-        return $this->belongsTo(\App\Models\Voyage::class, 'voyage_id');
+        return $this->belongsTo(Voyage::class, 'voyage_id');
     }
 
     public function cancelledBy()
@@ -294,14 +295,6 @@ class Shipment extends Model
     public function lastEditor()
     {
         return $this->belongsTo(User::class, 'last_edited_by');
-    }
-    public function originCity()
-    {
-        return $this->belongsTo(City::class, 'origin_city_id');
-    }
-    public function destinationCity()
-    {
-        return $this->belongsTo(City::class, 'destination_city_id');
     }
     public function originOffice()
     {
@@ -319,5 +312,31 @@ class Shipment extends Model
     {
         return $this->hasOne(ShipmentTrack::class, 'shipment_id', 'id')
             ->latestOfMany('tracked_at');
+    }
+    public function originCity()
+    {
+        return $this->belongsTo(\App\Models\City::class, 'origin_city_id');
+    }
+
+    public function destinationCity()
+    {
+        return $this->belongsTo(\App\Models\City::class, 'destination_city_id');
+    }
+
+    public function getRouteLabelAttribute(): string
+    {
+        $origin = $this->originCity?->name
+            ?? $this->origin
+            ?? $this->origin_name
+            ?? $this->pol_name
+            ?? $this->from;
+
+        $dest = $this->destinationCity?->name
+            ?? $this->destination
+            ?? $this->destination_name
+            ?? $this->pod_name
+            ?? $this->to;
+
+        return trim(($origin ?: '—') . ' → ' . ($dest ?: '—'));
     }
 }

@@ -409,43 +409,58 @@ class ShipmentResource extends Resource
 
                                 Select::make('voyage_id')
                                     ->label('Jadwal Kapal *')
-                                    ->searchable()
                                     ->native(false)
+                                    ->searchable()
                                     ->required(fn(Get $get) => $get('mode') === \App\Enums\ShipmentMode::Sea->value)
                                     ->hidden(fn(Get $get) => $get('mode') !== \App\Enums\ShipmentMode::Sea->value)
-                                    ->getSearchResultsUsing(function (string $search) {
-                                        return \App\Models\Voyage::query()
-                                            ->with(['vessel', 'portFrom', 'portTo'])
-                                            ->when($search, function ($q) use ($search) {
-                                                $q->where('voyage_no', 'ilike', "%{$search}%")
-                                                    ->orWhereHas('vessel', fn($qq) => $qq->where('name', 'ilike', "%{$search}%"))
-                                                    ->orWhereHas('portFrom', fn($qq) => $qq->where('code', 'ilike', "%{$search}%")->orWhere('name', 'ilike', "%{$search}%"))
-                                                    ->orWhereHas('portTo',   fn($qq) => $qq->where('code', 'ilike', "%{$search}%")->orWhere('name', 'ilike', "%{$search}%"));
-                                            })
+
+                                    // preload 50 jadwal terbaru
+                                    ->options(function () {
+                                        return Voyage::with(['vessel', 'portFrom', 'portTo'])
                                             ->orderByDesc('etd')
                                             ->limit(50)
                                             ->get()
-                                            ->mapWithKeys(function ($v) {
-                                                $label = sprintf(
+                                            ->mapWithKeys(fn($v) => [
+                                                $v->id => sprintf(
                                                     '%s / %s — %s (%s → %s)',
                                                     $v->vessel?->name ?: '-',
-                                                    $v->voyage_no ?: '-',
-                                                    optional($v->etd)->format('d M Y') ?: '-',
+                                                    $v->voyage_no,
+                                                    $v->etd?->format('d M Y') ?? '-',
                                                     $v->portFrom?->code ?: $v->portFrom?->name ?: '-',
                                                     $v->portTo?->code   ?: $v->portTo?->name   ?: '-',
-                                                );
-                                                return [$v->id => $label];
-                                            })->toArray();
+                                                ),
+                                            ])->toArray();
                                     })
+                                    ->getSearchResultsUsing(function (string $search) {
+                                        return Voyage::with(['vessel', 'portFrom', 'portTo'])
+                                            ->where('voyage_no', 'ilike', "%{$search}%")
+                                            ->orWhereHas('vessel', fn($q) => $q->where('name', 'ilike', "%{$search}%"))
+                                            ->orWhereHas('portFrom', fn($q) => $q->where('code', 'ilike', "%{$search}%")->orWhere('name', 'ilike', "%{$search}%"))
+                                            ->orWhereHas('portTo', fn($q) => $q->where('code', 'ilike', "%{$search}%")->orWhere('name', 'ilike', "%{$search}%"))
+                                            ->orderByDesc('etd')
+                                            ->limit(50)
+                                            ->get()
+                                            ->mapWithKeys(fn($v) => [
+                                                $v->id => sprintf(
+                                                    '%s / %s — %s (%s → %s)',
+                                                    $v->vessel?->name ?: '-',
+                                                    $v->voyage_no,
+                                                    $v->etd?->format('d M Y') ?? '-',
+                                                    $v->portFrom?->code ?: $v->portFrom?->name ?: '-',
+                                                    $v->portTo?->code   ?: $v->portTo?->name   ?: '-',
+                                                ),
+                                            ])->toArray();
+                                    })
+
                                     ->getOptionLabelUsing(function ($value) {
-                                        $v = \App\Models\Voyage::with(['vessel', 'portFrom', 'portTo'])->find($value);
+                                        $v = Voyage::with(['vessel', 'portFrom', 'portTo'])->find($value);
                                         return $v ? sprintf(
                                             '%s / %s — %s (%s → %s)',
                                             $v->vessel?->name ?: '-',
-                                            $v->voyage_no ?: '-',
-                                            optional($v->etd)->format('d M Y') ?: '-',
+                                            $v->voyage_no,
+                                            $v->etd?->format('d M Y') ?? '-',
                                             $v->portFrom?->code ?: $v->portFrom?->name ?: '-',
-                                            $v->portTo?->code   ?: $v->portTo?->name   ?: '-'
+                                            $v->portTo?->code   ?: $v->portTo?->name   ?: '-',
                                         ) : null;
                                     })
                                     ->live()
@@ -454,7 +469,7 @@ class ShipmentResource extends Resource
                                             foreach (['vessel_name', 'voyage', 'pol', 'pod', 'etd', 'eta'] as $f) $set($f, null);
                                             return;
                                         }
-                                        if ($v = \App\Models\Voyage::with(['vessel', 'portFrom', 'portTo'])->find($state)) {
+                                        if ($v = Voyage::with(['vessel', 'portFrom', 'portTo'])->find($state)) {
                                             $set('vessel_name', $v->vessel?->name);
                                             $set('voyage',      $v->voyage_no);
                                             $set('pol',         $v->portFrom?->code ?: $v->portFrom?->name);
