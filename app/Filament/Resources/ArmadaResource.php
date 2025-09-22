@@ -9,8 +9,18 @@ use App\Filament\Resources\ArmadaResource\RelationManagers\AssignmentsRelationMa
 use App\Filament\Resources\ArmadaResource\RelationManagers\MaintenancesRelationManager;
 use App\Models\Armada;
 use Filament\Forms;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\View;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\View as ComponentsView;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Support\Exceptions\Halt;
 use Filament\Tables;
+use Filament\Tables\Actions\Action;
 
 class ArmadaResource extends Resource
 {
@@ -25,16 +35,36 @@ class ArmadaResource extends Resource
     public static function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([
-            Forms\Components\TextInput::make('code')->label('Kode')->required()->unique(ignoreRecord: true),
-            Forms\Components\Select::make('type')->label('Tipe')
-                ->options(collect(ArmadaType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))->required(),
-            Forms\Components\TextInput::make('plate_number')->label('No. Polisi'),
-            Forms\Components\TextInput::make('capacity')->numeric()->label('Kapasitas'),
-            Forms\Components\Select::make('status')->label('Status')
-                ->options(collect(ArmadaStatus::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))->required(),
-            Forms\Components\Select::make('branch_id')->relationship('branch', 'name')->label('Cabang')->required(),
-            Forms\Components\Select::make('depot_id')->relationship('depot', 'name')->label('Depot'),
-            Forms\Components\Textarea::make('notes')->label('Catatan')->columnSpanFull(),
+            Select::make('type')->label('Tipe')
+                ->label('Tipe')
+                ->options(collect(\App\Enums\ArmadaType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))
+                ->required()
+                ->live()
+                ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                    $prefix = Armada::resolvePrefixFromTypeValue((string) $state);
+                    $set('code', Armada::previewNextCode($prefix, pad: 3));
+                }),
+            TextInput::make('code')
+                ->label('Kode')
+                ->disabled()
+                ->dehydrated()
+                ->helperText('Diisi otomatis berdasarkan Tipe'),
+            TextInput::make('plate_number')->label('No. Polisi'),
+            TextInput::make('capacity')->numeric()->label('Kapasitas'),
+
+            ComponentsView::make('components.form-armada-status-badge')
+                ->label('Status')
+                ->viewData(
+                    fn(Get $get, ?Armada $record) => [
+                        'label' => $record?->status?->label() ?? ArmadaStatus::Available->label(),
+                        'color' => $record?->status?->color() ?? 'success',
+                    ]
+                )
+                ->columnSpanFull(),
+
+            Select::make('branch_id')->relationship('branch', 'name')->label('Cabang')->required(),
+            Select::make('depot_id')->relationship('depot', 'name')->label('Depot'),
+            Textarea::make('notes')->label('Catatan')->columnSpanFull(),
         ])->columns(2);
     }
 
@@ -45,55 +75,36 @@ class ArmadaResource extends Resource
                 ->badge()
                 ->label('Kode')
                 ->searchable(),
-
-            // TYPE (pakai ArmadaType, bukan ArmadaStatus)
             Tables\Columns\TextColumn::make('type')
-                ->label('Tipe')
-                ->badge()
-                ->state(
-                    fn($record) =>
-                    // kalau sudah cast enum: panggil label(); kalau belum: fallback string
-                    (is_object($record->type) && method_exists($record->type, 'label'))
-                        ? $record->type->label()
-                        : (string) $record->type
-                ),
-
-            Tables\Columns\TextColumn::make('plate_number')->label('No. Polisi'),
-
+                ->label('Tipe')->badge()
+                ->state(fn($record) => is_object($record->type) && method_exists($record->type, 'label') ? $record->type->label() : (string) $record->type),
+            Tables\Columns\TextColumn::make('plate_number')
+                ->label('No. Polisi'),
             Tables\Columns\TextColumn::make('capacity')
                 ->label('Kapasitas')
                 ->numeric(),
-
-            // STATUS
-            Tables\Columns\TextColumn::make('status')
-                ->label('Status')
-                ->badge()
-                ->color(
-                    fn($record) => (is_object($record->status) && method_exists($record->status, 'color'))
-                        ? $record->status->color()
-                        : 'gray'
-                )
-                ->state(
-                    fn($record) => (is_object($record->status) && method_exists($record->status, 'label'))
-                        ? $record->status->label()
-                        : (string) $record->status
-                ),
-
-            Tables\Columns\TextColumn::make('branch.name')->label('Cabang')->badge(),
-            Tables\Columns\TextColumn::make('depot.name')->label('Depot'),
-            Tables\Columns\TextColumn::make('updated_at')->since()->label('Diubah'),
+            Tables\Columns\TextColumn::make('status')->label('Status')->badge()
+                ->color(fn($record) => is_object($record->status) && method_exists($record->status, 'color') ? $record->status->color() : 'gray')
+                ->state(fn($record) => is_object($record->status) && method_exists($record->status, 'label') ? $record->status->label() : (string) $record->status),
+            Tables\Columns\TextColumn::make('branch.name')
+                ->label('Cabang')
+                ->badge(),
+            Tables\Columns\TextColumn::make('depot.name')
+                ->label('Depot'),
+            Tables\Columns\TextColumn::make('updated_at')
+                ->since()
+                ->label('Diubah'),
         ])->filters([
             Tables\Filters\SelectFilter::make('type')
-                ->options(collect(\App\Enums\ArmadaType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()])),
+                ->options(collect(ArmadaType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()])),
             Tables\Filters\SelectFilter::make('status')
-                ->options(collect(\App\Enums\ArmadaStatus::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()])),
+                ->options(collect(ArmadaStatus::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()])),
         ])->actions([
             Tables\Actions\EditAction::make()->label('Ubah'),
         ])->bulkActions([
             Tables\Actions\DeleteBulkAction::make()->label('Hapus'),
         ]);
     }
-
 
     public static function getRelations(): array
     {
