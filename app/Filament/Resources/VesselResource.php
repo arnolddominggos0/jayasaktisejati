@@ -17,12 +17,13 @@ class VesselResource extends Resource
     protected static ?string $pluralLabel = 'Kapal';
     protected static ?string $navigationIcon = 'heroicon-m-rocket-launch';
     protected static ?string $modelLabel = 'Kapal';
+    protected static ?int    $navigationSort  = 40;
 
     public static function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([
             Forms\Components\TextInput::make('name')->label('Nama Kapal')->required(),
-            Forms\Components\Select::make('shipping_line_id')->relationship('shippingLine','name')->label('Shipping Line')->required(),
+            Forms\Components\Select::make('shipping_line_id')->relationship('shippingLine', 'name')->label('Shipping Line')->required(),
             Forms\Components\TextInput::make('imo')->label('IMO')->maxLength(20),
         ])->columns(2);
     }

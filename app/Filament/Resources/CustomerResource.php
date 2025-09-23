@@ -23,12 +23,12 @@ class CustomerResource extends Resource
 {
     protected static ?string $model = Customer::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-user-group';
+    protected static ?string $navigationIcon  = 'heroicon-m-users';
     protected static ?string $navigationLabel = 'Pelanggan';
     protected static ?string $pluralModelLabel = 'Pelanggan';
     protected static ?string $modelLabel = 'Pelanggan';
     protected static ?string $navigationGroup = 'Manajemen Pengguna';
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 20;
 
     public static function canViewAny(): bool
     {
@@ -111,11 +111,9 @@ class CustomerResource extends Resource
                                     ? 'digits:16'
                                     : 'nullable'
                             )
-                            // Simpan hanya angka
                             ->mutateDehydratedStateUsing(fn($state) => $state ? preg_replace('/\D+/', '', (string) $state) : null)
                             ->maxLength(16),
 
-                        // === Kondisional: NPWP untuk Company ===
                         TextInput::make('npwp')
                             ->label('NPWP')
                             ->visible(

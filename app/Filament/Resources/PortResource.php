@@ -17,6 +17,7 @@ class PortResource extends Resource
     protected static ?string $pluralLabel = 'Pelabuhan';
     protected static ?string $navigationIcon = 'heroicon-m-map-pin';
     protected static ?string $modelLabel = 'Pelabuhan';
+    protected static ?int    $navigationSort  = 50;
 
     public static function form(Forms\Form $form): Forms\Form
     {

@@ -6,8 +6,8 @@ use App\Enums\{ServiceType, ShipmentMode, ShipmentStatus, CargoType, RequestType
 use App\Filament\Resources\ShipmentResource\Pages\CreateShipment;
 use App\Filament\Resources\ShipmentResource\Pages\EditShipment;
 use App\Filament\Resources\ShipmentResource\Pages\ListShipments;
-use App\Filament\Resources\ShipmentResource\RelationManagers\ShipmentTracksRelationManager;
-use App\Models\FleetSchedule;
+use App\Models\Armada;
+use App\Models\Driver;
 use App\Models\Shipment;
 use App\Models\Voyage;
 use Filament\Forms;
@@ -37,7 +37,8 @@ class ShipmentResource extends Resource
     protected static ?string $navigationLabel = 'Permintaan Pengiriman';
     protected static ?string $modelLabel = 'Permintaan Pengiriman';
     protected static ?string $pluralModelLabel = 'Permintaan Pengiriman';
-    protected static ?string $navigationIcon = 'heroicon-m-archive-box';
+    protected static ?string $navigationIcon  = 'heroicon-m-queue-list';
+    protected static ?int    $navigationSort  = 10;
 
     public static function form(Form $form): Form
     {
@@ -400,7 +401,7 @@ class ShipmentResource extends Resource
                                         TextInput::make('engine_no')->label('Mesin No.')->maxLength(60)->columnSpan(2),
                                         TextInput::make('color')->label('Warna')->maxLength(30)->columnSpan(1),
                                         TextInput::make('do_number')->label('No. DO')->maxLength(60)->columnSpan(2),
-                                        Forms\Components\Checkbox::make('is_rack')->label('Rack')->inline(false)->columnSpan(2),
+                                        Checkbox::make('is_rack')->label('Rack')->inline(false)->columnSpan(2),
                                         TextInput::make('qty')->label('Qty')->numeric()->minValue(1)->default(1)->columnSpan(1),
                                         TextInput::make('notes')->label('Ket')->maxLength(120)->columnSpan(5),
                                     ])
@@ -497,57 +498,61 @@ class ShipmentResource extends Resource
                             ->schema([
                                 ViewField::make('mode_badge_land')->view('filament.forms.fields.mode-badge-land')->columnSpan(12),
 
-                                Select::make('vehicle_type')
-                                    ->label('Jenis Armada')
-                                    ->options([
-                                        'car_carrier' => 'Car Carrier (CC)',
-                                        'towing'      => 'Towing',
-                                        'truck'       => 'Truck',
-                                    ])
-                                    ->native(false)
-                                    ->live()
-                                    ->afterStateUpdated(
-                                        fn(Set $set, $state) =>
-                                        $set('service_option', match ($state) {
-                                            'car_carrier' => 'car_carrier',
-                                            'towing'      => 'towing',
-                                            default       => 'truck'
-                                        })
-                                    )
-                                    ->columnSpan(4),
-
-                                Select::make('driver_id')
-                                    ->label('Pilih Sopir')
-                                    ->visible(fn() => $hasDrivers)
-                                    ->options(function () use ($hasDrivers) {
-                                        if (!$hasDrivers) return [];
-                                        return DB::table('drivers')->orderBy('name')->limit(200)
-                                            ->get()
-                                            ->mapWithKeys(fn($d) => [$d->id => "{$d->name} • {$d->phone}"])
-                                            ->toArray();
-                                    })
+                                Select::make('armada_id')
+                                    ->label('Pilih Armada')
+                                    ->relationship('armada', 'code')
                                     ->searchable()
                                     ->preload()
-                                    ->live()
-                                    ->afterStateUpdated(function (Set $set, $state) {
-                                        $isSea = $state === ShipmentMode::Sea->value;
-                                        if (! $isSea) {
-                                            $set('voyage_id', null);
-                                            foreach (['vessel_name', 'voyage', 'pol', 'pod', 'etd', 'eta'] as $f) $set($f, null);
-                                        }
-                                        $d = DB::table('drivers')->where('id', $state)->first();
-                                        $set('driver_name', $d?->name);
-                                        $set('driver_phone', $d?->phone);
-                                    })
-                                    ->columnSpan(4),
-
-                                TextInput::make('vehicle_plate')->label('No. Polisi Armada')->maxLength(20)->columnSpan(4),
-                                DatePicker::make('pickup_date')
-                                    ->label('Tanggal Pickup (estimasi)')
-                                    ->required()
                                     ->native(false)
-                                    ->prefixIcon('heroicon-m-calendar')
-                                    ->columnSpan(4),
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Set $set) {
+                                        if (! $state) {
+                                            $set('vehicle_plate', null);
+                                            $set('service_option', null);
+                                            return;
+                                        }
+                                        $armada = Armada::find($state);
+                                        $set('vehicle_plate', $armada?->plate_number);
+                                        $set('service_option', match ($armada?->type) {
+                                            'car_carrier' => 'car_carrier',
+                                            'towing'      => 'towing',
+                                            'truck'       => 'truck',
+                                            default       => null,
+                                        });
+                                    })
+                                    ->columnSpan(6),
+
+                                TextInput::make('vehicle_plate')
+                                    ->label('No. Polisi')
+                                    ->disabled()
+                                    ->dehydrated()
+                                    ->columnSpan(6),
+
+                                Select::make('driver_id')
+                                    ->label('Pilih Supir')
+                                    ->relationship('driver', 'name')
+                                    ->searchable()
+                                    ->preload()
+                                    ->native(false)
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Set $set) {
+                                        if (! $state) {
+                                            $set('driver_name', null);
+                                            $set('driver_phone', null);
+                                            return;
+                                        }
+                                        $driver = \App\Models\Driver::find($state);
+                                        $set('driver_name', $driver?->name);
+                                        $set('driver_phone', $driver?->phone);
+                                    })
+                                    ->columnSpan(6),
+
+                                TextInput::make('driver_phone')
+                                    ->label('No. HP Sopir')
+                                    ->disabled()
+                                    ->dehydrated()
+                                    ->columnSpan(6),
+
                             ]),
                     ]),
 
@@ -790,7 +795,25 @@ class ShipmentResource extends Resource
             ], layout: FiltersLayout::AboveContent)
             ->filtersFormColumns(4)
             ->defaultSort('updated_at', 'desc')
-            ->actions([EditAction::make()->label('Edit')])
+            ->actions([
+                EditAction::make()->label('Edit'),
+                \Filament\Tables\Actions\Action::make('createAssignment')
+                    ->label('Buat Penugasan')
+                    ->icon('heroicon-m-clipboard-document-check')
+                    ->url(fn($record) => ArmadaAssignmentResource::getUrl('create', [
+                        'prefill[shipment_id]' => $record->id,
+                        'prefill[branch_id]'   => $record->branch_id,
+                        'prefill[depot_id]'    => $record->origin_office_id ?? $record->depot_id,
+                    ]))
+                    ->visible(
+                        fn($record) => ($record->mode === ShipmentMode::Land)
+                            && in_array($record->status?->value ?? (string)$record->status, [
+                                ShipmentStatus::Draft->value ?? 'waiting_assignment',
+                                ShipmentStatus::Draft->value ?? 'draft',
+                            ], true)
+                    ),
+
+            ])
             ->bulkActions([
                 BulkAction::make('export_selected')
                     ->label('Export Terpilih (CSV)')

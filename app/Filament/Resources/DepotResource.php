@@ -18,6 +18,7 @@ class DepotResource extends Resource
     protected static ?string $pluralLabel = 'Depo';
     protected static ?string $navigationIcon = 'heroicon-m-building-office-2';
     protected static ?string $modelLabel = 'Depo';
+    protected static ?int    $navigationSort  = 50;
 
     public static function form(Forms\Form $form): Forms\Form
     {
@@ -33,7 +34,7 @@ class DepotResource extends Resource
                     User::role('field_coordinator')->orderBy('name')->pluck('name','id')
                 )
                 ->searchable()
-                ->helperText('User dengan role "field_coordinator".'),
+                ->helperText('Pengguna dengan peran "Koordinator Lapangan".'),
         ])->columns(2);
     }
 

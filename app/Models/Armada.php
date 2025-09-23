@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ArmadaStatus;
 use App\Enums\ArmadaType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +27,13 @@ class Armada extends Model
         'type'   => ArmadaType::class,
         'status' => ArmadaStatus::class,
     ];
+
+    public function getDisplayNameAttribute(): string
+    {
+        $code  = $this->code ?? '–';
+        $plate = $this->plate_number ?? '–';
+        return trim($code . ' - ' . $plate);
+    }
 
     public function statusLogs(): HasMany
     {
@@ -138,5 +146,14 @@ class Armada extends Model
                 'changed_at'  => now(),
             ]);
         });
+    }
+
+    public function scopeAssignable(Builder $query, ?string $date = null, ?int $branchId = null): Builder
+    {
+        return $query->when($branchId, fn($qq) => $qq->where('branch_id', $branchId))
+            ->where('status', ArmadaStatus::Available)
+            ->when($date, function ($qq) use ($date) {
+                $qq->whereDoesntHave('assignments', fn($aq) => $aq->whereDate('date', $date));
+            });
     }
 }

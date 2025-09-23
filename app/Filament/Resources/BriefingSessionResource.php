@@ -20,14 +20,15 @@ class BriefingSessionResource extends Resource
     protected static ?string $pluralLabel = 'Sesi Briefing';
     protected static ?string $navigationIcon = 'heroicon-m-clipboard-document-check';
     protected static ?string $modelLabel = 'Sesi Briefing';
+    protected static ?int    $navigationSort  = 30;
 
     public static function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([
             Forms\Components\DatePicker::make('date')->label('Tanggal')->required(),
-            Forms\Components\Select::make('depot_id')->relationship('depot','name')->label('Depot')->required(),
+            Forms\Components\Select::make('depot_id')->relationship('depot', 'name')->label('Depot')->required(),
             Forms\Components\Select::make('coordinator_user_id')->label('Koordinator (User)')
-                ->options(User::role('field_coordinator')->orderBy('name')->pluck('name','id'))
+                ->options(User::role('field_coordinator')->orderBy('name')->pluck('name', 'id'))
                 ->searchable(),
             Forms\Components\Textarea::make('notes')->label('Catatan')->columnSpanFull(),
         ])->columns(2);
@@ -51,8 +52,8 @@ class BriefingSessionResource extends Resource
     public static function getRelations(): array
     {
         return [
-        //     \App\Filament\Resources\BriefingSessionResource\RelationManagers\ChecklistsRelationManager::class,
-        //     \App\Filament\Resources\BriefingSessionResource\RelationManagers\AttendancesRelationManager::class,
+            //     \App\Filament\Resources\BriefingSessionResource\RelationManagers\ChecklistsRelationManager::class,
+            //     \App\Filament\Resources\BriefingSessionResource\RelationManagers\AttendancesRelationManager::class,
         ];
     }
 

@@ -6,6 +6,7 @@ use App\Enums\MPDomain;
 use App\Filament\Resources\ManpowerResource\Pages;
 use App\Models\Manpower;
 use Filament\Forms;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Resources\Resource;
 use Filament\Tables;
 
@@ -18,6 +19,7 @@ class ManpowerResource extends Resource
     protected static ?string $pluralLabel = 'Tenaga Kerja (MP)';
     protected static ?string $navigationIcon = 'heroicon-m-user-group';
     protected static ?string $modelLabel = 'Tenaga Kerja (MP)';
+    protected static ?int    $navigationSort  = 40;
 
     public static function form(Forms\Form $form): Forms\Form
     {
@@ -25,9 +27,16 @@ class ManpowerResource extends Resource
             Forms\Components\TextInput::make('name')->label('Nama')->required(),
             Forms\Components\Select::make('domain')->label('Domain')
                 ->options(collect(MPDomain::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))->required(),
-            Forms\Components\TagsInput::make('skills')->label('Keahlian')
-                ->suggestions(['stuffing', 'unloading', 'loading', 'rigger', 'checker', 'forklift'])
-                ->splitKeys([',']),
+            CheckboxList::make('skills')
+                ->label('Keahlian')
+                ->options([
+                    'stuffing'   => 'Stuffing',
+                    'unloading'  => 'Unloading',
+                    'Racking'    => 'Racking',
+                    'loading'    => 'Loading',
+                    'checker'    => 'Checker',
+                ])
+                ->columns(2),
             Forms\Components\TagsInput::make('certs')->label('Sertifikasi')
                 ->suggestions(['SIO Forklift', 'AK3 Umum', 'K3 Rigger', 'Pelatihan APD'])
                 ->splitKeys([',']),

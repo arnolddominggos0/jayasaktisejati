@@ -7,6 +7,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -36,8 +37,6 @@ class AdminPanelProvider extends PanelProvider
             ->favicon(asset('images/favicon/favicon.ico'))
 
             ->sidebarCollapsibleOnDesktop()
-            ->globalSearchKeyBindings(['ctrl+k', 'cmd+k'])
-
             ->colors(['primary' => Color::hex('#0137A1')])
             ->viteTheme('resources/css/filament/admin/theme.css')
 
@@ -60,6 +59,12 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 Widgets\AccountWidget::class,
                 Widgets\FilamentInfoWidget::class,
+            ])
+            ->navigationGroups([
+                NavigationGroup::make('Manajemen Armada & MP')->collapsible(),
+                NavigationGroup::make('Pelayaran & Kapal')->collapsible(),
+                NavigationGroup::make('Pengiriman')->collapsible(),
+                NavigationGroup::make('Manajemen Pengguna')->collapsible(),
             ])
 
             ->middleware([

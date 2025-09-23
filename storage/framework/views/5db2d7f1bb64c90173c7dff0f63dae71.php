@@ -9,4 +9,4 @@
     <?php echo e($getChildComponentContainer()); ?>
 
 </div>
-<?php /**PATH D:\Jayasakti\jss_dashboard\vendor\filament\forms\resources\views/components/grid.blade.php ENDPATH**/ ?>
+<?php /**PATH D:\Jayasakti\jss_dashboard\vendor\filament\forms\resources\views/components/group.blade.php ENDPATH**/ ?>

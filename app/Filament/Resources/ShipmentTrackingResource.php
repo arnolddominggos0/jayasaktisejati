@@ -22,17 +22,18 @@ class ShipmentTrackingResource extends Resource
     protected static ?string $navigationLabel  = 'Pelacakan & Monitoring';
     protected static ?string $modelLabel       = 'Pelacakan';
     protected static ?string $pluralModelLabel = 'Pelacakan';
-    protected static ?string $navigationIcon   = 'heroicon-m-map-pin';
+    protected static ?string $navigationIcon  = 'heroicon-m-map';
+    protected static ?int    $navigationSort  = 20;
 
     public static function shouldRegisterNavigation(): bool
     {
-        return auth_user()?->hasAnyRole(['super_admin','office_admin']) === true;
+        return auth_user()?->hasAnyRole(['super_admin', 'office_admin']) === true;
     }
 
     public static function table(Table $table): Table
     {
         return $table
-            ->query(fn () => static::getEloquentQuery())
+            ->query(fn() => static::getEloquentQuery())
             ->columns([
                 TextColumn::make('code')->label('Kode')->badge()->copyable()
                     ->extraAttributes(['class' => 'font-mono'])->sortable()->searchable(),
@@ -46,8 +47,9 @@ class ShipmentTrackingResource extends Resource
                 TextColumn::make('customer.name')->label('Customer')->badge()->toggleable(),
 
                 TextColumn::make('route_summary')->label('Rute')->html()
-                    ->getStateUsing(fn(Shipment $r) =>
-                        "<div class='font-medium'>".($r->originCity->name ?? '-') ." &rarr; ".($r->destinationCity->name ?? '-')."</div>"
+                    ->getStateUsing(
+                        fn(Shipment $r) =>
+                        "<div class='font-medium'>" . ($r->originCity->name ?? '-') . " &rarr; " . ($r->destinationCity->name ?? '-') . "</div>"
                     )->toggleable(),
 
                 TextColumn::make('progress_count')->label('Progress')->state(function (Shipment $r) {
@@ -118,6 +120,6 @@ class ShipmentTrackingResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['customer','receiver','originCity','destinationCity','latestTrack']);
+            ->with(['customer', 'receiver', 'originCity', 'destinationCity', 'latestTrack']);
     }
 }

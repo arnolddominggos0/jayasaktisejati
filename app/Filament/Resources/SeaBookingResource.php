@@ -26,8 +26,10 @@ class SeaBookingResource extends Resource
     protected static ?string $navigationGroup = 'Pelayaran & Kapal';
     protected static ?string $pluralModelLabel = 'Booking Kontainer';
     protected static ?string $navigationLabel = 'Booking Kontainer';
-    protected static ?string $navigationIcon = 'heroicon-m-clipboard-document';
+    protected static ?string $navigationIcon = 'heroicon-m-cube';
     protected static ?string $modelLabel = 'Booking Kontainer';
+    protected static ?int    $navigationSort  = 20;
+
 
     public static function form(Forms\Form $form): Forms\Form
     {

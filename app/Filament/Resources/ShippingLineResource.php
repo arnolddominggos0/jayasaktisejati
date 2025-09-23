@@ -14,8 +14,9 @@ class ShippingLineResource extends Resource
     protected static ?string $navigationGroup = 'Pelayaran & Kapal';
     protected static ?string $navigationLabel = 'Pelayaran';
     protected static ?string $pluralLabel = 'Pelayaran';
-    protected static ?string $navigationIcon = 'heroicon-m-building-office-2';
+    protected static ?string $navigationIcon = 'heroicon-m-arrow-path';
     protected static ?string $modelLabel = 'Pelayaran';
+    protected static ?int    $navigationSort  = 30;
 
     public static function form(Forms\Form $form): Forms\Form
     {

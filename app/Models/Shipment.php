@@ -56,7 +56,6 @@ class Shipment extends Model
         'pod',
         'etd',
         'eta',
-        'schedule_id',
         'voyage_id',
 
         // Darat
@@ -163,7 +162,7 @@ class Shipment extends Model
 
                 $m->vessel_name = $m->voyage = $m->pol = $m->pod = null;
                 $m->etd = null;
-                $m->schedule_id = null;
+                $m->voyage_id = null;
                 $m->container_size = null;
                 $m->container_qty  = null;
             }
@@ -286,6 +285,11 @@ class Shipment extends Model
     public function voyage()
     {
         return $this->belongsTo(Voyage::class, 'voyage_id');
+    }
+
+    public function armada()
+    {
+        return $this->belongsTo(Armada::class, 'armada_id');
     }
 
     public function cancelledBy()

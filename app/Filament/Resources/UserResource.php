@@ -21,11 +21,11 @@ class UserResource extends Resource
     protected static ?string $model = User::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
-    protected static ?string $navigationLabel = 'User';
-    protected static ?string $pluralModelLabel = 'User';
-    protected static ?string $modelLabel = 'User';
+    protected static ?string $navigationLabel = 'Pengguna';
+    protected static ?string $pluralModelLabel = 'Pengguna';
+    protected static ?string $modelLabel = 'Pengguna';
     protected static ?string $navigationGroup = 'Manajemen Pengguna';
-    protected static ?int $navigationSort = 5;
+    protected static ?int    $navigationSort  = 10;
 
     public static function canViewAny(): bool
     {
