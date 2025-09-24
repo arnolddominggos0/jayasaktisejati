@@ -13,12 +13,12 @@ class DepotResource extends Resource
 {
     protected static ?string $model = Depot::class;
 
-    protected static ?string $navigationGroup = 'Manajemen Armada & MP';
+    protected static ?string $navigationGroup = 'Manajemen Armada';
     protected static ?string $navigationLabel = 'Depo';
     protected static ?string $pluralLabel = 'Depo';
     protected static ?string $navigationIcon = 'heroicon-m-building-office-2';
     protected static ?string $modelLabel = 'Depo';
-    protected static ?int    $navigationSort  = 50;
+    protected static ?int    $navigationSort  = 40;
 
     public static function form(Forms\Form $form): Forms\Form
     {

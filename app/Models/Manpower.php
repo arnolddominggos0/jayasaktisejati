@@ -10,7 +10,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Manpower extends Model
 {
     protected $fillable = [
-        'name','domain','skills','certs','phone','license_number','branch_id','depot_id','active'
+        'name',
+        'domain',
+        'skills',
+        'certs',
+        'phone',
+        'license_number',
+        'branch_id',
+        'depot_id',
+        'active'
     ];
 
     protected $casts = [
@@ -30,9 +38,9 @@ class Manpower extends Model
         return $this->belongsTo(Depot::class);
     }
 
-    public function attendances(): HasMany
+    public function attendances()
     {
-        return $this->hasMany(ManpowerAttendance::class);
+        return $this->hasMany(ManpowerAttendance::class, 'manpower_id');
     }
 
     public function assignments(): HasMany

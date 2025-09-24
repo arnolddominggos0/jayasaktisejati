@@ -26,7 +26,7 @@ class ArmadaMaintenanceResource extends Resource
 {
     protected static ?string $model = ArmadaMaintenance::class;
 
-    protected static ?string $navigationGroup  = 'Manajemen Armada & MP';
+    protected static ?string $navigationGroup  = 'Manajemen Armada';
     protected static ?string $navigationIcon   = 'heroicon-m-wrench';
     protected static ?string $navigationLabel  = 'Perawatan Armada';
     protected static ?string $pluralModelLabel = 'Perawatan Armada';

@@ -19,7 +19,6 @@
     $suffixIcon = $getSuffixIcon();
     $suffixLabel = $getSuffixLabel();
     $statePath = $getStatePath();
-    $placeholder = $getPlaceholder();
 
     if ($isPasswordRevealable) {
         $xData = '{ isPasswordRevealed: false }';
@@ -90,7 +89,7 @@
                         'maxlength' => (! $isConcealed) ? $getMaxLength() : null,
                         'min' => (! $isConcealed) ? $getMinValue() : null,
                         'minlength' => (! $isConcealed) ? $getMinLength() : null,
-                        'placeholder' => filled($placeholder) ? e($placeholder) : null,
+                        'placeholder' => $getPlaceholder(),
                         'readonly' => $isReadOnly(),
                         'required' => $isRequired() && (! $isConcealed),
                         'step' => $getStep(),
@@ -126,7 +125,7 @@
                         'maxlength' => (! $isConcealed) ? $getMaxLength() : null,
                         'min' => (! $isConcealed) ? $getMinValue() : null,
                         'minlength' => (! $isConcealed) ? $getMinLength() : null,
-                        'placeholder' => filled($placeholder) ? e($placeholder) : null,
+                        'placeholder' => $getPlaceholder(),
                         'readonly' => $isReadOnly(),
                         'required' => $isRequired() && (! $isConcealed),
                         'step' => $getStep(),

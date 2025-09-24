@@ -8,7 +8,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BriefingChecklist extends Model
 {
-    protected $fillable = ['session_id','item','status','remark'];
+    protected $table = 'briefing_checklists';
+
+    protected $fillable = [
+        'session_id',
+        'item',
+        'status',
+        'remark'
+    ];
 
     protected $casts = [
         'status' => ChecklistStatus::class,

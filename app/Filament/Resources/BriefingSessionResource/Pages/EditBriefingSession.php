@@ -13,7 +13,14 @@ class EditBriefingSession extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            Actions\Action::make('kelolaAbsensi')
+                ->label('Kelola Absensi')
+                ->icon('heroicon-m-clipboard-document-list')
+                ->url(fn () => route(
+                    'filament.admin.resources.briefing-attendances.index',
+                    ['session_id' => $this->record->id]
+                )),
+            Actions\DeleteAction::make()->label('Hapus'),
         ];
     }
 }

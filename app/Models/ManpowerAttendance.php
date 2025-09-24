@@ -9,7 +9,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class ManpowerAttendance extends Model
 {
     protected $fillable = [
-        'session_id','manpower_id','attendance_status','temperature','bp','has_ppe','remark'
+        'session_id',
+        'manpower_id',
+        'attendance_status',
+        'temperature',
+        'bp',
+        'has_ppe',
+        'remark'
     ];
 
     protected $casts = [
@@ -17,12 +23,12 @@ class ManpowerAttendance extends Model
         'has_ppe'           => 'bool',
     ];
 
-    public function session(): BelongsTo
+    public function session()
     {
         return $this->belongsTo(BriefingSession::class, 'session_id');
     }
 
-    public function manpower(): BelongsTo
+    public function manpower()
     {
         return $this->belongsTo(Manpower::class);
     }

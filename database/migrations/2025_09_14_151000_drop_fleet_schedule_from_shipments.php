@@ -8,18 +8,13 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
-        // Kalau tabelnya aja belum ada, jangan sok aksi
         if (! Schema::hasTable('shipments')) return;
 
-        // Drop constraint & index di Postgres secara aman
         if (DB::getDriverName() === 'pgsql') {
-            // constraint bisa jadi belum pernah ada: aman pakai IF EXISTS
             DB::statement('ALTER TABLE shipments DROP CONSTRAINT IF EXISTS shipments_fleet_schedule_id_foreign');
-            // index juga mungkin ga ada
             DB::statement('DROP INDEX IF EXISTS shipments_schedule_index');
         }
 
-        // Di level Schema Builder juga dijaga biar gak meledak
         if (Schema::hasColumn('shipments', 'fleet_schedule_id')) {
             Schema::table('shipments', function (Blueprint $table) {
                 try { $table->dropForeign(['fleet_schedule_id']); } catch (\Throwable $e) {}

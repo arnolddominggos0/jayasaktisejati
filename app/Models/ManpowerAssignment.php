@@ -7,7 +7,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ManpowerAssignment extends Model
 {
-    protected $fillable = ['manpower_id','shipment_id','depot_id','date','role_at_task','notes'];
+    protected $fillable = [
+        'manpower_id',
+        'shipment_id',
+        'depot_id',
+        'date',
+        'role_at_task',
+        'notes'
+    ];
 
     protected $casts = ['date' => 'date'];
 

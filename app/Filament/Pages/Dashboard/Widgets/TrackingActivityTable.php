@@ -57,7 +57,6 @@ class TrackingActivityTable extends BaseWidget
                     ->sortable()
                     ->extraAttributes(['class' => 'whitespace-nowrap w-32 font-mono']),
 
-                // Route dibaca dari accessor route_label di model Shipment
                 Tables\Columns\TextColumn::make('shipment.route_label')
                     ->label('Route')
                     ->state(fn (ShipmentTrack $r) => $r->shipment?->route_label ?? '—')

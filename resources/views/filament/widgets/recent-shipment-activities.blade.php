@@ -63,7 +63,7 @@
                                     @if ($it['changedText'])
                                         <span
                                             class="ml-2 text-xs font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">
-                                            Field: {{ $it['changedText'] }}
+                                            Kolom: {{ $it['changedText'] }}
                                         </span>
                                     @endif
                                 </div>

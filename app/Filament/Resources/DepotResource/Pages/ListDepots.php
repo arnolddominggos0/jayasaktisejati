@@ -12,6 +12,6 @@ class ListDepots extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [Actions\CreateAction::make()->label('Tambah Depot')];
+        return [Actions\CreateAction::make()->label('Tambah Depo')];
     }
 }

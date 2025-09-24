@@ -23,7 +23,6 @@ class UserController extends Controller
             ->with(['branch:id,code,name']) 
             ->select(['id', 'name', 'email', 'branch_id', 'created_at', 'updated_at']);
 
-        // Scope by branch untuk non-super_admin
         if (!$auth->hasRole('super_admin')) {
             $currentBranchId = $request->attributes->get('currentBranchId');
             if (empty($currentBranchId)) {
@@ -31,7 +30,6 @@ class UserController extends Controller
             }
             $q->where('branch_id', $currentBranchId);
         } else {
-            // super_admin boleh filter branch_id
             if ($request->filled('branch_id')) {
                 $q->where('branch_id', $request->integer('branch_id'));
             }
@@ -46,7 +44,6 @@ class UserController extends Controller
             });
         }
 
-        // Filter by role (Spatie)
         if ($role = $request->input('role')) {
             $q->role($role);
         }
@@ -64,7 +61,6 @@ class UserController extends Controller
         $q->orderBy($sortBy, $sortDir)
           ->orderBy('id', 'asc'); 
 
-        // Pagination
         $perPage   = $request->perPage(); 
         $paginator = $q->paginate($perPage)->appends($request->validated());
 

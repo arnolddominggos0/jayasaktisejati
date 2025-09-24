@@ -2,19 +2,33 @@
 
 namespace App\Models;
 
+use App\Enums\AttendanceStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class BriefingSession extends Model
 {
-    protected $fillable = ['date','depot_id','coordinator_user_id','notes'];
+    protected $table = 'briefing_sessions';
 
-    protected $casts = ['date' => 'date'];
+    protected $fillable = [
+        'date',
+        'depot_id',
+        'coordinator_user_id',
+        'notes',
+        'summary_headcount',
+        'summary_sufficient',
+        'summary_solution',
+    ];
+
+    protected $casts = [
+        'date' => 'date',
+        'summary_sufficient' => 'boolean',
+    ];
 
     public function depot(): BelongsTo
     {
-        return $this->belongsTo(Depot::class);
+        return $this->belongsTo(Depot::class, 'depot_id');
     }
 
     public function coordinator(): BelongsTo
@@ -22,13 +36,21 @@ class BriefingSession extends Model
         return $this->belongsTo(User::class, 'coordinator_user_id');
     }
 
-    public function checklists(): HasMany
-    {
-        return $this->hasMany(BriefingChecklist::class, 'session_id');
-    }
-
     public function attendances(): HasMany
     {
-        return $this->hasMany(ManpowerAttendance::class, 'session_id');
+        return $this->hasMany(BriefingAttendance::class, 'session_id');
+    }
+
+    public function presentAttendances()
+    {
+        return $this->hasMany(\App\Models\BriefingAttendance::class, 'session_id')
+            ->where('attendance_status', AttendanceStatus::Present->value);
+    }
+
+    public function getDisplayLabelAttribute(): string
+    {
+        $date  = $this->date ? $this->date->format('Y-m-d') : (string) $this->date;
+        $depot = $this->depot->name ?? '-';
+        return "{$date} · {$depot}";
     }
 }

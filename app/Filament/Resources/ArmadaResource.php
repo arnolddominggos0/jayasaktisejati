@@ -26,7 +26,7 @@ class ArmadaResource extends Resource
 {
     protected static ?string $model = Armada::class;
 
-    protected static ?string $navigationGroup = 'Manajemen Armada & MP';
+    protected static ?string $navigationGroup = 'Manajemen Armada';
     protected static ?string $navigationLabel = 'Armada';
     protected static ?string $modelLabel = 'Armada';
     protected static ?string $pluralModelLabel = 'Armada';

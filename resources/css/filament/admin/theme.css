@@ -6,17 +6,49 @@
 @import '/vendor/filament/filament/resources/css/theme.css';
 @config './tailwind.config.js';
 
-.fi-topbar { @apply h-16; }
-.fi-topbar > div { @apply gap-3; }
+.fi-topbar {
+    @apply h-16;
+}
 
-.fi-topbar .fi-topbar-item { display: inline-flex; align-items: center; }
+.fi-topbar>div {
+    @apply gap-3;
+}
 
-.fi-page-header { display: none !important; }
+.fi-topbar .fi-topbar-item {
+    display: inline-flex;
+    align-items: center;
+}
 
-.fi-topbar .fi-global-search { max-width: 28rem; margin-left: auto; margin-right: auto; }
-@media (max-width: 1024px) { .fi-topbar .fi-global-search { max-width: 16.5rem; } }
+.fi-page-header {
+    display: none !important;
+}
 
-.fi-sidebar { @apply bg-white; }
-.fi-sidebar .fi-sidebar-item a { @apply rounded-xl; }
-.fi-sidebar .fi-sidebar-item a:hover { @apply bg-slate-100; }
-@media (max-width: 640px){ .fi-sidebar{ max-width: 18rem; } }
+.fi-topbar .fi-global-search {
+    max-width: 28rem;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@media (max-width: 1024px) {
+    .fi-topbar .fi-global-search {
+        max-width: 16.5rem;
+    }
+}
+
+.fi-sidebar {
+    @apply bg-white;
+}
+
+.fi-sidebar .fi-sidebar-item a {
+    @apply rounded-xl;
+}
+
+.fi-sidebar .fi-sidebar-item a:hover {
+    @apply bg-slate-100;
+}
+
+@media (max-width: 640px) {
+    .fi-sidebar {
+        max-width: 18rem;
+    }
+}

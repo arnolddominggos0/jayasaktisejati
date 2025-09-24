@@ -14,10 +14,10 @@ use Filament\Tables\Columns\{TextColumn, BadgeColumn};
 class ArmadaAssignmentResource extends Resource
 {
     protected static ?string $model = ArmadaAssignment::class;
-    protected static ?string $navigationGroup = 'Manajemen Armada & MP';
+    protected static ?string $navigationGroup = 'Manajemen Armada';
     protected static ?string $navigationLabel = 'Penugasan Armada';
     protected static ?string $navigationIcon = 'heroicon-m-clipboard-document-check';
-    protected static ?int    $navigationSort = 20;
+    protected static ?int    $navigationSort = 30;
 
     public static function form(Forms\Form $form): Forms\Form
     {
