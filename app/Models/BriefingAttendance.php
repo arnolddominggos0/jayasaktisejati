@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AttendanceStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -15,14 +16,17 @@ class BriefingAttendance extends Model
         'ppeitem_id',
         'attendance_status',
         'temperature',
-        'bp',
+        'bp_systolic',
+        'bp_diastolic',
         'has_ppe',
         'remark',
+        'health_complaint',
         'created_by',
     ];
 
     protected $casts = [
         'has_ppe' => 'boolean',
+        'attendance_status' => AttendanceStatus::class,
     ];
 
     public function session(): BelongsTo
@@ -42,5 +46,27 @@ class BriefingAttendance extends Model
     {
         $items = $this->ppeItems()->pluck('condition', 'ppe_type');
         return $items->count() >= 4 && $items->every(fn($c) => $c === \App\Enums\PpeCondition::Baik);
+    }
+    public function getBpAttribute(): ?string
+    {
+        if ($this->bp_systolic && $this->bp_diastolic) {
+            return "{$this->bp_systolic}/{$this->bp_diastolic}";
+        }
+
+        return null;
+    }
+
+    public function setBpAttribute(?string $value): void
+    {
+        if (! $value) {
+            $this->bp_systolic = null;
+            $this->bp_diastolic = null;
+            return;
+        }
+
+        if (preg_match('/^\s*(\d{2,3})\s*\/\s*(\d{2,3})\s*$/', $value, $m)) {
+            $this->bp_systolic = (int) $m[1];
+            $this->bp_diastolic = (int) $m[2];
+        }
     }
 }

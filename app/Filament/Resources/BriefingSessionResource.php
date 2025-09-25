@@ -10,6 +10,7 @@ use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Validation\Rule;
 
@@ -69,7 +70,33 @@ class BriefingSessionResource extends Resource
                     };
                 }),
             Forms\Components\TextInput::make('summary_headcount')->label('Jumlah MP')->numeric(),
-            Forms\Components\Toggle::make('summary_sufficient')->label('Cukup'),
+            Forms\Components\Placeholder::make('computed_sufficient')
+                ->label('Kecukupan')
+                ->content(function (?BriefingSession $record) {
+                    if (! $record?->id) return '—';
+                    $present = $record->presentAttendances()->count();
+                    $target  = (int) $record->summary_headcount;
+                    if ($target <= 0) return 'Target belum diisi';
+                    return $present >= $target
+                        ? "Cukup ({$present}/{$target})"
+                        : "Tidak Cukup ({$present}/{$target})";
+                })
+                ->extraAttributes(function (?BriefingSession $record) {
+                    if (! $record?->id || ! $record->summary_headcount) return ['class' => 'text-gray-500'];
+                    $present = $record->presentAttendances()->count();
+                    $target  = (int) $record->summary_headcount;
+                    return ['class' => $present >= $target ? 'text-green-600 font-medium' : 'text-rose-600 font-medium'];
+                }),
+
+            Forms\Components\Textarea::make('summary_solution')
+                ->label('Solusi/Keterangan')
+                ->columnSpanFull()
+                ->required(function (Get $get, ?BriefingSession $record) {
+                    $target  = (int) $get('summary_headcount');
+                    if (! $record?->id || $target <= 0) return false;
+                    $present = $record->presentAttendances()->count();
+                    return $present < $target;
+                }),
             Forms\Components\Textarea::make('summary_solution')->label('Solusi/Keterangan')->columnSpanFull(),
             Forms\Components\Textarea::make('notes')->label('Catatan')->columnSpanFull(),
         ])->columns(2);
@@ -82,13 +109,41 @@ class BriefingSessionResource extends Resource
             TextColumn::make('depot.name')->label('Depot'),
             TextColumn::make('coordinator.name')->label('Koordinator'),
             TextColumn::make('attendances_count')->counts('attendances')->label('Absensi (total)'),
+            TextColumn::make('summary_sufficient')
+                ->label('Kecukupan')
+                ->state(function ($record) {
+                    $present = $record->presentAttendances()->count();
+                    $target  = (int) $record->summary_headcount;
+                    if ($target <= 0) return 'Belum Ditentukan';
+                    return $present >= $target ? 'Cukup' : 'Tidak Cukup';
+                })
+                ->badge()
+                ->color(function ($record) {
+                    $present = $record->presentAttendances()->count();
+                    $target  = (int) $record->summary_headcount;
+                    if ($target <= 0) return 'gray';
+                    return $present >= $target ? 'success' : 'danger';
+                })
+                ->tooltip(function ($record) {
+                    $present = $record->presentAttendances()->count();
+                    $target  = (int) $record->summary_headcount;
+                    return "Hadir {$present} / Target {$target}";
+                }),
             TextColumn::make('present_attendances_count')
                 ->counts('presentAttendances')
                 ->label('Hadir')
+                ->formatStateUsing(
+                    fn($state, $record) =>
+                    $record->summary_headcount
+                        ? "{$state}/{$record->summary_headcount}"
+                        : (string) $state
+                ),
         ])->actions([
-            Tables\Actions\Action::make('kelolaAbsensi')->label('Kelola Absensi')
+            Tables\Actions\Action::make('kelolaAbsensi')
+                ->label('Kelola Absensi')
                 ->icon('heroicon-m-clipboard-document-list')
-                ->url(fn($record) => route('filament.admin.resources.briefing-attendances.index', ['session_id' => $record->id])),
+                ->url(fn($record) => route('filament.admin.resources.briefing-attendances.index', ['session_id' => $record->id]))
+                ->color(fn($record) => $record->presentAttendances()->count() < (int)$record->summary_headcount ? 'danger' : 'gray'),
             Tables\Actions\EditAction::make()->label('Ubah'),
             Tables\Actions\DeleteAction::make()->label('Hapus'),
         ])->bulkActions([

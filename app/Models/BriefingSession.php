@@ -53,4 +53,13 @@ class BriefingSession extends Model
         $depot = $this->depot->name ?? '-';
         return "{$date} · {$depot}";
     }
+
+    protected static function booted()
+    {
+        static::saving(function ($session) {
+            $present = $session->presentAttendances()->count();
+            $target  = (int) $session->summary_headcount;
+            $session->summary_sufficient = $target > 0 && $present >= $target;
+        });
+    }
 }
