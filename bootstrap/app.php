@@ -31,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role'                => RoleMiddleware::class,
             'permission'          => PermissionMiddleware::class,
             'scope.branch'        => ScopeByBranch::class,
+            
         ]);
     })
     // bootstrap/app.php

@@ -15,5 +15,6 @@ class DatabaseSeeder extends Seeder
         $this->call(InitialSetupSeeder::class);
         // $this->call(DummyOperationalSeeder::class);
         // $this->call(FleetMPSeeder::class);
+        $this->call(FieldCoordinatorSeeder::class);
     }
 }

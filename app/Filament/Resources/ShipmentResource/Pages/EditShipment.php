@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ShipmentResource\Pages;
 
 use App\Enums\ShipmentStatus;
+use App\Events\ShipmentStatusUpdated;
 use App\Filament\Resources\ShipmentResource;
 use App\Filament\Resources\ShipmentResource\Widgets\RecentShipmentActivities;
 use App\Filament\Resources\ShipmentTrackingResource\Widgets\RecentTrackingActivities;
@@ -102,4 +103,11 @@ class EditShipment extends EditRecord
                 ->send();
         }
     }
+
+    public function afterSave(): void
+    {
+        $shipment = $this->record;
+
+        event(new ShipmentStatusUpdated($shipment, 'fc') );
+    }   
 }

@@ -20,7 +20,6 @@ class KpiOverview extends BaseWidget
     {
         [$from, $to] = [Carbon::today()->startOfDay(), Carbon::today()->endOfDay()];
 
-        // Scope organisasi (pakai kolom yang benar-benar ada)
         $scope = function ($q) {
             $u = auth()->user();
             if (! $u || (method_exists($u, 'hasRole') && $u->hasRole('super_admin'))) return;
