@@ -39,7 +39,6 @@ class ShipmentsByStatusChart extends ChartWidget
         $start = Carbon::now()->startOfMonth();
         $end   = Carbon::now()->endOfMonth();
 
-        // Scope organisasi seperlunya saja (jangan sok tebak kolom yang tidak ada).
         $scope = function ($q) {
             $u = auth_user();
             if (! $u || (method_exists($u, 'hasRole') && $u->hasRole('super_admin'))) {
@@ -60,7 +59,6 @@ class ShipmentsByStatusChart extends ChartWidget
             ->pluck('total', 'status')
             ->toArray();
 
-        // Hitung total untuk persen, lalu susun label "Nama — N (X%)".
         $sum = array_sum($raw);
         $labels = [];
         $data   = [];
@@ -78,7 +76,6 @@ class ShipmentsByStatusChart extends ChartWidget
             $colors[] = self::COLORS[$key] ?? '#94A3B8'; // fallback slate-400
         }
 
-        // Kalau kosong, tampilkan satu irisan “Tidak ada data” biar nggak blank bikin kaget.
         if (empty($labels)) {
             $labels = ['Tidak ada data'];
             $data   = [1];

@@ -14,6 +14,11 @@ return [
     |
     */
 
+    'panels' => [
+        App\Providers\Filament\AdminPanelProvider::class,
+        App\Providers\Filament\FieldCoordinatorPanelProvider::class,
+    ],
+
     'broadcasting' => [
 
         // 'echo' => [

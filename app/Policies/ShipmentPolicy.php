@@ -7,17 +7,32 @@ use App\Models\User;
 
 class ShipmentPolicy
 {
-    public function viewAny(User $u): bool
+    public function viewAny(User $user): bool
     {
-        return $u->hasAnyRole(['super_admin', 'office_admin']);
-    }
-    public function view(User $u, Shipment $s): bool
-    {
-        return $this->viewAny($u);
+        return $user->hasAnyRole(['super_admin','office_admin','field_coordinator']);
     }
 
-    public function update(User $u, Shipment $s): bool
+    public function view(User $user, Shipment $shipment): bool
     {
-        return $u->hasRole('super_admin');
+        if ($user->hasAnyRole(['super_admin','office_admin'])) return true;
+        if ($user->hasRole('field_coordinator')) {
+            return ($user->branch_id && $shipment->branch_id === $user->branch_id)
+                && ($shipment->coordinator_id === null || $shipment->coordinator_id === $user->id);
+        }
+        return false;
+    }
+
+    public function update(User $user, Shipment $shipment): bool
+    {
+        if ($user->hasAnyRole(['super_admin','office_admin'])) return true;
+        if ($user->hasRole('field_coordinator')) {
+            return ($shipment->coordinator_id === $user->id);
+        }
+        return false;
+    }
+
+    public function delete(User $user, Shipment $shipment): bool
+    {
+        return $user->hasAnyRole(['super_admin','office_admin']);
     }
 }

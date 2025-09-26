@@ -1,28 +1,41 @@
-import preset from './vendor/filament/support/tailwind.config.preset'
+import defaultTheme from 'tailwindcss/defaultTheme'
+import forms from '@tailwindcss/forms'
+import typography from '@tailwindcss/typography'
+import preset from './vendor/filament/filament/tailwind.config.preset'
 
-/** @type {import('tailwindcss').Config} */
 export default {
-  presets: [preset],             
+  presets: [preset],
+  darkMode: 'class',
   content: [
-    './resources/**/*.blade.php',
+    './app/Filament/**/*.php',
+    './resources/views/filament/**/*.blade.php',
+    './vendor/filament/**/*.blade.php',
+    './resources/css/filament/**/*.css',
     './resources/**/*.js',
     './resources/**/*.vue',
-    './vendor/filament/**/*.blade.php',
-    './vendor/filament/**/*.php',
-    './app/Filament/**/*.php',
   ],
   theme: {
     extend: {
       colors: {
-        brand: '#0137A1',
-        ink:   '#0f172a',
-        muted: '#64748b',
-        line:  '#e5e7eb',
-        bg:    '#f7f8fa',
+        primary: {
+          50:  '#eef2ff',
+          100: '#e0e7ff',
+          200: '#c7d2fe',
+          300: '#a5b4fc',
+          400: '#818cf8',
+          500: '#0137A1',
+          600: '#0b3b8c',
+          700: '#0e4aaf',
+          800: '#0a2e6f',
+          900: '#081f4d',
+          950:'#051433',
+        },
+        brand: { DEFAULT: '#0137A1' },
       },
-      borderRadius: { '2xl': '1rem' },
-      boxShadow: { soft: '0 6px 20px rgba(15,23,42,.06)' },
+      borderRadius: { xl: '0.75rem', '2xl': '1rem' },
+      boxShadow: { card: '0 8px 30px rgba(2, 6, 23, 0.06)' },
+      fontFamily: { sans: ['Inter', ...defaultTheme.fontFamily.sans] },
     },
   },
-  plugins: [],
+  plugins: [forms, typography],
 }

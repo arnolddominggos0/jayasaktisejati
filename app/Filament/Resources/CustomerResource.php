@@ -111,11 +111,9 @@ class CustomerResource extends Resource
                                     ? 'digits:16'
                                     : 'nullable'
                             )
-                            // Simpan hanya angka
                             ->mutateDehydratedStateUsing(fn($state) => $state ? preg_replace('/\D+/', '', (string) $state) : null)
                             ->maxLength(16),
 
-                        // === Kondisional: NPWP untuk Company ===
                         TextInput::make('npwp')
                             ->label('NPWP')
                             ->visible(

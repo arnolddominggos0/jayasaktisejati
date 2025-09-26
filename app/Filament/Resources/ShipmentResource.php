@@ -10,6 +10,7 @@ use App\Filament\Resources\ShipmentResource\RelationManagers\ShipmentTracksRelat
 use App\Models\FleetSchedule;
 use App\Models\Shipment;
 use App\Models\Voyage;
+use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\{Checkbox, DatePicker, FileUpload, Grid, Group, Hidden, Placeholder, Repeater, Section, Select, Textarea, TextInput, ToggleButtons, ViewField};
 use Filament\Forms\Form;
@@ -569,6 +570,14 @@ class ShipmentResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(function (Builder $query) {
+                $user = Filament::auth()->user();
+                $query->when($user?->branch_id, fn($q) => $q->where('branch_id', $user->branch_id));
+                $query->when($user?->id, fn($q) => $q->where(function ($qq) use ($user) {
+                    $qq->where('coordinator_id', $user->id)
+                        ->orWhereNull('coordinator_id');
+                }));
+            })
             ->columns([
                 TextColumn::make('code')
                     ->label('Kode')

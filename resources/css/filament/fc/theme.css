@@ -5,21 +5,18 @@
 }
 .fi-topbar > div {
     gap: 0.75rem;
+    display: flex;
 }
-
 .fi-topbar .fi-topbar-item {
     display: inline-flex;
     align-items: center;
 }
-
 .fi-page-header {
     display: none !important;
 }
-
 .fi-topbar .fi-global-search {
     max-width: 28rem;
-    margin-left: auto;
-    margin-right: auto;
+    margin-inline: auto;
 }
 @media (max-width: 1024px) {
     .fi-topbar .fi-global-search {
@@ -40,4 +37,9 @@
     .fi-sidebar {
         max-width: 18rem;
     }
+}
+
+button,
+.fi-btn {
+    min-height: 2.75rem;
 }

@@ -2,38 +2,32 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Pages\Dashboard\DashboardHome;
+use App\Filament\FC\Pages\Dashboard\Dashboard;
 use App\Http\Middleware\EnsurePanelRole;
+use App\Http\Middleware\ScopeByBranch;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
-use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use Filament\Widgets;
-use Illuminate\Database\Eloquent\Scope;
 
-class AdminPanelProvider extends PanelProvider
+class FieldCoordinatorPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
         return $panel
-            ->default()
-            ->id('admin')
-            ->path('admin')
+            ->id('fc')
+            ->path('fc')
             ->login()
             ->authGuard('web')
 
-            // Brand
             ->brandName('Jaya Sakti Sejati')
             ->brandLogo(fn() => view('filament.logo'))
             ->favicon(asset('images/favicon/favicon.ico'))
@@ -41,32 +35,28 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->globalSearchKeyBindings(['ctrl+k', 'cmd+k'])
 
-            ->colors(['primary' => Color::hex('#0137A1')])
-            ->viteTheme('resources/css/filament/admin/theme.css')
-
-            ->renderHook(
-                PanelsRenderHook::TOPBAR_START,
-                fn() => Blade::render(view('filament.topbar.page-title')->render()),
-            )
-
-
-            ->renderHook(
-                PanelsRenderHook::USER_MENU_BEFORE,
-                fn() => Blade::render(view('filament.topbar.actions')->render()),
-            )
-
-            ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
-            ->pages([
-                DashboardHome::class,
+            ->colors([
+                'primary' => '#0137A1',
             ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
-            ->widgets([
-                Widgets\AccountWidget::class,
-                Widgets\FilamentInfoWidget::class,
+            ->viteTheme('resources/css/filament/fc/theme.css')
+
+            ->pages([
+                Dashboard::class,
+            ])
+            ->homeUrl(fn() => Dashboard::getUrl())
+
+            ->discoverResources(in: app_path('Filament/Fc/Resources'), for: 'App\\Filament\\Fc\\Resources')
+            ->discoverPages(in: app_path('Filament/Fc/Pages'),    for: 'App\\Filament\\Fc\\Pages')
+            ->discoverWidgets(in: app_path('Filament/Fc/Widgets'), for: 'App\\Filament\\Fc\\Widgets')
+
+            ->navigationGroups([
+                'Tugas Lapangan',
+                'Insiden & Reschedule',
             ])
 
             ->middleware([
                 EnsurePanelRole::class,
+                ScopeByBranch::class,
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
@@ -76,6 +66,7 @@ class AdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                ScopeByBranch::class,
             ])
             ->authMiddleware([
                 Authenticate::class,
