@@ -9,7 +9,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class BriefingAttendancePpeItem extends Model
 {
-    protected $fillable = ['attendance_id','ppe_type','condition','remark'];
+    protected $fillable = [
+        'attendance_id',
+        'ppe_type',
+        'condition',
+        'remark'
+    ];
 
     protected $casts = [
         'ppe_type' => PpeType::class,

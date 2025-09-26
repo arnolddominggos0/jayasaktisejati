@@ -42,6 +42,12 @@ class BriefingAttendance extends Model
     {
         return $this->hasMany(\App\Models\BriefingAttendancePpeItem::class, 'attendance_id');
     }
+
+    public function ppeInspections()
+    {
+        return $this->hasMany(\App\Models\PpeInspection::class, 'briefing_attendance_id');
+    }
+
     public function getPpeAllGoodAttribute(): bool
     {
         $items = $this->ppeItems()->pluck('condition', 'ppe_type');
