@@ -27,8 +27,8 @@ class AdminDashboard extends Page implements HasForms
     protected static string $view = 'filament.pages.admin-dashboard';
     protected static ?string $title = 'Dashboard';
 
-    public ?int   $branchId = null;    
-    public ?string $mode    = null;     
+    public ?int   $branchId = null;
+    public ?string $mode    = null;
     public string $period   = 'weekly';
 
     // Brand
@@ -55,7 +55,7 @@ class AdminDashboard extends Page implements HasForms
                             DB::table('branches')->orderBy('name')->pluck('name', 'id')
                         )
                         ->reactive()
-                        ->afterStateUpdated(fn ($state) => $this->branchId = $state),
+                        ->afterStateUpdated(fn($state) => $this->branchId = $state),
 
                     Forms\Components\Select::make('mode')
                         ->label('Moda')
@@ -65,7 +65,7 @@ class AdminDashboard extends Page implements HasForms
                             ShipmentMode::Land->value => 'Darat',
                         ])
                         ->reactive()
-                        ->afterStateUpdated(fn ($state) => $this->mode = $state),
+                        ->afterStateUpdated(fn($state) => $this->mode = $state),
 
                     Forms\Components\Select::make('period')
                         ->label('Periode')
@@ -74,7 +74,7 @@ class AdminDashboard extends Page implements HasForms
                             'monthly' => 'Bulanan (12 bulan)',
                         ])
                         ->reactive()
-                        ->afterStateUpdated(fn ($state) => $this->period = $state)
+                        ->afterStateUpdated(fn($state) => $this->period = $state)
                         ->columnSpan(['default' => 3, 'lg' => 2]),
 
                     Forms\Components\Actions::make([
@@ -109,21 +109,21 @@ class AdminDashboard extends Page implements HasForms
             ->count();
 
         $armadaAktif = Armada::query()
-            ->when($this->branchId, fn ($qq) => $qq->where('branch_id', $this->branchId))
+            ->when($this->branchId, fn($qq) => $qq->where('branch_id', $this->branchId))
             ->where('is_active', true)
             ->count();
 
         $aktivitasHariIni = ShipmentTrack::query()
-            ->when($this->branchId, fn ($qq) => $qq->whereHas('shipment', fn ($s) => $s->where('branch_id', $this->branchId)))
-            ->when($this->mode, fn ($qq) => $qq->whereHas('shipment', fn ($s) => $s->where('mode', $this->mode)))
+            ->when($this->branchId, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('branch_id', $this->branchId)))
+            ->when($this->mode, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('mode', $this->mode)))
             ->whereDate('tracked_at', Carbon::today())
             ->count();
 
         $sparkline = collect(range(6, 0))->map(function ($i) {
             $day = Carbon::today()->subDays($i);
             $count = ShipmentTrack::query()
-                ->when($this->branchId, fn ($qq) => $qq->whereHas('shipment', fn ($s) => $s->where('branch_id', $this->branchId)))
-                ->when($this->mode, fn ($qq) => $qq->whereHas('shipment', fn ($s) => $s->where('mode', $this->mode)))
+                ->when($this->branchId, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('branch_id', $this->branchId)))
+                ->when($this->mode, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('mode', $this->mode)))
                 ->whereDate('tracked_at', $day)
                 ->count();
             return ['label' => $day->format('d M'), 'value' => $count];
@@ -141,7 +141,7 @@ class AdminDashboard extends Page implements HasForms
     public function getTrendSeries(): array
     {
         if ($this->period === 'monthly') {
-            $labels = collect(range(11, 0))->map(fn ($i) => Carbon::now()->subMonths($i)->format('M Y'));
+            $labels = collect(range(11, 0))->map(fn($i) => Carbon::now()->subMonths($i)->format('M Y'));
             $series = $labels->map(function ($label) {
                 $month = Carbon::createFromFormat('M Y', $label)->startOfMonth();
                 $end   = (clone $month)->endOfMonth();
@@ -201,15 +201,15 @@ class AdminDashboard extends Page implements HasForms
             ->select(['customers.id', 'customers.name'])
             ->selectRaw('COUNT(shipments.id) as total')
             ->leftJoin('shipments', 'shipments.customer_id', '=', 'customers.id')
-            ->when($this->branchId, fn ($qq) => $qq->where('shipments.branch_id', $this->branchId))
-            ->when($this->mode, fn ($qq) => $qq->where('shipments.mode', $this->mode))
+            ->when($this->branchId, fn($qq) => $qq->where('shipments.branch_id', $this->branchId))
+            ->when($this->mode, fn($qq) => $qq->where('shipments.mode', $this->mode))
             ->whereBetween('shipments.created_at', [Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()])
             ->groupBy(['customers.id', 'customers.name'])
             ->orderByDesc('total')
             ->limit(5)
             ->get();
 
-        return $rows->map(fn ($r) => ['name' => $r->name, 'total' => (int) $r->total])->values()->all();
+        return $rows->map(fn($r) => ['name' => $r->name, 'total' => (int) $r->total])->values()->all();
     }
 
     public function getLeadTimeSummary(): array
@@ -235,15 +235,15 @@ class AdminDashboard extends Page implements HasForms
     {
         return ShipmentTrack::query()
             ->with(['shipment:id,code', 'user:id,name'])
-            ->when($this->branchId, fn ($qq) => $qq->whereHas('shipment', fn ($s) => $s->where('branch_id', $this->branchId)))
-            ->when($this->mode, fn ($qq) => $qq->whereHas('shipment', fn ($s) => $s->where('mode', $this->mode)))
+            ->when($this->branchId, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('branch_id', $this->branchId)))
+            ->when($this->mode, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('mode', $this->mode)))
             ->latest('tracked_at')
             ->limit(12)
             ->get()
             ->map(function ($t) {
                 return [
                     'shipment_code' => $t->shipment?->code ?? '-',
-                    'status'        => (string) $t->status,
+                    'status'        => $t->status instanceof \BackedEnum ? $t->status->value : (string) $t->status,
                     'when'          => Carbon::parse($t->tracked_at)->diffForHumans(),
                     'who'           => $t->user?->name ?? 'Sistem',
                     'note'          => $t->note,
@@ -254,7 +254,7 @@ class AdminDashboard extends Page implements HasForms
     protected function baseShipmentQuery(): Builder
     {
         return Shipment::query()
-            ->when($this->branchId, fn ($q) => $q->where('branch_id', $this->branchId))
-            ->when($this->mode, fn ($q) => $q->where('mode', $this->mode));
+            ->when($this->branchId, fn($q) => $q->where('branch_id', $this->branchId))
+            ->when($this->mode, fn($q) => $q->where('mode', $this->mode));
     }
 }

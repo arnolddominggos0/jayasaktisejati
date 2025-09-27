@@ -577,12 +577,22 @@ class ShipmentResource extends Resource
         return $table
             ->modifyQueryUsing(function (Builder $query) {
                 $user = Filament::auth()->user();
-                $query->when($user?->branch_id, fn($q) => $q->where('branch_id', $user->branch_id));
-                $query->when($user?->id, fn($q) => $q->where(function ($qq) use ($user) {
-                    $qq->where('coordinator_id', $user->id)
-                        ->orWhereNull('coordinator_id');
-                }));
+
+                if ($user?->branch_id) {
+                    $query->where(function ($w) use ($user) {
+                        $w->where('branch_id', $user->branch_id)
+                            ->orWhereNull('branch_id'); 
+                    });
+                }
+
+                if ($user?->id) {
+                    $query->where(function ($qq) use ($user) {
+                        $qq->where('coordinator_id', $user->id)
+                            ->orWhereNull('coordinator_id');
+                    });
+                }
             })
+
             ->columns([
                 TextColumn::make('code')
                     ->label('Kode')

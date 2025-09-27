@@ -126,6 +126,20 @@ class Shipment extends Model
                 $modeCode = in_array(strtolower($mode), ['sea', 'sea_freight'], true) ? 'SH' : 'TC';
                 $m->eta = self::computeEta($modeCode, (string) ($m->priority ?? 'normal'))->toDateTimeString();
             }
+
+            // >>> Opsi A: isi otomatis branch_id & coordinator_id saat create
+            if (blank($m->branch_id)) {
+                if (Auth::check() && Auth::user()->branch_id) {
+                    $m->branch_id = Auth::user()->branch_id;
+                } elseif ($m->origin_office_id) {
+                    $m->branch_id = Office::whereKey($m->origin_office_id)->value('branch_id');
+                }
+            }
+
+            if (blank($m->coordinator_id) && Auth::check()) {
+                $m->coordinator_id = Auth::id();
+            }
+            // <<<
         });
 
         static::saving(function (Shipment $m) {
@@ -144,7 +158,7 @@ class Shipment extends Model
                 $m->pickup_date = $m->estimated_ready_at = null;
             } else {
                 $m->voyage_id = null;
-                $m->service_type   = $m->vehicle_type === 'car_carrier'
+                $m->service_type = $m->vehicle_type === 'car_carrier'
                     ? ServiceType::CarCarrier
                     : ServiceType::LandTrucking;
 
@@ -167,19 +181,28 @@ class Shipment extends Model
                 $m->container_qty  = null;
             }
 
+            // Pastikan branch_id terisi juga saat update (fallback)
+            if (blank($m->branch_id)) {
+                if (Auth::check() && Auth::user()->branch_id) {
+                    $m->branch_id = Auth::user()->branch_id;
+                } elseif ($m->origin_office_id) {
+                    $m->branch_id = Office::whereKey($m->origin_office_id)->value('branch_id');
+                }
+            }
+
             $middle = $m->mode === ShipmentMode::Sea
-                ? strtoupper((string)$m->service_option)
-                : ucfirst(str_replace('_', ' ', (string)$m->service_option));
+                ? strtoupper((string) $m->service_option)
+                : ucfirst(str_replace('_', ' ', (string) $m->service_option));
 
-            $scope = DeliveryScope::short($m->delivery_scope) ? ' • ' . DeliveryScope::short($m->delivery_scope) : '';
+            $scopeShort = DeliveryScope::short($m->delivery_scope);
+            $scope = $scopeShort ? ' • ' . $scopeShort : '';
 
-            $m->route_summary = implode(' → ', array_filter([
-                optional($m->originCity ?? null)->name ?? '' . $m->route_from,
-                $middle,
-                optional($m->destinationCity ?? null)->name ?? '' . $m->route_to,
-            ])) . $scope;
+            $from = ($m->originCity->name ?? null) ?: (string) $m->route_from;
+            $to   = ($m->destinationCity->name ?? null) ?: (string) $m->route_to;
+
+            $m->route_summary = implode(' → ', array_filter([$from, $middle, $to])) . $scope;
         });
-
+        
         static::updated(function (Shipment $m) {
             $changed = array_keys($m->getChanges());
             $ignore  = ['updated_at', 'created_at', 'edited_fields', 'last_edited_by'];
