@@ -3,11 +3,9 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\PpeItemResource\Pages;
-use App\Models\Manpower;
 use App\Models\PpeItem;
 use App\Models\PpeSku;
 use Filament\Forms;
-use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Get;
@@ -32,10 +30,10 @@ class PpeItemResource extends Resource
 
     private const STATUSES = [
         'in_stock' => 'In Stock',
-        'assigned' => 'Assigned',
         'damaged'  => 'Rusak',
         'lost'     => 'Hilang',
         'disposed' => 'Disposed',
+        // 'assigned' sengaja TIDAK disediakan di form, karena assignment via PpeAssignment
     ];
 
     private const STATUS_COLORS = [
@@ -56,6 +54,7 @@ class PpeItemResource extends Resource
                 ->searchable()
                 ->preload()
                 ->reactive(),
+
             TextInput::make('serial')
                 ->label('Nomor Seri')
                 ->maxLength(100)
@@ -66,25 +65,12 @@ class PpeItemResource extends Resource
                     if (! $isSer) return null;
                     return Rule::unique('ppe_items','serial')->ignore($record?->id);
                 }),
+
             Select::make('status')
                 ->label('Status')
                 ->options(self::STATUSES)
                 ->default('in_stock')
-                ->required()
-                ->reactive(),
-            Select::make('current_manpower_id')
-                ->label('Dipakai Oleh')
-                ->options(fn() => Manpower::query()->orderBy('name')->pluck('name','id'))
-                ->searchable()
-                ->preload()
-                ->visible(fn(Get $get) => $get('status') === 'assigned')
-                ->required(fn(Get $get) => $get('status') === 'assigned'),
-            DateTimePicker::make('assigned_at')
-                ->label('Tgl. Penugasan')
-                ->seconds(false)
-                ->default(now())
-                ->visible(fn(Get $get) => $get('status') === 'assigned')
-                ->required(fn(Get $get) => $get('status') === 'assigned'),
+                ->required(),
         ])->columns(2);
     }
 
@@ -104,7 +90,7 @@ class PpeItemResource extends Resource
                 TextColumn::make('created_at')->label('Dibuat')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('status')->label('Status')->options(self::STATUSES),
+                SelectFilter::make('status')->label('Status')->options(self::STATUSES + ['assigned' => 'Assigned']),
                 SelectFilter::make('ppe_sku_id')->label('SKU')->relationship('sku','name'),
                 SelectFilter::make('sku.type')->label('Jenis')->relationship('sku','type')->options(
                     collect(\App\Enums\PpeType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()])

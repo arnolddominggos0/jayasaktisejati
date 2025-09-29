@@ -2,18 +2,31 @@
 
 namespace App\Filament\FC\Pages\Dashboard;
 
-use Filament\Pages\Dashboard as BaseDashboard;
+use Filament\Pages\Page;
+use Filament\Facades\Filament;
+use Illuminate\Contracts\Support\Htmlable;
 
-class Dashboard extends BaseDashboard
+class Dashboard extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-m-home';
+    protected static ?string $slug = 'dashboard';
+
+    protected static ?string $navigationIcon  = 'heroicon-m-home';
     protected static ?string $navigationLabel = 'Dashboard';
-    protected static ?string $slug = '/';
-    protected static ?string $navigationGroup = 'Tugas Lapangan';
-    protected static ?int $navigationSort = 1;
+    protected static ?string $navigationGroup = 'Operasional Lapangan';
+    protected static ?int    $navigationSort  = 1;
+
     protected static ?string $title = 'Dashboard';
-    protected static ?string $breadcrumb = 'Dashboard';
-    protected static ?string $recordTitleAttribute = 'name';
-    protected static ?string $modelLabel = 'Dashboard';
-    protected static ?string $pluralModelLabel = 'Dashboard';
+
+    protected static string $view = 'filament.fc.pages.dashboard';
+
+    public static function canAccess(): bool
+    {
+        return Filament::auth()->user()?->hasRole('field_coordinator') ?? false;
+    }
+
+    // Opsional: kalau mau pastikan judul selalu "Dashboard"
+    public function getTitle(): string|Htmlable
+    {
+        return static::$title ?? 'Dashboard';
+    }
 }

@@ -103,7 +103,7 @@ class PpeAssignmentResource extends Resource
 
     public static function getEloquentQuery(): EloquentBuilder
     {
-        return static::getModel()::query()->with(['item:id,ppe_sku_id,serial','item.sku:id,code,name','manpower:id,name']);
+        return static::getModel()::query()->with(['item:id,ppe_sku_id,serial,assigned_at,current_manpower_id','item.sku:id,code,name','manpower:id,name']);
     }
 
     public static function getPages(): array

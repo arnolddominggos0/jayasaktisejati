@@ -3,8 +3,8 @@
 namespace App\Filament\Resources\BriefingSessionResource\Pages;
 
 use App\Filament\Resources\BriefingSessionResource;
-use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
+use Filament\Actions;
 
 class EditBriefingSession extends EditRecord
 {
@@ -13,14 +13,18 @@ class EditBriefingSession extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('kelolaAbsensi')
-                ->label('Kelola Absensi')
-                ->icon('heroicon-m-clipboard-document-list')
-                ->url(fn () => route(
-                    'filament.admin.resources.briefing-attendances.index',
-                    ['session_id' => $this->record->id]
-                )),
-            Actions\DeleteAction::make()->label('Hapus'),
+            Actions\Action::make('openPpe')
+                ->label('Kelola Stok APD')
+                ->icon('heroicon-m-cube')
+                ->url(route('filament.admin.resources.ppe-items.index'))
+                ->color('gray'),
+            Actions\DeleteAction::make()->label('Hapus Sesi'),
         ];
+    }
+
+    public function getTitle(): string
+    {
+        $record = $this->record;
+        return "Kelola Briefing • {$record->date} • {$record->depot?->name}";
     }
 }

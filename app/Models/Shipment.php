@@ -127,7 +127,6 @@ class Shipment extends Model
                 $m->eta = self::computeEta($modeCode, (string) ($m->priority ?? 'normal'))->toDateTimeString();
             }
 
-            // >>> Opsi A: isi otomatis branch_id & coordinator_id saat create
             if (blank($m->branch_id)) {
                 if (Auth::check() && Auth::user()->branch_id) {
                     $m->branch_id = Auth::user()->branch_id;
@@ -137,9 +136,11 @@ class Shipment extends Model
             }
 
             if (blank($m->coordinator_id) && Auth::check()) {
-                $m->coordinator_id = Auth::id();
+                $u = Auth::user();
+                if (method_exists($u, 'hasRole') && $u->hasRole('field_coordinator')) {
+                    $m->coordinator_id = $u->id;
+                }
             }
-            // <<<
         });
 
         static::saving(function (Shipment $m) {
@@ -181,7 +182,6 @@ class Shipment extends Model
                 $m->container_qty  = null;
             }
 
-            // Pastikan branch_id terisi juga saat update (fallback)
             if (blank($m->branch_id)) {
                 if (Auth::check() && Auth::user()->branch_id) {
                     $m->branch_id = Auth::user()->branch_id;
@@ -202,20 +202,40 @@ class Shipment extends Model
 
             $m->route_summary = implode(' → ', array_filter([$from, $middle, $to])) . $scope;
         });
-        
+
         static::updated(function (Shipment $m) {
             $changed = array_keys($m->getChanges());
             $ignore  = ['updated_at', 'created_at', 'edited_fields', 'last_edited_by'];
             $changed = array_values(array_diff($changed, $ignore));
 
-            if ($changed) {
-                $editorId = Auth::id();
-                $payload = ['edited_fields' => $changed];
+            if (!empty($changed)) {
+                $editorId = \Illuminate\Support\Facades\Auth::id();
+                $payload  = ['edited_fields' => $changed];
                 if ($editorId) {
                     $payload['last_edited_by'] = $editorId;
                 }
-
                 $m->forceFill($payload)->saveQuietly();
+            }
+
+            if ($m->wasChanged('status')) {
+                $val = $m->status instanceof \BackedEnum
+                    ? $m->status->value
+                    : (string) $m->status;
+
+                $map = [
+                    'pickup'    => \App\Enums\TrackStatus::Pickup,
+                    'delivered' => \App\Enums\TrackStatus::Delivered,
+                    'hold'      => \App\Enums\TrackStatus::Hold,
+                    'cancelled' => \App\Enums\TrackStatus::Cancelled,
+                ];
+
+                if (isset($map[$val])) {
+                    \App\Models\ShipmentTrack::create([
+                        'shipment_id' => $m->id,
+                        'status'      => $map[$val],
+                        'note'        => 'Auto from Shipment.status: ' . $val,
+                    ]);
+                }
             }
         });
     }

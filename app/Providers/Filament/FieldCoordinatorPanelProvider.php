@@ -4,7 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\FC\Pages\Dashboard\Dashboard;
 use App\Http\Middleware\EnsurePanelRole;
-use App\Http\Middleware\ScopeByBranch;
+use App\Http\Middleware\ScopeByBranchAndDepot;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -29,34 +29,29 @@ class FieldCoordinatorPanelProvider extends PanelProvider
             ->authGuard('web')
 
             ->brandName('Jaya Sakti Sejati')
-            ->brandLogo(fn() => view('filament.logo'))
+            ->brandLogo(fn () => view('filament.logo'))
             ->favicon(asset('images/favicon/favicon.ico'))
 
             ->sidebarCollapsibleOnDesktop()
-            ->globalSearchKeyBindings(['ctrl+k', 'cmd+k'])
+            // ->globalSearchKeyBindings(['ctrl+k','cmd+k']) 
 
-            ->colors([
-                'primary' => '#0137A1',
-            ])
+            ->colors(['primary' => '#0137A1'])
             ->viteTheme('resources/css/filament/fc/theme.css')
 
-            ->pages([
-                Dashboard::class,
-            ])
-            ->homeUrl(fn() => Dashboard::getUrl())
+            ->pages([ Dashboard::class ])
+            ->homeUrl(fn () => Dashboard::getUrl())
 
-            ->discoverResources(in: app_path('Filament/Fc/Resources'), for: 'App\\Filament\\Fc\\Resources')
-            ->discoverPages(in: app_path('Filament/Fc/Pages'),    for: 'App\\Filament\\Fc\\Pages')
-            ->discoverWidgets(in: app_path('Filament/Fc/Widgets'), for: 'App\\Filament\\Fc\\Widgets')
+            ->discoverResources(in: app_path('Filament/FC/Resources'), for: 'App\\Filament\\FC\\Resources')
+            ->discoverPages(in: app_path('Filament/FC/Pages'),       for: 'App\\Filament\\FC\\Pages')
+            ->discoverWidgets(in: app_path('Filament/FC/Widgets'),   for: 'App\\Filament\\FC\\Widgets')
 
             ->navigationGroups([
-                'Tugas Lapangan',
-                'Insiden & Reschedule',
+                'Operasional Lapangan',
+                'Armada & K3',
+                'Laporan & Notifikasi',
             ])
 
             ->middleware([
-                EnsurePanelRole::class,
-                ScopeByBranch::class,
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
@@ -66,10 +61,10 @@ class FieldCoordinatorPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
-                ScopeByBranch::class,
+
+                EnsurePanelRole::class,
+                ScopeByBranchAndDepot::class,
             ])
-            ->authMiddleware([
-                Authenticate::class,
-            ]);
+            ->authMiddleware([ Authenticate::class ]);
     }
 }

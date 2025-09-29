@@ -26,15 +26,32 @@ class DepotResource extends Resource
             Forms\Components\TextInput::make('code')->label('Kode')->required()->unique(ignoreRecord: true),
             Forms\Components\TextInput::make('name')->label('Nama')->required(),
             Forms\Components\Select::make('mode')->label('Moda')
-                ->options(['sea_freight'=>'Laut','land_trucking'=>'Darat'])->required(),
+                ->options(['sea_freight' => 'Laut', 'land_trucking' => 'Darat'])->required(),
             Forms\Components\Textarea::make('address')->label('Alamat')->columnSpanFull(),
-            Forms\Components\Select::make('branch_id')->relationship('branch','name')->label('Cabang')->required(),
-            Forms\Components\Select::make('coordinator_user_id')->label('Koordinator Lapangan')
+            Forms\Components\Select::make('branch_id')->relationship('branch', 'name')->label('Cabang')->required(),
+            Forms\Components\Select::make('coordinator_user_id')
+                ->label('Koordinator Lapangan')
                 ->options(
-                    User::role('field_coordinator')->orderBy('name')->pluck('name','id')
+                    \App\Models\User::role('field_coordinator')->orderBy('name')->pluck('name', 'id')
                 )
                 ->searchable()
-                ->helperText('Pengguna dengan peran "Koordinator Lapangan".'),
+                ->helperText('Pengguna dengan peran "Koordinator Lapangan". Satu koordinator untuk satu depo.')
+                ->nullable()
+                ->rule(function (\Filament\Forms\Get $get) {
+                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                        if (!$value) return;
+
+                        $exists = \App\Models\Depot::query()
+                            ->where('coordinator_user_id', $value)
+                            ->when($get('id') ?? null, fn($query, $id) => $query->where('id', '!=', $id))
+                            ->exists();
+
+                        if ($exists) {
+                            $fail('Koordinator ini sudah ditetapkan di depo lain.');
+                        }
+                    };
+                })
+
         ])->columns(2);
     }
 
@@ -44,7 +61,7 @@ class DepotResource extends Resource
             Tables\Columns\TextColumn::make('code')->badge()->label('Kode')->searchable(),
             Tables\Columns\TextColumn::make('name')->label('Nama')->searchable(),
             Tables\Columns\TextColumn::make('mode')->badge()->label('Moda')
-                ->formatStateUsing(fn($state)=>$state==='sea_freight'?'Laut':'Darat'),
+                ->formatStateUsing(fn($state) => $state === 'sea_freight' ? 'Laut' : 'Darat'),
             Tables\Columns\TextColumn::make('branch.name')->label('Cabang')->badge(),
             Tables\Columns\TextColumn::make('coordinator.name')->label('Koordinator'),
             Tables\Columns\TextColumn::make('updated_at')->since()->label('Diubah'),

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\BriefingSessionResource\Pages;
+use App\Filament\Resources\BriefingSessionResource\RelationManagers\AttendanceRelationManager;
 use App\Models\BriefingSession;
 use App\Models\Depot;
 use App\Models\User;
@@ -18,7 +19,10 @@ use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Facades\Filament;
+use Filament\Tables\Columns\ViewColumn;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class BriefingSessionResource extends Resource
@@ -26,8 +30,8 @@ class BriefingSessionResource extends Resource
     protected static ?string $model = BriefingSession::class;
 
     protected static ?string $navigationGroup = 'Manajemen MP';
-    protected static ?string $navigationLabel = 'Sesi Briefing';
-    protected static ?string $pluralLabel     = 'Sesi Briefing';
+    protected static ?string $navigationLabel = 'Briefing MP';
+    protected static ?string $pluralLabel     = 'Briefing MP';
     protected static ?string $modelLabel      = 'Sesi Briefing';
     protected static ?string $navigationIcon  = 'heroicon-m-clipboard-document-check';
     protected static ?int    $navigationSort  = 20;
@@ -44,12 +48,30 @@ class BriefingSessionResource extends Resource
                     $depotId = (int) $get('depot_id');
                     if (! $depotId) return null;
                     return Rule::unique('briefing_sessions', 'date')
-                        ->where(fn($q) => $q->where('depot_id', $depotId))
+                        ->where(fn($query) => $query->where('depot_id', $depotId))
                         ->ignore($record?->id);
                 }),
 
             Select::make('depot_id')
-                ->relationship('depot', 'name')
+                ->relationship('depot', 'name', function (EloquentBuilder $query) {
+                    $u = Filament::auth()?->user();
+
+                    $isFc = false;
+                    if ($u) {
+                        $isFc = DB::table('model_has_roles')
+                            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                            ->where('model_has_roles.model_type', User::class)
+                            ->where('model_has_roles.model_id', $u->id)
+                            ->where('roles.name', 'field_coordinator')
+                            ->exists();
+                    }
+
+                    if ($u && $isFc && isset($u->branch_id)) {
+                        $query->where('branch_id', $u->branch_id);
+                    }
+
+                    $query->orderBy('name');
+                })
                 ->label('Depot')
                 ->searchable()
                 ->preload()
@@ -57,13 +79,12 @@ class BriefingSessionResource extends Resource
                 ->reactive(),
 
             Select::make('coordinator_user_id')
-                ->label('Koordinator (PIC)')
+                ->label('PIC')
                 ->options(function (Get $get) {
                     $depotId  = $get('depot_id');
                     $branchId = $depotId ? Depot::query()->whereKey($depotId)->value('branch_id') : null;
-
                     return User::role('field_coordinator')
-                        ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+                        ->when($branchId, fn($query) => $query->where('branch_id', $branchId))
                         ->orderBy('name')
                         ->pluck('name', 'id');
                 })
@@ -75,12 +96,10 @@ class BriefingSessionResource extends Resource
                         if (! $value) return;
                         $depotId  = (int) $get('depot_id');
                         $branchId = $depotId ? Depot::query()->whereKey($depotId)->value('branch_id') : null;
-
                         $ok = User::role('field_coordinator')
-                            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+                            ->when($branchId, fn($query) => $query->where('branch_id', $branchId))
                             ->whereKey($value)
                             ->exists();
-
                         if (! $ok) $fail('PIC harus koordinator lapangan di cabang yang sama.');
                     };
                 }),
@@ -128,19 +147,51 @@ class BriefingSessionResource extends Resource
     public static function table(Tables\Table $table): Tables\Table
     {
         return $table
-            ->query(fn(): EloquentBuilder => static::getEloquentQuery())
+            ->query(function (): EloquentBuilder {
+                return static::getEloquentQuery();
+            })
             ->defaultSort('date', 'desc')
             ->columns([
                 TextColumn::make('date')->date()->label('Tanggal')->sortable(),
                 TextColumn::make('depot.name')->label('Depot')->sortable()->toggleable(),
                 TextColumn::make('coordinator.name')->label('Koordinator')->sortable()->toggleable(),
-                TextColumn::make('attendances_count')
-                    ->label('Absensi (total)')
-                    ->sortable()
-                    ->getStateUsing(fn($record) => $record->attendances_count),
+                TextColumn::make('summary_headcount')->label('Target MP')->sortable()->toggleable(),
 
-                TextColumn::make('summary_sufficient')
-                    ->label('Kecukupan')
+                ViewColumn::make('attendance_progress')
+                    ->label('Hadir')
+                    ->state(function ($record) {
+                        $present = (int) ($record->present_attendances_count ?? $record->presentAttendances()->count());
+                        $target  = max(0, (int) $record->summary_headcount);
+
+                        $percent = $target > 0 ? (int) round(min(100, ($present / $target) * 100)) : 0;
+
+                        $tone = 'gray';
+                        if ($target > 0) {
+                            $tone = $present >= $target ? 'emerald'
+                                : ($present >= ceil($target * 0.5) ? 'amber' : 'rose');
+                        }
+
+                        return [
+                            'present' => $present,
+                            'target'  => $target,
+                            'percent' => $percent,
+                            'tone'    => $tone,
+                        ];
+                    })
+                    ->view('tables.columns.attendance-progress')
+                    ->sortable(false)
+                    ->toggleable(),
+
+                TextColumn::make('present_attendances_count')
+                    ->label('Hadir (x/y)')
+                    ->getStateUsing(fn($record) => $record->summary_headcount
+                        ? "{$record->present_attendances_count}/{$record->summary_headcount}"
+                        : (string) $record->present_attendances_count)
+                    ->sortable()
+                    ->extraAttributes(['class' => 'font-medium'])
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('summary_sufficient')->label('Kecukupan')
                     ->state(function ($record) {
                         $present = $record->present_attendances_count ?? $record->presentAttendances()->count();
                         $target  = (int) $record->summary_headcount;
@@ -148,55 +199,66 @@ class BriefingSessionResource extends Resource
                         return $present >= $target ? 'Cukup' : 'Tidak Cukup';
                     })
                     ->badge()
-                    ->color(function ($record) {
-                        $present = $record->present_attendances_count ?? $record->presentAttendances()->count();
-                        $target  = (int) $record->summary_headcount;
-                        if ($target <= 0) return 'gray';
-                        return $present >= $target ? 'success' : 'danger';
-                    })
-                    ->tooltip(function ($record) {
-                        $present = $record->present_attendances_count ?? $record->presentAttendances()->count();
-                        $target  = (int) $record->summary_headcount;
-                        return "Hadir {$present} / Target {$target}";
-                    }),
-
-                TextColumn::make('present_attendances_count')
-                    ->label('Hadir')
-                    ->sortable()
-                    ->getStateUsing(fn($record) => $record->summary_headcount
-                        ? "{$record->present_attendances_count}/{$record->summary_headcount}"
-                        : (string) ($record->present_attendances_count))
-                    ->extraAttributes(['class' => 'font-medium']),
+                    ->color(fn($record) => ($record->summary_headcount > 0 && ($record->present_attendances_count ?? 0) < $record->summary_headcount) ? 'danger' : 'success')
+                    ->tooltip(fn($record) => "Hadir " . ($record->present_attendances_count ?? 0) . " / Target " . (int) $record->summary_headcount),
             ])
             ->filters([
-                Filter::make('bulan_ini')
-                    ->label('Bulan ini')
-                    ->query(fn(EloquentBuilder $q) => $q->whereBetween('date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])),
-                Filter::make('rentang_tanggal')
-                    ->form([
-                        DatePicker::make('from')->label('Dari'),
-                        DatePicker::make('until')->label('Sampai'),
-                    ])
-                    ->query(function (EloquentBuilder $q, array $data) {
-                        if ($data['from'] ?? null) $q->whereDate('date', '>=', $data['from']);
-                        if ($data['until'] ?? null) $q->whereDate('date', '<=', $data['until']);
-                        return $q;
+                Filter::make('today')->label('Hari ini')
+                    ->query(fn(EloquentBuilder $query) => $query->whereDate('date', now()->toDateString())),
+                Filter::make('bulan_ini')->label('Bulan ini')
+                    ->query(fn(EloquentBuilder $query) => $query->whereBetween('date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])),
+                Filter::make('rentang')
+                    ->form([DatePicker::make('from')->label('Dari'), DatePicker::make('until')->label('Sampai')])
+                    ->query(function (EloquentBuilder $query, array $data) {
+                        if ($data['from'] ?? null)  $query->whereDate('date', '>=', $data['from']);
+                        if ($data['until'] ?? null) $query->whereDate('date', '<=', $data['until']);
                     }),
                 SelectFilter::make('depot_id')->label('Depot')->relationship('depot', 'name'),
                 SelectFilter::make('coordinator_user_id')->label('Koordinator')->relationship('coordinator', 'name'),
             ])
+            ->headerActions([
+                Tables\Actions\Action::make('startToday')
+                    ->label('Mulai Briefing Hari Ini')
+                    ->icon('heroicon-m-play')
+                    ->action(function () {
+                        $u = Filament::auth()?->user();
+
+                        $isFc = false;
+                        if ($u) {
+                            $isFc = DB::table('model_has_roles')
+                                ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                                ->where('model_has_roles.model_type', User::class)
+                                ->where('model_has_roles.model_id', $u->id)
+                                ->where('roles.name', 'field_coordinator')
+                                ->exists();
+                        }
+
+                        $depotId = Depot::query()
+                            ->when(
+                                $u && $isFc && isset($u->branch_id),
+                                fn($query) => $query->where('branch_id', $u->branch_id)
+                            )
+                            ->orderBy('name')
+                            ->value('id');
+
+                        $session = BriefingSession::firstOrCreate(
+                            ['date' => now()->toDateString(), 'depot_id' => $depotId],
+                            ['coordinator_user_id' => $u?->id, 'summary_headcount' => 0]
+                        );
+
+                        return redirect(static::getUrl('edit', ['record' => $session]));
+                    }),
+                Tables\Actions\CreateAction::make()->label('Tambah Sesi'),
+            ])
             ->actions([
-                Tables\Actions\Action::make('kelolaAbsensi')
-                    ->label('Kelola Absensi')
+                Tables\Actions\Action::make('kelola')
+                    ->label('Kelola')
                     ->icon('heroicon-m-clipboard-document-list')
-                    ->url(fn($record) => route('filament.admin.resources.briefing-attendances.index', ['session_id' => $record->id]))
-                    ->color(fn($record) => ($record->present_attendances_count ?? 0) < (int) $record->summary_headcount ? 'danger' : 'gray'),
+                    ->url(fn($record) => static::getUrl('edit', ['record' => $record])),
                 Tables\Actions\EditAction::make()->label('Ubah'),
                 Tables\Actions\DeleteAction::make()->label('Hapus'),
             ])
-            ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make()->label('Hapus'),
-            ]);
+            ->bulkActions([Tables\Actions\DeleteBulkAction::make()->label('Hapus')]);
     }
 
     public static function getEloquentQuery(): EloquentBuilder
@@ -206,12 +268,19 @@ class BriefingSessionResource extends Resource
             ->withCount(['attendances', 'presentAttendances']);
     }
 
+    public static function getRelations(): array
+    {
+        return [
+            AttendanceRelationManager::class,
+        ];
+    }
+
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListBriefingSessions::route('/'),
+            'index' => Pages\ListBriefingSessions::route('/'),
             'create' => Pages\CreateBriefingSession::route('/create'),
-            'edit'   => Pages\EditBriefingSession::route('/{record}/edit'),
+            'edit' => Pages\EditBriefingSession::route('/{record}/edit'),
         ];
     }
 }

@@ -15,7 +15,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
-use Illuminate\Validation\Rule;
 
 class PpeSkuResource extends Resource
 {
@@ -33,21 +32,33 @@ class PpeSkuResource extends Resource
         return $form->schema([
             TextInput::make('code')
                 ->label('Kode')
+                ->disabled()
+                ->dehydrated(false)
+                ->hint('Otomatis saat simpan'),
+
+            TextInput::make('name')
+                ->label('Nama')
                 ->required()
-                ->maxLength(50)
-                ->rule(fn(?PpeSku $record) => Rule::unique('ppe_skus', 'code')->ignore($record?->id)),
-            TextInput::make('name')->label('Nama')->required()->maxLength(100),
+                ->maxLength(100),
+
             Select::make('type')
                 ->label('Jenis')
                 ->options(collect(PpeType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))
                 ->required()
                 ->searchable()
                 ->preload(),
+
             TextInput::make('brand')->label('Merek')->maxLength(100),
             TextInput::make('model')->label('Model')->maxLength(100),
             TextInput::make('size')->label('Ukuran')->maxLength(50),
-            Toggle::make('is_serialized')->label('Pakai Nomor Seri')->default(true),
-            TextInput::make('min_qty')->label('Min. Stok')->numeric(),
+
+            Toggle::make('is_serialized')
+                ->label('Pakai Nomor Seri')
+                ->default(true),
+
+            TextInput::make('min_qty')
+                ->label('Min. Stok')
+                ->numeric(),
         ])->columns(2);
     }
 
@@ -61,7 +72,7 @@ class PpeSkuResource extends Resource
                 TextColumn::make('name')->label('Nama')->searchable()->sortable(),
                 TextColumn::make('type')
                     ->label('Jenis')
-                    ->formatStateUsing(fn($state) => PpeType::tryFrom($state)?->label() ?? $state)
+                    ->formatStateUsing(fn($state) => \App\Enums\PpeType::tryFrom($state)?->label() ?? $state)
                     ->badge()
                     ->sortable(),
                 TextColumn::make('brand')->label('Merek')->toggleable(),
