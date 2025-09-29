@@ -29,17 +29,15 @@ class FieldCoordinatorPanelProvider extends PanelProvider
             ->authGuard('web')
 
             ->brandName('Jaya Sakti Sejati')
-            ->brandLogo(fn () => view('filament.logo'))
+            ->brandLogo(fn() => view('filament.logo'))
             ->favicon(asset('images/favicon/favicon.ico'))
 
             ->sidebarCollapsibleOnDesktop()
-            // ->globalSearchKeyBindings(['ctrl+k','cmd+k']) 
-
             ->colors(['primary' => '#0137A1'])
             ->viteTheme('resources/css/filament/fc/theme.css')
 
-            ->pages([ Dashboard::class ])
-            ->homeUrl(fn () => Dashboard::getUrl())
+            ->pages([Dashboard::class])
+            ->homeUrl(fn() => Dashboard::getUrl())
 
             ->discoverResources(in: app_path('Filament/FC/Resources'), for: 'App\\Filament\\FC\\Resources')
             ->discoverPages(in: app_path('Filament/FC/Pages'),       for: 'App\\Filament\\FC\\Pages')
@@ -61,10 +59,11 @@ class FieldCoordinatorPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
-
                 EnsurePanelRole::class,
                 ScopeByBranchAndDepot::class,
             ])
-            ->authMiddleware([ Authenticate::class ]);
+            ->authMiddleware([
+                Authenticate::class,
+            ]);
     }
 }

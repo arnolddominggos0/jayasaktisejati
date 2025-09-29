@@ -58,10 +58,10 @@ enum TrackStatus: string
         ];
     }
 
-    public function toShipmentStatus(): ?\App\Enums\ShipmentStatus
+    public function toShipmentStatus(): ?ShipmentStatus
     {
         return match ($this) {
-            self::Pickup             => \App\Enums\ShipmentStatus::Pickup,
+            self::Pickup             => ShipmentStatus::Pickup,
             self::Handover,
             self::Stuffing,
             self::DeliveryToPort,
@@ -71,10 +71,10 @@ enum TrackStatus: string
             self::VesselDepart,
             self::VesselArrival,
             self::Unloading,
-            self::DeliveryToCustomer => \App\Enums\ShipmentStatus::Transit,
-            self::Delivered          => \App\Enums\ShipmentStatus::Delivered,
-            self::Hold               => \App\Enums\ShipmentStatus::Hold,
-            self::Cancelled          => \App\Enums\ShipmentStatus::Cancelled,
+            self::DeliveryToCustomer => ShipmentStatus::Transit,
+            self::Delivered          => ShipmentStatus::Delivered,
+            self::Hold               => ShipmentStatus::Hold,
+            self::Cancelled          => ShipmentStatus::Cancelled,
         };
     }
 

@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Enums\{ShipmentStatus, ShipmentMode, ServiceType, CargoType, DeliveryScope, RequestType};
+use App\Enums\{ShipmentStatus, ShipmentMode, ServiceType, CargoType, DeliveryScope, RequestType, TrackStatus};
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 
@@ -216,27 +216,6 @@ class Shipment extends Model
                 }
                 $m->forceFill($payload)->saveQuietly();
             }
-
-            if ($m->wasChanged('status')) {
-                $val = $m->status instanceof \BackedEnum
-                    ? $m->status->value
-                    : (string) $m->status;
-
-                $map = [
-                    'pickup'    => \App\Enums\TrackStatus::Pickup,
-                    'delivered' => \App\Enums\TrackStatus::Delivered,
-                    'hold'      => \App\Enums\TrackStatus::Hold,
-                    'cancelled' => \App\Enums\TrackStatus::Cancelled,
-                ];
-
-                if (isset($map[$val])) {
-                    \App\Models\ShipmentTrack::create([
-                        'shipment_id' => $m->id,
-                        'status'      => $map[$val],
-                        'note'        => 'Auto from Shipment.status: ' . $val,
-                    ]);
-                }
-            }
         });
     }
 
@@ -308,6 +287,23 @@ class Shipment extends Model
         $this->save();
     }
 
+    public function appendTrack(TrackStatus $status, ?string $note = null, ?string $location = null): ShipmentTrack
+    {
+        $track = $this->tracks()->create([
+            'status'   => $status,
+            'note'     => $note,
+            'location' => $location,
+        ]);
+
+        if ($to = $status->toShipmentStatus()) {
+            if ($this->status !== $to) {
+                $this->forceFill(['status' => $to])->saveQuietly();
+            }
+        }
+
+        return $track;
+    }
+
     // Relations
     public function customer()
     {
@@ -360,6 +356,17 @@ class Shipment extends Model
         return $this->hasOne(ShipmentTrack::class, 'shipment_id', 'id')
             ->latestOfMany('tracked_at');
     }
+
+    public function getLatestTrackStatusAttribute(): ?TrackStatus
+    {
+        return $this->latestTrack?->status;
+    }
+
+    public function getLatestTrackedAtAttribute(): ?\Illuminate\Support\Carbon
+    {
+        return $this->latestTrack?->tracked_at;
+    }
+
     public function originCity()
     {
         return $this->belongsTo(\App\Models\City::class, 'origin_city_id');
