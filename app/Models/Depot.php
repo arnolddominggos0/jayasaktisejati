@@ -9,7 +9,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Depot extends Model
 {
     protected $fillable = [
-        'code','name','mode','address','branch_id','coordinator_user_id'
+        'code',
+        'name',
+        'mode',
+        'address',
+        'branch_id',
+        'coordinator_user_id'
     ];
 
     public function branch(): BelongsTo
@@ -35,5 +40,9 @@ class Depot extends Model
     public function briefingSessions(): HasMany
     {
         return $this->hasMany(BriefingSession::class);
+    }
+    public function port(): BelongsTo
+    {
+        return $this->belongsTo(Port::class, 'port_id');
     }
 }

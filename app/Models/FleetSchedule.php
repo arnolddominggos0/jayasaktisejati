@@ -10,7 +10,12 @@ class FleetSchedule extends Model
     use HasFactory;
 
     protected $fillable = [
-        'vessel_name', 'voyage', 'pol', 'pod', 'etd', 'eta',
+        'vessel_name',
+        'voyage',
+        'pol',
+        'pod',
+        'etd',
+        'eta',
     ];
 
     protected $casts = [
@@ -35,4 +40,3 @@ class FleetSchedule extends Model
         return $this->hasOne(Voyage::class, 'voyage_no', 'voyage');
     }
 }
-

@@ -632,6 +632,8 @@ class ShipmentResource extends Resource
                     })
                     ->toggleable(),
 
+                
+
                 TextColumn::make('service_type')
                     ->label('Layanan')
                     ->getStateUsing(fn(Shipment $r) => $r->service_type?->label() ?? (is_string($r->service_type) ? $r->service_type : '-'))
@@ -921,12 +923,6 @@ class ShipmentResource extends Resource
                     ->deselectRecordsAfterCompletion()
                     ->successNotificationTitle('Data terpilih telah dihapus'),
             ]);
-    }
-
-
-    public static function getRelations(): array
-    {
-        return [];
     }
 
     public static function getPages(): array

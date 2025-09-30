@@ -57,6 +57,7 @@ class Shipment extends Model
         'etd',
         'eta',
         'voyage_id',
+        'assigned_depot_id',
 
         // Darat
         'vehicle_type',
@@ -342,6 +343,10 @@ class Shipment extends Model
     public function originOffice()
     {
         return $this->belongsTo(Office::class, 'origin_office_id');
+    }
+    public function assignedDepot()
+    {
+        return $this->belongsTo(Depot::class, 'assigned_depot_id');
     }
     public function destinationOffice()
     {

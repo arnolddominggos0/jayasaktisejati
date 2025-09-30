@@ -8,6 +8,7 @@ use App\Filament\FC\Resources\ShipmentResource\Pages\ListShipments;
 use App\Filament\FC\Resources\ShipmentResource\Pages\ViewShipment;
 use App\Models\Shipment;
 use App\Models\City;
+use App\Models\Depot;
 use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Resources\Resource;
@@ -15,6 +16,7 @@ use Filament\Tables;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Schema;
 
 class ShipmentResource extends Resource
 {
@@ -47,33 +49,34 @@ class ShipmentResource extends Resource
         $q = parent::getEloquentQuery();
 
         $u = Filament::auth()->user();
-        if (! $u) {
+        if (! $u) return $q->whereRaw('1=0');
+
+        $branchId = app()->bound('scope.branch_id') ? app('scope.branch_id') : ($u->branch_id ?? null);
+        $depotId  = app()->bound('scope.depot_id')  ? app('scope.depot_id')  : null;
+
+        $q->where('mode', ShipmentMode::Sea->value);
+
+        if ($branchId) {
+            $q->where('branch_id', $branchId);
+        }
+
+        if (! $depotId) {
+            $depotId = Depot::where('coordinator_user_id', $u->id)->value('id');
+        }
+
+        if ($depotId) {
+            $q->where('assigned_depot_id', $depotId);
+        } else {
             return $q->whereRaw('1=0');
         }
 
-        return $q
-            ->with([
-                'customer:id,name',
-                'receiver:id,name',
-                'originCity:id,name',
-                'destinationCity:id,name',
-                'latestTrack', 
-
-            ])
-            ->when($u->branch_id, function (Builder $w) use ($u) {
-                $w->where(function ($x) use ($u) {
-                    $x->where('branch_id', $u->branch_id)
-                        ->orWhereNull('branch_id');
-                });
-            })
-            ->when($u->office_id, function (Builder $w) use ($u) {
-                $w->where(function ($x) use ($u) {
-                    $x->where('origin_office_id', $u->office_id)
-                        ->orWhere('destination_office_id', $u->office_id)
-                        ->orWhereNull('origin_office_id')
-                        ->orWhereNull('destination_office_id');
-                });
-            });
+        return $q->with([
+            'customer:id,name',
+            'receiver:id,name',
+            'originCity:id,name',
+            'destinationCity:id,name',
+            'latestTrack',
+        ]);
     }
 
     protected static function trackUpdateForm(): array
@@ -184,7 +187,7 @@ class ShipmentResource extends Resource
                         if ($record->mode === ShipmentMode::Sea && $state === 'fcl') {
                             $size = $record->container_size instanceof ContainerSize
                                 ? $record->container_size->label()
-                                : \App\Enums\ContainerSize::tryFrom((string) $record->container_size)?->label();
+                                : ContainerSize::tryFrom((string) $record->container_size)?->label();
                             if ($size) {
                                 $qty = $record->container_qty ? " × {$record->container_qty}" : '';
                                 $label .= " • {$size}{$qty}";
@@ -232,9 +235,9 @@ class ShipmentResource extends Resource
                     ->badge()
                     ->formatStateUsing(fn(Shipment $record) => $record->latest_track_status?->label() ?? '-')
                     ->color(fn(Shipment $record) => match ($record->latest_track_status) {
-                        \App\Enums\TrackStatus::Delivered => 'success',
-                        \App\Enums\TrackStatus::Cancelled => 'danger',
-                        \App\Enums\TrackStatus::Hold      => 'warning',
+                        TrackStatus::Delivered => 'success',
+                        TrackStatus::Cancelled => 'danger',
+                        TrackStatus::Hold      => 'warning',
                         null                              => 'gray',
                         default                           => 'info',
                     })
