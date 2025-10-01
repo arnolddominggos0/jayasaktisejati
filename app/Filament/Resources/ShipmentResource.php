@@ -10,6 +10,7 @@ use App\Models\Armada;
 use App\Models\Driver;
 use App\Models\Shipment;
 use App\Models\Voyage;
+use App\Observers\ShipmentObserver;
 use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\{Checkbox, DatePicker, FileUpload, Grid, Group, Hidden, Placeholder, Repeater, Section, Select, Textarea, TextInput, ToggleButtons, ViewField};
@@ -43,8 +44,6 @@ class ShipmentResource extends Resource
 
     public static function form(Form $form): Form
     {
-        $hasDrivers = Schema::hasTable('drivers');
-
         $recalcLclTotals = function (Get $get, Set $set) {
             $rows = $get('lcl_items') ?? [];
             $sumCbm = 0.0;
@@ -210,6 +209,22 @@ class ShipmentResource extends Resource
                                         'container_qty_vehicle',
                                     ] as $f
                                 ) $set($f, null);
+                            })
+                            //Validasi agar SEA punya Voyage/POL/POD terisi
+                            ->rules(function (Get $get) {
+                                return [
+                                    function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        $state = $get();
+                                        if ($value === ShipmentMode::Sea->value) {
+                                            $voy = $state['voyage_id'] ?? null;
+                                            $pol = trim((string)($state['pol'] ?? ''));
+                                            $pod = trim((string)($state['pod'] ?? ''));
+                                            if (!$voy && ($pol === '' && $pod === '')) {
+                                                $fail('Untuk moda laut, isi Voyage atau minimal POL/POD.');
+                                            }
+                                        }
+                                    },
+                                ];
                             })
                             ->columnSpan(12),
 
@@ -416,7 +431,6 @@ class ShipmentResource extends Resource
                                     ->required(fn(Get $get) => $get('mode') === \App\Enums\ShipmentMode::Sea->value)
                                     ->hidden(fn(Get $get) => $get('mode') !== \App\Enums\ShipmentMode::Sea->value)
 
-                                    // preload 50 jadwal terbaru
                                     ->options(function () {
                                         return Voyage::with(['vessel', 'portFrom', 'portTo'])
                                             ->orderByDesc('etd')
@@ -489,72 +503,85 @@ class ShipmentResource extends Resource
                                 TextInput::make('pol')->disabled()->dehydrated()->columnSpan(4),
                                 TextInput::make('pod')->disabled()->dehydrated()->columnSpan(4),
 
+                                Placeholder::make('assignment_hint')
+                                    ->label('Status Penugasan Depo')
+                                    ->content(function (?Shipment $record) {
+                                        if (!$record) return '—';
+                                        if (($record->mode?->value ?? (string)$record->mode) !== 'sea') {
+                                            return 'Non-SEA: tidak memakai penugasan depo.';
+                                        }
+                                        return $record->assigned_depot?->name
+                                            ? ('Assigned ke: ' . $record->assigned_depot->name)
+                                            : 'Belum ter-assign. Lengkapi Voyage/POL/POD agar otomatis ter-assign.';
+                                    })
+                                    ->columnSpan(12),
                             ]),
 
-                        // === DARAT ===
-                        Group::make()
-                            ->columnSpan(12)
-                            ->columns(12)
-                            ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Land->value)
-                            ->schema([
-                                ViewField::make('mode_badge_land')->view('filament.forms.fields.mode-badge-land')->columnSpan(12),
+                    ]),
 
-                                Select::make('armada_id')
-                                    ->label('Pilih Armada')
-                                    ->relationship('armada', 'code')
-                                    ->searchable()
-                                    ->preload()
-                                    ->native(false)
-                                    ->live()
-                                    ->afterStateUpdated(function ($state, Set $set) {
-                                        if (! $state) {
-                                            $set('vehicle_plate', null);
-                                            $set('service_option', null);
-                                            return;
-                                        }
-                                        $armada = Armada::find($state);
-                                        $set('vehicle_plate', $armada?->plate_number);
-                                        $set('service_option', match ($armada?->type) {
-                                            'car_carrier' => 'car_carrier',
-                                            'towing'      => 'towing',
-                                            'truck'       => 'truck',
-                                            default       => null,
-                                        });
-                                    })
-                                    ->columnSpan(6),
+                // === DARAT ===
+                Group::make()
+                    ->columnSpan(12)
+                    ->columns(12)
+                    ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Land->value)
+                    ->schema([
+                        ViewField::make('mode_badge_land')->view('filament.forms.fields.mode-badge-land')->columnSpan(12),
 
-                                TextInput::make('vehicle_plate')
-                                    ->label('No. Polisi')
-                                    ->disabled()
-                                    ->dehydrated()
-                                    ->columnSpan(6),
+                        Select::make('armada_id')
+                            ->label('Pilih Armada')
+                            ->relationship('armada', 'code')
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(function ($state, Set $set) {
+                                if (! $state) {
+                                    $set('vehicle_plate', null);
+                                    $set('service_option', null);
+                                    return;
+                                }
+                                $armada = Armada::find($state);
+                                $set('vehicle_plate', $armada?->plate_number);
+                                $set('service_option', match ($armada?->type) {
+                                    'car_carrier' => 'car_carrier',
+                                    'towing'      => 'towing',
+                                    'truck'       => 'truck',
+                                    default       => null,
+                                });
+                            })
+                            ->columnSpan(6),
 
-                                Select::make('driver_id')
-                                    ->label('Pilih Supir')
-                                    ->relationship('driver', 'name')
-                                    ->searchable()
-                                    ->preload()
-                                    ->native(false)
-                                    ->live()
-                                    ->afterStateUpdated(function ($state, Set $set) {
-                                        if (! $state) {
-                                            $set('driver_name', null);
-                                            $set('driver_phone', null);
-                                            return;
-                                        }
-                                        $driver = \App\Models\Driver::find($state);
-                                        $set('driver_name', $driver?->name);
-                                        $set('driver_phone', $driver?->phone);
-                                    })
-                                    ->columnSpan(6),
+                        TextInput::make('vehicle_plate')
+                            ->label('No. Polisi')
+                            ->disabled()
+                            ->dehydrated()
+                            ->columnSpan(6),
 
-                                TextInput::make('driver_phone')
-                                    ->label('No. HP Sopir')
-                                    ->disabled()
-                                    ->dehydrated()
-                                    ->columnSpan(6),
+                        Select::make('driver_id')
+                            ->label('Pilih Supir')
+                            ->relationship('driver', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(function ($state, Set $set) {
+                                if (! $state) {
+                                    $set('driver_name', null);
+                                    $set('driver_phone', null);
+                                    return;
+                                }
+                                $driver = \App\Models\Driver::find($state);
+                                $set('driver_name', $driver?->name);
+                                $set('driver_phone', $driver?->phone);
+                            })
+                            ->columnSpan(6),
 
-                            ]),
+                        TextInput::make('driver_phone')
+                            ->label('No. HP Sopir')
+                            ->disabled()
+                            ->dehydrated()
+                            ->columnSpan(6),
+
                     ]),
 
                 Hidden::make('service_type')->dehydrated(),
@@ -581,7 +608,7 @@ class ShipmentResource extends Resource
                 if ($user?->branch_id) {
                     $query->where(function ($w) use ($user) {
                         $w->where('branch_id', $user->branch_id)
-                            ->orWhereNull('branch_id'); 
+                            ->orWhereNull('branch_id');
                     });
                 }
 
@@ -632,10 +659,7 @@ class ShipmentResource extends Resource
                     })
                     ->toggleable(),
 
-                
-
-                TextColumn::make('service_type')
-                    ->label('Layanan')
+                TextColumn::make('service_type')->label('Layanan')
                     ->getStateUsing(fn(Shipment $r) => $r->service_type?->label() ?? (is_string($r->service_type) ? $r->service_type : '-'))
                     ->badge()
                     ->colors([
@@ -813,6 +837,7 @@ class ShipmentResource extends Resource
 
                 SelectFilter::make('origin_city_id')->label('Kota Asal')->relationship('originCity', 'name')->searchable()->preload(),
                 SelectFilter::make('destination_city_id')->label('Kota Tujuan')->relationship('destinationCity', 'name')->searchable()->preload(),
+                Filter::make('assigned_only')->label('Hanya yang sudah assigned')->query(fn(Builder $q) => $q->whereNotNull('assigned_depot_id'))->toggle(),
             ], layout: FiltersLayout::AboveContent)
             ->filtersFormColumns(4)
             ->defaultSort('updated_at', 'desc')
@@ -932,5 +957,22 @@ class ShipmentResource extends Resource
             'create' => CreateShipment::route('/create'),
             'edit'   => EditShipment::route('/{record}/edit'),
         ];
+    }
+
+    public static function mutateFormDataBeforeCreate(array $data): array
+    {
+        return $data;
+    }
+    public static function afterCreate($record): void
+    {
+        app(ShipmentObserver::class)->created($record->refresh());
+    }
+    public static function mutateFormDataBeforeSave(array $data): array
+    {
+        return $data;
+    }
+    public static function afterSave($record): void
+    {
+        app(ShipmentObserver::class)->updated($record->refresh());
     }
 }

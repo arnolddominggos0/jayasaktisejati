@@ -5,35 +5,22 @@ namespace App\Observers;
 use App\Enums\ShipmentMode;
 use App\Enums\ShipmentStatus;
 use App\Models\Depot;
+use App\Models\Port;
 use App\Models\Shipment;
 use App\Models\Voyage;
 use BackedEnum;
+use Illuminate\Support\Facades\Schema;
 
 class ShipmentObserver
 {
     private function normalize(mixed $v): ?string
     {
-        if ($v instanceof BackedEnum) {
-            return (string) $v->value;
-        }
-
-        if (is_null($v)) {
-            return null;
-        }
-
-        if (is_array($v)) {
-            return json_encode($v, JSON_UNESCAPED_UNICODE);
-        }
-
-        if (is_object($v)) {
-            return method_exists($v, '__toString')
-                ? (string) $v
-                : json_encode($v, JSON_UNESCAPED_UNICODE);
-        }
-
+        if ($v instanceof BackedEnum) return (string) $v->value;
+        if (is_null($v)) return null;
+        if (is_array($v)) return json_encode($v, JSON_UNESCAPED_UNICODE);
+        if (is_object($v)) return method_exists($v, '__toString') ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE);
         return (string) $v;
     }
-
 
     private function statusLabel(?string $code): ?string
     {
@@ -50,78 +37,126 @@ class ShipmentObserver
             ->log($event);
     }
 
+    /** Depot query helper: filter by branch & port; filter 'mode' hanya jika kolomnya ada */
+    private function depotQuery(int $branchId, array $portIds)
+    {
+        $q = Depot::query()
+            ->where('branch_id', $branchId)
+            ->whereIn('port_id', $portIds);
+
+        if (Schema::hasColumn('depots', 'mode')) {
+            // hanya terapkan kalau kolomnya memang ada
+            $q->where('mode', 'sea');
+        }
+
+        return $q;
+    }
+
+    /** Cari kandidat depot berdasarkan voyage atau POL/POD */
     private function tryAssignDepot(Shipment $s): void
     {
-        if (($s->mode?->value ?? (string)$s->mode) !== 'sea') {
-            $s->assigned_depot_id = null;
+        $mode = $s->mode?->value ?? (string) $s->mode;
+
+        // Non SEA: depot harus null agar lolos constraint
+        if ($mode !== ShipmentMode::Sea->value) {
+            if ($s->assigned_depot_id) {
+                $s->assigned_depot_id = null;
+            }
             return;
         }
 
+        // Sudah ada depot: biarkan
+        if ($s->assigned_depot_id) return;
+
+        // Butuh branch agar pencarian depo terarah
+        if (empty($s->branch_id)) return;
+
         $portIds = [];
+
+        // 1) Voyage → port_from/port_to
         if ($s->voyage_id) {
-            $v = \App\Models\Voyage::select('port_from_id', 'port_to_id')->find($s->voyage_id);
-            if ($v) $portIds = array_filter([$v->port_from_id, $v->port_to_id]);
+            $v = Voyage::select('port_from_id', 'port_to_id')->find($s->voyage_id);
+            if ($v) $portIds = array_values(array_filter([$v->port_from_id, $v->port_to_id]));
         }
 
+        // 2) Jika belum ada, gunakan POL/POD (code ATAU name)
         if (empty($portIds)) {
-            $codes = array_filter([strtoupper((string)$s->pol), strtoupper((string)$s->pod)]);
-            if ($codes) {
-                $portIds = \App\Models\Port::whereIn('code', $codes)->pluck('id')->all();
+            $codesOrNames = array_values(array_filter([
+                trim((string) $s->pol),
+                trim((string) $s->pod),
+            ]));
+
+            if ($codesOrNames) {
+                $portIds = Port::where(function ($w) use ($codesOrNames) {
+                        $w->whereIn('code', array_map('strtoupper', $codesOrNames))
+                          ->orWhereIn('name', $codesOrNames);
+                    })
+                    ->pluck('id')
+                    ->all();
             }
         }
 
-        if ($portIds) {
-            $depotId = \App\Models\Depot::where('mode', 'sea')
-                ->where('branch_id', $s->branch_id)
-                ->whereIn('port_id', $portIds)
-                ->value('id');
+        if (!empty($portIds)) {
+            $depotId = $this->depotQuery((int) $s->branch_id, $portIds)->value('id');
+
             if ($depotId) {
                 $s->assigned_depot_id = $depotId;
+
+                if (empty($s->coordinator_id)) {
+                    $coord = Depot::whereKey($depotId)->value('coordinator_user_id');
+                    if ($coord) $s->coordinator_id = $coord;
+                }
             }
         }
     }
 
+    /** Pastikan assignment valid sebelum INSERT/UPDATE (hindari cek constraint error) */
+    public function saving(Shipment $s): void
+    {
+        if (($s->mode?->value ?? (string) $s->mode) !== 'sea') {
+            $s->assigned_depot_id = null;
+            return;
+        }
+
+        $this->tryAssignDepot($s);
+
+        if ($s->assigned_depot_id && empty($s->coordinator_id)) {
+            $coord = Depot::whereKey($s->assigned_depot_id)->value('coordinator_user_id');
+            if ($coord) $s->coordinator_id = $coord;
+        }
+    }
 
     public function created(Shipment $s): void
     {
+        // fallback
         $this->tryAssignDepot($s);
-        if ($s->isDirty('assigned_depot_id')) {
+        if ($s->isDirty('assigned_depot_id') || $s->isDirty('coordinator_id')) {
             $s->saveQuietly();
         }
 
         $status = $this->normalize($s->status);
         $this->log('created', $s, [
-            'status'      => $status,
+            'status'       => $status,
             'status_label' => $this->statusLabel($status),
         ]);
-
-        $this->ensureAssignedDepot($s);
     }
-
 
     public function updated(Shipment $s): void
     {
         $fromStatus = $this->normalize($s->getOriginal('status'));
         $toStatus   = $this->normalize($s->status);
 
-        $changes    = array_keys($s->getChanges());
-        $changed    = fn(string $k) => in_array($k, $changes, true);
+        $changes = array_keys($s->getChanges());
+        $changed = fn(string $k) => in_array($k, $changes, true);
 
-        $cancelChanged  = $changed('cancelled_at');
-        $statusChanged  = $changed('status');
-
-        $keys = array_keys($s->getChanges());
-        if (array_intersect($keys, ['voyage_id', 'pol', 'pod', 'branch_id', 'mode'])) {
+        if (array_intersect($changes, ['voyage_id', 'pol', 'pod', 'branch_id', 'mode'])) {
             $this->tryAssignDepot($s);
-            if ($s->isDirty('assigned_depot_id')) {
+            if ($s->isDirty('assigned_depot_id') || $s->isDirty('coordinator_id')) {
                 $s->saveQuietly();
             }
         }
 
-        if (
-            $cancelChanged ||
-            ($statusChanged && $toStatus === ShipmentStatus::Cancelled->value)
-        ) {
+        if ($changed('cancelled_at') || ($changed('status') && $toStatus === ShipmentStatus::Cancelled->value)) {
             if ($s->cancelled_at) {
                 $this->log('cancelled', $s, [
                     'from'       => $fromStatus,
@@ -138,24 +173,13 @@ class ShipmentObserver
                     'to_label'   => $this->statusLabel($toStatus),
                 ]);
             }
-
-            $changes = array_values(array_diff($changes, ['status', 'cancelled_at', 'cancelled_by']));
-        } elseif ($statusChanged) {
+        } elseif ($changed('status')) {
             $this->log('status_changed', $s, [
                 'from'       => $fromStatus,
                 'to'         => $toStatus,
                 'from_label' => $this->statusLabel($fromStatus),
                 'to_label'   => $this->statusLabel($toStatus),
             ]);
-            $changes = array_values(array_diff($changes, ['status']));
-        }
-
-        if (in_array('route_summary', $changes, true)) {
-            $this->log('route_updated', $s, [
-                'from' => (string) ($s->getOriginal('route_summary') ?? ''),
-                'to'   => (string) $s->route_summary,
-            ]);
-            $changes = array_values(array_diff($changes, ['route_summary']));
         }
 
         $other = array_values(array_diff($changes, [
@@ -163,8 +187,10 @@ class ShipmentObserver
             'created_at',
             'edited_fields',
             'last_edited_by',
+            'status',
+            'cancelled_at',
+            'cancelled_by',
         ]));
-
         if (!empty($other)) {
             $diff = [];
             foreach ($other as $key) {
@@ -173,19 +199,7 @@ class ShipmentObserver
                     'to'   => $this->normalize($s->$key),
                 ];
             }
-            $this->log('updated', $s, [
-                'changed_fields' => $other,
-                'diff'           => $diff,
-            ]);
-        }
-
-        if (
-            in_array('voyage_id', $changes, true) ||
-            in_array('branch_id', $changes, true) ||
-            in_array('mode', $changes, true)      ||
-            ($s->mode === ShipmentMode::Sea && in_array('assigned_depot_id', $changes, true) && $s->assigned_depot_id === null)
-        ) {
-            $this->ensureAssignedDepot($s);
+            $this->log('updated', $s, ['changed_fields' => $other, 'diff' => $diff]);
         }
     }
 
@@ -193,49 +207,9 @@ class ShipmentObserver
     {
         $this->log('deleted', $s);
     }
+
     public function restored(Shipment $s): void
     {
         $this->log('restored', $s);
-    }
-
-    private function ensureAssignedDepot(Shipment $s): void
-    {
-        if (($s->mode?->value ?? (string)$s->mode) !== 'sea' || empty($s->branch_id)) {
-            if ($s->assigned_depot_id) {
-                $s->forceFill(['assigned_depot_id' => null])->saveQuietly();
-            }
-            return;
-        }
-
-        $voyId = $s->voyage_id;
-        if (! $voyId) return;
-
-        $voy = Voyage::with(['portFrom', 'portTo'])->find($voyId);
-        if (! $voy) return;
-
-        $candidateId = Depot::query()
-            ->where('branch_id', $s->branch_id)
-            ->where('mode', 'sea')
-            ->where('port_id', $voy->port_from_id)
-            ->value('id');
-
-        if (! $candidateId) {
-            $candidateId = Depot::query()
-                ->where('branch_id', $s->branch_id)
-                ->where('mode', 'sea')
-                ->where('port_id', $voy->port_to_id)
-                ->value('id');
-        }
-
-        if ($candidateId && $candidateId !== $s->assigned_depot_id) {
-            $payload = ['assigned_depot_id' => $candidateId];
-
-            if (empty($s->coordinator_id)) {
-                $coord = Depot::whereKey($candidateId)->value('coordinator_user_id');
-                if ($coord) $payload['coordinator_id'] = $coord;
-            }
-
-            $s->forceFill($payload)->saveQuietly();
-        }
     }
 }

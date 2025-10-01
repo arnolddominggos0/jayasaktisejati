@@ -11,12 +11,13 @@ use App\Models\City;
 use App\Models\Depot;
 use Filament\Facades\Filament;
 use Filament\Forms;
+use Filament\Forms\Components\Textarea;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 
 class ShipmentResource extends Resource
 {
@@ -51,24 +52,26 @@ class ShipmentResource extends Resource
         $u = Filament::auth()->user();
         if (! $u) return $q->whereRaw('1=0');
 
-        $branchId = app()->bound('scope.branch_id') ? app('scope.branch_id') : ($u->branch_id ?? null);
-        $depotId  = app()->bound('scope.depot_id')  ? app('scope.depot_id')  : null;
-
         $q->where('mode', ShipmentMode::Sea->value);
 
+        $branchId = app()->bound('scope.branch_id') ? app('scope.branch_id') : ($u->branch_id ?? null);
         if ($branchId) {
             $q->where('branch_id', $branchId);
         }
 
+        $depotId = app()->bound('scope.depot_id') ? app('scope.depot_id') : null;
         if (! $depotId) {
-            $depotId = Depot::where('coordinator_user_id', $u->id)->value('id');
+            $depotId = \App\Models\Depot::where('coordinator_user_id', $u->id)->value('id');
         }
 
-        if ($depotId) {
-            $q->where('assigned_depot_id', $depotId);
-        } else {
-            return $q->whereRaw('1=0');
-        }
+        $q->where(function ($w) use ($depotId, $u) {
+            if ($depotId) {
+                $w->where('assigned_depot_id', $depotId)
+                    ->orWhere('coordinator_id', $u->id);
+            } else {
+                $w->where('coordinator_id', $u->id);
+            }
+        });
 
         return $q->with([
             'customer:id,name',
@@ -78,6 +81,7 @@ class ShipmentResource extends Resource
             'latestTrack',
         ]);
     }
+
 
     protected static function trackUpdateForm(): array
     {
@@ -284,7 +288,6 @@ class ShipmentResource extends Resource
                             return;
                         }
 
-                        // Jika status tidak berubah, jangan buat log baru.
                         if ($record->latest_track_status?->value === $status->value) {
                             $record->latestTrack?->update([
                                 'note'       => $data['note'] ?? $record->latestTrack?->note,
@@ -320,7 +323,7 @@ class ShipmentResource extends Resource
                             ->color('info')
                             ->visible(fn(Shipment $record) => ($record->status?->value ?? (string)$record->status) === 'pending')
                             ->form([
-                                \Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3),
+                                Textarea::make('note')->label('Catatan')->rows(3),
                             ])
                             ->action(function (Shipment $record, array $data) {
                                 $record->appendTrack(TrackStatus::Pickup, $data['note'] ?? null);
@@ -331,7 +334,7 @@ class ShipmentResource extends Resource
                             ->icon('heroicon-m-building-office')
                             ->color('info')
                             ->visible(fn(Shipment $record) => in_array($record->status?->value ?? (string)$record->status, ['pickup', 'transit'], true))
-                            ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                            ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                             ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::Handover, $data['note'] ?? null)),
 
                         Tables\Actions\Action::make('stuffing')
@@ -339,7 +342,7 @@ class ShipmentResource extends Resource
                             ->icon('heroicon-m-wrench-screwdriver')
                             ->color('info')
                             ->visible(fn(Shipment $record) => in_array($record->status?->value ?? (string)$record->status, ['pickup', 'transit'], true))
-                            ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                            ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                             ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::Stuffing, $data['note'] ?? null)),
 
                         Tables\Actions\Action::make('deliveryToPort')
@@ -347,7 +350,7 @@ class ShipmentResource extends Resource
                             ->icon('heroicon-m-arrow-up-right')
                             ->color('info')
                             ->visible(fn(Shipment $record) => in_array($record->status?->value ?? (string)$record->status, ['pickup', 'transit'], true))
-                            ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                            ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                             ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::DeliveryToPort, $data['note'] ?? null)),
 
                         Tables\Actions\Action::make('stacking')
@@ -355,7 +358,7 @@ class ShipmentResource extends Resource
                             ->icon('heroicon-m-rectangle-group')
                             ->color('info')
                             ->visible(fn(Shipment $record) => ($record->status?->value ?? (string)$record->status) === 'transit')
-                            ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                            ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                             ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::Stacking, $data['note'] ?? null)),
 
                         Tables\Actions\Action::make('unitLoading')
@@ -363,7 +366,7 @@ class ShipmentResource extends Resource
                             ->icon('heroicon-m-arrow-up-tray')
                             ->color('info')
                             ->visible(fn(Shipment $record) => ($record->status?->value ?? (string)$record->status) === 'transit')
-                            ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                            ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                             ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::UnitLoading, $data['note'] ?? null)),
 
                         Tables\Actions\Action::make('onShip')
@@ -371,7 +374,7 @@ class ShipmentResource extends Resource
                             ->icon('heroicon-m-rocket-launch')
                             ->color('info')
                             ->visible(fn(Shipment $record) => ($record->status?->value ?? (string)$record->status) === 'transit')
-                            ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                            ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                             ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::OnShip, $data['note'] ?? null)),
 
                         Tables\Actions\Action::make('vesselDepart')
@@ -379,7 +382,7 @@ class ShipmentResource extends Resource
                             ->icon('heroicon-m-paper-airplane')
                             ->color('info')
                             ->visible(fn(Shipment $record) => ($record->status?->value ?? (string)$record->status) === 'transit')
-                            ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                            ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                             ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::VesselDepart, $data['note'] ?? null)),
 
                         Tables\Actions\Action::make('vesselArrival')
@@ -387,7 +390,7 @@ class ShipmentResource extends Resource
                             ->icon('heroicon-m-flag')
                             ->color('info')
                             ->visible(fn(Shipment $record) => ($record->status?->value ?? (string)$record->status) === 'transit')
-                            ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                            ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                             ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::VesselArrival, $data['note'] ?? null)),
 
                         Tables\Actions\Action::make('unloading')
@@ -395,7 +398,7 @@ class ShipmentResource extends Resource
                             ->icon('heroicon-m-arrow-down-tray')
                             ->color('info')
                             ->visible(fn(Shipment $record) => ($record->status?->value ?? (string)$record->status) === 'transit')
-                            ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                            ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                             ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::Unloading, $data['note'] ?? null)),
 
                         Tables\Actions\Action::make('deliveryToCustomer')
@@ -403,7 +406,7 @@ class ShipmentResource extends Resource
                             ->icon('heroicon-m-user')
                             ->color('info')
                             ->visible(fn(Shipment $record) => ($record->status?->value ?? (string)$record->status) === 'transit')
-                            ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                            ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                             ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::DeliveryToCustomer, $data['note'] ?? null)),
 
                         Tables\Actions\Action::make('markDelivered')
@@ -412,7 +415,7 @@ class ShipmentResource extends Resource
                             ->color('success')
                             ->visible(fn(Shipment $record) => in_array($record->status?->value ?? (string)$record->status, ['transit', 'pickup', 'pending'], true))
                             ->form([
-                                \Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3),
+                                Textarea::make('note')->label('Catatan')->rows(3),
                             ])
                             ->action(function (Shipment $record, array $data) {
                                 $record->appendTrack(TrackStatus::Delivered, $data['note'] ?? 'Terkirim');
@@ -424,7 +427,7 @@ class ShipmentResource extends Resource
                             ->color('warning')
                             ->visible(fn(Shipment $record) => !in_array($record->status?->value ?? (string)$record->status, ['delivered', 'cancelled'], true))
                             ->form([
-                                \Filament\Forms\Components\Textarea::make('note')
+                                Textarea::make('note')
                                     ->label('Alasan')
                                     ->rows(3)
                                     ->required(),
@@ -437,7 +440,7 @@ class ShipmentResource extends Resource
                             ->color('danger')
                             ->visible(fn(Shipment $record) => $record->canCancel())
                             ->form([
-                                \Filament\Forms\Components\Textarea::make('note')
+                                Textarea::make('note')
                                     ->label('Alasan')
                                     ->rows(3)
                                     ->required(),
@@ -456,11 +459,6 @@ class ShipmentResource extends Resource
             ])
             ->bulkActions([])
             ->defaultSort('updated_at', 'desc');
-    }
-
-    public static function getRelations(): array
-    {
-        return [];
     }
 
     public static function getPages(): array
