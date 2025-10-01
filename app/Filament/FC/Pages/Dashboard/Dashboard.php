@@ -24,7 +24,6 @@ class Dashboard extends Page
         return Filament::auth()->user()?->hasRole('field_coordinator') ?? false;
     }
 
-    // Opsional: kalau mau pastikan judul selalu "Dashboard"
     public function getTitle(): string|Htmlable
     {
         return static::$title ?? 'Dashboard';

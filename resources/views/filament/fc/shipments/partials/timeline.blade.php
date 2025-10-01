@@ -52,7 +52,6 @@
         return 'text-gray-400';
     };
 
-    // Helper deskripsi default per status
     $describeStep = function ($hit, bool $curr, string $val) {
         if (!empty($hit?->note)) {
             return ['text' => $hit->note, 'class' => 'text-gray-900'];
@@ -66,7 +65,7 @@
             $defaultDone = match ($val) {
                 'pickup'               => 'Penjemputan selesai.',
                 'handover'             => 'Sudah serah terima di depo.',
-                'stuffing'             => 'Stuffing & segel rampung.',
+                'stuffing'             => 'Stuffing & segel telah dilakukan.',
                 'delivery_to_port'     => 'Barang tiba di pelabuhan.',
                 'stacking'             => 'Stacking di terminal selesai.',
                 'unit_loading'         => 'Kontainer sudah dimuat ke kapal.',
@@ -109,7 +108,6 @@
             @endif
         </div>
 
-        {{-- Progress bar --}}
         <div class="mt-3">
             <div class="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
                 <div class="h-full rounded-full bg-blue-500 bg-gradient-to-r from-green-500 via-green-400 to-blue-500" style="width: {{ $progressPct }}%"></div>
@@ -136,7 +134,6 @@
                     $connector = $curr || $done ? 'from-green-400 to-green-200' : 'from-gray-200 to-gray-200';
                     $rowWrap   = $curr ? 'bg-blue-50 ring-1 ring-blue-300' : ($done ? 'bg-white' : 'hover:bg-gray-50');
 
-                    // deskripsi per-step (pakai helper 3 arg)
                     $d = $describeStep($hit, $curr, $val);
                 @endphp
 
@@ -147,12 +144,10 @@
 
                     <div class="rounded-lg {{ $rowWrap }} transition-colors">
                         <div class="grid grid-cols-[2rem_1fr_auto] sm:grid-cols-[2.5rem_1fr_12rem] items-start gap-3 sm:gap-4 px-3 sm:px-6 py-2.5 sm:py-3">
-                            <!-- node -->
                             <div class="flex items-start justify-center">
                                 <div class="mt-1 h-3 w-3 rounded-full {{ $dot($done, $curr) }}"></div>
                             </div>
 
-                            <!-- content -->
                             <div class="min-w-0">
                                 <div class="flex items-start gap-3">
                                     <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-gray-200 bg-white shadow-sm">
@@ -184,7 +179,6 @@
                                             {{ $d['text'] }}
                                         </p>
 
-                                        <!-- mobile time -->
                                         <div class="mt-0.5 text-xs text-gray-500 sm:hidden">
                                             {{ $hit?->tracked_at ? $fmt($hit->tracked_at) : '' }}
                                         </div>
@@ -192,7 +186,6 @@
                                 </div>
                             </div>
 
-                            <!-- desktop time -->
                             <div class="hidden sm:flex items-start justify-end">
                                 <time class="text-xs text-gray-500">{{ $hit?->tracked_at ? $fmt($hit->tracked_at) : '' }}</time>
                             </div>

@@ -18,10 +18,10 @@ class FcKpiStats extends Widget
         $fcCol = (string) config('fc.shipment_fc_column', 'coordinator_id');
 
         $base = Shipment::query()
-            ->when($u?->branch_id, fn(Builder $q) => $q->where(function ($w) use ($u) {
+            ->when($u?->branch_id, fn(Builder $query) => $query->where(function ($w) use ($u) {
                 $w->where('branch_id', $u->branch_id)->orWhereNull('branch_id');
             }))
-            ->when($u?->office_id ?? null, fn(Builder $q) => $q->where(function ($w) use ($u) {
+            ->when($u?->office_id ?? null, fn(Builder $query) => $query->where(function ($w) use ($u) {
                 $w->where('origin_office_id', $u->office_id)->orWhere('destination_office_id', $u->office_id)
                     ->orWhereNull('origin_office_id');
             }))

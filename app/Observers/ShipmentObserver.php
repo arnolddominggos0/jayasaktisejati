@@ -37,7 +37,6 @@ class ShipmentObserver
             ->log($event);
     }
 
-    /** Depot query helper: filter by branch & port; filter 'mode' hanya jika kolomnya ada */
     private function depotQuery(int $branchId, array $portIds)
     {
         $q = Depot::query()
@@ -45,19 +44,16 @@ class ShipmentObserver
             ->whereIn('port_id', $portIds);
 
         if (Schema::hasColumn('depots', 'mode')) {
-            // hanya terapkan kalau kolomnya memang ada
             $q->where('mode', 'sea');
         }
 
         return $q;
     }
 
-    /** Cari kandidat depot berdasarkan voyage atau POL/POD */
     private function tryAssignDepot(Shipment $s): void
     {
         $mode = $s->mode?->value ?? (string) $s->mode;
 
-        // Non SEA: depot harus null agar lolos constraint
         if ($mode !== ShipmentMode::Sea->value) {
             if ($s->assigned_depot_id) {
                 $s->assigned_depot_id = null;
@@ -65,21 +61,17 @@ class ShipmentObserver
             return;
         }
 
-        // Sudah ada depot: biarkan
         if ($s->assigned_depot_id) return;
 
-        // Butuh branch agar pencarian depo terarah
         if (empty($s->branch_id)) return;
 
         $portIds = [];
 
-        // 1) Voyage → port_from/port_to
         if ($s->voyage_id) {
             $v = Voyage::select('port_from_id', 'port_to_id')->find($s->voyage_id);
             if ($v) $portIds = array_values(array_filter([$v->port_from_id, $v->port_to_id]));
         }
 
-        // 2) Jika belum ada, gunakan POL/POD (code ATAU name)
         if (empty($portIds)) {
             $codesOrNames = array_values(array_filter([
                 trim((string) $s->pol),
@@ -110,7 +102,6 @@ class ShipmentObserver
         }
     }
 
-    /** Pastikan assignment valid sebelum INSERT/UPDATE (hindari cek constraint error) */
     public function saving(Shipment $s): void
     {
         if (($s->mode?->value ?? (string) $s->mode) !== 'sea') {
@@ -128,7 +119,6 @@ class ShipmentObserver
 
     public function created(Shipment $s): void
     {
-        // fallback
         $this->tryAssignDepot($s);
         if ($s->isDirty('assigned_depot_id') || $s->isDirty('coordinator_id')) {
             $s->saveQuietly();

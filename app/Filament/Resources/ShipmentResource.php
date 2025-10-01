@@ -7,12 +7,10 @@ use App\Filament\Resources\ShipmentResource\Pages\CreateShipment;
 use App\Filament\Resources\ShipmentResource\Pages\EditShipment;
 use App\Filament\Resources\ShipmentResource\Pages\ListShipments;
 use App\Models\Armada;
-use App\Models\Driver;
 use App\Models\Shipment;
 use App\Models\Voyage;
 use App\Observers\ShipmentObserver;
 use Filament\Facades\Filament;
-use Filament\Forms;
 use Filament\Forms\Components\{Checkbox, DatePicker, FileUpload, Grid, Group, Hidden, Placeholder, Repeater, Section, Select, Textarea, TextInput, ToggleButtons, ViewField};
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -28,19 +26,17 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 class ShipmentResource extends Resource
 {
     protected static ?string $model = Shipment::class;
 
-    protected static ?string $navigationGroup = 'Pengiriman';
-    protected static ?string $navigationLabel = 'Permintaan Pengiriman';
-    protected static ?string $modelLabel = 'Permintaan Pengiriman';
-    protected static ?string $pluralModelLabel = 'Permintaan Pengiriman';
-    protected static ?string $navigationIcon  = 'heroicon-m-queue-list';
-    protected static ?int    $navigationSort  = 10;
+    protected static ?string $navigationGroup   = 'Pengiriman';
+    protected static ?string $navigationLabel   = 'Permintaan Pengiriman';
+    protected static ?string $modelLabel        = 'Permintaan Pengiriman';
+    protected static ?string $pluralModelLabel  = 'Permintaan Pengiriman';
+    protected static ?string $navigationIcon    = 'heroicon-m-queue-list';
+    protected static ?int    $navigationSort    = 10;
 
     public static function form(Form $form): Form
     {
@@ -605,6 +601,10 @@ class ShipmentResource extends Resource
             ->modifyQueryUsing(function (Builder $query) {
                 $user = Filament::auth()->user();
 
+                if ($user?->hasRole('super_admin')) {
+                    return;
+                }
+
                 if ($user?->branch_id) {
                     $query->where(function ($w) use ($user) {
                         $w->where('branch_id', $user->branch_id)
@@ -612,7 +612,7 @@ class ShipmentResource extends Resource
                     });
                 }
 
-                if ($user?->id) {
+                if ($user?->hasRole('field_coordinator')) {
                     $query->where(function ($qq) use ($user) {
                         $qq->where('coordinator_id', $user->id)
                             ->orWhereNull('coordinator_id');
@@ -957,6 +957,19 @@ class ShipmentResource extends Resource
             'create' => CreateShipment::route('/create'),
             'edit'   => EditShipment::route('/{record}/edit'),
         ];
+    }
+
+    public static function canEdit($record): bool
+    {
+        $u = Filament::auth()->user();
+        if ($u?->hasRole('super_admin')) return true;
+        return $u?->can('update', $record) ?? false;
+    }
+
+    public static function canViewAny(): bool
+    {
+        $u = Filament::auth()->user();
+        return $u?->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']) ?? false;
     }
 
     public static function mutateFormDataBeforeCreate(array $data): array

@@ -7,37 +7,46 @@ use App\Models\User;
 
 class ShipmentPolicy
 {
+
+    public function before(User $user, $ability)
+    {
+        if ($user->hasRole('super_admin')) {
+            return true;
+        }
+        return null;
+    }
+
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']);
+        return $user->hasAnyRole(['office_admin', 'field_coordinator']);
     }
 
     public function view(User $user, Shipment $shipment): bool
     {
-        if ($user->hasAnyRole(['super_admin', 'office_admin'])) return true;
-        if ($user->hasRole('field_coordinator')) {
-            return ($user->branch_id && $shipment->branch_id === $user->branch_id)
-                && ($shipment->coordinator_id === null || $shipment->coordinator_id === $user->id);
-        }
-        return false;
+        return $this->update($user, $shipment);
     }
 
-    public function update(User $user, Shipment $s): bool
+    public function create(User $user): bool
     {
-        if (! $user->hasRole('field_coordinator')) return false;
+        return $user->hasAnyRole(['super_admin', 'office_admin']);
+    }
 
-        $sameBranch = !$user->branch_id || $s->branch_id === $user->branch_id || $s->branch_id === null;
-        $sameOffice = !$user->office_id
-            || in_array($user->office_id, [$s->origin_office_id, $s->destination_office_id, null], true);
+    public function update(User $user, Shipment $shipment): bool
+    {
+        if ($user->hasRole('office_admin')) {
+            return is_null($shipment->branch_id) || $shipment->branch_id === $user->branch_id;
+        }
 
-        $editable = !in_array($s->status?->value ?? (string)$s->status, ['delivered', 'cancelled'], true);
+        if ($user->hasRole('field_coordinator')) {
+            return $shipment->coordinator_id === $user->id || is_null($shipment->coordinator_id);
+        }
 
-        return $sameBranch && $sameOffice && $editable;
+        return false;
     }
 
 
     public function delete(User $user, Shipment $shipment): bool
     {
-        return $user->hasAnyRole(['super_admin', 'office_admin']);
+        return $this->update($user, $shipment);
     }
 }

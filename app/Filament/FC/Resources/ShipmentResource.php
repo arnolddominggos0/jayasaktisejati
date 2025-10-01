@@ -8,16 +8,15 @@ use App\Filament\FC\Resources\ShipmentResource\Pages\ListShipments;
 use App\Filament\FC\Resources\ShipmentResource\Pages\ViewShipment;
 use App\Models\Shipment;
 use App\Models\City;
-use App\Models\Depot;
 use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Log;
 
 class ShipmentResource extends Resource
 {
@@ -314,7 +313,7 @@ class ShipmentResource extends Resource
                             ->requiresConfirmation()
                             ->action(function (Shipment $record) {
                                 $record->update(['status' => ShipmentStatus::Pending]);
-                                \Filament\Notifications\Notification::make()->title('Status di-set ke Menunggu')->success()->send();
+                                Notification::make()->title('Status di-set ke Menunggu')->success()->send();
                             }),
 
                         Tables\Actions\Action::make('startPickup')

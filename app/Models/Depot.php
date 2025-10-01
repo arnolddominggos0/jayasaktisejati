@@ -12,9 +12,15 @@ class Depot extends Model
         'code',
         'name',
         'mode',
+        'port_id',
+        'service_types',
         'address',
         'branch_id',
-        'coordinator_user_id'
+        'coordinator_user_id',
+    ];
+
+    protected $casts = [
+        'service_types' => 'array',
     ];
 
     public function branch(): BelongsTo
@@ -41,8 +47,13 @@ class Depot extends Model
     {
         return $this->hasMany(BriefingSession::class);
     }
+
     public function port(): BelongsTo
     {
         return $this->belongsTo(Port::class, 'port_id');
+    }
+    public function shipments(): HasMany
+    {
+        return $this->hasMany(\App\Models\Shipment::class, 'assigned_depot_id');
     }
 }

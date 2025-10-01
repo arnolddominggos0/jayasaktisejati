@@ -77,10 +77,10 @@ class FcRecentActivities extends BaseWidget
 
                 Tables\Columns\TextColumn::make('location_text')
                     ->label('Lokasi')
-                    ->getStateUsing(function ($r) {
-                        $o = $r->shipment->originCity->name ?? null;
-                        $d = $r->shipment->destinationCity->name ?? null;
-                        return $r->location_name ?: ($o && $d ? "{$o} → {$d}" : '—');
+                    ->getStateUsing(function ($record) {
+                        $o = $record->shipment->originCity->name ?? null;
+                        $d = $record->shipment->destinationCity->name ?? null;
+                        return $record->location_name ?: ($o && $d ? "{$o} → {$d}" : '—');
                     })
                     ->wrap(),
 

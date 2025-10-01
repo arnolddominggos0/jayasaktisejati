@@ -4,7 +4,6 @@ namespace App\Observers;
 
 use App\Enums\TrackStatus;
 use App\Models\ShipmentTrack;
-use App\Support\ShipmentStatusSyncer as SupportShipmentStatusSyncer;
 use App\Supports\ShipmentStatusSyncer;
 
 class ShipmentTrackObserver
@@ -54,7 +53,6 @@ class ShipmentTrackObserver
 
     public function updated(ShipmentTrack $m): void
     {
-        // 1) Status berubah?
         if ($m->wasChanged('status')) {
             $from = $m->getOriginal('status');
             $to   = $m->getAttribute('status');
@@ -77,7 +75,6 @@ class ShipmentTrackObserver
             app(ShipmentStatusSyncer::class)->syncFromTrack($m);
         }
 
-        // 2) Lokasi berubah?
         if ($m->wasChanged('location')) {
             activity('tracking')
                 ->performedOn($m)
@@ -94,7 +91,6 @@ class ShipmentTrackObserver
         }
 
 
-        // 3) ETA berubah?
         if ($m->wasChanged('eta')) {
             $from = $m->getOriginal('eta');
             $to   = $m->eta;
@@ -112,7 +108,6 @@ class ShipmentTrackObserver
                 ->log('ETA tracking diubah');
         }
 
-        // 4) Kolom lain
         $watched = ['route', 'lat', 'lng', 'proof_url', 'note'];
         $changed = array_values(array_filter($watched, fn($f) => $m->wasChanged($f)));
 
