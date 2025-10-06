@@ -18,36 +18,36 @@ class BackfillShipmentVoyageId extends Command
 
         Shipment::whereNull('voyage_id')
             ->chunkById(500, function ($rows) use (&$count) {
-                foreach ($rows as $s) {
+                foreach ($rows as $state) {
                     $q = Voyage::query();
 
-                    if ($s->voyage) {
-                        $q->where('voyage_no', $s->voyage);
+                    if ($state->voyage) {
+                        $q->where('voyage_no', $state->voyage);
                     }
 
-                    if ($s->vessel_name) {
+                    if ($state->vessel_name) {
                         $q->whereHas('vessel', fn($qq) =>
-                            $qq->where('name', 'ilike', $s->vessel_name));
+                            $qq->where('name', 'ilike', $state->vessel_name));
                     }
 
-                    if ($s->pol) {
+                    if ($state->pol) {
                         $q->whereHas('portFrom', fn($qq) =>
-                            $qq->where('code', 'ilike', $s->pol)->orWhere('name', 'ilike', $s->pol));
+                            $qq->where('code', 'ilike', $state->pol)->orWhere('name', 'ilike', $state->pol));
                     }
-                    if ($s->pod) {
+                    if ($state->pod) {
                         $q->whereHas('portTo', fn($qq) =>
-                            $qq->where('code', 'ilike', $s->pod)->orWhere('name', 'ilike', $s->pod));
+                            $qq->where('code', 'ilike', $state->pod)->orWhere('name', 'ilike', $state->pod));
                     }
 
-                    if ($s->etd) {
-                        $etd = Carbon::parse($s->etd)->startOfDay();
+                    if ($state->etd) {
+                        $etd = Carbon::parse($state->etd)->startOfDay();
                         $q->whereBetween('etd', [$etd, (clone $etd)->endOfDay()]);
                     }
 
                     $voy = $q->orderByDesc('etd')->first();
                     if ($voy) { 
-                        $s->voyage_id = $voy->id;
-                        $s->saveQuietly();
+                        $state->voyage_id = $voy->id;
+                        $state->saveQuietly();
                         $count++;
                     }
                 }

@@ -1,11 +1,10 @@
 <?php
-
+// app/Http/Controllers/ShipmentPrintController.php
 namespace App\Http\Controllers;
 
 use App\Models\Shipment;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Milon\Barcode\DNS1D;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
@@ -17,13 +16,13 @@ class ShipmentPrintController extends Controller
         foreach (['branch', 'originBranch', 'assigned_depot', 'customer', 'receiver', 'originCity', 'destinationCity'] as $rel) {
             if (method_exists($shipment, $rel)) $rels[] = $rel;
         }
-        if (!empty($rels)) $shipment->load($rels);
+        if ($rels) $shipment->load($rels);
 
         $trackUrl = route('tracking.show', $shipment->code);
-        $qrSvg = QrCode::format('svg')->size(140)->margin(0)->generate($trackUrl);
+        $qrSvg    = QrCode::format('svg')->size(128)->margin(0)->generate($trackUrl);
 
         $barcode = new DNS1D();
-        $barcodeBase64 = $barcode->getBarcodePNG($shipment->code, 'C128', 2, 50);
+        $barcodeBase64 = $barcode->getBarcodePNG($shipment->code, 'C128', 1.9, 44);
 
         $branchModel = $shipment->branch ?? $shipment->originBranch ?? null;
         $branchInfo = null;
@@ -63,6 +62,27 @@ class ShipmentPrintController extends Controller
             $logoDataUri = "data:{$logoMime};base64,{$logoData}";
         }
 
+        $brand = [
+            'name'  => config('app.name', 'PT Jaya Sakti Sejati'),
+            'abbr'  => 'JSS',
+            'color' => '#0137A1',
+            'logo'  => $logoDataUri,
+            'site'  => env('APP_BRAND_SITE', env('COMPANY_URL', 'https://jayasaktisejati.com')),
+            'phone' => env('COMPANY_PHONE', config('company.phone', '+6221 693 0565')),
+            'addr'  => (function () use ($branchInfo) {
+                if (empty($branchInfo)) {
+                    return 'KOMPLEK LODAN CENTER, Blok T1 & T2
+                JI. Lodan Raya No.0.2 Jakarta Utara - 14430';
+                }
+                $parts = [];
+                if (!empty($branchInfo['name']))    $parts[] = trim($branchInfo['name']);
+                if (!empty($branchInfo['address'])) $parts[] = trim($branchInfo['address']);
+                if (!empty($branchInfo['city']))    $parts[] = trim($branchInfo['city']);
+                return implode(', ', array_filter($parts));
+            })(),
+        ];
+        if (strtolower($brand['name']) === 'laravel') $brand['name'] = 'PT Jaya Sakti Sejati';
+
         $data = [
             'shipment'       => $shipment,
             'qrSvg'          => $qrSvg,
@@ -71,22 +91,7 @@ class ShipmentPrintController extends Controller
             'branchInfo'     => $branchInfo,
             'depotInfo'      => $depotInfo,
             'printedAt'      => now()->timezone(config('app.timezone'))->format('d M Y H:i'),
-            'brand'          => [
-                'name'  => config('app.name', 'PT Jaya Sakti Sejati'),
-                'abbr'  => 'JSS',
-                'color' => '#0137A1',
-                'logo'  => $logoDataUri,
-                'site'  => env('APP_BRAND_SITE', env('COMPANY_URL', 'https://jayasaktisejati.com')),
-                'phone' => env('COMPANY_PHONE', config('company.phone', '+62 852-7090-9923')),
-                'addr'  => (function () use ($branchInfo) {
-                    if (empty($branchInfo)) return 'Komplek Lodan Center Jakarta';
-                    $parts = [];
-                    if (!empty($branchInfo['name']))    $parts[] = trim($branchInfo['name']);
-                    if (!empty($branchInfo['address'])) $parts[] = trim($branchInfo['address']);
-                    if (!empty($branchInfo['city']))    $parts[] = trim($branchInfo['city']);
-                    return implode(', ', array_filter($parts));
-                })(),
-            ],
+            'brand'          => $brand,
         ];
 
         $pdf = Pdf::loadView('shipments.resi', $data)
@@ -99,7 +104,7 @@ class ShipmentPrintController extends Controller
                 'defaultFont'          => 'DejaVu Sans',
             ]);
 
-        $filename = 'RESI-' . Str::upper($shipment->code) . '.pdf';
+        $filename = 'RESI-' . strtoupper($shipment->code) . '.pdf';
         return $request->boolean('download') ? $pdf->download($filename) : $pdf->stream($filename);
     }
 }

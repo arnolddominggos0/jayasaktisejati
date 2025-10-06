@@ -11,7 +11,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class SeaContainer extends Model
 {
     protected $fillable = [
-        'booking_id','size_type','container_no','seal_no','status','gross_weight'
+        'booking_id',
+        'size_type',
+        'container_no',
+        'seal_no',
+        'status',
+        'gross_weight'
     ];
 
     protected $casts = [
@@ -19,6 +24,9 @@ class SeaContainer extends Model
         'status'    => ContainerStatus::class,
     ];
 
-    public function booking(): BelongsTo { return $this->belongsTo(SeaBooking::class, 'booking_id'); }
-    public function events(): HasMany { return $this->hasMany(SeaContainerEvent::class, 'container_id'); }
+    // public function booking(): BelongsTo { return $this->belongsTo(SeaBooking::class, 'booking_id'); }
+    public function events(): HasMany
+    {
+        return $this->hasMany(SeaContainerEvent::class, 'container_id');
+    }
 }

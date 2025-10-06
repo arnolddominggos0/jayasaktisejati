@@ -4,29 +4,34 @@ namespace App\Enums;
 
 enum ContainerStatus: string
 {
-    case Reserved     = 'reserved';      // slot disetujui carrier
-    case PickedUp     = 'picked_up';     // ambil empty
-    case GateIn       = 'gate_in';       // gate in terminal
-    case Loaded       = 'loaded';        // loaded on vessel
-    case Arrived      = 'arrived';       // vessel arrived POD
-    case EmptyReturn  = 'empty_return';  // empty returned
-    case Cancelled    = 'cancelled';
+    case Draft     = 'draft';
+    case Stuffing  = 'stuffing';
+    case GateIn    = 'gate_in';
+    case OnShip    = 'on_ship';
+    case Completed = 'completed';
+    case Cancelled = 'cancelled';
 
     public function label(): string
     {
-        return str_replace('_', ' ', ucfirst($this->value));
+        return match ($this) {
+            self::Draft     => 'Draf',
+            self::Stuffing  => 'Stuffing',
+            self::GateIn    => 'Gate-In',
+            self::OnShip    => 'On Ship',
+            self::Completed => 'Selesai',
+            self::Cancelled => 'Dibatalkan',
+        };
     }
 
     public function color(): string
     {
-        return match($this) {
-            self::Reserved    => 'warning',
-            self::PickedUp    => 'primary',
-            self::GateIn      => 'info',
-            self::Loaded      => 'success',
-            self::Arrived     => 'success',
-            self::EmptyReturn => 'gray',
-            self::Cancelled   => 'danger',
+        return match ($this) {
+            self::Draft     => 'gray',
+            self::Stuffing  => 'warning',
+            self::GateIn    => 'primary',
+            self::OnShip    => 'info',
+            self::Completed => 'success',
+            self::Cancelled => 'danger',
         };
     }
 }

@@ -21,12 +21,12 @@ class ContainersRelationManager extends RelationManager
     public function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([
-           Select::make('size_type')->label('Size/Type')
-                ->options(collect(ContainerSize::cases())->mapWithKeys(fn($c)=>[$c->value=>$c->label()]))->required(),
+            Select::make('size_type')->label('Size/Type')
+                ->options(collect(ContainerSize::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))->required(),
             TextInput::make('container_no')->label('Container No'),
             TextInput::make('seal_no')->label('Seal No'),
-           Select::make('status')->label('Status')
-                ->options(collect(ContainerStatus::cases())->mapWithKeys(fn($c)=>[$c->value=>$c->label()]))->required(),
+            Select::make('status')->label('Status')
+                ->options(collect(ContainerStatus::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))->required(),
             TextInput::make('gross_weight')->numeric()->label('Gross (kg)'),
         ])->columns(2);
     }

@@ -59,6 +59,7 @@ class Shipment extends Model
         'driver_id',
         'status',
         'notes',
+        'delivered_at',
         'requested_at',
         'cancelled_at',
         'cancelled_by',
@@ -86,6 +87,7 @@ class Shipment extends Model
         'pickup_date'        => 'datetime',
         'estimated_ready_at' => 'datetime',
         'confirm_is_true'    => 'boolean',
+        'delivered_at'       => 'datetime',
         'cancelled_at'       => 'datetime',
         'edited_fields'      => 'array',
     ];
@@ -185,7 +187,41 @@ class Shipment extends Model
             $to   = ($m->destinationCity->name ?? null) ?: (string) $m->route_to;
 
             $m->route_summary = implode(' → ', array_filter([$from, $middle, $to])) . $scope;
+
+            $prev = ShipmentStatus::tryFrom((string) $m->getOriginal('status'));
+            $curr = $m->status instanceof ShipmentStatus
+                ? $m->status
+                : ShipmentStatus::tryFrom((string) $m->status);
+
+            if ($curr !== $prev) {
+                if ($curr === ShipmentStatus::Delivered) {
+                    $deliveredTrackAt = $m->exists
+                        ? optional(
+                            $m->tracks()
+                                ->where('status', TrackStatus::Delivered->value)
+                                ->latest('tracked_at')
+                                ->first()
+                        )->tracked_at
+                        : null;
+
+                    $m->delivered_at = $deliveredTrackAt ?: now();
+                    $m->cancelled_at = null;
+                    $m->cancelled_by = null;
+                } elseif ($curr === ShipmentStatus::Cancelled) {
+                    $m->cancelled_at = $m->cancelled_at ?: now();
+                    $m->cancelled_by = $m->cancelled_by ?: (Auth::id() ?: null);
+                    $m->delivered_at = null;
+                } else {
+                    $m->delivered_at = null;
+                    if ($prev === ShipmentStatus::Cancelled) {
+                        $m->cancelled_at = null;
+                        $m->cancelled_by = null;
+                    }
+                }
+            }
         });
+
+
 
         static::updated(function (Shipment $m) {
             $changed = array_keys($m->getChanges());
@@ -286,6 +322,35 @@ class Shipment extends Model
         }
 
         return $track;
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->whereIn('status', array_map(fn($event) => $event->value, ShipmentStatus::active()));
+    }
+
+    public function scopeHistory($q)
+    {
+        return $q->whereIn('status', array_map(fn($e) => $e->value, ShipmentStatus::completed()));
+    }
+
+    public function getCompletedAtAttribute(): ?Carbon
+    {
+        $st = $this->status instanceof ShipmentStatus ? $this->status : ShipmentStatus::tryFrom((string) $this->status);
+        if ($st === ShipmentStatus::Delivered) {
+            $deliveredTrack = $this->tracks()
+                ->where('status', TrackStatus::Delivered->value)
+                ->latest('tracked_at')
+                ->first();
+
+            return $deliveredTrack?->tracked_at ?: ($this->updated_at ?? null);
+        }
+
+        if ($st === ShipmentStatus::Cancelled) {
+            return $this->cancelled_at ?: ($this->updated_at ?? null);
+        }
+
+        return null;
     }
 
     public function customer()
@@ -392,5 +457,14 @@ class Shipment extends Model
             fn($p) => Storage::disk('public')->url($p),
             $paths
         ));
+    }
+
+    public function isHistorical(): bool
+    {
+        $st = $this->status instanceof ShipmentStatus
+            ? $this->status
+            : ShipmentStatus::tryFrom((string)$this->status);
+
+        return in_array($st, [ShipmentStatus::Delivered, ShipmentStatus::Cancelled], true);
     }
 }

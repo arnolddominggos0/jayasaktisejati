@@ -32,7 +32,7 @@ return new class extends Migration
     {
         Schema::table('shipments', function (Blueprint $table) {
             if (Schema::hasColumn('shipments', 'weight_total')) {
-                $table->dropColumn('weight_total');
+                $table->dropColumn('weight_total'); 
             }
             if (Schema::hasColumn('shipments', 'packages_total')) {
                 $table->dropColumn('packages_total');

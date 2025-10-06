@@ -141,4 +141,9 @@ class SeaBookingResource extends Resource
             'edit'   => Pages\EditSeaBooking::route('/{record}/edit'),
         ];
     }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 }

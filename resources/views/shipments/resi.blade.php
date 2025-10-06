@@ -1,83 +1,91 @@
 @php
-$brandDefaults = [
-'name' => 'PT Jaya Sakti Sejati',
-'abbr' => 'JSS',
-'color' => '#0137A1',
-'logo' => null,
-'site' => env('APP_BRAND_SITE', env('COMPANY_URL', config('company.url', config('app.url', 'https://jayasaktisejati.com')))),
-'phone' => env('COMPANY_PHONE', config('company.phone', '')),
-'addr' => (!empty($branchInfo) && is_array($branchInfo))
-? trim(
-($branchInfo['name'] ? $branchInfo['name'].' — ' : '').
-($branchInfo['address'] ?? '').
-(($branchInfo['city'] ?? '') ? ', '.$branchInfo['city'] : '')
-)
-: 'Komplek Lodan Center Jakarta',
-];
-$brand = array_merge($brandDefaults, $brand ?? []);
-if (isset($brand['site']) && $brand['site'] && !preg_match('~^https?://~i', $brand['site'])) {
-$brand['site'] = 'https://'.ltrim($brand['site'], '/');
-}
-if (strtolower($brand['name']) === 'laravel') $brand['name'] = $brandDefaults['name'];
+    $brandDefaults = [
+        'name' => 'PT Jaya Sakti Sejati',
+        'abbr' => 'JSS',
+        'color' => '#0137A1',
+        'logo' => null,
+        'site' => env(
+            'APP_BRAND_SITE',
+            env('COMPANY_URL', config('company.url', config('app.url', 'https://jayasaktisejati.com'))),
+        ),
+        'phone' => env('COMPANY_PHONE', config('company.phone', '')),
+        'addr' =>
+            !empty($branchInfo) && is_array($branchInfo)
+                ? trim(
+                    ($branchInfo['name'] ? $branchInfo['name'] . ' — ' : '') .
+                        ($branchInfo['address'] ?? '') .
+                        ($branchInfo['city'] ?? '' ? ', ' . $branchInfo['city'] : ''),
+                )
+                : 'Komplek Lodan Center Jakarta, Ancol',
+    ];
+    $brand = array_merge($brandDefaults, $brand ?? []);
+    if (isset($brand['site']) && $brand['site'] && !preg_match('~^https?://~i', $brand['site'])) {
+        $brand['site'] = 'https://' . ltrim($brand['site'], '/');
+    }
+    if (strtolower($brand['name']) === 'laravel') {
+        $brand['name'] = $brandDefaults['name'];
+    }
 
-$fmtDate = fn($dt) => optional($dt)->timezone(config('app.timezone'))->format('d M Y');
-$fmtDatetime = fn($dt) => optional($dt)->timezone(config('app.timezone'))->format('d M Y H:i');
-$safe = fn($v, $dash='-') => (filled($v) ? e($v) : $dash);
-$join = function (array $parts, string $sep = ' · ') {
-$clean = array_values(array_filter(array_map(fn($v) => is_string($v) ? trim($v) : ($v ?? ''), $parts), fn($v) => $v !== ''));
-return implode($sep, $clean);
-};
-$toTitle = fn($x) => $x === '-' ? '-' : mb_convert_case($x, MB_CASE_TITLE, 'UTF-8');
+    $fmtDate = fn($dt) => optional($dt)->timezone(config('app.timezone'))->format('d M Y');
+    $fmtDatetime = fn($dt) => optional($dt)->timezone(config('app.timezone'))->format('d M Y H:i');
+    $safe = fn($v, $dash = '-') => filled($v) ? e($v) : $dash;
+    $join = function (array $parts, string $sep = ' · ') {
+        $clean = array_values(
+            array_filter(array_map(fn($v) => is_string($v) ? trim($v) : $v ?? '', $parts), fn($v) => $v !== ''),
+        );
+        return implode($sep, $clean);
+    };
+    $toTitle = fn($x) => $x === '-' ? '-' : mb_convert_case($x, MB_CASE_TITLE, 'UTF-8');
 
-$bgBrand = $brand['color'] ?? '#0137A1';
+    $bgBrand = $brand['color'] ?? '#0137A1';
 
-$originRaw = $shipment->originCity->name
-?? $shipment->origin_city_name
-?? $shipment->route_from
-?? optional($shipment->originBranch?->city)->name
-?? $shipment->originBranch?->name
-?? '-';
-$destRaw = $shipment->destinationCity->name
-?? $shipment->destination_city_name
-?? $shipment->route_to
-?? optional($shipment->destinationBranch?->city)->name
-?? $shipment->destinationBranch?->name
-?? '-';
+    $originRaw =
+        $shipment->originCity->name ??
+        ($shipment->origin_city_name ??
+            ($shipment->route_from ??
+                (optional($shipment->originBranch?->city)->name ?? ($shipment->originBranch?->name ?? '-'))));
+    $destRaw =
+        $shipment->destinationCity->name ??
+        ($shipment->destination_city_name ??
+            ($shipment->route_to ??
+                (optional($shipment->destinationBranch?->city)->name ?? ($shipment->destinationBranch?->name ?? '-'))));
 
-$origin = $toTitle($originRaw);
-$dest = $toTitle($destRaw);
+    $origin = $toTitle($originRaw);
+    $dest = $toTitle($destRaw);
 
-$packages = (int) ($shipment->packages_total ?? 0);
-$weightKg = (float) ($shipment->weight_total ?? 0);
-$volume = (float) ($shipment->cbm_total ?? 0);
+    $packages = (int) ($shipment->packages_total ?? 0);
+    $weightKg = (float) ($shipment->weight_total ?? 0);
+    $volume = (float) ($shipment->cbm_total ?? 0);
 
-$containerSize = $shipment->container_size ?? null;
-$containerQty = (int) ($shipment->container_qty ?? 0);
-$isFcl = !empty($containerSize) && $containerQty > 0;
+    $containerSize = $shipment->container_size ?? null;
+    $containerQty = (int) ($shipment->container_qty ?? 0);
+    $isFcl = !empty($containerSize) && $containerQty > 0;
 
-$senderName = $shipment->customer?->name ?? '';
-$senderPhone = $shipment->customer?->phone ?? $shipment->customer?->pic_phone ?? '';
+    $senderName = $shipment->customer?->name ?? '';
+    $senderPhone = $shipment->customer?->phone ?? ($shipment->customer?->pic_phone ?? '');
 
-$recvName = $shipment->receiver?->name ?? '';
-$recvPhone = $shipment->receiver?->phone ?? $shipment->receiver?->pic_phone ?? '';
-$recvAddr = $shipment->receiver?->address ?? '';
+    $recvName = $shipment->receiver?->name ?? '';
+    $recvPhone = $shipment->receiver?->phone ?? ($shipment->receiver?->pic_phone ?? '');
+    $recvAddr = $shipment->receiver?->address ?? '';
 
-$serviceTypeLabel = $shipment->service_type?->label() ?? (is_string($shipment->service_type) ? $shipment->service_type : '-');
-$modeLabel = $shipment->mode?->label() ?? (is_string($shipment->mode) ? strtoupper($shipment->mode) : '-');
-$cargoTypeLabel = $shipment->cargo_type?->label() ?? (is_string($shipment->cargo_type) ? $shipment->cargo_type : '-');
+    $serviceTypeLabel =
+        $shipment->service_type?->label() ?? (is_string($shipment->service_type) ? $shipment->service_type : '-');
+    $modeLabel = $shipment->mode?->label() ?? (is_string($shipment->mode) ? strtoupper($shipment->mode) : '-');
+    $cargoTypeLabel =
+        $shipment->cargo_type?->label() ?? (is_string($shipment->cargo_type) ? $shipment->cargo_type : '-');
 
-$serviceOption = match($shipment->service_option) {
-'fcl' => 'FCL',
-'lcl' => 'LCL',
-'truck' => 'Truck',
-'car_carrier' => 'Car Carrier',
-'towing' => 'Towing',
-default => $shipment->service_option ?? '-'
-};
+    $serviceOption = match ($shipment->service_option) {
+        'fcl' => 'FCL',
+        'lcl' => 'LCL',
+        'truck' => 'Truck',
+        'car_carrier' => 'Car Carrier',
+        'towing' => 'Towing',
+        default => $shipment->service_option ?? '-',
+    };
 
-$createdOn = $fmtDate($shipment->created_at);
-$etaOn = filled($shipment->eta) ? $fmtDate($shipment->eta) : '-';
-$etdOn = filled($shipment->etd) ? $fmtDate($shipment->etd) : '-';
+    $createdOn = $fmtDate($shipment->created_at);
+    $etaOn = filled($shipment->eta) ? $fmtDate($shipment->eta) : '-';
+    $etdOn = filled($shipment->etd) ? $fmtDate($shipment->etd) : '-';
 @endphp
 
 <!DOCTYPE html>
@@ -408,15 +416,15 @@ $etdOn = filled($shipment->etd) ? $fmtDate($shipment->etd) : '-';
     <div class="header">
         <div class="header-left">
             <div style="display:flex;align-items:center;gap:12px">
-                @if(!empty($brand['logo']))
-                <img src="{{ $brand['logo'] }}" alt="Logo" style="height:38px;width:auto">
+                @if (!empty($brand['logo']))
+                    <img src="{{ $brand['logo'] }}" alt="Logo" style="height:38px;width:auto">
                 @endif
                 <div>
                     <div class="logo-title">{{ e($brand['name']) }}</div>
                     <div class="company-info">
                         {{ $join([
                             filled($brand['addr']) ? $brand['addr'] : null,
-                            filled($brand['phone']) ? 'Telp: '.$brand['phone'] : null,
+                            filled($brand['phone']) ? 'Telp: ' . $brand['phone'] : null,
                             filled($brand['site']) ? $brand['site'] : null,
                         ]) }}
                     </div>
@@ -518,119 +526,120 @@ $etdOn = filled($shipment->etd) ? $fmtDate($shipment->etd) : '-';
                 <div class="info-label">Opsi</div>
                 <div class="info-value">{{ $serviceOption }}</div>
             </div>
-            @if($isFcl && $containerSize)
-            <div class="info-row">
-                <div class="info-label">Container</div>
-                <div class="info-value">{{ $safe(strtoupper($containerSize)) }} × {{ $containerQty }}</div>
-            </div>
+            @if ($isFcl && $containerSize)
+                <div class="info-row">
+                    <div class="info-label">Container</div>
+                    <div class="info-value">{{ $safe(strtoupper($containerSize)) }} × {{ $containerQty }}</div>
+                </div>
             @endif
-            @if(!$isFcl && $packages > 0)
-            <div class="info-row">
-                <div class="info-label">Jumlah Koli</div>
-                <div class="info-value">{{ number_format($packages) }} koli</div>
-            </div>
+            @if (!$isFcl && $packages > 0)
+                <div class="info-row">
+                    <div class="info-label">Jumlah Koli</div>
+                    <div class="info-value">{{ number_format($packages) }} koli</div>
+                </div>
             @endif
-            @if(!$isFcl && $weightKg > 0)
-            <div class="info-row">
-                <div class="info-label">Berat Total</div>
-                <div class="info-value">{{ number_format($weightKg, 2) }} kg</div>
-            </div>
+            @if (!$isFcl && $weightKg > 0)
+                <div class="info-row">
+                    <div class="info-label">Berat Total</div>
+                    <div class="info-value">{{ number_format($weightKg, 2) }} kg</div>
+                </div>
             @endif
-            @if(!$isFcl && $volume > 0)
-            <div class="info-row">
-                <div class="info-label">Volume</div>
-                <div class="info-value">{{ number_format($volume, 3) }} CBM</div>
-            </div>
+            @if (!$isFcl && $volume > 0)
+                <div class="info-row">
+                    <div class="info-label">Volume</div>
+                    <div class="info-value">{{ number_format($volume, 3) }} CBM</div>
+                </div>
             @endif
             <div class="info-row">
                 <div class="info-label">Jenis Muatan</div>
                 <div class="info-value">{{ $cargoTypeLabel }}</div>
             </div>
-            @if(filled($shipment->priority) && $shipment->priority !== 'normal')
-            <div class="info-row">
-                <div class="info-label">Prioritas</div>
-                <div class="info-value"><span class="badge badge-priority">{{ $safe(strtoupper($shipment->priority)) }}</span></div>
-            </div>
+            @if (filled($shipment->priority) && $shipment->priority !== 'normal')
+                <div class="info-row">
+                    <div class="info-label">Prioritas</div>
+                    <div class="info-value"><span
+                            class="badge badge-priority">{{ $safe(strtoupper($shipment->priority)) }}</span></div>
+                </div>
             @endif
         </div>
         <div class="card">
             <div class="card-header">Informasi Tambahan</div>
-            @if(filled($shipment->doc_number))
-            <div class="info-row">
-                <div class="info-label">No. Dokumen</div>
-                <div class="info-value">{{ $safe($shipment->doc_number) }}</div>
-            </div>
+            @if (filled($shipment->doc_number))
+                <div class="info-row">
+                    <div class="info-label">No. Dokumen</div>
+                    <div class="info-value">{{ $safe($shipment->doc_number) }}</div>
+                </div>
             @endif
         </div>
     </div>
 
-    @if(filled($shipment->lcl_items) && is_iterable($shipment->lcl_items))
-    <div class="card">
-        <div class="card-header">Detail Barang (LCL)</div>
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th style="width:6%">No</th>
-                    <th style="width:42%">Uraian Barang</th>
-                    <th style="width:12%">Qty</th>
-                    <th style="width:20%">Berat (kg)</th>
-                    <th style="width:20%">Volume (CBM)</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($shipment->lcl_items as $idx => $it)
-                @php
-                $desc = $it['description'] ?? '-';
-                $qty = (int) ($it['qty'] ?? 0);
-                $w = (float)($it['weight_kg'] ?? 0);
-                $p = (float)($it['length_cm'] ?? 0);
-                $l = (float)($it['width_cm'] ?? 0);
-                $t = (float)($it['height_cm'] ?? 0);
-                $cbm = ($p * $l * $t * $qty) / 1000000;
-                @endphp
-                <tr>
-                    <td style="text-align:center">{{ $idx + 1 }}</td>
-                    <td>{{ e($desc) }}</td>
-                    <td style="text-align:center">{{ $qty }}</td>
-                    <td style="text-align:right">{{ number_format($w, 2) }}</td>
-                    <td style="text-align:right">{{ number_format($cbm, 3) }}</td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </div>
+    @if (filled($shipment->lcl_items) && is_iterable($shipment->lcl_items))
+        <div class="card">
+            <div class="card-header">Detail Barang (LCL)</div>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th style="width:6%">No</th>
+                        <th style="width:42%">Uraian Barang</th>
+                        <th style="width:12%">Qty</th>
+                        <th style="width:20%">Berat (kg)</th>
+                        <th style="width:20%">Volume (CBM)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($shipment->lcl_items as $idx => $it)
+                        @php
+                            $desc = $it['description'] ?? '-';
+                            $qty = (int) ($it['qty'] ?? 0);
+                            $w = (float) ($it['weight_kg'] ?? 0);
+                            $p = (float) ($it['length_cm'] ?? 0);
+                            $l = (float) ($it['width_cm'] ?? 0);
+                            $t = (float) ($it['height_cm'] ?? 0);
+                            $cbm = ($p * $l * $t * $qty) / 1000000;
+                        @endphp
+                        <tr>
+                            <td style="text-align:center">{{ $idx + 1 }}</td>
+                            <td>{{ e($desc) }}</td>
+                            <td style="text-align:center">{{ $qty }}</td>
+                            <td style="text-align:right">{{ number_format($w, 2) }}</td>
+                            <td style="text-align:right">{{ number_format($cbm, 3) }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
     @endif
 
-    @if(filled($shipment->units) && is_iterable($shipment->units))
-    <div class="card" style="margin-top:10px">
-        <div class="card-header">Detail Unit Kendaraan</div>
-        <table class="items-table">
-            <thead>
-                <tr>
-                    <th style="width:6%">No</th>
-                    <th style="width:20%">Model</th>
-                    <th style="width:14%">No. Polisi</th>
-                    <th style="width:22%">No. Rangka</th>
-                    <th style="width:22%">No. Mesin</th>
-                    <th style="width:8%">Qty</th>
-                    <th style="width:8%">Rack</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($shipment->units as $idx => $unit)
-                <tr>
-                    <td style="text-align:center">{{ $idx + 1 }}</td>
-                    <td>{{ e($unit['model_no'] ?? '-') }}</td>
-                    <td>{{ e($unit['reg_no'] ?? '-') }}</td>
-                    <td style="font-size:8px">{{ e($unit['chassis_no'] ?? '-') }}</td>
-                    <td style="font-size:8px">{{ e($unit['engine_no'] ?? '-') }}</td>
-                    <td style="text-align:center">{{ $unit['qty'] ?? 1 }}</td>
-                    <td style="text-align:center">{{ !empty($unit['is_rack']) ? '✓' : '-' }}</td>
-                </tr>
-                @endforeach
-            </tbody>
-        </table>
-    </div>
+    @if (filled($shipment->units) && is_iterable($shipment->units))
+        <div class="card" style="margin-top:10px">
+            <div class="card-header">Detail Unit Kendaraan</div>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th style="width:6%">No</th>
+                        <th style="width:20%">Model</th>
+                        <th style="width:14%">No. Polisi</th>
+                        <th style="width:22%">No. Rangka</th>
+                        <th style="width:22%">No. Mesin</th>
+                        <th style="width:8%">Qty</th>
+                        <th style="width:8%">Rack</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($shipment->units as $idx => $unit)
+                        <tr>
+                            <td style="text-align:center">{{ $idx + 1 }}</td>
+                            <td>{{ e($unit['model_no'] ?? '-') }}</td>
+                            <td>{{ e($unit['reg_no'] ?? '-') }}</td>
+                            <td style="font-size:8px">{{ e($unit['chassis_no'] ?? '-') }}</td>
+                            <td style="font-size:8px">{{ e($unit['engine_no'] ?? '-') }}</td>
+                            <td style="text-align:center">{{ $unit['qty'] ?? 1 }}</td>
+                            <td style="text-align:center">{{ !empty($unit['is_rack']) ? '✓' : '-' }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
     @endif
 
     <div class="grid-2" style="margin-top:10px">
@@ -642,9 +651,14 @@ $etdOn = filled($shipment->etd) ? $fmtDate($shipment->etd) : '-';
 
     <div class="footer">
         <strong>{{ e($brand['name']) }}</strong> · Resi ini adalah bukti sah pengiriman.<br>
-        Simpan nomor resi untuk pelacakan. Layanan pelanggan: <strong>{{ e($brand['phone']) }}</strong> · {{ e($brand['site']) }}
-        @if(isset($depotInfo) && $depotInfo)
-        <br><span style="font-size:7.5px;display:block;margin-top:4px">Depo: {{ e($depotInfo['name']) }} · {{ e($depotInfo['address']) }}@if(!empty($depotInfo['phone'])) · Telp: {{ e($depotInfo['phone']) }}@endif</span>
+        Simpan nomor resi untuk pelacakan. Layanan pelanggan: <strong>{{ e($brand['phone']) }}</strong> ·
+        {{ e($brand['site']) }}
+        @if (isset($depotInfo) && $depotInfo)
+            <br><span style="font-size:7.5px;display:block;margin-top:4px">Depo: {{ e($depotInfo['name']) }} ·
+                {{ e($depotInfo['address']) }}@if (!empty($depotInfo['phone']))
+                    · Telp: {{ e($depotInfo['phone']) }}
+                @endif
+            </span>
         @endif
     </div>
 </body>

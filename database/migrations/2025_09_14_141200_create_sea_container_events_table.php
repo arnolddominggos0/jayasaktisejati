@@ -10,9 +10,9 @@ return new class extends Migration {
         Schema::create('sea_container_events', function (Blueprint $table) {
             $table->id();
             $table->foreignId('container_id')->constrained('sea_containers')->cascadeOnDelete();
-            $table->string('event');     // picked_up / gate_in / loaded / arrived / empty_return / dll
+            $table->string('event');  
             $table->dateTime('event_time');
-            $table->string('location')->nullable(); // CY/CT di POL/POD
+            $table->string('location')->nullable(); 
             $table->string('remark')->nullable();
             $table->timestamps();
 

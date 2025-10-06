@@ -9,9 +9,7 @@ use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\KeyValue;
-use Filament\Infolists\Components\View as ViewComponent; // ← tambah ini
-use App\Models\Shipment;
+use Filament\Infolists\Components\View as ViewComponent; 
 
 class ViewShipment extends ViewRecord
 {

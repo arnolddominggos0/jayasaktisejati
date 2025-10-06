@@ -7,6 +7,7 @@ use App\Filament\Resources\ShipmentResource\Pages\CreateShipment;
 use App\Filament\Resources\ShipmentResource\Pages\EditShipment;
 use App\Filament\Resources\ShipmentResource\Pages\ListShipments;
 use App\Filament\Resources\ArmadaAssignmentResource;
+use App\Filament\Resources\SeaBookingResource\RelationManagers\ContainersRelationManager;
 use App\Models\Armada;
 use App\Models\Customer;
 use App\Models\Shipment;
@@ -1074,7 +1075,6 @@ class ShipmentResource extends Resource
 
                 SelectFilter::make('origin_city_id')->label('Kota Asal')->relationship('originCity', 'name')->searchable()->preload(),
                 SelectFilter::make('destination_city_id')->label('Kota Tujuan')->relationship('destinationCity', 'name')->searchable()->preload(),
-                Filter::make('assigned_only')->label('Hanya yang sudah assigned')->query(fn(Builder $q) => $q->whereNotNull('assigned_depot_id'))->toggle(),
             ], layout: FiltersLayout::AboveContent)
             ->filtersFormColumns(4)
             ->defaultSort('updated_at', 'desc')
