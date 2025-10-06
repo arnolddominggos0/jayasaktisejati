@@ -9,6 +9,16 @@ enum DeliveryScope: string
     case DoorToPort = 'door_to_port';
     case DoorToDoor = 'door_to_door';
 
+    public function hasOriginDoor(): bool
+    {
+        return in_array($this, [self::DoorToDoor, self::DoorToPort], true);
+    }
+
+    public function hasDestinationDoor(): bool
+    {
+        return in_array($this, [self::DoorToDoor, self::PortToDoor], true);
+    }
+
     public function label(): string
     {
         return match ($this) {

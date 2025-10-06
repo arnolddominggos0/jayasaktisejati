@@ -51,16 +51,41 @@ class ShipmentTrackingResource extends Resource
                         "<div class='font-medium'>" . ($r->originCity->name ?? '-') . " &rarr; " . ($r->destinationCity->name ?? '-') . "</div>"
                     )->toggleable(),
 
-                TextColumn::make('progress_count')->label('Progress')->state(function (Shipment $r) {
-                    $order = TrackStatus::order();
-                    $raw   = $r->latestTrack?->status;
-                    $last  = $raw instanceof \BackedEnum ? $raw->value : $raw;
-                    $idx = -1;
-                    if ($last && ($cur = TrackStatus::tryFrom((string) $last))) {
+
+                TextColumn::make('progress_count')
+                    ->label('Progress')
+                    ->state(function (Shipment $r) {
+                        $order = TrackStatus::orderForMode($r->mode);
+
+                        $raw  = $r->latestTrack?->status;
+                        $cur  = $raw instanceof TrackStatus ? $raw : TrackStatus::tryFrom((string) $raw);
+
+                        if (! $cur) {
+                            return '0/' . count($order);
+                        }
+
+                        if ($cur === TrackStatus::Hold) {
+                            return $cur->label(); 
+                        }
+                        if ($cur === TrackStatus::Cancelled) {
+                            return $cur->label();
+                        }
+
                         $idx = array_search($cur, $order, true);
-                    }
-                    return ($idx + 1) . '/' . count($order);
-                })->badge()->icon('heroicon-m-bolt')->toggleable(),
+                        $pos = ($idx === false) ? 0 : ($idx + 1);
+
+                        return $pos . '/' . count($order);
+                    })
+                    ->badge()
+                    ->icon('heroicon-m-bolt')
+                    ->color(function ($state) {
+                        return match ($state) {
+                            'Ditahan'     => 'warning',
+                            'Dibatalkan'  => 'danger',
+                            default       => 'primary',
+                        };
+                    })
+                    ->toggleable(),
 
                 ViewColumn::make('progress_stepper')->label(' ')->view('tables.columns.tracking-progress'),
 

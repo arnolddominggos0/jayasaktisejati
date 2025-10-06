@@ -13,9 +13,19 @@ class Customer extends Model
     use HasFactory;
 
     protected $fillable = [
-        'code','type','name','email','phone','nik','npwp',
-        'pic_name','pic_phone','pic_email',
-        'city_id','address','postal_code',
+        'code',
+        'type',
+        'name',
+        'email',
+        'phone',
+        'nik',
+        'npwp',
+        'pic_name',
+        'pic_phone',
+        'pic_email',
+        'city_id',
+        'address',
+        'postal_code',
     ];
 
     protected $casts = [

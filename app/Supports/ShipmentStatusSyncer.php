@@ -2,84 +2,72 @@
 
 namespace App\Supports;
 
+use App\Enums\ShipmentMode;
 use App\Enums\ShipmentStatus;
 use App\Enums\TrackStatus;
 use App\Models\Shipment;
 use App\Models\ShipmentTrack;
 
-final class ShipmentStatusSyncer
+class ShipmentStatusSyncer
 {
-    private const MAP = [
-        'pickup'              => ShipmentStatus::Pickup,
-        'handover'            => ShipmentStatus::Transit,
-        'stuffing'            => ShipmentStatus::Transit,
-        'delivery_to_port'    => ShipmentStatus::Transit,
-        'stacking'            => ShipmentStatus::Transit,
-        'unit_loading'        => ShipmentStatus::Transit,
-        'onship'              => ShipmentStatus::Transit,
-        'vessel_depart'       => ShipmentStatus::Transit,
-        'vessel_arrival'      => ShipmentStatus::Transit,
-        'unloading'           => ShipmentStatus::Transit,
-        'delivery_to_customer'=> ShipmentStatus::Transit,
-        'delivered'           => ShipmentStatus::Delivered,
-        'hold'                => ShipmentStatus::Hold,
-        'cancelled'           => ShipmentStatus::Cancelled,
-    ];
-
-    private const RANK = [
-        'draft'     => 0,
-        'pending'   => 1,
-        'pickup'    => 2,
-        'transit'   => 3,
-        'delivered' => 4,
-        'hold'      => 90,
-        'cancelled' => 100,
-    ];
-
-    public function syncFromTrack(ShipmentTrack $track): void
+        public function syncFromTrack(ShipmentTrack $track): void
     {
-        $shipment = $track->shipment;
-        if (!$shipment) {
+        $shipment = $track->shipment()->with('tracks')->first();
+        if (! $shipment) {
             return;
         }
 
-        if (in_array($shipment->status, [ShipmentStatus::Delivered, ShipmentStatus::Cancelled], true)) {
-            return;
-        }
-
-        $candidate = $this->candidateFromTrack($track);
-        if (!$candidate) {
-            return;
-        }
-
-        if (in_array($candidate, [ShipmentStatus::Hold, ShipmentStatus::Cancelled], true)) {
-            $this->apply($shipment, $candidate);
-            return;
-        }
-
-        if ($this->rank($candidate) > $this->rank($shipment->status)) {
-            $this->apply($shipment, $candidate);
-        }
+        $shipment->status = $this->reduce($shipment);
+        $shipment->saveQuietly();
     }
 
-    private function candidateFromTrack(ShipmentTrack $track): ?ShipmentStatus
+    public function reduce(Shipment $shipment): ShipmentStatus
     {
-        $ts = $track->status;
-        if (!$ts) return null;
+        $tracks = $shipment->relationLoaded('tracks')
+            ? $shipment->tracks
+            : $shipment->tracks()->get();
 
-        $ts = $ts instanceof TrackStatus ? $ts : TrackStatus::tryFrom((string) $ts);
-        if (!$ts) return null;
+        $tracks = $tracks->sortBy('tracked_at')->values();
 
-        return self::MAP[$ts->value] ?? null;
-    }
+        if ($tracks->isEmpty()) {
+            return ShipmentStatus::tryFrom((string) $shipment->status) ?? ShipmentStatus::Pending;
+        }
 
-    private function rank(ShipmentStatus $state): int
-    {
-        return self::RANK[$state->value] ?? -1;
-    }
+        $last = $tracks->last();
+        $lastVal = $last->status instanceof TrackStatus ? $last->status->value : (string) $last->status;
 
-    private function apply(Shipment $shipment, ShipmentStatus $to): void
-    {
-        $shipment->update(['status' => $to]);
+        if ($lastVal === TrackStatus::Cancelled->value) {
+            return ShipmentStatus::Cancelled;
+        }
+        if ($lastVal === TrackStatus::Hold->value) {
+            return ShipmentStatus::Hold;
+        }
+
+        $mode = $shipment->mode instanceof ShipmentMode ? $shipment->mode->value : (string) $shipment->mode;
+
+        $ordered = $mode === ShipmentMode::Land->value
+            ? TrackStatus::orderLand()
+            : TrackStatus::orderSea();
+
+        $rank = [];
+        foreach ($ordered as $idx => $s) {
+            $rank[$s->value] = $idx;
+        }
+
+        $max = null;
+        foreach ($tracks as $t) {
+            $ts = $t->status instanceof TrackStatus ? $t->status->value : (string) $t->status;
+            if (isset($rank[$ts])) {
+                if ($max === null || $rank[$ts] > $rank[$max]) {
+                    $max = $ts;
+                }
+            }
+        }
+
+        if ($max === null) {
+            return ShipmentStatus::Transit;
+        }
+
+        return TrackStatus::tryFrom($max)?->toShipmentStatus() ?? ShipmentStatus::Transit;
     }
 }

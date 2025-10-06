@@ -39,7 +39,7 @@ class RolesAndUsersSeeder extends Seeder
         $fc = User::firstOrCreate(
             ['email' => 'koor.jkt@jss.local'],
             ['name' => 'Koordinator JKT', 'password' => Hash::make('Admin#12345'), 'branch_id' => $jkt->id]
-        );  
+        );
         $fc->syncRoles(['field_coordinator']);
 
         $cust = User::firstOrCreate(

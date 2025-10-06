@@ -2,14 +2,11 @@
 
 namespace App\Http\Resources;
 
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class UserResource extends JsonResource
+class UserApiResource extends JsonResource
 {
     /**
-     * Transform the resource into an array.
-     *
      * @return array<string, mixed>
      */
     public function toArray($request): array
@@ -27,7 +24,6 @@ class UserResource extends JsonResource
                 ];
             }),
             'branch_id'  => $this->branch_id,
-            'is_active'  => $this->when(isset($this->is_active), (bool) $this->is_active),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

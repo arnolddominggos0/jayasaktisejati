@@ -4,15 +4,21 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\Branch;
+use App\Models\Customer;
 use App\Models\User;
-use Filament\Forms\Form;
-use Filament\Resources\Resource;
-use Filament\Tables\Table;
 use Filament\Forms;
+use Filament\Forms\Form;
+use Filament\Forms\Components\Group;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Get;
+use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
 
@@ -20,116 +26,160 @@ class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-users';
-    protected static ?string $navigationLabel = 'Pengguna';
+    protected static ?string $navigationIcon   = 'heroicon-o-users';
+    protected static ?string $navigationLabel  = 'Pengguna';
     protected static ?string $pluralModelLabel = 'Pengguna';
-    protected static ?string $modelLabel = 'Pengguna';
-    protected static ?string $navigationGroup = 'Manajemen Pengguna';
-    protected static ?int    $navigationSort  = 10;
+    protected static ?string $modelLabel       = 'Pengguna';
+    protected static ?string $navigationGroup  = 'Manajemen Pengguna';
+    protected static ?int    $navigationSort   = 10;
 
     public static function canViewAny(): bool
     {
         return auth_user()?->hasAnyRole('super_admin', 'office_admin') ?? false;
     }
 
+    /** Office admin hanya melihat user di cabangnya. */
+    public static function getEloquentQuery(): Builder
+    {
+        $q = parent::getEloquentQuery();
+        $u = auth_user();
+
+        if ($u?->hasRole('super_admin')) return $q;
+
+        if ($u?->hasRole('office_admin') && $u->branch_id) {
+            return $q->where('branch_id', $u->branch_id);
+        }
+
+        return $q->whereRaw('1=0');
+    }
+
     public static function form(Form $form): Form
     {
-        return $form->schema([
-            Forms\Components\Group::make()->schema([
-                Forms\Components\Section::make('Data User')
+        $isSuper = auth_user()?->hasRole('super_admin') ?? false;
+
+        return $form
+            ->schema([
+                Group::make()
                     ->schema([
-                        TextInput::make('name')
-                            ->label('Nama Lengkap')
-                            ->required()
-                            ->maxLength(150)
-                            ->placeholder('Nama User'),
+                        Section::make('Data User')
+                            ->schema([
+                                TextInput::make('name')
+                                    ->label('Nama Lengkap')
+                                    ->required()
+                                    ->maxLength(150)
+                                    ->placeholder('Nama User'),
 
-                        TextInput::make('email')
-                            ->label('Email')
-                            ->email()
-                            ->unique(ignoreRecord: true)
-                            ->required()
-                            ->placeholder('user@example.com'),
+                                TextInput::make('email')
+                                    ->label('Email')
+                                    ->email()
+                                    ->unique(ignoreRecord: true)
+                                    ->required()
+                                    ->placeholder('user@example.com'),
 
-                        TextInput::make('password')
-                            ->label('Password (kosongkan jika tidak diubah)')
-                            ->password()
-                            ->revealable()
-                            ->dehydrateStateUsing(fn($state) => filled($state) ? Hash::make($state) : null)
-                            ->dehydrated(fn($state) => filled($state))
-                            ->maxLength(100),
-                    ])->columns(2),
+                                TextInput::make('password')
+                                    ->label(fn(?User $record) => $record
+                                        ? 'Password (kosongkan jika tidak diubah)'
+                                        : 'Password')
+                                    ->helperText(fn(?User $record) => $record
+                                        ? 'Biarkan kosong jika tidak mengganti password.'
+                                        : 'Minimal 8 karakter.')
+                                    ->password()
+                                    ->revealable()
+                                    ->required(fn(?User $record) => $record === null)
+                                    ->rule(fn(?User $record) => $record === null ? 'required|min:8' : 'nullable|min:8')
+                                    ->dehydrateStateUsing(fn(?string $state) => filled($state) ? Hash::make(trim($state)) : null)
+                                    ->dehydrated(fn(?string $state) => filled($state))
+                                    ->maxLength(100),
+                            ])
+                            ->columns(2),
 
-                Section::make('Atribusi')
-                    ->schema([
-                        Select::make('branch_id')
-                            ->label('Cabang')
-                            ->placeholder('Pilih cabang')
-                            ->options(
-                                Branch::query()
-                                    ->orderBy('name')
-                                    ->pluck('name', 'id')
-                            )
-                            ->searchable()
-                            ->required(),
+                        Section::make('Atribusi')
+                            ->schema([
+                                Select::make('branch_id')
+                                    ->label('Cabang')
+                                    ->placeholder('Pilih cabang')
+                                    ->options(
+                                        fn() =>
+                                        $isSuper
+                                            ? Branch::query()->orderBy('name')->pluck('name', 'id')
+                                            : Branch::query()->whereKey(auth_user()?->branch_id)->pluck('name', 'id')
+                                    )
+                                    ->default(fn() => auth_user()?->branch_id)
+                                    ->searchable()
+                                    ->required(),
 
-                        Section::make('customer_id')
-                            ->label('Customer (opsional, untuk akun portal)')
-                            ->placeholder('Pilih customer')
-                            ->options(
-                                \App\Models\Customer::query()
-                                    ->orderBy('name')
-                                    ->pluck('name', 'id')
-                            )
-                            ->searchable()
-                            ->helperText('Isi jika user ini adalah akun portal milik customer tertentu.'),
-                    ])->columns(2),
+                                Select::make('customer_id')
+                                    ->label('Customer (untuk akun portal)')
+                                    ->placeholder('Pilih customer')
+                                    ->options(
+                                        Customer::query()
+                                            ->orderBy('name')
+                                            ->pluck('name', 'id')
+                                    )
+                                    ->searchable()
+                                    ->nullable()
+                                    ->visible(fn(Get $get) => $get('role_name') === 'customer')
+                                    ->required(fn(Get $get) => $get('role_name') === 'customer')
+                                    ->helperText('Wajib jika role = customer.'),
+                            ])
+                            ->columns(2),
 
-                Forms\Components\Section::make('Role & Izin')
-                    ->schema([
-                        Section::make('roles')
-                            ->label('Role')
-                            ->multiple()
-                            ->preload()
-                            ->searchable()
-                            ->options(fn() => Role::query()->orderBy('name')->pluck('name', 'name'))
-                            ->helperText('Pilih satu atau lebih role: super_admin, office_admin, field_coordinator, customer.')
-                            ->required(),
-                    ]),
-            ])->columnSpan(['lg' => 2]),
-        ])->columns(3);
+                        Section::make('Role')
+                            ->schema([
+                                Select::make('role_name')
+                                    ->label('Role')
+                                    ->options(
+                                        fn() =>
+                                        $isSuper
+                                            ? Role::query()->orderBy('name')->pluck('name', 'name')
+                                            : Role::query()
+                                            ->whereIn('name', ['office_admin', 'field_coordinator', 'customer'])
+                                            ->orderBy('name')->pluck('name', 'name')
+                                    )
+                                    ->searchable()
+                                    ->required()
+                                    ->dehydrated(false) // tidak disimpan ke kolom users
+                                    ->helperText('Hanya satu role per pengguna.')
+                                    ->afterStateHydrated(function (Select $component, ?User $record) {
+                                        if ($record) {
+                                            $component->state($record->getRoleNames()->first());
+                                        }
+                                    }),
+                            ]),
+                    ])
+                    ->columnSpan(['lg' => 2]),
+            ])
+            ->columns(3);
     }
 
     public static function table(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('name')->label('Nama')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('email')->label('Email')->searchable()->copyable(),
-                Tables\Columns\TextColumn::make('branch.name')->label('Cabang')->toggleable(),
-                Tables\Columns\TextColumn::make('customer.name')->label('Customer')->toggleable(),
-                Tables\Columns\TextColumn::make('roles.name')
+                TextColumn::make('name')->label('Nama')->searchable()->sortable(),
+                TextColumn::make('email')->label('Email')->searchable()->copyable(),
+                TextColumn::make('branch.name')->label('Cabang')->toggleable(),
+                TextColumn::make('roles.name')
                     ->label('Role')
                     ->badge()
                     ->separator(', ')
-                    ->sortable()
-                    ->formatStateUsing(fn($state) => is_array($state) ? implode(', ', $state) : $state),
-                Tables\Columns\TextColumn::make('updated_at')->label('Diubah')->since()->sortable(),
+                    ->sortable(false)
+                    ->formatStateUsing(fn($state) => is_array($state) ? implode(', ', $state) : (string) $state),
+                TextColumn::make('updated_at')->label('Diubah')->since()->sortable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('roles')
+                SelectFilter::make('roles')
                     ->label('Filter Role')
                     ->multiple()
-                    ->options(fn() => Role::query()->orderBy('name')->pluck('name', 'name')),
+                    ->relationship('roles', 'name'),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()->label('Ubah'),
-                Tables\Actions\DeleteAction::make()->label('Hapus')
-                    ->visible(
-                        fn($record) => (auth_user()?->hasRole('super_admin') ?? false)
-                            && ! $record->hasRole('super_admin')
-                            && ($record->id !== auth_user()?->id)
-                    ),
+                Tables\Actions\DeleteAction::make()
+                    ->label('Hapus')
+                    ->visible(fn($record) => (auth_user()?->hasRole('super_admin') ?? false)
+                        && ! $record->hasRole('super_admin')
+                        && ($record->id !== auth_user()?->id)),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -148,8 +198,16 @@ class UserResource extends Resource
         ];
     }
 
+    /** Badge mengikuti scope cabang untuk office_admin. */
     public static function getNavigationBadge(): ?string
     {
-        return (string) User::count();
+        $q = User::query();
+        $u = auth_user();
+
+        if ($u?->hasRole('office_admin') && $u->branch_id) {
+            $q->where('branch_id', $u->branch_id);
+        }
+
+        return (string) $q->count();
     }
 }

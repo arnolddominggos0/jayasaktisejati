@@ -8,26 +8,11 @@ use App\Supports\ShipmentStatusSyncer;
 
 class ShipmentTrackObserver
 {
-    private function asValue(null|string|TrackStatus $v): ?string
-    {
-        if ($v === null) return null;
-        return $v instanceof TrackStatus ? $v->value : (string) $v;
-    }
-
     private function label(null|string|TrackStatus $v): ?string
     {
         if ($v === null) return null;
         if ($v instanceof TrackStatus) return $v->label();
         return TrackStatus::tryFrom((string) $v)?->label() ?? strtoupper((string) $v);
-    }
-
-    private function baseProps(ShipmentTrack $m): array
-    {
-        return [
-            'track_id'    => $m->getKey(),
-            'shipment_id' => $m->shipment_id,
-            'code'        => $m->shipment?->code ?? '-',
-        ];
     }
 
     public function created(ShipmentTrack $m): void
@@ -36,11 +21,11 @@ class ShipmentTrackObserver
             ->performedOn($m)
             ->event('track_created')
             ->withProperties([
-                'track_id'    => $m->getKey(),
-                'shipment_id' => $m->shipment_id,
-                'code'        => $m->shipment?->code ?? '-',
+                'track_id'     => $m->getKey(),
+                'shipment_id'  => $m->shipment_id,
+                'code'         => $m->shipment?->code ?? '-',
                 'status'       => $m->status instanceof TrackStatus ? $m->status->value : (string) $m->status,
-                'status_label' => $m->status instanceof TrackStatus ? $m->status->label() : (TrackStatus::tryFrom((string) $m->status)?->label() ?? strtoupper((string) $m->status)),
+                'status_label' => $this->label($m->status),
                 'location'     => $m->location,
                 'note'         => $m->note,
                 'tracked_at'   => $m->tracked_at?->toIso8601String(),
@@ -49,7 +34,6 @@ class ShipmentTrackObserver
 
         app(ShipmentStatusSyncer::class)->syncFromTrack($m);
     }
-
 
     public function updated(ShipmentTrack $m): void
     {
@@ -64,11 +48,11 @@ class ShipmentTrackObserver
                     'track_id'    => $m->getKey(),
                     'shipment_id' => $m->shipment_id,
                     'code'        => $m->shipment?->code ?? '-',
-                    'from'       => $from instanceof TrackStatus ? $from->value : (string) $from,
-                    'from_label' => $from instanceof TrackStatus ? $from->label() : (TrackStatus::tryFrom((string) $from)?->label() ?? strtoupper((string) $from)),
-                    'to'         => $to instanceof TrackStatus ? $to->value : (string) $to,
-                    'to_label'   => $to instanceof TrackStatus ? $to->label() : (TrackStatus::tryFrom((string) $to)?->label() ?? strtoupper((string) $to)),
-                    'tracked_at' => $m->tracked_at?->toIso8601String(),
+                    'from'        => $from instanceof TrackStatus ? $from->value : (string) $from,
+                    'from_label'  => $this->label($from),
+                    'to'          => $to instanceof TrackStatus ? $to->value : (string) $to,
+                    'to_label'    => $this->label($to),
+                    'tracked_at'  => $m->tracked_at?->toIso8601String(),
                 ])
                 ->log('Status tracking diubah');
 
@@ -83,13 +67,12 @@ class ShipmentTrackObserver
                     'track_id'    => $m->getKey(),
                     'shipment_id' => $m->shipment_id,
                     'code'        => $m->shipment?->code ?? '-',
-                    'from'       => $m->getOriginal('location'),
-                    'to'         => $m->location,
-                    'tracked_at' => $m->tracked_at?->toIso8601String(),
+                    'from'        => $m->getOriginal('location'),
+                    'to'          => $m->location,
+                    'tracked_at'  => $m->tracked_at?->toIso8601String(),
                 ])
                 ->log('Lokasi tracking diubah');
         }
-
 
         if ($m->wasChanged('eta')) {
             $from = $m->getOriginal('eta');
@@ -102,8 +85,8 @@ class ShipmentTrackObserver
                     'track_id'    => $m->getKey(),
                     'shipment_id' => $m->shipment_id,
                     'code'        => $m->shipment?->code ?? '-',
-                    'from' => $from?->toIso8601String(),
-                    'to'   => $to?->toIso8601String(),
+                    'from'        => $from?->toIso8601String(),
+                    'to'          => $to?->toIso8601String(),
                 ])
                 ->log('ETA tracking diubah');
         }
@@ -137,7 +120,6 @@ class ShipmentTrackObserver
             ])
             ->log('Tracking dihapus');
     }
-
 
     public function restored(ShipmentTrack $m): void
     {

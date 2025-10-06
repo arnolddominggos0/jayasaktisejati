@@ -40,7 +40,8 @@ enum TrackStatus: string
         };
     }
 
-    public static function order(): array
+
+    public static function orderSea(): array
     {
         return [
             self::Pickup,
@@ -56,6 +57,33 @@ enum TrackStatus: string
             self::DeliveryToCustomer,
             self::Delivered,
         ];
+    }
+
+    public static function orderLand(): array
+    {
+        return [
+            self::Pickup,
+            self::DeliveryToCustomer,
+            self::Delivered,
+        ];
+    }
+
+    public static function orderForMode(null|string|ShipmentMode $mode): array
+    {
+        $val = $mode instanceof ShipmentMode ? $mode->value : (string) $mode;
+        return $val === ShipmentMode::Land->value
+            ? self::orderLand()
+            : self::orderSea();
+    }
+
+    public static function optionsForMode(?string $mode): array
+    {
+        $list = self::orderForMode($mode);
+        $out = [];
+        foreach ($list as $s) {
+            $out[$s->value] = $s->label();
+        }
+        return $out;
     }
 
     public function toShipmentStatus(): ?ShipmentStatus
@@ -83,8 +111,13 @@ enum TrackStatus: string
         return [self::Delivered, self::Cancelled];
     }
 
-    public static function inTransit(): array
+    public static function inTransitSea(): array
     {
-        return array_values(array_diff(self::order(), [self::Delivered]));
+        return array_values(array_diff(self::orderSea(), [self::Delivered]));
+    }
+
+    public static function inTransitLand(): array
+    {
+        return array_values(array_diff(self::orderLand(), [self::Delivered]));
     }
 }

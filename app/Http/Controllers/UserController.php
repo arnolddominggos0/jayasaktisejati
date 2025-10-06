@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\UserIndexRequest;
-use App\Http\Resources\UserResource;
+use App\Http\Resources\UserApiResource;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -12,7 +12,7 @@ class UserController extends Controller
     public function index(UserIndexRequest $request)
     {
         $auth = $request->user();
-        if (!$auth) {
+        if (! $auth) {
             return response()->json(['message' => 'Unauthenticated'], 401);
         }
         if ($auth->hasRole('customer')) {
@@ -20,10 +20,10 @@ class UserController extends Controller
         }
 
         $q = User::query()
-            ->with(['branch:id,code,name']) 
+            ->with(['branch:id,code,name'])
             ->select(['id', 'name', 'email', 'branch_id', 'created_at', 'updated_at']);
 
-        if (!$auth->hasRole('super_admin')) {
+        if (! $auth->hasRole('super_admin')) {
             $currentBranchId = $request->attributes->get('currentBranchId');
             if (empty($currentBranchId)) {
                 return response()->json(['message' => 'Branch scope not set'], 422);
@@ -36,7 +36,7 @@ class UserController extends Controller
         }
 
         $search = $request->input('search', $request->input('q'));
-        if (!empty($search)) {
+        if (! empty($search)) {
             $term = '%' . str_replace('%', '\\%', $search) . '%';
             $q->where(function ($w) use ($term) {
                 $w->where(DB::raw('LOWER(name)'), 'LIKE', strtolower($term))
@@ -48,23 +48,15 @@ class UserController extends Controller
             $q->role($role);
         }
 
-        if ($status = $request->input('status')) {
-            if ($status === 'active') {
-                $q->where('is_active', true);
-            } elseif ($status === 'inactive') {
-                $q->where('is_active', false);
-            }
-        }
-
-        $sortBy  = $request->sortBy();    
-        $sortDir = $request->sortDir();  
+        $sortBy  = $request->sortBy();
+        $sortDir = $request->sortDir();
         $q->orderBy($sortBy, $sortDir)
-          ->orderBy('id', 'asc'); 
+          ->orderBy('id', 'asc');
 
-        $perPage   = $request->perPage(); 
+        $perPage   = $request->perPage();
         $paginator = $q->paginate($perPage)->appends($request->validated());
 
-        return UserResource::collection($paginator)->additional([
+        return UserApiResource::collection($paginator)->additional([
             'context' => [
                 'sort_by'  => $sortBy,
                 'sort_dir' => $sortDir,
@@ -72,7 +64,6 @@ class UserController extends Controller
                     'search'    => $search,
                     'role'      => $request->input('role'),
                     'branch_id' => $request->input('branch_id'),
-                    'status'    => $request->input('status'),
                 ],
             ],
         ]);

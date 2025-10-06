@@ -18,18 +18,14 @@ class FleetMpSeeder extends Seeder
 {
     public function run(): void
     {
-        // Role koordinator lapangan (guard web)
         Role::findOrCreate('field_coordinator', 'web');
 
-        // Cabang
         $jkt = Branch::firstOrCreate(['code' => 'JKT'], ['name' => 'Jakarta']);
         $mdo = Branch::firstOrCreate(['code' => 'MDO'], ['name' => 'Manado']);
 
-        // User koordinator per depot
         $coordJkt = User::firstOrCreate(['email' => 'coord.tpr@jss.local'], [
             'name'      => 'Koordinator Tj. Priok',
             'password'  => Hash::make('Coord#12345'),
-            // hapus baris berikut jika kolom branch_id tidak ada di users
             'branch_id' => $jkt->id,
         ]);
         $coordJkt->syncRoles(['field_coordinator']);
@@ -37,12 +33,10 @@ class FleetMpSeeder extends Seeder
         $coordMdo = User::firstOrCreate(['email' => 'coord.bit@jss.local'], [
             'name'      => 'Koordinator Bitung',
             'password'  => Hash::make('Coord#12345'),
-            // hapus baris berikut jika kolom branch_id tidak ada di users
             'branch_id' => $mdo->id,
         ]);
         $coordMdo->syncRoles(['field_coordinator']);
 
-        // Depots (mode laut)
         $tpr = Depot::firstOrCreate(['code' => 'DEP-TPR'], [
             'name'                 => 'Depot Tanjung Priok',
             'mode'                 => 'sea_freight',
@@ -57,7 +51,6 @@ class FleetMpSeeder extends Seeder
             'coordinator_user_id'  => $coordMdo->id,
         ]);
 
-        // Armada sampel
         Armada::firstOrCreate(['code' => 'ARM-TRK-001'], [
             'type'      => ArmadaType::Truck->value,
             'plate_number' => 'B 1234 JSS',
@@ -76,7 +69,6 @@ class FleetMpSeeder extends Seeder
             'depot_id'  => $tpr->id,
         ]);
 
-        // MP sample per depot (domain laut) — TANPA kolom phone
         Manpower::firstOrCreate(
             ['name' => 'Budi Stuffing', 'depot_id' => $tpr->id],
             [

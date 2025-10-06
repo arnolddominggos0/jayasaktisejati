@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ShipmentResource\RelationManagers;
 
+use App\Enums\ShipmentMode;
 use App\Enums\TrackStatus;
 use Filament\Facades\Filament;
 use Filament\Forms;
@@ -9,9 +10,9 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Tables\Actions\ActionGroup;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Validation\Rules\Enum as EnumRule;
@@ -26,10 +27,11 @@ class ShipmentTracksRelationManager extends RelationManager
         return $form->schema([
             Select::make('status')
                 ->label('Status')
-                ->options(
-                    collect(TrackStatus::order())
-                        ->mapWithKeys(fn(TrackStatus $state) => [$state->value => $state->label()])
-                )
+                ->options(function () {
+                    $mode = $this->getOwnerRecord()?->mode;
+                    $modeVal = $mode instanceof ShipmentMode ? $mode->value : (string) $mode;
+                    return TrackStatus::optionsForMode($modeVal);
+                })
                 ->afterStateHydrated(function ($component, $state) {
                     $component->state($state instanceof TrackStatus ? $state->value : $state);
                 })
@@ -47,7 +49,11 @@ class ShipmentTracksRelationManager extends RelationManager
         return $table
             ->columns([
                 TextColumn::make('status')->label('Status')->badge()
-                    ->formatStateUsing(fn($state) => $state?->label() ?? (string) $state),
+                    ->formatStateUsing(function ($state) {
+                        if ($state instanceof TrackStatus) return $state->label();
+                        $try = TrackStatus::tryFrom((string) $state);
+                        return $try ? $try->label() : (string) $state;
+                    }),
                 TextColumn::make('location')->label('Lokasi'),
                 TextColumn::make('note')->label('Catatan')->limit(80),
                 TextColumn::make('tracked_at')->label('Waktu')->dateTime('d M Y H:i'),
@@ -64,10 +70,8 @@ class ShipmentTracksRelationManager extends RelationManager
                     ->slideOver()
                     ->mutateFormDataUsing(function (array $data): array {
                         $userId = Filament::auth()->id() ?? auth()->id();
-
                         $data['created_by'] = $userId;
                         $data['tracked_at'] = $data['tracked_at'] ?? now();
-
                         return $data;
                     }),
             ])

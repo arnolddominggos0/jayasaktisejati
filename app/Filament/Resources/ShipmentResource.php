@@ -6,12 +6,33 @@ use App\Enums\{ServiceType, ShipmentMode, ShipmentStatus, CargoType, RequestType
 use App\Filament\Resources\ShipmentResource\Pages\CreateShipment;
 use App\Filament\Resources\ShipmentResource\Pages\EditShipment;
 use App\Filament\Resources\ShipmentResource\Pages\ListShipments;
+use App\Filament\Resources\ArmadaAssignmentResource;
 use App\Models\Armada;
+use App\Models\Customer;
 use App\Models\Shipment;
 use App\Models\Voyage;
+use App\Models\Depot;
+use App\Models\City;
 use App\Observers\ShipmentObserver;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\{Checkbox, DatePicker, FileUpload, Grid, Group, Hidden, Placeholder, Repeater, Section, Select, Textarea, TextInput, ToggleButtons, ViewField};
+use Filament\Forms\Components\{
+    Actions,
+    Checkbox,
+    DatePicker,
+    FileUpload,
+    Grid,
+    Group,
+    Hidden,
+    Placeholder,
+    Repeater,
+    Section,
+    Select,
+    Textarea,
+    TextInput,
+    ToggleButtons,
+    ViewField
+};
+use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
@@ -26,6 +47,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 
 class ShipmentResource extends Resource
 {
@@ -37,6 +59,25 @@ class ShipmentResource extends Resource
     protected static ?string $pluralModelLabel  = 'Permintaan Pengiriman';
     protected static ?string $navigationIcon    = 'heroicon-m-queue-list';
     protected static ?int    $navigationSort    = 10;
+
+    protected static function resolveDepotId(?int $branchId, ?string $mode, ?int $voyageId): ?int
+    {
+        if (!$branchId || !$mode) return null;
+
+        $q = Depot::query()
+            ->where('branch_id', $branchId)
+            ->where('mode', $mode);
+
+        if ($mode === ShipmentMode::Sea->value && $voyageId) {
+            $polId = Voyage::whereKey($voyageId)->value('port_from_id');
+            if ($polId) {
+                $byPol = (clone $q)->where('port_id', $polId)->orderBy('name')->value('id');
+                if ($byPol) return (int) $byPol;
+            }
+        }
+
+        return $q->orderBy('name')->value('id');
+    }
 
     public static function form(Form $form): Form
     {
@@ -72,90 +113,261 @@ class ShipmentResource extends Resource
         return $form
             ->schema([
                 Section::make('A. Data Customer & Dokumen')
-                    ->columns(12)
                     ->schema([
-                        Select::make('customer_id')
-                            ->label('Pengirim *')
-                            ->placeholder('Pilih Customer Pengirim')
-                            ->relationship('customer', 'name')
-                            ->searchable()
-                            ->preload()
-                            ->required()
-                            ->columnSpan(4),
+                        Grid::make(12)->schema([
+                            Hidden::make('branch_id')
+                                ->default(fn() => Filament::auth()->user()?->branch_id)
+                                ->dehydrated(),
 
-                        Select::make('receiver_id')
-                            ->label('Penerima *')
-                            ->placeholder('Pilih Customer Penerima')
-                            ->relationship('receiver', 'name')
-                            ->searchable()
-                            ->preload()
-                            ->required()
-                            ->native(false)
-                            ->columnSpan(4),
+                            Group::make([
+                                Select::make('customer_id')
+                                    ->label('Pengirim')
+                                    ->relationship('customer', 'name')
+                                    ->searchable()
+                                    ->preload()
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, Set $set) {
+                                        $set('pickup_contact_use_custom', false);
+                                    })
+                                    ->columnSpan(12),
+                            ])->columnSpan(['default' => 12, 'md' => 6]),
 
-                        TextInput::make('pic_name')
-                            ->label('PIC / Kontak *')
-                            ->required()
-                            ->maxLength(100)
-                            ->columnSpan(4),
+                            Group::make([
+                                Select::make('receiver_id')
+                                    ->label('Penerima')
+                                    ->relationship('receiver', 'name')
+                                    ->searchable()
+                                    ->preload()
+                                    ->reactive()
+                                    ->afterStateUpdated(function ($state, Set $set) {
+                                        $set('delivery_contact_use_custom', false);
+                                    })
+                                    ->columnSpan(12),
+                            ])->columnSpan(['default' => 12, 'md' => 6]),
 
-                        TextInput::make('pic_phone')
-                            ->label('No. Telp/WA *')
-                            ->tel()
-                            ->required()
-                            ->maxLength(20)
-                            ->columnSpan(2),
+                            Placeholder::make('pickup_contact_summary')
+                                ->key('pickup_contact_summary')
+                                ->label('Kontak untuk Pickup')
+                                ->content(function (Get $get) {
+                                    if ($get('pickup_contact_use_custom')) {
+                                        return collect([
+                                            $get('pickup_contact_name'),
+                                            $get('pickup_contact_phone'),
+                                            $get('pickup_contact_address'),
+                                        ])->filter()->join(' | ');
+                                    }
 
-                        Select::make('request_type')
-                            ->label('Tipe Permintaan')
-                            ->options(collect(RequestType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))
-                            ->default(RequestType::SPPB_DO->value)
-                            ->required()
-                            ->live()
-                            ->selectablePlaceholder(false)
-                            ->columnSpan(2),
+                                    $id = (int) $get('customer_id');
+                                    if ($id > 0) {
+                                        $c = Customer::query()
+                                            ->select(['name', 'pic_name', 'phone', 'pic_phone', 'address'])
+                                            ->find($id);
 
-                        TextInput::make('doc_number')
-                            ->label('No. Dokumen (SPPB/DO)')
-                            ->required(fn(Get $get) => $get('request_type') === RequestType::SPPB_DO->value)
-                            ->hidden(fn(Get $get) => $get('request_type') !== RequestType::SPPB_DO->value)
-                            ->placeholder('Input No Dokumen SPPB/DO')
-                            ->maxLength(64)
-                            ->columnSpan(3),
+                                        if ($c) {
+                                            return collect([
+                                                $c->pic_name ?: $c->name,
+                                                $c->pic_phone ?: $c->phone,
+                                                $c->address,
+                                            ])->filter()->join(' | ');
+                                        }
+                                    }
 
-                        Select::make('priority')
-                            ->label('Prioritas')
-                            ->options(['normal' => 'Normal', 'urgent' => 'Urgent'])
-                            ->default('normal')
-                            ->native(false)
-                            ->columnSpan(2),
+                                    return 'Belum ada kontak';
+                                })
+                                ->hintActions([
+                                    Action::make('editPickupContact')
+                                        ->label('Ganti kontak')
+                                        ->icon('heroicon-m-pencil')
+                                        ->link()
+                                        ->modalHeading('Ganti Pickup Contact')
+                                        ->mountUsing(function (array $data, Get $get, Set $set) {
+                                            if ($get('pickup_contact_use_custom')) return;
 
-                        DatePicker::make('requested_at')
-                            ->label('Tanggal Permintaan *')
-                            ->native(false)
-                            ->required()
-                            ->columnSpan(3),
+                                            $id = (int) $get('customer_id');
+                                            if ($id > 0) {
+                                                $c = Customer::query()
+                                                    ->select(['name', 'pic_name', 'phone', 'pic_phone', 'address'])
+                                                    ->find($id);
 
-                        FileUpload::make('attachments')
-                            ->label('Lampiran Dokumen')
-                            ->multiple()
-                            ->downloadable()
-                            ->openable()
-                            ->maxSize(10 * 1024)
-                            ->preserveFilenames()
-                            ->acceptedFileTypes([
-                                'application/pdf',
-                                'image/*',
-                                'application/vnd.ms-excel',
-                                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                            ])
-                            ->columnSpan(7),
+                                                if ($c) {
+                                                    $set('pickup_contact_name',    $c->pic_name ?: $c->name);
+                                                    $set('pickup_contact_phone',   $c->pic_phone ?: $c->phone);
+                                                    $set('pickup_contact_address', $c->address);
+                                                }
+                                            }
+                                        })
+                                        ->form([
+                                            TextInput::make('pickup_contact_name')->label('Nama PIC')->maxLength(100)->required(),
+                                            TextInput::make('pickup_contact_phone')->label('Telepon')->tel()->maxLength(30)->required(),
+                                            Textarea::make('pickup_contact_address')->label('Alamat')->rows(2)->required(),
+                                        ])
+                                        ->action(function (array $data, Set $set) {
+                                            $set('pickup_contact_use_custom', true);
+                                            $set('pickup_contact_name',    $data['pickup_contact_name']);
+                                            $set('pickup_contact_phone',   $data['pickup_contact_phone']);
+                                            $set('pickup_contact_address', $data['pickup_contact_address']);
+                                        }),
 
-                        Textarea::make('notes')
-                            ->label('Keterangan tambahan')
-                            ->rows(5)
-                            ->columnSpan(5),
-                    ]),
+                                    Action::make('resetPickupContact')
+                                        ->label('Gunakan default')
+                                        ->icon('heroicon-m-arrow-path')
+                                        ->color('gray')
+                                        ->link()
+                                        ->requiresConfirmation()
+                                        ->action(fn(Set $set) => $set('pickup_contact_use_custom', false)),
+                                ])
+                                ->extraAttributes([
+                                    'class' => 'text-sm text-gray-700 break-words whitespace-pre-line leading-relaxed md:line-clamp-none line-clamp-4',
+                                ])
+                                ->columnSpan(['default' => 12, 'md' => 6]),
+
+                            Placeholder::make('delivery_contact_summary')
+                                ->key('delivery_contact_summary')
+                                ->label('Delivery contact')
+                                ->content(function (Get $get) {
+                                    if ($get('delivery_contact_use_custom')) {
+                                        return collect([
+                                            $get('delivery_contact_name'),
+                                            $get('delivery_contact_phone'),
+                                            $get('delivery_contact_address'),
+                                        ])->filter()->join(' | ');
+                                    }
+
+                                    $id = (int) $get('receiver_id');
+                                    if ($id > 0) {
+                                        $r = Customer::query()
+                                            ->select(['name', 'pic_name', 'phone', 'pic_phone', 'address'])
+                                            ->find($id);
+
+                                        if ($r) {
+                                            return collect([
+                                                $r->pic_name ?: $r->name,
+                                                $r->pic_phone ?: $r->phone,
+                                                $r->address,
+                                            ])->filter()->join(' | ');
+                                        }
+                                    }
+
+                                    return 'Belum ada kontak';
+                                })
+                                ->hintActions([
+                                    Action::make('editDeliveryContact')
+                                        ->label('Ganti kontak')
+                                        ->icon('heroicon-m-pencil')
+                                        ->link()
+                                        ->modalHeading('Ganti Delivery Contact')
+                                        ->mountUsing(function (array $data, Get $get, Set $set) {
+                                            if ($get('delivery_contact_use_custom')) return;
+
+                                            $id = (int) $get('receiver_id');
+                                            if ($id > 0) {
+                                                $r = Customer::query()
+                                                    ->select(['name', 'pic_name', 'phone', 'pic_phone', 'address'])
+                                                    ->find($id);
+
+                                                if ($r) {
+                                                    $set('delivery_contact_name',    $r->pic_name ?: $r->name);
+                                                    $set('delivery_contact_phone',   $r->pic_phone ?: $r->phone);
+                                                    $set('delivery_contact_address', $r->address);
+                                                }
+                                            }
+                                        })
+                                        ->form([
+                                            TextInput::make('delivery_contact_name')->label('Nama PIC')->maxLength(100)->required(),
+                                            TextInput::make('delivery_contact_phone')->label('Telepon')->tel()->maxLength(30)->required(),
+                                            Textarea::make('delivery_contact_address')->label('Alamat')->rows(2)->required(),
+                                        ])
+                                        ->action(function (array $data, Set $set) {
+                                            $set('delivery_contact_use_custom', true);
+                                            $set('delivery_contact_name',    $data['delivery_contact_name']);
+                                            $set('delivery_contact_phone',   $data['delivery_contact_phone']);
+                                            $set('delivery_contact_address', $data['delivery_contact_address']);
+                                        }),
+
+                                    Action::make('resetDeliveryContact')
+                                        ->label('Gunakan default')
+                                        ->icon('heroicon-m-arrow-path')
+                                        ->color('gray')
+                                        ->link()
+                                        ->requiresConfirmation()
+                                        ->action(fn(Set $set) => $set('delivery_contact_use_custom', false)),
+                                ])
+                                ->extraAttributes([
+                                    'class' => 'text-sm text-gray-700 break-words whitespace-pre-line leading-relaxed md:line-clamp-none line-clamp-4',
+                                ])
+                                ->columnSpan(['default' => 12, 'md' => 6]),
+
+                            Hidden::make('pickup_contact_use_custom')->default(false)->dehydrated(false),
+                            Hidden::make('pickup_contact_name')->dehydrated(false),
+                            Hidden::make('pickup_contact_phone')->dehydrated(false),
+                            Hidden::make('pickup_contact_address')->dehydrated(false),
+
+                            Hidden::make('delivery_contact_use_custom')->default(false)->dehydrated(false),
+                            Hidden::make('delivery_contact_name')->dehydrated(false),
+                            Hidden::make('delivery_contact_phone')->dehydrated(false),
+                            Hidden::make('delivery_contact_address')->dehydrated(false),
+
+                            Section::make('Detail Permintaan')
+                                ->schema([
+                                    Grid::make(12)->schema([
+                                        Select::make('request_type')
+                                            ->label('Tipe Permintaan')
+                                            ->options(collect(RequestType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))
+                                            ->default(RequestType::SPPB_DO->value)
+                                            ->required()
+                                            ->live()
+                                            ->selectablePlaceholder(false)
+                                            ->columnSpan(['default' => 12, 'md' => 2]),
+
+                                        TextInput::make('doc_number')->label('No. Dokumen')->maxLength(50)
+                                            ->visible(fn(Get $get) => $get('request_type') === 'sppb_do')
+                                            ->required(fn(Get $get) => $get('request_type') === 'sppb_do')
+                                            ->columnSpan(['default' => 12, 'md' => 5]),
+
+                                        Select::make('priority')->label('Prioritas')
+                                            ->options(['normal' => 'Normal', 'urgent' => 'Urgent'])
+                                            ->default('normal')
+                                            ->columnSpan(['default' => 12, 'md' => 2]),
+
+                                        DatePicker::make('requested_at')->label('Tanggal Permintaan')
+                                            ->default(now())
+                                            ->required()
+                                            ->columnSpan(['default' => 12, 'md' => 3]),
+                                    ]),
+                                ])
+                                ->compact()
+                                ->columnSpan(12),
+
+                            Grid::make(12)->schema([
+                                FileUpload::make('attachments')
+                                    ->label('Lampiran Dokumen')
+                                    ->multiple()
+                                    ->disk('public')
+                                    ->directory(fn() => 'shipments/' . now()->format('Y/m'))
+                                    ->visibility('public')
+                                    ->preserveFilenames()
+                                    ->downloadable()
+                                    ->openable()
+                                    ->imagePreviewHeight('160')
+                                    ->acceptedFileTypes([
+                                        'image/*',
+                                        'application/pdf',
+                                        'application/msword',
+                                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                        'application/vnd.ms-excel',
+                                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                        'text/plain',
+                                    ])
+                                    ->columnSpan(['default' => 12, 'md' => 6]),
+
+                                Textarea::make('notes')->label('Keterangan tambahan')
+                                    ->rows(6)
+                                    ->maxLength(1000)
+                                    ->columnSpan(['default' => 12, 'md' => 6]),
+                            ])->columnSpan(12),
+                        ]),
+                    ])
+                    ->compact(),
 
                 Section::make('B. Informasi Rute & Moda')
                     ->columns(12)
@@ -177,7 +389,7 @@ class ShipmentResource extends Resource
                             ->inline()
                             ->required()
                             ->live()
-                            ->afterStateUpdated(function (Set $set) {
+                            ->afterStateUpdated(function (Get $get, Set $set, $state) {
                                 foreach (
                                     [
                                         'vessel_name',
@@ -204,9 +416,14 @@ class ShipmentResource extends Resource
                                         'container_size_vehicle',
                                         'container_qty_vehicle',
                                     ] as $f
-                                ) $set($f, null);
+                                ) {
+                                    $set($f, null);
+                                }
+
+                                $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->branch_id);
+                                $depotId = self::resolveDepotId($branchId, $state, $get('voyage_id'));
+                                $set('assigned_depot_id', $depotId);
                             })
-                            //Validasi agar SEA punya Voyage/POL/POD terisi
                             ->rules(function (Get $get) {
                                 return [
                                     function (string $attribute, $value, \Closure $fail) use ($get) {
@@ -232,7 +449,8 @@ class ShipmentResource extends Resource
                             ->preload()
                             ->required()
                             ->helperText('cth: Jakarta')
-                            ->columnSpan(6),
+                            ->reactive()
+                            ->columnSpan(['default' => 12, 'md' => 6]),
 
                         Select::make('destination_city_id')
                             ->label('Tujuan (Kota Tujuan) *')
@@ -242,7 +460,7 @@ class ShipmentResource extends Resource
                             ->preload()
                             ->required()
                             ->helperText('cth: Manado')
-                            ->columnSpan(6),
+                            ->columnSpan(['default' => 12, 'md' => 6]),
 
                         ToggleButtons::make('cargo_type')
                             ->label('Jenis Muatan')
@@ -254,7 +472,6 @@ class ShipmentResource extends Resource
                             ->required()
                             ->columnSpan(12),
 
-                        // === LAUT ===
                         Group::make()
                             ->columnSpan(12)
                             ->columns(12)
@@ -296,7 +513,7 @@ class ShipmentResource extends Resource
                                     ->columnSpan(12),
 
                                 Select::make('container_size')
-                                    ->label("Ukuran Kontainer (FCL • General)")
+                                    ->label('Ukuran Kontainer (FCL • General)')
                                     ->options(ContainerSize::options())
                                     ->native(false)
                                     ->searchable()
@@ -310,7 +527,6 @@ class ShipmentResource extends Resource
                                     ->visible(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
                                     ->required(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
                                     ->columnSpan(4),
-
 
                                 Repeater::make('lcl_items')
                                     ->label('Rincian Volume (LCL • General Cargo)')
@@ -357,11 +573,10 @@ class ShipmentResource extends Resource
                                     ->visible(
                                         fn(Get $get) =>
                                         $get('service_option') === 'lcl'
-                                            && $get('cargo_type') === \App\Enums\CargoType::General->value
+                                            && $get('cargo_type') === CargoType::General->value
                                     )
                                     ->columns(12)
                                     ->schema([
-
                                         TextInput::make('weight_total_input')
                                             ->label('Total Berat (opsional)')
                                             ->suffix('kg')
@@ -424,9 +639,8 @@ class ShipmentResource extends Resource
                                     ->label('Jadwal Kapal *')
                                     ->native(false)
                                     ->searchable()
-                                    ->required(fn(Get $get) => $get('mode') === \App\Enums\ShipmentMode::Sea->value)
-                                    ->hidden(fn(Get $get) => $get('mode') !== \App\Enums\ShipmentMode::Sea->value)
-
+                                    ->required(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value)
+                                    ->hidden(fn(Get $get) => $get('mode') !== ShipmentMode::Sea->value)
                                     ->options(function () {
                                         return Voyage::with(['vessel', 'portFrom', 'portTo'])
                                             ->orderByDesc('etd')
@@ -463,7 +677,6 @@ class ShipmentResource extends Resource
                                                 ),
                                             ])->toArray();
                                     })
-
                                     ->getOptionLabelUsing(function ($value) {
                                         $v = Voyage::with(['vessel', 'portFrom', 'portTo'])->find($value);
                                         return $v ? sprintf(
@@ -476,19 +689,25 @@ class ShipmentResource extends Resource
                                         ) : null;
                                     })
                                     ->live()
-                                    ->afterStateUpdated(function ($state, Set $set) {
-                                        if (! $state) {
-                                            foreach (['vessel_name', 'voyage', 'pol', 'pod', 'etd', 'eta'] as $f) $set($f, null);
-                                            return;
+                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                        if (!$state) {
+                                            foreach (['vessel_name', 'voyage', 'pol', 'pod', 'etd', 'eta'] as $f) {
+                                                $set($f, null);
+                                            }
+                                        } else {
+                                            if ($v = Voyage::with(['vessel', 'portFrom', 'portTo'])->find($state)) {
+                                                $set('vessel_name', $v->vessel?->name);
+                                                $set('voyage',      $v->voyage_no);
+                                                $set('pol',         $v->portFrom?->code ?: $v->portFrom?->name);
+                                                $set('pod',         $v->portTo?->code   ?: $v->portTo?->name);
+                                                $set('etd',         optional($v->etd)->toDateString());
+                                                $set('eta',         optional($v->eta)->toDateString());
+                                            }
                                         }
-                                        if ($v = Voyage::with(['vessel', 'portFrom', 'portTo'])->find($state)) {
-                                            $set('vessel_name', $v->vessel?->name);
-                                            $set('voyage',      $v->voyage_no);
-                                            $set('pol',         $v->portFrom?->code ?: $v->portFrom?->name);
-                                            $set('pod',         $v->portTo?->code   ?: $v->portTo?->name);
-                                            $set('etd',         optional($v->etd)->toDateString());
-                                            $set('eta',         optional($v->eta)->toDateString());
-                                        }
+
+                                        $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->branch_id);
+                                        $depotId = self::resolveDepotId($branchId, $get('mode'), $state);
+                                        $set('assigned_depot_id', $depotId);
                                     })
                                     ->columnSpan(12),
 
@@ -499,23 +718,36 @@ class ShipmentResource extends Resource
                                 TextInput::make('pol')->disabled()->dehydrated()->columnSpan(4),
                                 TextInput::make('pod')->disabled()->dehydrated()->columnSpan(4),
 
+                                Hidden::make('assigned_depot_id')->dehydrated(),
+
+                                Placeholder::make('auto_depot_display')
+                                    ->label('Depo Penugasan (otomatis)')
+                                    ->content(function (Get $get) {
+                                        $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->branch_id);
+                                        $depotId = $get('assigned_depot_id') ?: self::resolveDepotId($branchId, $get('mode'), $get('voyage_id'));
+                                        if ($depotId) {
+                                            return Depot::whereKey($depotId)->value('name') ?: '—';
+                                        }
+                                        return 'Belum ada depo untuk cabang & mode ini. Tambahkan depo di menu Depo.';
+                                    })
+                                    ->columnSpan(12),
+
                                 Placeholder::make('assignment_hint')
                                     ->label('Status Penugasan Depo')
                                     ->content(function (?Shipment $record) {
                                         if (!$record) return '—';
-                                        if (($record->mode?->value ?? (string)$record->mode) !== 'sea') {
+                                        $mode = $record->mode instanceof ShipmentMode ? $record->mode->value : (string) $record->mode;
+                                        if ($mode !== ShipmentMode::Sea->value) {
                                             return 'Non-SEA: tidak memakai penugasan depo.';
                                         }
                                         return $record->assigned_depot?->name
                                             ? ('Assigned ke: ' . $record->assigned_depot->name)
-                                            : 'Belum ter-assign. Lengkapi Voyage/POL/POD agar otomatis ter-assign.';
+                                            : 'Belum ter-assign.';
                                     })
                                     ->columnSpan(12),
                             ]),
-
                     ]),
 
-                // === DARAT ===
                 Group::make()
                     ->columnSpan(12)
                     ->columns(12)
@@ -531,7 +763,7 @@ class ShipmentResource extends Resource
                             ->native(false)
                             ->live()
                             ->afterStateUpdated(function ($state, Set $set) {
-                                if (! $state) {
+                                if (!$state) {
                                     $set('vehicle_plate', null);
                                     $set('service_option', null);
                                     return;
@@ -561,7 +793,7 @@ class ShipmentResource extends Resource
                             ->native(false)
                             ->live()
                             ->afterStateUpdated(function ($state, Set $set) {
-                                if (! $state) {
+                                if (!$state) {
                                     $set('driver_name', null);
                                     $set('driver_phone', null);
                                     return;
@@ -577,7 +809,6 @@ class ShipmentResource extends Resource
                             ->disabled()
                             ->dehydrated()
                             ->columnSpan(6),
-
                     ]),
 
                 Hidden::make('service_type')->dehydrated(),
@@ -710,7 +941,7 @@ class ShipmentResource extends Resource
                             } else {
                                 $sizeLabel = ContainerSize::tryFrom((string) $record->container_size)?->label();
 
-                                if (! $sizeLabel) {
+                                if (!$sizeLabel) {
                                     $legacy = [
                                         '20'   => ContainerSize::COC_20_DRY->label(),
                                         '40'   => ContainerSize::COC_40_DRY->label(),
@@ -740,6 +971,7 @@ class ShipmentResource extends Resource
                         default => 'gray',
                     })
                     ->toggleable(),
+
                 TextColumn::make('delivery_scope')
                     ->label('Cakupan')
                     ->getStateUsing(fn(Shipment $r) => $r->delivery_scope?->label() ?? (is_string($r->delivery_scope) ? $r->delivery_scope : '-'))
@@ -782,6 +1014,11 @@ class ShipmentResource extends Resource
                     ->sortable()
                     ->toggleable(),
 
+                TextColumn::make('attachments_count')
+                    ->label('Lampiran')
+                    ->getStateUsing(fn(Shipment $r) => count($r->attachments ?? []))
+                    ->badge()
+                    ->sortable(),
 
                 TextColumn::make('status')
                     ->label('Status')
@@ -803,7 +1040,7 @@ class ShipmentResource extends Resource
                     ->badge()
                     ->dateTime('d M Y H:i')
                     ->color(function ($state) {
-                        if (! $state) return 'gray';
+                        if (!$state) return 'gray';
                         $eta = Carbon::parse($state);
                         if ($eta->isPast()) return 'danger';
                         if ($eta->diffInDays(now()) <= 2) return 'warning';
@@ -858,7 +1095,11 @@ class ShipmentResource extends Resource
                                 ShipmentStatus::Draft->value ?? 'draft',
                             ], true)
                     ),
-
+                \Filament\Tables\Actions\Action::make('print_resi')
+                    ->label('Cetak Resi')
+                    ->icon('heroicon-m-printer')
+                    ->url(fn($record) => route('shipments.resi', ['shipment' => $record->id]) . '?download=1')
+                    ->openUrlInNewTab(),
             ])
             ->bulkActions([
                 BulkAction::make('export_selected')
@@ -974,16 +1215,68 @@ class ShipmentResource extends Resource
 
     public static function mutateFormDataBeforeCreate(array $data): array
     {
+        unset(
+            $data['pickup_contact_use_custom'],
+            $data['pickup_contact_name'],
+            $data['pickup_contact_phone'],
+            $data['pickup_contact_address'],
+            $data['delivery_contact_use_custom'],
+            $data['delivery_contact_name'],
+            $data['delivery_contact_phone'],
+            $data['delivery_contact_address'],
+            $data['edit_pickup_contact'],
+            $data['edit_delivery_contact'],
+        );
+
+        if (empty($data['branch_id'])) {
+            $data['branch_id'] = Filament::auth()->user()?->branch_id;
+        }
+
+        $mode = $data['mode'] ?? null;
+        $opt  = $data['service_option'] ?? null;
+
+        if ($mode === ShipmentMode::Sea->value) {
+            $data['service_type'] = ServiceType::SeaFreight->value;
+
+            if (empty($data['assigned_depot_id'])) {
+                $data['assigned_depot_id'] = self::resolveDepotId(
+                    (int) ($data['branch_id'] ?? 0),
+                    $mode,
+                    (int) ($data['voyage_id'] ?? 0) ?: null
+                );
+            }
+
+            if (empty($data['assigned_depot_id'])) {
+                throw ValidationException::withMessages([
+                    'assigned_depot_id' => 'Tidak ada Depo (mode laut) untuk cabang ini. Tambahkan depo di menu Depo.',
+                ]);
+            }
+        } elseif ($mode === ShipmentMode::Land->value) {
+            $data['service_type'] = match ($opt) {
+                'car_carrier' => ServiceType::CarCarrier->value,
+                default       => ServiceType::LandTrucking->value,
+            };
+        }
+
+        $data['route_summary'] = sprintf(
+            '%s → %s',
+            optional(City::find($data['origin_city_id'] ?? null))->name ?? '-',
+            optional(City::find($data['destination_city_id'] ?? null))->name ?? '-',
+        );
+
         return $data;
     }
+
     public static function afterCreate($record): void
     {
         app(ShipmentObserver::class)->created($record->refresh());
     }
+
     public static function mutateFormDataBeforeSave(array $data): array
     {
         return $data;
     }
+
     public static function afterSave($record): void
     {
         app(ShipmentObserver::class)->updated($record->refresh());

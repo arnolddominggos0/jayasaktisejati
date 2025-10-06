@@ -6,8 +6,6 @@ use App\Filament\Resources\CustomerResource;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Actions;
 use Filament\Forms\Components\TextInput;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 
 class EditCustomer extends EditRecord
 {
@@ -19,42 +17,39 @@ class EditCustomer extends EditRecord
             Actions\Action::make('buat_portal_user')
                 ->label('Buat Akun Portal')
                 ->icon('heroicon-o-user-plus')
-                ->modalHeading('Buat Akun Portal Customer')
+                ->visible(fn() => config('portal.auth_mode') === 'customer_monolith'
+                    && (auth_user()?->hasAnyRole(['super_admin', 'office_admin']) ?? false))
                 ->form([
-                    TextInput::make('name')
-                        ->label('Nama User')
-                        ->required()
-                        ->default(fn() => $this->record->name),
-
-                    TextInput::make('email')
-                        ->label('Email')
-                        ->email()
-                        ->required()
-                        ->default(fn() => $this->record->email),
-
-                    TextInput::make('password')
-                        ->label('Password')
-                        ->password()
-                        ->revealable()
-                        ->required()
-                        ->helperText('Berikan password ini kepada customer (bisa diubah nanti).'),
+                    TextInput::make('name')->label('Nama User')->required()->default(fn() => $this->record->name),
+                    TextInput::make('email')->label('Email')->email()->required()->default(fn() => $this->record->email),
+                    TextInput::make('password')->label('Password')->password()->revealable()->required()->rule('min:8'),
                 ])
                 ->action(function (array $data) {
-                    $customer = $this->record;
-
-                    $user = \App\Models\User::create([
+                    if (\App\Models\User::where('email', $data['email'])->exists()) {
+                        throw \Illuminate\Validation\ValidationException::withMessages(['email' => 'Email sudah digunakan.']);
+                    }
+                    $u = \App\Models\User::create([
                         'name'        => $data['name'],
                         'email'       => $data['email'],
-                        'password'    => Hash::make($data['password']),
-                        'customer_id' => $customer->id,
+                        'password'    => \Illuminate\Support\Facades\Hash::make($data['password']),
+                        'customer_id' => $this->record->id,
                     ]);
-
-                    $user->syncRoles(['customer']);
-
+                    $u->syncRoles(['customer']);
                     $this->notify('success', 'Akun portal customer berhasil dibuat.');
-                })
-                ->visible(fn() => auth_user()?->hasAnyRole(['super_admin', 'office_admin']) ?? false)
-
+                }),
         ];
+    }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        if (($data['pic_same'] ?? false) === true) {
+            $data['pic_name']  = $data['name']  ?? null;
+            $data['pic_email'] = $data['email'] ?? null;
+            $data['pic_phone'] = $data['phone'] ?? null;
+        }
+
+        unset($data['pic_same']);
+
+        return $data;
     }
 }

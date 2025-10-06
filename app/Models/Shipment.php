@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Enums\{ShipmentStatus, ShipmentMode, ServiceType, CargoType, DeliveryScope, RequestType, TrackStatus};
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class Shipment extends Model
 {
@@ -21,35 +22,29 @@ class Shipment extends Model
         'origin_office_id',
         'destination_office_id',
         'branch_id',
-
-        // A. Data Customer & Dokumen
         'pic_name',
         'pic_phone',
+        'pickup_contact_name',
+        'pickup_contact_phone',
+        'delivery_contact_name',
+        'delivery_contact_phone',
         'request_type',
         'doc_number',
         'priority',
         'attachments',
-
-        // B. Informasi Rute & Moda
         'mode',
         'route_from',
         'route_to',
         'route_summary',
-
-        // Layanan & Muatan
         'service_type',
         'service_option',
         'delivery_scope',
         'cargo_type',
         'container_size',
         'container_qty',
-
-        // Totals LCL
         'packages_total',
         'cbm_total',
         'weight_total',
-
-        // Laut
         'vessel_name',
         'voyage',
         'pol',
@@ -58,28 +53,18 @@ class Shipment extends Model
         'eta',
         'voyage_id',
         'assigned_depot_id',
-
-        // Darat
         'vehicle_type',
         'vehicle_plate',
         'pickup_date',
         'driver_id',
-
-        // Umum
         'status',
         'notes',
-
-        // Perubahan
         'requested_at',
         'cancelled_at',
         'cancelled_by',
         'edited_fields',
         'last_edited_by',
-
-        // Konfirmasi
         'confirm_is_true',
-
-        // Lead Time TL
         'estimated_ready_at',
     ];
 
@@ -90,12 +75,10 @@ class Shipment extends Model
         'cargo_type'         => CargoType::class,
         'request_type'       => RequestType::class,
         'delivery_scope'     => DeliveryScope::class,
-
         'container_qty'      => 'integer',
         'packages_total'     => 'integer',
         'cbm_total'          => 'decimal:3',
         'weight_total'       => 'decimal:2',
-
         'requested_at'       => 'datetime',
         'attachments'        => 'array',
         'etd'                => 'datetime',
@@ -305,10 +288,13 @@ class Shipment extends Model
         return $track;
     }
 
-    // Relations
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
     }
     public function driver()
     {
@@ -397,5 +383,14 @@ class Shipment extends Model
             ?? $this->to;
 
         return trim(($origin ?: '—') . ' → ' . ($dest ?: '—'));
+    }
+
+    public function getAttachmentUrlsAttribute(): array
+    {
+        $paths = $this->attachments ?? [];
+        return array_values(array_map(
+            fn($p) => Storage::disk('public')->url($p),
+            $paths
+        ));
     }
 }

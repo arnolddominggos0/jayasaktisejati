@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\CustomerType;
 use App\Filament\Resources\CustomerResource\Pages;
 use App\Models\Customer;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables\Table;
@@ -18,17 +19,18 @@ use Filament\Forms\Set;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 
 class CustomerResource extends Resource
 {
     protected static ?string $model = Customer::class;
 
-    protected static ?string $navigationIcon  = 'heroicon-m-users';
-    protected static ?string $navigationLabel = 'Pelanggan';
+    protected static ?string $navigationIcon   = 'heroicon-m-users';
+    protected static ?string $navigationLabel  = 'Pelanggan';
     protected static ?string $pluralModelLabel = 'Pelanggan';
-    protected static ?string $modelLabel = 'Pelanggan';
-    protected static ?string $navigationGroup = 'Manajemen Pengguna';
-    protected static ?int $navigationSort = 20;
+    protected static ?string $modelLabel       = 'Pelanggan';
+    protected static ?string $navigationGroup  = 'Manajemen Pengguna';
+    protected static ?int    $navigationSort   = 20;
 
     public static function canViewAny(): bool
     {
@@ -59,7 +61,7 @@ class CustomerResource extends Resource
                             ->required()
                             ->default(CustomerType::Individual->value)
                             ->live()
-                            ->afterStateUpdated(function ($state, Set $set) {
+                            ->afterStateUpdated(function (string $state, Set $set) {
                                 if ($state === CustomerType::Company->value) {
                                     $set('nik', null);
                                 } else {
@@ -69,75 +71,95 @@ class CustomerResource extends Resource
 
                         TextInput::make('code')
                             ->label('Kode Customer')
-                            ->placeholder('CTM-0001')
-                            ->required()
-                            ->unique(ignoreRecord: true)
-                            ->maxLength(20),
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->hiddenOn('create'),
 
                         TextInput::make('name')
-                            ->label(
-                                fn(Get $get) =>
-                                $get('type') === CustomerType::Company->value ? 'Nama Perusahaan' : 'Nama Lengkap'
-                            )
-                            ->placeholder(
-                                fn(Get $get) =>
-                                $get('type') === CustomerType::Company->value ? 'PT Contoh Sejahtera' : 'Budi Santoso'
-                            )
+                            ->label(fn(Get $get) => $get('type') === CustomerType::Company->value ? 'Nama Perusahaan' : 'Nama Lengkap')
                             ->required()
-                            ->maxLength(150),
+                            ->maxLength(150)
+                            ->live(debounce: 500)
+                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                if ($get('pic_same')) {
+                                    $set('pic_name', $state);
+                                }
+                            }),
 
                         TextInput::make('email')
                             ->label('Email')
                             ->email()
-                            ->maxLength(150),
+                            ->maxLength(150)
+                            ->live(debounce: 500)
+                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                if ($get('pic_same')) {
+                                    $set('pic_email', $state);
+                                }
+                            }),
 
                         TextInput::make('phone')
                             ->label('No. Telepon')
-                            ->maxLength(30),
+                            ->maxLength(30)
+                            ->live(debounce: 500)
+                            ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                if ($get('pic_same')) {
+                                    $set('pic_phone', $state);
+                                }
+                            }),
 
                         TextInput::make('nik')
                             ->label('NIK')
-                            ->visible(
-                                fn(Get $get) =>
-                                $get('type') === CustomerType::Individual->value
-                            )
-                            ->required(
-                                fn(Get $get) =>
-                                $get('type') === CustomerType::Individual->value
-                            )
-                            ->rule(
-                                fn(Get $get) =>
-                                $get('type') === CustomerType::Individual->value
-                                    ? 'digits:16'
-                                    : 'nullable'
-                            )
+                            ->visible(fn(Get $get) => $get('type') === CustomerType::Individual->value)
+                            ->required(fn(Get $get) => $get('type') === CustomerType::Individual->value)
+                            ->rule(fn(Get $get) => $get('type') === CustomerType::Individual->value ? 'digits:16' : 'nullable')
                             ->mutateDehydratedStateUsing(fn($state) => $state ? preg_replace('/\D+/', '', (string) $state) : null)
                             ->maxLength(16),
 
                         TextInput::make('npwp')
                             ->label('NPWP')
-                            ->visible(
-                                fn(Get $get) =>
-                                $get('type') === CustomerType::Company->value
-                            )
-                            ->required(
-                                fn(Get $get) =>
-                                $get('type') === CustomerType::Company->value
-                            )
-                            ->rule(
-                                fn(Get $get) =>
-                                $get('type') === CustomerType::Company->value
-                                    ? 'max:32'
-                                    : 'nullable'
-                            )
+                            ->visible(fn(Get $get) => $get('type') === CustomerType::Company->value)
+                            ->required(fn(Get $get) => $get('type') === CustomerType::Company->value)
+                            ->rule(fn(Get $get) => $get('type') === CustomerType::Company->value ? 'max:32' : 'nullable')
                             ->mutateDehydratedStateUsing(fn($state) => $state ? trim((string) $state) : null)
                             ->maxLength(32),
                     ])->columns(2),
 
                 Section::make('Kontak & Alamat')->schema([
-                    TextInput::make('pic_name')->label('Nama PIC')->maxLength(100),
-                    TextInput::make('pic_phone')->label('No. PIC')->maxLength(30),
-                    TextInput::make('pic_email')->label('Email PIC')->email()->maxLength(150),
+                    Checkbox::make('pic_same')
+                        ->label('PIC sama dengan data utama')
+                        ->default(true)
+                        ->dehydrated(false)
+                        ->live()
+                        ->afterStateUpdated(function (bool $state, Set $set, Get $get) {
+                            if ($state) {
+                                $set('pic_name',  $get('name'));
+                                $set('pic_email', $get('email'));
+                                $set('pic_phone', $get('phone'));
+                            }
+                        })
+                        ->columnSpan(2),
+
+                    TextInput::make('pic_name')
+                        ->label('PIC / Kontak *')
+                        ->required()
+                        ->maxLength(100)
+                        ->disabled(fn(Get $get) => (bool) $get('pic_same'))
+                        ->columnSpan(4),
+
+                    TextInput::make('pic_phone')
+                        ->label('No. Telp/WA *')
+                        ->tel()
+                        ->required()
+                        ->maxLength(20)
+                        ->disabled(fn(Get $get) => (bool) $get('pic_same'))
+                        ->columnSpan(2),
+
+                    TextInput::make('pic_email')
+                        ->label('Email PIC')
+                        ->email()
+                        ->maxLength(150)
+                        ->required(fn(Get $get) => $get('type') === CustomerType::Company->value && ! $get('pic_same'))
+                        ->disabled(fn(Get $get) => (bool) $get('pic_same')),
 
                     Textarea::make('address')->label('Alamat')->rows(3)->columnSpanFull(),
                 ])->columns(2),
@@ -165,12 +187,18 @@ class CustomerResource extends Resource
                     ->sortable(),
 
                 TextColumn::make('name')->label('Nama')->searchable()->sortable(),
-                TextColumn::make('email')->label('Email')->toggleable(),
-                TextColumn::make('phone')->label('Telepon')->toggleable(),
+                TextColumn::make('email')->label('Email')->toggleable()->searchable(),
+                TextColumn::make('phone')->label('Telepon')->toggleable()->searchable(),
                 TextColumn::make('pic_name')->label('PIC')->toggleable(),
                 TextColumn::make('updated_at')->label('Diubah')->since()->sortable(),
             ])
             ->filters([
+                SelectFilter::make('type')
+                    ->label('Tipe')
+                    ->options([
+                        CustomerType::Individual->value => CustomerType::Individual->label(),
+                        CustomerType::Company->value    => CustomerType::Company->label(),
+                    ]),
                 Filter::make('has_email')
                     ->label('Punya Email')
                     ->query(fn($query) => $query->whereNotNull('email')),

@@ -35,7 +35,6 @@ class ArmadaResource extends Resource
 
     public static function form(Forms\Form $form): Forms\Form
     {
-        //helper untuk kolom no polisi
         $composePlate = function (Get $get): string {
             $pfx = strtoupper(trim((string) $get('plate_prefix')));
             $num = preg_replace('/\D+/', '', (string) $get('plate_number_digits'));

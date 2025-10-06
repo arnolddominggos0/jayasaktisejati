@@ -14,20 +14,17 @@ class CustomerFactory extends Factory
 
     public function definition(): array
     {
-        // Pastikan ada city; hindari City::factory() bila belum ada CityFactory
         $cityId = City::query()->inRandomOrder()->value('id')
             ?? City::firstOrCreate(
                 ['slug' => Str::slug('Jakarta')],
                 ['name' => 'Jakarta', 'country' => 'Indonesia']
             )->id;
 
-        // Buat faker lokal Indonesia terpisah
         $fakerId = \Faker\Factory::create('id_ID');
 
-        // 70% company, 30% individual (gunakan value enum lowercase!)
         $type = $this->faker->boolean(70)
-            ? CustomerType::Company->value      // 'company'
-            : CustomerType::Individual->value;  // 'individual'
+            ? CustomerType::Company->value      
+            : CustomerType::Individual->value;  
 
         $isCompany = $type === CustomerType::Company->value;
 
@@ -41,7 +38,6 @@ class CustomerFactory extends Factory
             'email'       => $this->faker->unique()->safeEmail(),
             'phone'       => '08' . $this->faker->numerify('##########'),
 
-            // Hanya salah satu sesuai tipe
             'nik'         => $isCompany ? null : $this->faker->unique()->numerify(str_repeat('#', 16)),
             'npwp'        => $isCompany ? $this->faker->bothify('##.###.###.#-###.###') : null,
 

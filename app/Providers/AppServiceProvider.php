@@ -23,6 +23,8 @@ use App\Filament\Pages\Dashboard\Widgets\{
     TodayManpowerWidget,
     ActiveArmadaWidget
 };
+use App\Models\Customer;
+use App\Observers\CustomerObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -45,6 +47,8 @@ class AppServiceProvider extends ServiceProvider
         // Observers
         Shipment::observe(ShipmentObserver::class);
         ShipmentTrack::observe(ShipmentTrackObserver::class);
+        // ShipmentTrackHistory::observe(ShipmentTrackHistoryObserver::class);
+        Customer::observe(CustomerObserver::class);
 
         $aliases = [
             'app.filament.pages.dashboard.widgets.kpi-overview'             => KpiOverview::class,

@@ -6,6 +6,7 @@ use App\Filament\Resources\DepotResource\Pages;
 use App\Models\Depot;
 use App\Models\Port;
 use App\Models\Shipment;
+use Closure;
 use Filament\Forms;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
@@ -51,7 +52,10 @@ class DepotResource extends Resource
                 ])
                 ->required()
                 ->native(false)
-                ->live(),
+                ->live()
+                ->formatStateUsing(fn($state) => $state === 'sea_freight' ? 'sea' : $state)
+                ->dehydrateStateUsing(fn($state) => $state === 'sea_freight' ? 'sea' : $state)
+                ->rules(['in:sea,land']),
 
             Select::make('port_id')
                 ->label('Pelabuhan (khusus Laut)')
@@ -67,9 +71,19 @@ class DepotResource extends Resource
                     TextInput::make('city')->label('Kota')->maxLength(120),
                     TextInput::make('country')->label('Negara')->maxLength(120),
                 ])
-                ->createOptionAction(
-                    fn(Action $action) => $action->label('Tambah Pelabuhan')
-                ),
+                ->createOptionAction(fn(Action $action) => $action->label('Tambah Pelabuhan'))
+                ->rules([
+                    fn(Get $get): Closure => function (string $attribute, $value, Closure $fail) use ($get) {
+                        if ($get('mode') !== 'sea' || !$value) return;
+                        $exists = Depot::query()
+                            ->where('branch_id', $get('branch_id'))
+                            ->where('mode', 'sea')
+                            ->where('port_id', $value)
+                            ->when($get('id') ?? null, fn($q, $id) => $q->where('id', '!=', $id))
+                            ->exists();
+                        if ($exists) $fail('Depo laut untuk cabang & pelabuhan ini sudah ada.');
+                    },
+                ]),
 
             CheckboxList::make('service_types')
                 ->label('Jenis Layanan (khusus Darat)')
@@ -100,20 +114,16 @@ class DepotResource extends Resource
                 ->searchable()
                 ->nullable()
                 ->helperText('Satu koordinator hanya bisa di satu depo.')
-                ->rule(function (Get $get) {
-                    return function ($value, \Closure $fail) use ($get) {
+                ->rules([
+                    fn(Get $get): Closure => function (string $attribute, $value, Closure $fail) use ($get) {
                         if (!$value) return;
-
                         $exists = Depot::query()
                             ->where('coordinator_user_id', $value)
                             ->when($get('id') ?? null, fn($q, $id) => $q->where('id', '!=', $id))
                             ->exists();
-
-                        if ($exists) {
-                            $fail('Koordinator ini sudah ditetapkan di depo lain.');
-                        }
-                    };
-                }),
+                        if ($exists) $fail('Koordinator ini sudah ditetapkan di depo lain.');
+                    },
+                ]),
         ])->columns(2);
     }
 
@@ -123,7 +133,7 @@ class DepotResource extends Resource
             TextColumn::make('code')->badge()->label('Kode')->searchable(),
             TextColumn::make('name')->label('Nama')->searchable(),
             TextColumn::make('mode')->badge()->label('Moda')
-                ->formatStateUsing(fn($state) => $state === 'sea' ? 'Laut' : 'Darat'),
+                ->formatStateUsing(fn($state) => ($state === 'sea_freight' ? 'sea' : $state) === 'sea' ? 'Laut' : 'Darat'),
             TextColumn::make('port.code')->label('Kode Pelabuhan')->badge()->toggleable()->toggledHiddenByDefault(),
             TextColumn::make('port.name')->label('Pelabuhan')->default('-')->toggleable(),
             TextColumn::make('service_types')->label('Layanan')
@@ -139,7 +149,6 @@ class DepotResource extends Resource
                 ->before(function ($record, $action) {
                     if ($record->shipments()->exists()) {
                         $action->halt();
-
                         Notification::make()
                             ->title('Tidak bisa menghapus depo')
                             ->body('Depo masih dipakai oleh shipment. Pindahkan dulu shipment ke depo lain.')
@@ -160,30 +169,18 @@ class DepotResource extends Resource
                         $inUse = Shipment::where('assigned_depot_id', $depot->id)
                             ->where('mode', 'sea')
                             ->exists();
-
                         if ($inUse) {
                             $blocked[] = $depot->code ?: $depot->name ?: ('ID ' . $depot->id);
                             continue;
                         }
-
-                        try {
-                            $depot->delete();
-                        } catch (\Throwable $e) {
+                        try { $depot->delete(); } catch (\Throwable $e) {
                             $blocked[] = $depot->code ?: $depot->name ?: ('ID ' . $depot->id);
                         }
                     }
-
                     if (! empty($blocked)) {
-                        Notification::make()
-                            ->title('Sebagian gagal dihapus')
-                            ->body('Depo berikut masih dipakai: ' . implode(', ', $blocked))
-                            ->danger()
-                            ->send();
+                        Notification::make()->title('Sebagian gagal dihapus')->body('Depo berikut masih dipakai: ' . implode(', ', $blocked))->danger()->send();
                     } else {
-                        Notification::make()
-                            ->title('Depo terpilih dihapus')
-                            ->success()
-                            ->send();
+                        Notification::make()->title('Depo terpilih dihapus')->success()->send();
                     }
                 }),
         ]);
