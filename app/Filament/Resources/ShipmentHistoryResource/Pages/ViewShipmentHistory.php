@@ -3,10 +3,14 @@
 namespace App\Filament\Resources\ShipmentHistoryResource\Pages;
 
 use App\Filament\Resources\ShipmentHistoryResource;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists\Infolist;
-use Filament\Infolists\Components\{Section, TextEntry, IconEntry};
+use Filament\Infolists\Components\{Section, TextEntry, IconEntry, ViewEntry};
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+
 
 class ViewShipmentHistory extends ViewRecord
 {
@@ -17,31 +21,40 @@ class ViewShipmentHistory extends ViewRecord
         $record = $this->record;
 
         return [
-            \Filament\Actions\Action::make('print_resi')
+            Action::make('print_resi')
                 ->label('Cetak Resi')
                 ->icon('heroicon-o-printer')
                 ->url(route('shipments.resi', ['shipment' => $record->id]) . '?download=1')
                 ->openUrlInNewTab(),
 
-            \Filament\Actions\Action::make('timeline')
+            Action::make('timeline')
                 ->label('Kelola Timeline')
                 ->icon('heroicon-o-sparkles')
                 ->color('primary')
                 ->url(\App\Filament\Resources\ShipmentTrackingResource::getUrl('manage', ['record' => $record]))
                 ->visible(fn() => auth_user()?->hasRole('super_admin') === true),
 
-            \Filament\Actions\Action::make('edit')
+            Action::make('edit')
                 ->label('Edit')
                 ->icon('heroicon-o-pencil-square')
                 ->color('warning')
                 ->url(\App\Filament\Resources\ShipmentResource::getUrl('edit', ['record' => $record]))
                 ->visible(fn() => auth_user()?->hasRole('super_admin') === true),
 
-            \Filament\Actions\Action::make('copy_link')
+            Action::make('copy_link')
                 ->label('Salin Link')
                 ->icon('heroicon-o-link')
-                ->action(fn() => \Filament\Support\Facades\FilamentView::panel('admin')->js('navigator.clipboard.writeText(window.location.href)'))
-                ->color('gray'),
+                ->action(
+                    fn() => Notification::make()
+                        ->title('Link disalin')
+                        ->success()
+                        ->send()
+                )
+                ->extraAttributes([
+                    'x-data' => '{}',
+                    'x-on:click.stop' => 'navigator.clipboard.writeText(window.location.href)',
+                ])
+                ->color('gray')
         ];
     }
 
@@ -112,9 +125,18 @@ class ViewShipmentHistory extends ViewRecord
                 TextEntry::make('status')->label('Status Akhir')->badge()
                     ->color(fn($state) => ($state?->label() ?? $state) === 'Terkirim' ? 'success' : 'danger')
                     ->formatStateUsing(fn($state) => $state?->label() ?? (string)$state),
-                TextEntry::make('delivered_at')->label('Terkirim')->dateTime('d M Y H:i')->placeholder('—'),
-                TextEntry::make('cancelled_at')->label('Dibatalkan')->dateTime('d M Y H:i')->placeholder('—'),
-                TextEntry::make('cancelledBy.name')->label('Dibatalkan Oleh')->placeholder('—'),
+                TextEntry::make('delivered_at')
+                    ->label('Terkirim')
+                    ->state($this->record->delivered_at ?? $this->record->delivered_at)
+                    ->dateTime('d M Y H:i')
+                    ->placeholder('—'),
+                TextEntry::make('cancelled_at')
+                    ->label('Dibatalkan')
+                    ->dateTime('d M Y H:i')
+                    ->placeholder('—'),
+                TextEntry::make('cancelledBy.name')
+                    ->label('Dibatalkan Oleh')
+                    ->placeholder('—'),
             ]),
 
             Section::make('Permintaan & Dokumen')->columns(4)->schema([
@@ -128,20 +150,88 @@ class ViewShipmentHistory extends ViewRecord
             ]),
 
             Section::make('Kuantitas')->columns(3)->schema([
-                TextEntry::make('packages_total')->label('Koli')->placeholder('—'),
+                TextEntry::make('container_summary')->label('Kontainer')
+                    ->state(function ($record) {
+                        $isSea  = ($record->mode?->value ?? $record->mode) === 'sea';
+                        $isFcl  = ($record->service_option ?? null) === 'fcl';
+                        $isGen  = ($record->cargo_type?->value ?? $record->cargo_type) === \App\Enums\CargoType::General->value;
+
+                        if (!($isSea && $isFcl && $isGen)) return null;
+
+                        $size = is_string($record->container_size)
+                            ? \App\Enums\ContainerSize::tryFrom($record->container_size)?->label()
+                            : $record->container_size?->label();
+
+                        if (!$size) return null;
+                        $qty = $record->container_qty ? " × {$record->container_qty}" : '';
+                        return "{$size}{$qty}";
+                    })
+                    ->placeholder('—'),
+                TextEntry::make('packages_total')->label('Koli')
+                    ->visible(
+                        fn($record) => ($record->service_option ?? null) === 'lcl' &&
+                            ($record->cargo_type?->value ?? $record->cargo_type) === \App\Enums\CargoType::General->value
+                    )
+                    ->placeholder('—'),
+
                 TextEntry::make('cbm_total')->label('CBM')
-                    ->formatStateUsing(fn($value) => is_null($value) ? '—' : number_format((float)$value, 3, '.', '')),
+                    ->visible(
+                        fn($record) => ($record->service_option ?? null) === 'lcl' &&
+                            ($record->cargo_type?->value ?? $record->cargo_type) === \App\Enums\CargoType::General->value
+                    )
+                    ->formatStateUsing(fn($state) => is_null($state) ? '—' : number_format((float)$state, 3, '.', '')),
+
                 TextEntry::make('weight_total')->label('Berat (kg)')
-                    ->formatStateUsing(fn($value) => is_null($value) ? '—' : number_format((float)$value, 2, '.', '')),
+                    ->visible(
+                        fn($record) => ($record->service_option ?? null) === 'lcl' &&
+                            ($record->cargo_type?->value ?? $record->cargo_type) === \App\Enums\CargoType::General->value
+                    )
+                    ->formatStateUsing(fn($state) => is_null($state) ? '—' : number_format((float)$state, 2, '.', '')),
+
+                TextEntry::make('units_count')->label('Unit')
+                    ->state(fn($record) => method_exists($record, 'units') ? $record->units()->count() : null)
+                    ->visible(
+                        fn($record) => ($record->cargo_type?->value ?? $record->cargo_type) === \App\Enums\CargoType::Vehicle->value
+                    )
+                    ->placeholder('—'),
             ]),
 
-            TextEntry::make('attachments')->label('Lampiran')
-                ->formatStateUsing(
-                    fn($state) => empty($state)
-                        ? '—'
-                        : collect($state)->map(fn($p) => '<a href="' . Storage::url($p) . '" target="_blank">' . $p . '</a>')->join('<br>')
-                )
-                ->html(),
+            Section::make('Lampiran')->schema([
+                ViewEntry::make('attachments_view')
+                    ->view('filament.infolists.attachments')
+                    ->state(function ($record) {
+                        $raw = $record->attachments ?? [];
+                        if (is_string($raw)) {
+                            $decoded = json_decode($raw, true);
+                            $raw = is_array($decoded) ? $decoded : [];
+                        }
+                        $files = array_values(array_filter((array) $raw));
+                        if (empty($files)) {
+                            return [];
+                        }
+
+                        $disk = Storage::disk('public');
+
+                        return collect($files)->map(function ($path) {
+                            $isUrl = str_starts_with($path, 'http://') || str_starts_with($path, 'https://');
+                            $name = basename(parse_url($path, PHP_URL_PATH) ?? $path);
+                            $ext  = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                            $isImage = in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp']);
+
+                            if ($isUrl) {
+                                return ['name' => $name, 'url' => $path, 'exists' => true, 'is_image' => $isImage];
+                            }
+
+                            $disk = Storage::disk('public');
+                            return [
+                                'name' => $name,
+                                'url' => $disk->exists($path) ? $disk->url($path) : null,
+                                'exists' => $disk->exists($path),
+                                'is_image' => $isImage,
+                            ];
+                        })->all();
+                    }),
+            ]),
         ]);
     }
 }
