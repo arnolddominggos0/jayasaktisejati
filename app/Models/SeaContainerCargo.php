@@ -5,15 +5,20 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class SeaContainerEvent extends Model
+class SeaContainerCargo extends Model
 {
-    protected $fillable = ['container_id', 'event', 'event_time', 'location', 'remark'];
-
-    protected $casts = ['event_time' => 'datetime'];
+    protected $fillable = [
+        'container_id',
+        'group_type',
+        'description',
+        'unit_ref',
+        'qty',
+        'cbm',
+        'weight_kg',
+    ];
 
     public function container(): BelongsTo
     {
         return $this->belongsTo(SeaContainer::class, 'container_id');
     }
 }
-    

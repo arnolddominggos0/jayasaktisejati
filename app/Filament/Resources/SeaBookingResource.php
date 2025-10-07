@@ -120,13 +120,6 @@ class SeaBookingResource extends Resource
         ]);
     }
 
-    public static function getRelations(): array
-    {
-        return [
-            ContainersRelationManager::class,
-        ];
-    }
-
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
         return parent::getEloquentQuery()

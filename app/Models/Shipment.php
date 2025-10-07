@@ -42,6 +42,8 @@ class Shipment extends Model
         'cargo_type',
         'container_size',
         'container_qty',
+        'container_no',
+        'seal_no',
         'packages_total',
         'cbm_total',
         'weight_total',
@@ -67,6 +69,9 @@ class Shipment extends Model
         'last_edited_by',
         'confirm_is_true',
         'estimated_ready_at',
+        'containers',
+        'lcl_items',
+        'units',
     ];
 
     protected $casts = [
@@ -90,6 +95,9 @@ class Shipment extends Model
         'delivered_at'       => 'datetime',
         'cancelled_at'       => 'datetime',
         'edited_fields'      => 'array',
+        'containers'         => 'array',
+        'lcl_items'          => 'array',
+        'units'              => 'array',
     ];
 
     protected static function booted(): void
@@ -188,10 +196,14 @@ class Shipment extends Model
 
             $m->route_summary = implode(' → ', array_filter([$from, $middle, $to])) . $scope;
 
-            $prev = ShipmentStatus::tryFrom((string) $m->getOriginal('status'));
-            $curr = $m->status instanceof ShipmentStatus
-                ? $m->status
-                : ShipmentStatus::tryFrom((string) $m->status);
+            $orig = $m->getOriginal('status');
+            $prev = $orig instanceof ShipmentStatus
+                ? $orig
+                : ShipmentStatus::tryFrom((string) $orig);
+            $currRaw = $m->status;
+            $curr = $currRaw instanceof ShipmentStatus
+                ? $currRaw
+                : ShipmentStatus::tryFrom((string) $currRaw);
 
             if ($curr !== $prev) {
                 if ($curr === ShipmentStatus::Delivered) {
@@ -220,8 +232,6 @@ class Shipment extends Model
                 }
             }
         });
-
-
 
         static::updated(function (Shipment $m) {
             $changed = array_keys($m->getChanges());
@@ -377,12 +387,10 @@ class Shipment extends Model
     {
         return $this->belongsTo(Voyage::class, 'voyage_id');
     }
-
     public function armada()
     {
         return $this->belongsTo(Armada::class, 'armada_id');
     }
-
     public function cancelledBy()
     {
         return $this->belongsTo(User::class, 'cancelled_by');
@@ -409,15 +417,13 @@ class Shipment extends Model
     }
     public function latestTrack()
     {
-        return $this->hasOne(ShipmentTrack::class, 'shipment_id', 'id')
-            ->latestOfMany('tracked_at');
+        return $this->hasOne(ShipmentTrack::class, 'shipment_id', 'id')->latestOfMany('tracked_at');
     }
 
     public function getLatestTrackStatusAttribute(): ?TrackStatus
     {
         return $this->latestTrack?->status;
     }
-
     public function getLatestTrackedAtAttribute(): ?\Illuminate\Support\Carbon
     {
         return $this->latestTrack?->tracked_at;
@@ -427,7 +433,6 @@ class Shipment extends Model
     {
         return $this->belongsTo(\App\Models\City::class, 'origin_city_id');
     }
-
     public function destinationCity()
     {
         return $this->belongsTo(\App\Models\City::class, 'destination_city_id');
@@ -466,5 +471,54 @@ class Shipment extends Model
             : ShipmentStatus::tryFrom((string)$this->status);
 
         return in_array($st, [ShipmentStatus::Delivered, ShipmentStatus::Cancelled], true);
+    }
+
+    public function getContainerMapAttribute(): array
+    {
+        $containers = collect($this->containers ?? [])
+            ->filter(fn($c) => !empty($c['container_no']))
+            ->mapWithKeys(function ($c) {
+                $no = trim((string) $c['container_no']);
+                return [$no => [
+                    'container_no' => $no,
+                    'seal_no'      => $c['seal_no'] ?? null,
+                    'lcl_count'    => 0,
+                    'unit_count'   => 0,
+                ]];
+            })->all();
+
+        foreach (($this->lcl_items ?? []) as $row) {
+            $ref = trim((string) ($row['container_no_ref'] ?? ''));
+            if ($ref !== '' && isset($containers[$ref])) {
+                $containers[$ref]['lcl_count']++;
+            }
+        }
+
+        foreach (($this->units ?? []) as $row) {
+            $ref = trim((string) ($row['container_no_ref'] ?? ''));
+            $qty = (int) ($row['qty'] ?? 1);
+            if ($ref !== '' && isset($containers[$ref])) {
+                $containers[$ref]['unit_count'] += max(1, $qty);
+            }
+        }
+
+        return array_values($containers);
+    }
+
+    public function getContainerSummaryAttribute(): ?string
+    {
+        $map = $this->container_map;
+        if (empty($map)) return null;
+
+        $parts = [];
+        foreach ($map as $c) {
+            $seal = $c['seal_no'] ? " / {$c['seal_no']}" : '';
+            $detail = [];
+            if ($c['lcl_count'] > 0) $detail[] = "{$c['lcl_count']} koli LCL";
+            if ($c['unit_count'] > 0) $detail[] = "{$c['unit_count']} unit";
+            $det = $detail ? ' • ' . implode(', ', $detail) : '';
+            $parts[] = "{$c['container_no']}{$seal}{$det}";
+        }
+        return implode('  |  ', $parts);
     }
 }

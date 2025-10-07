@@ -2,22 +2,21 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\{ContainerSize, DeliveryScope, RequestType, ServiceType, ShipmentMode, ShipmentStatus};
+use App\Enums\{ShipmentMode, ShipmentStatus};
 use App\Filament\Resources\ShipmentHistoryResource\Pages\ListShipmentHistories;
 use App\Filament\Resources\ShipmentHistoryResource\Pages\ViewShipmentHistory;
 use App\Models\Shipment;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\DatePicker;
 use Filament\Resources\Resource;
-use Filament\Tables;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Table;
-use Filament\Tables\Columns\{TextColumn, IconColumn, ViewColumn};
+use Filament\Tables\Columns\{TextColumn, IconColumn};
 use Filament\Tables\Enums\FiltersLayout;
 use Filament\Tables\Filters\{Filter, SelectFilter};
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 
 class ShipmentHistoryResource extends Resource
 {
@@ -29,7 +28,7 @@ class ShipmentHistoryResource extends Resource
     protected static ?string $pluralModelLabel  = 'Riwayat Pengiriman';
     protected static ?string $navigationIcon    = 'heroicon-m-archive-box';
     protected static ?int    $navigationSort    = 30;
-    protected static ?string $slug = 'shipment-histories';
+    protected static ?string $slug              = 'shipment-histories';
 
     public static function shouldRegisterNavigation(): bool
     {
@@ -40,7 +39,7 @@ class ShipmentHistoryResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $q = parent::getEloquentQuery()
-            ->with(['customer', 'receiver', 'originCity', 'destinationCity', 'latestTrack', 'tracks'])
+            ->with(['customer', 'receiver', 'originCity', 'destinationCity', 'tracks'])
             ->history();
 
         $user = Filament::auth()->user();
@@ -80,18 +79,31 @@ class ShipmentHistoryResource extends Resource
                     ->color(fn($state) => ($state?->value ?? $state) === ShipmentMode::Sea->value ? 'primary' : 'warning')
                     ->tooltip(fn($state) => ($state?->value ?? $state) === ShipmentMode::Sea->value ? 'Laut' : 'Darat'),
 
-                TextColumn::make('customer.name')->label('Pengirim')->badge()->sortable()->searchable(),
-                TextColumn::make('receiver.name')->label('Penerima')->badge()->sortable()->searchable(),
+                TextColumn::make('customer.name')
+                    ->label('Pengirim')
+                    ->badge()
+                    ->sortable()
+                    ->searchable(),
+
+                TextColumn::make('receiver.name')
+                    ->label('Penerima')
+                    ->badge()
+                    ->sortable()
+                    ->searchable(),
 
                 TextColumn::make('route_summary')
                     ->label('Rute')
                     ->html()
-                    ->getStateUsing(fn(Shipment $record) => "<div class='font-medium'>" . ($record->originCity->name ?? '-') . " &rarr; " . ($record->destinationCity->name ?? '-') . "</div>")
+                    ->getStateUsing(
+                        fn(Shipment $record) =>
+                        "<div class='font-medium'>" . ($record->originCity->name ?? '-') . " &rarr; " . ($record->destinationCity->name ?? '-') . "</div>"
+                    )
                     ->toggleable(),
 
                 TextColumn::make('status')
                     ->label('Status Akhir')
                     ->badge()
+                    ->tooltip(fn(Shipment $r) => $r->status === ShipmentStatus::Delivered ? 'Terkirim ke penerima (ATA)' : 'Dibatalkan oleh admin/koordinator')
                     ->getStateUsing(fn(Shipment $record) => $record->status?->label() ?? (is_string($record->status) ? $record->status : '-'))
                     ->colors([
                         'success' => ['Terkirim'],
@@ -101,16 +113,50 @@ class ShipmentHistoryResource extends Resource
 
                 TextColumn::make('completed_at')
                     ->label('Selesai')
-                    ->state(fn(Shipment $record) => $record->completed_at)
+                    ->getStateUsing(function (Shipment $record) {
+                        if ($record->status === ShipmentStatus::Delivered) {
+                            return $record->delivered_at
+                                ?? $record->tracks()
+                                ->where('status', 'delivered')
+                                ->latest('tracked_at')
+                                ->value('tracked_at');
+                        }
+
+                        if ($record->status === ShipmentStatus::Cancelled) {
+                            return $record->cancelled_at
+                                ?? $record->tracks()
+                                ->where('status', 'cancelled')
+                                ->latest('tracked_at')
+                                ->value('tracked_at');
+                        }
+
+                        return null;
+                    })
+                    ->placeholder('—')
                     ->dateTime('d M Y H:i')
                     ->badge()
-                    ->color(fn(Shipment $record) => $record->status === \App\Enums\ShipmentStatus::Delivered ? 'success' : 'danger')
+                    ->color(fn(Shipment $record) => $record->status === ShipmentStatus::Delivered ? 'success' : 'danger')
                     ->sortable(),
 
-                TextColumn::make('eta')->label('ETA (Terakhir)')->dateTime('d M Y H:i')->placeholder('—')->toggleable(),
-                TextColumn::make('updated_at')->label('Diubah')->since()->sortable()->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('created_at')->label('Dibuat')->dateTime('d M Y H:i')->sortable()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('eta')
+                    ->label('ETA (Terakhir)')
+                    ->dateTime('d M Y H:i')
+                    ->placeholder('—')
+                    ->toggleable(),
+
+                TextColumn::make('updated_at')
+                    ->label('Diubah')
+                    ->since()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('created_at')
+                    ->label('Dibuat')
+                    ->dateTime('d M Y H:i')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
+
             ->filters([
                 SelectFilter::make('status')
                     ->label('Status Akhir')
@@ -128,14 +174,23 @@ class ShipmentHistoryResource extends Resource
                     ])
                     ->native(false),
 
-                SelectFilter::make('customer_id')->label('Pengirim')->relationship('customer', 'name')->searchable()->preload(),
-                SelectFilter::make('receiver_id')->label('Penerima')->relationship('receiver', 'name')->searchable()->preload(),
+                SelectFilter::make('customer_id')
+                    ->label('Pengirim')
+                    ->relationship('customer', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                SelectFilter::make('receiver_id')
+                    ->label('Penerima')
+                    ->relationship('receiver', 'name')
+                    ->searchable()
+                    ->preload(),
 
                 Filter::make('completed_range')
                     ->label('Rentang Selesai')
                     ->form([
-                        \Filament\Forms\Components\DatePicker::make('from')->label('Dari'),
-                        \Filament\Forms\Components\DatePicker::make('to')->label('Sampai'),
+                        DatePicker::make('from')->label('Dari'),
+                        DatePicker::make('to')->label('Sampai'),
                     ])
                     ->query(function (Builder $q, array $data) {
                         $from = isset($data['from']) ? Carbon::parse($data['from'])->startOfDay() : null;
@@ -144,38 +199,25 @@ class ShipmentHistoryResource extends Resource
                         if (!$from && !$to) return;
 
                         $q->where(function ($w) use ($from, $to) {
-                            $w->where(function ($q1) use ($from, $to) {
-                                $q1->where('status', ShipmentStatus::Delivered->value);
-                                if ($from) $q1->where('updated_at', '>=', $from);
-                                if ($to)   $q1->where('updated_at', '<=', $to);
-                            })
-                                ->orWhere(function ($q2) use ($from, $to) {
-                                    $q2->where('status', ShipmentStatus::Cancelled->value);
-                                    if ($from) $q2->where(function ($x) use ($from) {
-                                        $x->whereNotNull('cancelled_at')->where('cancelled_at', '>=', $from)
-                                            ->orWhere(function ($y) use ($from) {
-                                                $y->whereNull('cancelled_at')->where('updated_at', '>=', $from);
-                                            });
-                                    });
-                                    if ($to) $q2->where(function ($x) use ($to) {
-                                        $x->whereNotNull('cancelled_at')->where('cancelled_at', '<=', $to)
-                                            ->orWhere(function ($y) use ($to) {
-                                                $y->whereNull('cancelled_at')->where('updated_at', '<=', $to);
-                                            });
-                                    });
-                                });
+                            if ($from) $w->where('updated_at', '>=', $from);
+                            if ($to)   $w->where('updated_at', '<=', $to);
                         });
                     }),
             ], layout: FiltersLayout::AboveContent)
             ->filtersFormColumns(4)
-            ->defaultSort(function ($query) {
+
+            ->defaultSort(
+                fn($query) =>
                 $query->orderByRaw("
-        CASE 
-            WHEN status = 'cancelled' THEN COALESCE(cancelled_at, updated_at)
-            ELSE updated_at
-        END DESC
-    ");
-            })
+                    COALESCE(
+                        delivered_at,
+                        cancelled_at,
+                        (SELECT MAX(tracked_at) FROM shipment_tracks WHERE shipment_id = shipments.id AND status IN ('delivered','cancelled')),
+                        updated_at
+                    ) DESC
+                ")
+            )
+
             ->actions([
                 ActionGroup::make([
                     Action::make('detail')

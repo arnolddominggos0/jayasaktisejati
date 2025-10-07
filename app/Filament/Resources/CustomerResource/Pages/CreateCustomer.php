@@ -18,9 +18,9 @@ class CreateCustomer extends CreateRecord
         }
 
         if (($data['pic_same'] ?? true)) {
-            $data['pic_name']  = $data['pic_name']  ?: ($data['name']  ?? null);
-            $data['pic_phone'] = $data['pic_phone'] ?: ($data['phone'] ?? null);
-            $data['pic_email'] = $data['pic_email'] ?: ($data['email'] ?? null);
+            $data['pic_name']  = ($data['pic_name']  ?? null) ?: ($data['name']  ?? null);
+            $data['pic_phone'] = ($data['pic_phone'] ?? null) ?: ($data['phone'] ?? null);
+            $data['pic_email'] = ($data['pic_email'] ?? null) ?: ($data['email'] ?? null);
         }
 
         unset($data['pic_same']);
@@ -31,9 +31,9 @@ class CreateCustomer extends CreateRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         if (($data['pic_same'] ?? false)) {
-            $data['pic_name']  = $data['pic_name']  ?: ($data['name']  ?? null);
-            $data['pic_phone'] = $data['pic_phone'] ?: ($data['phone'] ?? null);
-            $data['pic_email'] = $data['pic_email'] ?: ($data['email'] ?? null);
+            $data['pic_name']  = ($data['pic_name']  ?? null) ?: ($data['name']  ?? null);
+            $data['pic_phone'] = ($data['pic_phone'] ?? null) ?: ($data['phone'] ?? null);
+            $data['pic_email'] = ($data['pic_email'] ?? null) ?: ($data['email'] ?? null);
         }
 
         unset($data['pic_same']);

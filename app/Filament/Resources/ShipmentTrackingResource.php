@@ -25,8 +25,9 @@ class ShipmentTrackingResource extends Resource
     protected static ?int    $navigationSort  = 20;
 
     public static function shouldRegisterNavigation(): bool
-    {
-        return auth_user()?->hasAnyRole(['super_admin', 'office_admin']) === true;
+    {   
+        $u = auth_user();
+        return (bool) ($u && method_exists($u, 'hasAnyRole') && $u->hasAnyRole(['super_admin', 'office_admin']));
     }
 
     public static function table(Table $table): Table
@@ -51,29 +52,17 @@ class ShipmentTrackingResource extends Resource
                         "<div class='font-medium'>" . ($r->originCity->name ?? '-') . " &rarr; " . ($r->destinationCity->name ?? '-') . "</div>"
                     )->toggleable(),
 
-
                 TextColumn::make('progress_count')
                     ->label('Progress')
                     ->state(function (Shipment $r) {
                         $order = TrackStatus::orderForMode($r->mode);
-
                         $raw  = $r->latestTrack?->status;
                         $cur  = $raw instanceof TrackStatus ? $raw : TrackStatus::tryFrom((string) $raw);
-
-                        if (! $cur) {
-                            return '0/' . count($order);
-                        }
-
-                        if ($cur === TrackStatus::Hold) {
-                            return $cur->label(); 
-                        }
-                        if ($cur === TrackStatus::Cancelled) {
-                            return $cur->label();
-                        }
-
+                        if (!$cur) return '0/' . count($order);
+                        if ($cur === TrackStatus::Hold) return $cur->label();
+                        if ($cur === TrackStatus::Cancelled) return $cur->label();
                         $idx = array_search($cur, $order, true);
                         $pos = ($idx === false) ? 0 : ($idx + 1);
-
                         return $pos . '/' . count($order);
                     })
                     ->badge()
@@ -93,7 +82,7 @@ class ShipmentTrackingResource extends Resource
                     ->formatStateUsing(fn($state) => $state?->label() ?? 'Belum dimulai')
                     ->badge()
                     ->color(function ($state) {
-                        if (! $state) return 'gray';
+                        if (!$state) return 'gray';
                         $val = $state instanceof \BackedEnum ? $state->value : (string) $state;
                         return match ($val) {
                             'delivered' => 'success',
@@ -120,7 +109,10 @@ class ShipmentTrackingResource extends Resource
                     ->icon('heroicon-m-sparkles')
                     ->color('primary')
                     ->url(fn($record) => static::getUrl('manage', ['record' => $record]))
-                    ->visible(fn() => auth_user()?->hasRole('super_admin') === true),
+                    ->visible(function () {
+                        $u = auth_user();
+                        return (bool) ($u && method_exists($u, 'hasRole') && $u->hasRole('super_admin'));
+                    }),
             ])
             ->bulkActions([])
             ->defaultSort('updated_at', 'desc');
@@ -144,6 +136,10 @@ class ShipmentTrackingResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['customer', 'receiver', 'originCity', 'destinationCity', 'latestTrack']);
+            ->with(['customer', 'receiver', 'originCity', 'destinationCity', 'latestTrack'])
+            ->where(function ($w) {
+                $w->whereNull('status')
+                    ->orWhereNotIn('status', ['delivered', 'cancelled']);
+            });
     }
 }

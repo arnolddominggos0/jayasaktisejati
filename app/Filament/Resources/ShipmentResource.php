@@ -7,7 +7,6 @@ use App\Filament\Resources\ShipmentResource\Pages\CreateShipment;
 use App\Filament\Resources\ShipmentResource\Pages\EditShipment;
 use App\Filament\Resources\ShipmentResource\Pages\ListShipments;
 use App\Filament\Resources\ArmadaAssignmentResource;
-use App\Filament\Resources\SeaBookingResource\RelationManagers\ContainersRelationManager;
 use App\Models\Armada;
 use App\Models\Customer;
 use App\Models\Shipment;
@@ -110,6 +109,14 @@ class ShipmentResource extends Resource
                 $set('weight_total', $sumItemKg > 0 ? round($sumItemKg, 2, PHP_ROUND_HALF_UP) : null);
             }
         };
+
+        $recalcContainerDisplay = function (Get $get, Set $set) {
+            $no   = trim((string)($get('container_no') ?? ''));
+            $seal = trim((string)($get('seal_no') ?? ''));
+            $val  = ($no === '' && $seal === '') ? '–' : ($seal !== '' ? ($no . ' • ' . $seal) : $no);
+            $set('container_display', $val);
+        };
+
 
         return $form
             ->schema([
@@ -529,10 +536,93 @@ class ShipmentResource extends Resource
                                     ->required(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
                                     ->columnSpan(4),
 
+                                TextInput::make('container_no')
+                                    ->label('No. Kontainer')
+                                    ->maxLength(20)
+                                    ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value)
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(function (Get $get, Set $set) {
+                                        $fanout = function (Get $get, Set $set) {
+                                            $no   = trim((string)($get('container_no') ?? ''));
+                                            $seal = trim((string)($get('seal_no') ?? ''));
+                                            $label = ($no === '' && $seal === '') ? '–' : ($seal !== '' ? ($no . ' • ' . $seal) : $no);
+
+                                            $items = $get('lcl_items') ?? [];
+                                            foreach ($items as $i => $row) {
+                                                $items[$i]['container_display'] = $label;
+                                            }
+                                            $set('lcl_items', $items);
+
+                                            $units = $get('units') ?? [];
+                                            foreach ($units as $i => $row) {
+                                                $units[$i]['container_display'] = $label;
+                                            }
+                                            $set('units', $units);
+                                        };
+
+                                        $fanout($get, $set);
+                                    })
+                                    ->columnSpan(4),
+
+                                TextInput::make('seal_no')
+                                    ->label('Seal No.')
+                                    ->maxLength(20)
+                                    ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value)
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(function (Get $get, Set $set) {
+                                        $no   = trim((string)($get('container_no') ?? ''));
+                                        $seal = trim((string)($get('seal_no') ?? ''));
+                                        $label = ($no === '' && $seal === '') ? '–' : ($seal !== '' ? ($no . ' • ' . $seal) : $no);
+
+                                        $items = $get('lcl_items') ?? [];
+                                        foreach ($items as $i => $row) {
+                                            $items[$i]['container_display'] = $label;
+                                        }
+                                        $set('lcl_items', $items);
+
+                                        $units = $get('units') ?? [];
+                                        foreach ($units as $i => $row) {
+                                            $units[$i]['container_display'] = $label;
+                                        }
+                                        $set('units', $units);
+                                    })
+                                    ->columnSpan(4),
+
                                 Repeater::make('lcl_items')
                                     ->label('Rincian Volume (LCL • General Cargo)')
-                                    ->visible(fn(Get $get) => $get('service_option') === 'lcl' && $get('cargo_type') === CargoType::General->value)
+                                    ->visible(fn(Get $get) => $get('service_option') === 'lcl'
+                                        && $get('cargo_type') === CargoType::General->value)
                                     ->columns(12)
+                                    ->defaultItems(1)
+                                    ->minItems(1)
+                                    ->reorderable(false)
+                                    ->mutateDehydratedStateUsing(function (?array $state) {
+                                        $isEmpty = function ($row) {
+                                            if (!is_array($row)) return true;
+                                            $fields = ['description', 'length_cm', 'width_cm', 'height_cm', 'qty', 'weight_kg'];
+                                            foreach ($fields as $f) {
+                                                if (!empty($row[$f])) return false;
+                                            }
+                                            return true;
+                                        };
+                                        $state = array_values(array_filter($state ?? [], fn($r) => !$isEmpty($r)));
+                                        return $state;
+                                    })
+                                    ->afterStateHydrated(function (Get $get, Set $set) {
+                                        $items = $get('lcl_items') ?? [];
+                                        if (count($items) === 0) {
+                                            $items = [['qty' => 1]];
+                                        }
+
+                                        $no   = trim((string)($get('container_no') ?? ''));
+                                        $seal = trim((string)($get('seal_no') ?? ''));
+                                        $label = ($no === '' && $seal === '') ? '–' : ($seal !== '' ? ($no . ' • ' . $seal) : $no);
+
+                                        foreach ($items as $i => $row) {
+                                            $items[$i]['container_display'] = $row['container_display'] ?? $label;
+                                        }
+                                        $set('lcl_items', $items);
+                                    })
                                     ->schema([
                                         TextInput::make('description')->label('Deskripsi')->maxLength(120)->columnSpan(3),
                                         TextInput::make('length_cm')->label('P (cm)')->numeric()->minValue(0.01)->live(onBlur: true)->columnSpan(2),
@@ -541,32 +631,18 @@ class ShipmentResource extends Resource
                                         TextInput::make('qty')->label('Koli')->numeric()->minValue(1)->default(1)->live(onBlur: true)->columnSpan(1),
                                         TextInput::make('weight_kg')->label('Berat/pcs (kg)')->numeric()->minValue(0)->live(onBlur: true)->columnSpan(2),
 
-                                        TextInput::make('cbm_item')->label('CBM')
+                                        TextInput::make('container_display')
+                                            ->label('Dalam Kontainer')
                                             ->disabled()
                                             ->dehydrated(false)
-                                            ->afterStateHydrated(function (Get $get, Set $set) {
-                                                $p = (float)($get('length_cm') ?? 0);
-                                                $l = (float)($get('width_cm') ?? 0);
-                                                $t = (float)($get('height_cm') ?? 0);
-                                                $q = (int)  ($get('qty') ?? 0);
-                                                $cbm = ($p * $l * $t * $q) / 1_000_000;
-                                                $set('cbm_item', $cbm > 0 ? number_format(round($cbm, 3, PHP_ROUND_HALF_UP), 3, '.', '') : null);
-                                            })
+                                            ->columnSpan(3),
+
+                                        TextInput::make('cbm_item')
+                                            ->label('CBM')
+                                            ->disabled()
+                                            ->dehydrated(false)
                                             ->columnSpan(2),
                                     ])
-                                    ->afterStateUpdated(function (Get $get, Set $set) use ($recalcLclTotals) {
-                                        $rows = $get('lcl_items') ?? [];
-                                        foreach ($rows as $i => $row) {
-                                            $p = (float)($row['length_cm'] ?? 0);
-                                            $l = (float)($row['width_cm'] ?? 0);
-                                            $t = (float)($row['height_cm'] ?? 0);
-                                            $q = (int)  ($row['qty'] ?? 0);
-                                            $cbm = ($p * $l * $t * $q) / 1_000_000;
-                                            $rows[$i]['cbm_item'] = $cbm > 0 ? number_format(round($cbm, 3, PHP_ROUND_HALF_UP), 3, '.', '') : null;
-                                        }
-                                        $set('lcl_items', $rows);
-                                        $recalcLclTotals($get, $set);
-                                    })
                                     ->addActionLabel('Tambah Item')
                                     ->columnSpan(12),
 
@@ -622,6 +698,22 @@ class ShipmentResource extends Resource
                                     ->label('Unit Kendaraan (Laut)')
                                     ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
                                     ->columns(12)
+                                    ->defaultItems(1)
+                                    ->minItems(1)
+                                    ->reorderable(false)
+                                    ->mutateDehydratedStateUsing(fn($state) => array_values(array_filter($state ?? [], function ($r) {
+                                        foreach (['model_no', 'reg_no', 'chassis_no', 'engine_no', 'color', 'do_number', 'qty', 'notes'] as $f) {
+                                            if (!empty($r[$f])) return true;
+                                        }
+                                        return false;
+                                    })))
+                                    ->afterStateHydrated(function (Get $get, Set $set) {
+                                        $rows = $get('units') ?? [];
+                                        if (count($rows) === 0) {
+                                            $rows = [['qty' => 1]];
+                                        }
+                                        $set('units', $rows);
+                                    })
                                     ->schema([
                                         TextInput::make('model_no')->label('Model No.')->maxLength(60)->columnSpan(3),
                                         TextInput::make('reg_no')->label('No. Polisi / Reg')->maxLength(30)->columnSpan(2),
@@ -632,6 +724,17 @@ class ShipmentResource extends Resource
                                         Checkbox::make('is_rack')->label('Rack')->inline(false)->columnSpan(2),
                                         TextInput::make('qty')->label('Qty')->numeric()->minValue(1)->default(1)->columnSpan(1),
                                         TextInput::make('notes')->label('Ket')->maxLength(120)->columnSpan(5),
+
+                                        TextInput::make('container_display')
+                                            ->label('Dalam Kontainer')
+                                            ->disabled()
+                                            ->dehydrated(false)
+                                            ->formatStateUsing(function (Get $get) {
+                                                $no   = trim((string)($get('../../container_no') ?? ''));
+                                                $seal = trim((string)($get('../../seal_no') ?? ''));
+                                                return ($no === '' && $seal === '') ? '–' : ($seal !== '' ? ($no . ' • ' . $seal) : $no);
+                                            })
+                                            ->columnSpan(3),
                                     ])
                                     ->addActionLabel('Tambah Unit')
                                     ->columnSpan(12),
@@ -831,9 +934,14 @@ class ShipmentResource extends Resource
     {
         return $table
             ->modifyQueryUsing(function (Builder $query) {
+                $query->where(function ($w) {
+                    $w->whereNull('status')
+                        ->orWhereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value]);
+                });
+
                 $user = Filament::auth()->user();
 
-                if ($user?->hasRole('super_admin')) {
+                if ($user && method_exists($user, 'hasRole') && $user->hasRole('super_admin')) {
                     return;
                 }
 
@@ -844,7 +952,7 @@ class ShipmentResource extends Resource
                     });
                 }
 
-                if ($user?->hasRole('field_coordinator')) {
+                if ($user && method_exists($user, 'hasRole') && $user->hasRole('field_coordinator')) {
                     $query->where(function ($qq) use ($user) {
                         $qq->where('coordinator_id', $user->id)
                             ->orWhereNull('coordinator_id');
@@ -941,7 +1049,6 @@ class ShipmentResource extends Resource
                                 $sizeLabel = $record->container_size->label();
                             } else {
                                 $sizeLabel = ContainerSize::tryFrom((string) $record->container_size)?->label();
-
                                 if (!$sizeLabel) {
                                     $legacy = [
                                         '20'   => ContainerSize::COC_20_DRY->label(),
@@ -1203,14 +1310,14 @@ class ShipmentResource extends Resource
     public static function canEdit($record): bool
     {
         $u = Filament::auth()->user();
-        if ($u?->hasRole('super_admin')) return true;
-        return $u?->can('update', $record) ?? false;
+        if ($u && method_exists($u, 'hasRole') && $u->hasRole('super_admin')) return true;
+        return (bool) ($u?->can('update', $record));
     }
 
     public static function canViewAny(): bool
     {
         $u = Filament::auth()->user();
-        return $u?->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']) ?? false;
+        return (bool) ($u && method_exists($u, 'hasAnyRole') && $u->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']));
     }
 
     public static function mutateFormDataBeforeCreate(array $data): array

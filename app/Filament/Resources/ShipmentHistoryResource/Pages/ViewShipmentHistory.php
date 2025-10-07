@@ -9,8 +9,6 @@ use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\{Section, TextEntry, IconEntry, ViewEntry};
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-
 
 class ViewShipmentHistory extends ViewRecord
 {
@@ -54,13 +52,28 @@ class ViewShipmentHistory extends ViewRecord
                     'x-data' => '{}',
                     'x-on:click.stop' => 'navigator.clipboard.writeText(window.location.href)',
                 ])
-                ->color('gray')
+                ->color('gray'),
         ];
     }
 
-
     public function infolist(Infolist $infolist): Infolist
     {
+        $trackTime = function ($record, array $statuses, string $direction = 'asc') {
+            $q = null;
+            if (method_exists($record, 'tracks')) {
+                $q = $record->tracks();
+            } elseif (method_exists($record, 'shipmentTracks')) {
+                $q = $record->shipmentTracks();
+            } else {
+                return null;
+            }
+
+            $q = $q->whereIn('status', $statuses)->orderBy('tracked_at', $direction);
+            $row = $q->first();
+
+            return $row->tracked_at ?? null;
+        };
+
         return $infolist->schema([
             Section::make('Identitas')->columns(3)->schema([
                 TextEntry::make('code')->label('Kode')->copyable()->extraAttributes(['class' => 'font-mono']),
@@ -125,15 +138,34 @@ class ViewShipmentHistory extends ViewRecord
                 TextEntry::make('status')->label('Status Akhir')->badge()
                     ->color(fn($state) => ($state?->label() ?? $state) === 'Terkirim' ? 'success' : 'danger')
                     ->formatStateUsing(fn($state) => $state?->label() ?? (string)$state),
-                TextEntry::make('delivered_at')
-                    ->label('Terkirim')
-                    ->state($this->record->delivered_at ?? $this->record->delivered_at)
+
+                TextEntry::make('ata_display')
+                    ->label('Terkirim (ATA)')
+                    ->state(fn($record) => $record->delivered_at ?: $trackTime($record, ['delivered'], 'desc'))
                     ->dateTime('d M Y H:i')
                     ->placeholder('—'),
+
+                TextEntry::make('atd_display')
+                    ->label('Berangkat (ATD)')
+                    ->state(function ($record) use ($trackTime) {
+                        $mode = $record->mode?->value ?? $record->mode;
+
+                        if ($mode === 'sea') {
+                            return $trackTime($record, ['vessel_depart', 'onship'], 'asc') ?: ($record->etd ?? null);
+                        }
+
+
+                        return $trackTime($record, ['handover', 'delivery_to_customer', 'unit_loading'], 'asc')
+                            ?: ($record->requested_at ?? null);
+                    })
+                    ->dateTime('d M Y H:i')
+                    ->placeholder('—'),
+
                 TextEntry::make('cancelled_at')
                     ->label('Dibatalkan')
                     ->dateTime('d M Y H:i')
                     ->placeholder('—'),
+
                 TextEntry::make('cancelledBy.name')
                     ->label('Dibatalkan Oleh')
                     ->placeholder('—'),
@@ -167,6 +199,7 @@ class ViewShipmentHistory extends ViewRecord
                         return "{$size}{$qty}";
                     })
                     ->placeholder('—'),
+
                 TextEntry::make('packages_total')->label('Koli')
                     ->visible(
                         fn($record) => ($record->service_option ?? null) === 'lcl' &&
@@ -225,7 +258,7 @@ class ViewShipmentHistory extends ViewRecord
                             $disk = Storage::disk('public');
                             return [
                                 'name' => $name,
-                                'url' => $disk->exists($path) ? $disk->url($path) : null,
+                                'url' => $disk->exists($path) ? Storage::url($path) : null,
                                 'exists' => $disk->exists($path),
                                 'is_image' => $isImage,
                             ];

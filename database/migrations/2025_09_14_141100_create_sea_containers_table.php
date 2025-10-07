@@ -4,22 +4,30 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        Schema::create('sea_containers', function (Blueprint $table) {
+        Schema::create('sea_container_cargos', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('booking_id')->constrained('sea_bookings')->cascadeOnDelete();
-            $table->string('size_type');
-            $table->string('container_no')->nullable(); 
-            $table->string('seal_no')->nullable();
-            $table->string('status')->default('reserved');
-            $table->integer('gross_weight')->nullable(); 
+            $table->unsignedBigInteger('container_id')->nullable()->index();
+            $table->string('group_type', 20)->nullable(); 
+            $table->string('description', 120)->nullable();
+            $table->string('unit_ref', 60)->nullable();
+            $table->integer('qty')->default(1);
+            $table->decimal('cbm', 10, 3)->nullable();
+            $table->decimal('weight_kg', 10, 2)->nullable();
             $table->timestamps();
 
-            $table->index(['booking_id','status']);
-            $table->unique(['container_no']); 
+            $table->foreign('container_id', 'sea_container_cargos_container_fk')
+                ->references('id')
+                ->on('sea_containers')
+                ->onDelete('cascade');
         });
     }
-    public function down(): void { Schema::dropIfExists('sea_containers'); }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('sea_container_cargos');
+    }
 };
