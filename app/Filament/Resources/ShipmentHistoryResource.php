@@ -9,8 +9,7 @@ use App\Models\Shipment;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
 use Filament\Resources\Resource;
-use Filament\Tables\Actions\Action;
-use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Actions\{Action, ActionGroup};
 use Filament\Tables\Table;
 use Filament\Tables\Columns\{TextColumn, IconColumn};
 use Filament\Tables\Enums\FiltersLayout;
@@ -100,6 +99,29 @@ class ShipmentHistoryResource extends Resource
                     )
                     ->toggleable(),
 
+                TextColumn::make('kpi_summary')
+                    ->label('KPI Manado')
+                    ->state(fn(Shipment $r) => $r->kpiManadoSummaryText() ?? '-')
+                    ->tooltip('KPI Manado: Normal ≤19 hari, Urgent ≤17 hari')
+                    ->wrap(),
+
+                TextColumn::make('kpi_status')
+                    ->label('Status KPI')
+                    ->badge()
+                    ->state(function (Shipment $r) {
+                        $ev = $r->evaluateKpiForManado();
+                        return $ev['applies'] ? ($ev['badge'] ?? 'Pending') : '—';
+                    })
+                    ->color(function (Shipment $r) {
+                        $ev = $r->evaluateKpiForManado();
+                        if (!($ev['applies'] ?? false)) return 'gray';
+                        return match ($ev['badge'] ?? 'Pending') {
+                            'On Time' => 'success',
+                            'Late'    => 'danger',
+                            default   => 'gray',
+                        };
+                    }),
+
                 TextColumn::make('status')
                     ->label('Status Akhir')
                     ->badge()
@@ -186,6 +208,20 @@ class ShipmentHistoryResource extends Resource
                     ->searchable()
                     ->preload(),
 
+                Filter::make('manado_kpi_target')
+                    ->label('Target KPI Manado')
+                    ->query(function (Builder $q) {
+                        $cfg = config('jss_kpi.manado', []);
+                        $branchIds = array_map('intval', $cfg['branch_ids'] ?? []);
+                        $cityIds   = array_map('intval', $cfg['coverage_city_ids'] ?? []);
+                        $depotIds  = array_map('intval', $cfg['depot_ids'] ?? []);
+                        $q->where(function ($w) use ($branchIds, $cityIds, $depotIds) {
+                            if (!empty($branchIds)) $w->orWhereIn('branch_id', $branchIds);
+                            if (!empty($cityIds))   $w->orWhereIn('destination_city_id', $cityIds);
+                            if (!empty($depotIds))  $w->orWhereIn('assigned_depot_id', $depotIds);
+                        });
+                    }),
+
                 Filter::make('completed_range')
                     ->label('Rentang Selesai')
                     ->form([
@@ -231,7 +267,7 @@ class ShipmentHistoryResource extends Resource
                         ->icon('heroicon-o-pencil-square')
                         ->color('warning')
                         ->visible(fn() => auth_user()?->hasRole('super_admin') === true)
-                        ->url(fn($record) => \App\Filament\Resources\ShipmentResource::getUrl('edit', ['record' => $record])),
+                        ->url(fn($record) => ShipmentResource::getUrl('edit', ['record' => $record])),
                 ])->label('Aksi'),
             ]);
     }
