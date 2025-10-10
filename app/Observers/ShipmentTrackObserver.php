@@ -4,6 +4,8 @@ namespace App\Observers;
 
 use App\Enums\TrackStatus;
 use App\Models\ShipmentTrack;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use App\Supports\ShipmentStatusSyncer;
 
 class ShipmentTrackObserver
@@ -13,6 +15,33 @@ class ShipmentTrackObserver
         if ($v === null) return null;
         if ($v instanceof TrackStatus) return $v->label();
         return TrackStatus::tryFrom((string) $v)?->label() ?? strtoupper((string) $v);
+    }
+
+    private array $milestoneTouchFields = [
+        'status',       
+        'tracked_at',   
+        'location',     
+        'proof_url',    
+    ];
+
+    private function clearKpiCache(?int $shipmentId): void
+    {
+        if (!$shipmentId) return;
+
+        Cache::forget("kpi:badge:{$shipmentId}");
+        Cache::forget("kpi:summary:{$shipmentId}");
+    }
+
+    private function rebuildMilestones(ShipmentTrack $m): void
+    {
+        $shipment = $m->shipment;
+        if (!$shipment) return;
+
+        $shipment->rebuildMilestonesFromTracks();
+
+        $shipment->touch();
+
+        $this->clearKpiCache($shipment->getKey());
     }
 
     public function created(ShipmentTrack $m): void
@@ -33,6 +62,8 @@ class ShipmentTrackObserver
             ->log('Tracking dibuat');
 
         app(ShipmentStatusSyncer::class)->syncFromTrack($m);
+
+        $this->rebuildMilestones($m);
     }
 
     public function updated(ShipmentTrack $m): void
@@ -93,7 +124,6 @@ class ShipmentTrackObserver
 
         $watched = ['route', 'lat', 'lng', 'proof_url', 'note'];
         $changed = array_values(array_filter($watched, fn($f) => $m->wasChanged($f)));
-
         if ($changed) {
             activity('tracking')
                 ->performedOn($m)
@@ -105,6 +135,10 @@ class ShipmentTrackObserver
                     'changed_fields' => $changed,
                 ])
                 ->log('Tracking diperbarui');
+        }
+
+        if (Arr::first($this->milestoneTouchFields, fn($f) => $m->wasChanged($f))) {
+            $this->rebuildMilestones($m);
         }
     }
 
@@ -119,6 +153,8 @@ class ShipmentTrackObserver
                 'code'        => $m->shipment?->code ?? '-',
             ])
             ->log('Tracking dihapus');
+
+        $this->rebuildMilestones($m);
     }
 
     public function restored(ShipmentTrack $m): void
@@ -134,5 +170,7 @@ class ShipmentTrackObserver
             ->log('Tracking dipulihkan');
 
         app(ShipmentStatusSyncer::class)->syncFromTrack($m);
+
+        $this->rebuildMilestones($m);
     }
 }

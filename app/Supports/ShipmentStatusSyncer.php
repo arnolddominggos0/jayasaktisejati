@@ -10,50 +10,37 @@ use App\Models\ShipmentTrack;
 
 class ShipmentStatusSyncer
 {
-        public function syncFromTrack(ShipmentTrack $track): void
+    public function syncFromTrack(ShipmentTrack $track): void
     {
         $shipment = $track->shipment()->with('tracks')->first();
-        if (! $shipment) {
+        if (!$shipment) {
             return;
         }
-
         $shipment->status = $this->reduce($shipment);
         $shipment->saveQuietly();
     }
 
     public function reduce(Shipment $shipment): ShipmentStatus
     {
-        $tracks = $shipment->relationLoaded('tracks')
-            ? $shipment->tracks
-            : $shipment->tracks()->get();
-
+        $tracks = $shipment->relationLoaded('tracks') ? $shipment->tracks : $shipment->tracks()->get();
         $tracks = $tracks->sortBy('tracked_at')->values();
-
         if ($tracks->isEmpty()) {
             return ShipmentStatus::tryFrom((string) $shipment->status) ?? ShipmentStatus::Pending;
         }
-
         $last = $tracks->last();
         $lastVal = $last->status instanceof TrackStatus ? $last->status->value : (string) $last->status;
-
         if ($lastVal === TrackStatus::Cancelled->value) {
             return ShipmentStatus::Cancelled;
         }
         if ($lastVal === TrackStatus::Hold->value) {
             return ShipmentStatus::Hold;
         }
-
         $mode = $shipment->mode instanceof ShipmentMode ? $shipment->mode->value : (string) $shipment->mode;
-
-        $ordered = $mode === ShipmentMode::Land->value
-            ? TrackStatus::orderLand()
-            : TrackStatus::orderSea();
-
+        $ordered = $mode === ShipmentMode::Land->value ? TrackStatus::orderLand() : TrackStatus::orderSea();
         $rank = [];
         foreach ($ordered as $idx => $s) {
             $rank[$s->value] = $idx;
         }
-
         $max = null;
         foreach ($tracks as $t) {
             $ts = $t->status instanceof TrackStatus ? $t->status->value : (string) $t->status;
@@ -63,11 +50,9 @@ class ShipmentStatusSyncer
                 }
             }
         }
-
         if ($max === null) {
             return ShipmentStatus::Transit;
         }
-
         return TrackStatus::tryFrom($max)?->toShipmentStatus() ?? ShipmentStatus::Transit;
     }
 }

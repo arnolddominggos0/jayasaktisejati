@@ -18,7 +18,7 @@ class NotifyAdminOnShipmentUpdate
             ->get();
 
         if ($recipients->isEmpty()) {
-            return; 
+            return;
         }
 
         $url = route('filament.admin.resources.shipments.edit', ['record' => $shipment]);
@@ -37,7 +37,7 @@ class NotifyAdminOnShipmentUpdate
             ->actions([
                 Action::make('Lihat')
                     ->url($url)
-                    ->markAsRead(),     
+                    ->markAsRead(),
             ])
             ->sendToDatabase($recipients);
     }

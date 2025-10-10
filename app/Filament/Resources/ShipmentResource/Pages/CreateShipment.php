@@ -45,15 +45,21 @@ class CreateShipment extends CreateRecord
         }
 
         if ($requestType === RequestType::WALK_IN->value && empty($data['doc_number'])) {
-            $data['doc_number'] = 'AUTO-' . now()->format('Ymd-His');
+            $data['doc_number'] = 'JSS-' . now()->format('Ymd-His');
         }
 
         $base = null;
         if (!empty($data['etd'])) {
-            try { $base = Carbon::parse($data['etd']); } catch (\Throwable) {}
+            try {
+                $base = Carbon::parse($data['etd']);
+            } catch (\Throwable) {
+            }
         }
         if (!$base && !empty($data['requested_at'])) {
-            try { $base = Carbon::parse($data['requested_at']); } catch (\Throwable) {}
+            try {
+                $base = Carbon::parse($data['requested_at']);
+            } catch (\Throwable) {
+            }
         }
 
         $modeCode = match (strtolower((string)($data['mode'] ?? 'land'))) {
@@ -62,7 +68,7 @@ class CreateShipment extends CreateRecord
         };
 
         $priority = strtolower((string)($data['priority'] ?? 'normal'));
-        $priority = in_array($priority, ['normal','urgent'], true) ? $priority : 'normal';
+        $priority = in_array($priority, ['normal', 'urgent'], true) ? $priority : 'normal';
 
         $data['eta'] = Shipment::computeEta($modeCode, $priority, $base)->toDateTimeString();
 

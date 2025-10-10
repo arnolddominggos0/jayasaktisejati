@@ -3,13 +3,9 @@
 namespace App\Filament\Resources\ShipmentResource\Pages;
 
 use App\Enums\{ShipmentMode, ShipmentStatus};
-use App\Filament\Resources\ArmadaAssignmentResource;
 use App\Filament\Resources\ShipmentResource;
 use App\Models\Shipment;
 use Filament\Actions;
-use Filament\Actions\Action;
-use Filament\Actions\EditAction;
-use Filament\Actions\ViewAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Forms\Components\{Select, DatePicker};
@@ -90,7 +86,6 @@ class ListShipments extends ListRecords
                     return response()->streamDownload(function () use ($rows) {
                         $out = fopen('php://output', 'w');
 
-                        // Header CSV
                         fputcsv($out, [
                             'Kode',
                             'Pengirim',
@@ -121,7 +116,6 @@ class ListShipments extends ListRecords
                             $cargo  = $r->cargo_type?->label()    ?? (string) $r->cargo_type;
                             $status = $r->status?->label()        ?? (string) $r->status;
 
-                            // Format angka & tanggal
                             $cbm   = is_null($r->cbm_total)   ? null : number_format((float) $r->cbm_total, 3, '.', '');
                             $wkg   = is_null($r->weight_total) ? null : number_format((float) $r->weight_total, 2, '.', '');
                             $etd   = $r->etd ? Carbon::parse($r->etd)->format('d M Y H:i') : null;
