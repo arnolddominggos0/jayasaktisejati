@@ -143,6 +143,10 @@ class Shipment extends Model
             }
         });
 
+        static::created(function (Shipment $m) {
+            $m->ensureTrackSkeleton();
+        });
+
         static::saving(function (Shipment $m) {
             if ($m->mode === ShipmentMode::Sea) {
                 $m->service_type   = ServiceType::SeaFreight;
@@ -224,6 +228,7 @@ class Shipment extends Model
         });
 
         static::updated(function (Shipment $m) {
+            $m->ensureTrackSkeleton();
             $changed = array_keys($m->getChanges());
             $ignore  = ['updated_at', 'created_at', 'edited_fields', 'last_edited_by'];
             $changed = array_values(array_diff($changed, $ignore));
@@ -350,6 +355,19 @@ class Shipment extends Model
         return $track;
     }
 
+    public function ensureTrackSkeleton(): void
+    {
+        $order = \App\Enums\TrackStatus::orderForMode($this->mode);
+        $existing = $this->tracks()->pluck('status')->map(fn($s) => $s instanceof \BackedEnum ? $s->value : (string)$s)->all();
+        $toCreate = array_filter($order, fn($st) => !in_array($st->value, $existing, true));
+        foreach ($toCreate as $st) {
+            $this->tracks()->create([
+                'status'     => $st->value,
+                'tracked_at' => null,
+            ]);
+        }
+    }
+
     public function scopeActive($query)
     {
         return $query->whereIn('status', array_map(fn($event) => $event->value, ShipmentStatus::active()));
@@ -372,8 +390,6 @@ class Shipment extends Model
         }
         return null;
     }
-
-    // ===== KPI getters now use tracks (no milestone columns required) =====
 
     public function getDwellingDaysAttribute(): ?int
     {
@@ -404,7 +420,6 @@ class Shipment extends Model
 
     public function rebuildMilestonesFromTracks(): void
     {
-        // Optional legacy support (only writes if columns exist)
         $tracks = $this->tracks()->orderBy('tracked_at')->get();
         if (self::hasCol('pickup_started_at')) $this->pickup_started_at = null;
         if (self::hasCol('onboard_at'))        $this->onboard_at        = null;
@@ -447,8 +462,6 @@ class Shipment extends Model
 
         $this->saveQuietly();
     }
-
-    // ===== Relations =====
 
     public function customer()
     {
@@ -668,9 +681,9 @@ class Shipment extends Model
         $t = $this->kpiManadoThresholds();
 
         $ms = $this->milestoneTimes();
-        $dw = $this->diffDaysNullable($ms['pickup'],  $ms['onboard']); // dwelling: pickup..onboard
-        $sa = $this->diffDaysNullable($ms['onboard'], $ms['arrived']); // sailing: onboard..arrived
-        $dr = $this->diffDaysNullable($ms['arrived'], $ms['deliv']);   // dooring: arrived..delivered
+        $dw = $this->diffDaysNullable($ms['pickup'],  $ms['onboard']);
+        $sa = $this->diffDaysNullable($ms['onboard'], $ms['arrived']);
+        $dr = $this->diffDaysNullable($ms['arrived'], $ms['deliv']);
 
         $tt = ($dw !== null && $sa !== null && $dr !== null) ? ($dw + $sa + $dr) : null;
 

@@ -2,84 +2,94 @@
 
 namespace App\Filament\Resources\ShipmentResource\RelationManagers;
 
-use App\Enums\ShipmentMode;
 use App\Enums\TrackStatus;
+use App\Models\Shipment;
+use App\Models\ShipmentTrack;
 use Filament\Facades\Filament;
-use Filament\Forms;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
-use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
-use Illuminate\Validation\Rules\Enum as EnumRule;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\TextInputColumn;
+use Illuminate\Support\Carbon;
 
 class ShipmentTracksRelationManager extends RelationManager
 {
     protected static string $relationship = 'tracks';
     protected static ?string $title = 'Riwayat Tracking';
 
-    public function form(Forms\Form $form): Forms\Form
-    {
-        return $form->schema([
-            Select::make('status')
-                ->label('Status')
-                ->options(function () {
-                    $mode = $this->getOwnerRecord()?->mode;
-                    $modeVal = $mode instanceof ShipmentMode ? $mode->value : (string) $mode;
-                    return TrackStatus::optionsForMode($modeVal);
-                })
-                ->afterStateHydrated(function ($component, $state) {
-                    $component->state($state instanceof TrackStatus ? $state->value : $state);
-                })
-                ->dehydrateStateUsing(fn($state) => $state instanceof TrackStatus ? $state->value : $state)
-                ->rule(new EnumRule(TrackStatus::class))
-                ->required(),
-            TextInput::make('location')->label('Lokasi')->maxLength(120),
-            Textarea::make('note')->label('Catatan')->rows(3),
-            DateTimePicker::make('tracked_at')->label('Waktu')->default(now()),
-        ]);
-    }
-
     public function table(Table $table): Table
     {
         return $table
+            ->recordClasses(fn ($record) => empty($record->tracked_at) ? 'opacity-60' : '')
             ->columns([
-                TextColumn::make('status')->label('Status')->badge()
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
                     ->formatStateUsing(function ($state) {
                         if ($state instanceof TrackStatus) return $state->label();
                         $try = TrackStatus::tryFrom((string) $state);
                         return $try ? $try->label() : (string) $state;
+                    })
+                    ->color(fn ($state) => match (($state instanceof TrackStatus ? $state->value : $state)) {
+                        'delivered' => 'success',
+                        'hold' => 'warning',
+                        'cancelled' => 'danger',
+                        default => 'primary',
+                    })
+                    ->sortable(),
+
+                // Inline edit waktu (tanpa formatStateUsing)
+                TextInputColumn::make('tracked_at')
+                    ->label('Waktu (YYYY-MM-DD HH:mm)')
+                    ->placeholder('—')
+                    ->extraAttributes(['class' => 'font-mono text-sm'])
+                    ->rules(['nullable','date'])
+                    ->afterStateUpdated(function ($state, ShipmentTrack $record) {
+                        $record->tracked_at = blank($state) ? null : Carbon::parse($state);
+                        $record->updated_by = Filament::auth()?->id() ?? auth()->id();
+                        $record->save();
                     }),
-                TextColumn::make('location')->label('Lokasi'),
-                TextColumn::make('note')->label('Catatan')->limit(80),
-                TextColumn::make('tracked_at')->label('Waktu')->dateTime('d M Y H:i'),
-                TextColumn::make('user.name')->label('Diupdate oleh'),
+
+                TextInputColumn::make('location')
+                    ->label('Lokasi')
+                    ->placeholder('—')
+                    ->rules(['nullable','string','max:120'])
+                    ->afterStateUpdated(function ($state, ShipmentTrack $record) {
+                        $record->location = $state ?: null;
+                        $record->updated_by = Filament::auth()?->id() ?? auth()->id();
+                        $record->save();
+                    }),
+
+                TextInputColumn::make('note')
+                    ->label('Catatan')
+                    ->placeholder('—')
+                    ->rules(['nullable','string','max:500'])
+                    ->afterStateUpdated(function ($state, ShipmentTrack $record) {
+                        $record->note = $state ?: null;
+                        $record->updated_by = Filament::auth()?->id() ?? auth()->id();
+                        $record->save();
+                    }),
             ])
-            ->defaultSort('tracked_at', 'desc')
+            ->defaultSort('tracked_at', 'asc')
             ->paginated(false)
             ->emptyStateHeading('Belum ada timeline.')
-            ->emptyStateDescription('Tambah status pertama untuk mulai melacak.')
+            ->emptyStateDescription('Klik Generate Timeline untuk membuat rencana langkah otomatis.')
             ->headerActions([
-                Tables\Actions\CreateAction::make()
-                    ->label('Tambah status')
-                    ->icon('heroicon-m-plus')
-                    ->slideOver()
-                    ->mutateFormDataUsing(function (array $data): array {
-                        $userId = Filament::auth()->id() ?? auth()->id();
-                        $data['created_by'] = $userId;
-                        $data['tracked_at'] = $data['tracked_at'] ?? now();
-                        return $data;
-                    }),
+                Action::make('generate_timeline')
+                    ->label('Generate Timeline')
+                    ->icon('heroicon-m-sparkles')
+                    ->requiresConfirmation()
+                    ->action(function () {
+                        $s = $this->getOwnerRecord();
+                        if ($s instanceof Shipment) {
+                            $s->ensureTrackSkeleton();
+                        }
+                    })
+                    ->successNotificationTitle('Timeline otomatis dibuat'),
             ])
-            ->actions([
-                ActionGroup::make([
-                    Tables\Actions\EditAction::make()->slideOver(),
-                    Tables\Actions\DeleteAction::make()->requiresConfirmation(),
-                ])->icon('heroicon-m-ellipsis-horizontal'),
-            ]);
+            // nol row action, biar gak “panel kontrol kapal”
+            ->actions([]);
     }
 }

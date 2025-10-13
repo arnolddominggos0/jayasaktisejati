@@ -16,7 +16,6 @@ enum TrackStatus: string
     case Unloading           = 'unloading';
     case DeliveryToCustomer  = 'delivery_to_customer';
     case Delivered           = 'delivered';
-
     case Hold                = 'hold';
     case Cancelled           = 'cancelled';
 
@@ -39,7 +38,6 @@ enum TrackStatus: string
             self::Cancelled          => 'Dibatalkan',
         };
     }
-
 
     public static function orderSea(): array
     {
@@ -68,15 +66,18 @@ enum TrackStatus: string
         ];
     }
 
-    public static function orderForMode(null|string|ShipmentMode $mode): array
+    // AMAN DARI NULL: terima nilai campur aduk, normalize ke string, pakai alias sederhana
+    public static function orderForMode($mode): array
     {
-        $val = $mode instanceof ShipmentMode ? $mode->value : (string) $mode;
-        return $val === ShipmentMode::Land->value
+        $val = $mode instanceof \BackedEnum ? strtolower((string) $mode->value) : strtolower((string) $mode);
+        $landAliases = ['land', 'land_trucking', 'car_carrier', 'towing', 'truck'];
+
+        return in_array($val, $landAliases, true)
             ? self::orderLand()
-            : self::orderSea();
+            : self::orderSea(); // default ke sea kalau ragu
     }
 
-    public static function optionsForMode(?string $mode): array
+    public static function optionsForMode($mode): array
     {
         $list = self::orderForMode($mode);
         $out = [];
@@ -89,7 +90,7 @@ enum TrackStatus: string
     public function toShipmentStatus(): ?ShipmentStatus
     {
         return match ($this) {
-            self::Pickup             => ShipmentStatus::Pickup,
+            self::Pickup,
             self::Handover,
             self::Stuffing,
             self::DeliveryToPort,
