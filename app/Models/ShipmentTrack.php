@@ -15,6 +15,7 @@ class ShipmentTrack extends Model
     protected $fillable = [
         'shipment_id',
         'status',
+        'status_normalized',
         'tracked_at',
         'location',
         'note',
@@ -49,7 +50,7 @@ class ShipmentTrack extends Model
             throw ValidationException::withMessages(['status' => 'Status tidak dikenal: ' . (string) $value]);
         }
         $this->attributes['status'] = $enum->value;
-        $this->attributes['status_normalized'] = true; 
+        $this->attributes['status_normalized'] = true;
     }
 
     protected static function booted(): void
@@ -62,52 +63,25 @@ class ShipmentTrack extends Model
             }
         });
 
-        static::saving(function (ShipmentTrack $track) {
-            // Normalisasi status bila diset sebagai string
-            if (!($track->status instanceof TrackStatus)) {
-                $track->status = TrackStatus::normalize((string) $track->status);
-            }
-
-            $shipment = $track->shipment()->with('tracks')->first();
-            if (!$shipment) return;
-
-            $statusVal = $track->status instanceof TrackStatus ? $track->status->value : (string) $track->status;
-            $order = TrackStatus::orderForMode($shipment->mode);
-            $orderVals = array_map(fn($e) => $e->value, $order);
-            $idx = array_search($statusVal, $orderVals, true);
-
-            if ($idx === false) {
-                throw ValidationException::withMessages(['status' => 'Status tidak valid untuk moda ini.']);
-            }
-
-            // Validasi kronologi waktu
-            if ($track->tracked_at) {
-                for ($i = 0; $i < $idx; $i++) {
-                    $prev = $shipment->tracks->firstWhere('status', $order[$i]->value);
-                    if ($prev && $prev->tracked_at && $prev->tracked_at->gt($track->tracked_at)) {
-                        throw ValidationException::withMessages(['tracked_at' => 'Waktu tidak boleh lebih awal dari langkah sebelumnya.']);
-                    }
-                }
-                for ($j = $idx + 1; $j < count($order); $j++) {
-                    $next = $shipment->tracks->firstWhere('status', $order[$j]->value);
-                    if ($next && $next->tracked_at && $next->tracked_at->lt($track->tracked_at)) {
-                        throw ValidationException::withMessages(['tracked_at' => 'Waktu tidak boleh lebih lambat dari langkah setelahnya yang sudah terisi.']);
-                    }
-                }
-            }
-
-            // Jika Cancelled/Delivered diisi, kosongkan langkah sesudahnya
-            if (in_array($statusVal, [TrackStatus::Cancelled->value, TrackStatus::Delivered->value], true)) {
-                foreach ($order as $k => $st) {
-                    if ($k > $idx) {
-                        $next = $shipment->tracks->firstWhere('status', $st->value);
-                        if ($next && $next->tracked_at) {
-                            $next->tracked_at = null;
-                            $next->saveQuietly();
-                        }
-                    }
-                }
-            }
+        static::saving(function ($m) {
+            $status = $m->status instanceof \BackedEnum ? $m->status->value : (string) $m->status;
+            $map = [
+                'pickup'               => 10,
+                'handover'             => 20,
+                'stuffing'             => 30,
+                'delivery_to_port'     => 40,
+                'stacking'             => 50,
+                'unit_loading'         => 60,
+                'onship'               => 70,
+                'vessel_depart'        => 80,
+                'vessel_arrival'       => 90,
+                'unloading'            => 100,
+                'delivery_to_customer' => 110,
+                'delivered'            => 120,
+                'hold'                 => 900,
+                'cancelled'            => 999,
+            ];
+            $m->status_normalized = $map[$status] ?? 0;
         });
 
         static::updating(function (ShipmentTrack $track) {

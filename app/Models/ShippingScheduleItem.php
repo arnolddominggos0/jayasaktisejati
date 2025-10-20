@@ -22,8 +22,8 @@ class ShippingScheduleItem extends Model
     ];
 
     protected $casts = [
-        'etd' => 'datetime',
-        'eta' => 'datetime',
+        'etd'   => 'datetime',
+        'eta'   => 'datetime',
         'extra' => 'array',
     ];
 
@@ -32,6 +32,8 @@ class ShippingScheduleItem extends Model
         'vessel_capacity',
         'jss',
         'dwelling',
+        'voyage',   // alias untuk berjaga-jaga
+        'lts',      // <-- TAM minta ini tampil
     ];
 
     public function schedule(): BelongsTo
@@ -41,22 +43,22 @@ class ShippingScheduleItem extends Model
 
     public function shippingLine(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\ShippingLine::class);
+        return $this->belongsTo(ShippingLine::class);
     }
 
     public function vessel(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Vessel::class);
+        return $this->belongsTo(Vessel::class);
     }
 
     public function pol(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Port::class, 'pol_id');
+        return $this->belongsTo(Port::class, 'pol_id');
     }
 
     public function pod(): BelongsTo
     {
-        return $this->belongsTo(\App\Models\Port::class, 'pod_id');
+        return $this->belongsTo(Port::class, 'pod_id');
     }
 
     protected function cargoPlan(): Attribute
@@ -77,5 +79,15 @@ class ShippingScheduleItem extends Model
     protected function dwelling(): Attribute
     {
         return Attribute::get(fn() => $this->extra['dwelling'] ?? null);
+    }
+
+    protected function lts(): Attribute
+    {
+        return Attribute::get(fn() => $this->extra['lts'] ?? null);
+    }
+
+    protected function voyage(): Attribute
+    {
+        return Attribute::get(fn() => $this->voyage_no ?? ($this->extra['voyage_no'] ?? null));
     }
 }

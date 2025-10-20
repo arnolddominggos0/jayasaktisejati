@@ -35,7 +35,6 @@ class DummyOperationalSeeder extends Seeder
             DB::table('fleet_schedules')->insert($rows);
         }
 
-        // Supir dummy
         if (! DB::table('drivers')->exists()) {
             $rows = [];
             for ($i = 0; $i < 10; $i++) {

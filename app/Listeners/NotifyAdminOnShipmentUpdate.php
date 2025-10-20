@@ -6,6 +6,7 @@ use App\Events\ShipmentStatusUpdated;
 use App\Models\User;
 use Filament\Notifications\Actions\Action;
 use Filament\Notifications\Notification;
+use BackedEnum;
 
 class NotifyAdminOnShipmentUpdate
 {
@@ -23,11 +24,17 @@ class NotifyAdminOnShipmentUpdate
 
         $url = route('filament.admin.resources.shipments.edit', ['record' => $shipment]);
 
+        $statusText = match (true) {
+            $shipment->status instanceof BackedEnum => $shipment->status->value,
+            is_string($shipment->status) => $shipment->status,
+            default => '(tanpa status)',
+        };
+
         $title = 'Status pengiriman diperbarui';
         $body  = sprintf(
             'Shipment %s sekarang %s.',
             $shipment->code ?? '#',
-            $shipment->status ?? '(tanpa status)'
+            $statusText
         );
 
         Notification::make()

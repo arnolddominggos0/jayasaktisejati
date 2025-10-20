@@ -7,7 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SeaContainerEvent extends Model
 {
-    protected $fillable = ['container_id', 'event', 'event_time', 'location', 'remark'];
+    protected $fillable = [
+        'container_id',
+        'event',
+        'event_time',
+        'location',
+        'remark'
+    ];
 
     protected $casts = ['event_time' => 'datetime'];
 
@@ -16,4 +22,3 @@ class SeaContainerEvent extends Model
         return $this->belongsTo(SeaContainer::class, 'container_id');
     }
 }
-    

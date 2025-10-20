@@ -53,9 +53,9 @@ class ShippingSchedule extends Model
         return $this->belongsTo(Port::class, 'pod_id');
     }
 
-    public function items(): HasMany
+    public function items()
     {
-        return $this->hasMany(ShippingScheduleItem::class, 'schedule_id');
+        return $this->hasMany(\App\Models\ShippingScheduleItem::class, 'schedule_id');
     }
 
     public function isFinal(): bool

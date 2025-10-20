@@ -22,7 +22,7 @@ class ShipmentStats extends BaseWidget
 
     protected function getStats(): array
     {
-        $draft      = Shipment::where('status', ShipmentStatus::Draft)->count();
+        $draft      = Shipment::where('status', ShipmentStatus::Draft->value)->count();
         $inProgress = Shipment::whereIn('status', ShipmentStatus::inProgress())->count();
         $delivered  = Shipment::where('status', ShipmentStatus::Delivered)->count();
 

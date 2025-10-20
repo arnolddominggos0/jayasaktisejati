@@ -27,26 +27,4 @@ class ListShipmentHistories extends ListRecords
     {
         return 'Pengiriman yang sudah Terkirim atau Dibatalkan.';
     }
-
-     public function getTabs(): array
-    {
-        return [
-            'Semua' => Tab::make('Semua'),
-
-            'Terkirim' => Tab::make('Terkirim')
-                ->modifyQueryUsing(fn (\Illuminate\Database\Eloquent\Builder $q) =>
-                    $q->where('status', ShipmentStatus::Delivered->value)
-                ),
-
-            'Dibatalkan' => Tab::make('Dibatalkan')
-                ->modifyQueryUsing(fn (\Illuminate\Database\Eloquent\Builder $q) =>
-                    $q->where('status', ShipmentStatus::Cancelled->value)
-                ),
-
-            'KPI Target' => Tab::make('KPI Target')
-                ->modifyQueryUsing(fn (Builder $q) =>
-                    $q->manadoKpiTarget()
-                ),
-        ];
-    }
 }

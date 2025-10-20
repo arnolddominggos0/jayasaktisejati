@@ -10,8 +10,8 @@ class PortSeed extends Seeder
     public function run(): void
     {
         $data = [
-            ['code' => 'IDTPP', 'name' => 'Tanjung Priok'],
-            ['code' => 'IDMDC', 'name' => 'Bitung'],
+            ['code' => 'IDTPP', 'name' => 'Pelabuhan Tanjung Priok'],
+            ['code' => 'IDMDC', 'name' => 'Pelabuhan Bitung'],
         ];
         foreach ($data as $d) {
             Port::firstOrCreate(['code' => $d['code']], $d);

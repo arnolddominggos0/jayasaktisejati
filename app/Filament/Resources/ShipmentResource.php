@@ -677,11 +677,15 @@ class ShipmentResource extends Resource
                                     ->live()
                                     ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
                                     ->required(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
-                                    ->afterStateHydrated(function ($state, Set $set, ?Shipment $record) {
-                                        if ($record && $record->vehicle_kind) $set('vehicle_kind', $record->vehicle_kind);
+                                    ->dehydrated(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
+                                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
+                                        $valid = $state === 'motorcycle' ? ['regular', 'flat_rack'] : ['regular', 'rack'];
+                                        if (!in_array($get('vehicle_loading'), $valid, true)) {
+                                            $set('vehicle_loading', null);
+                                        }
                                     })
-                                    ->dehydrated()
                                     ->columnSpan(6),
+
                                 ToggleButtons::make('vehicle_loading')
                                     ->label('Metode Muat Unit')
                                     ->options(function (Get $get) {
@@ -694,14 +698,9 @@ class ShipmentResource extends Resource
                                     ->live()
                                     ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
                                     ->required(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
-                                    ->afterStateHydrated(function ($state, Get $get, Set $set, ?Shipment $record) {
-                                        if (!$record) return;
-                                        $kind = $record->vehicle_kind ?: $get('vehicle_kind');
-                                        $valid = $kind === 'motorcycle' ? ['regular', 'flat_rack'] : ['regular', 'rack'];
-                                        $set('vehicle_loading', in_array($record->vehicle_loading, $valid, true) ? $record->vehicle_loading : null);
-                                    })
-                                    ->dehydrated()
+                                    ->dehydrated(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
                                     ->columnSpan(6),
+
                                 Repeater::make('units')
                                     ->label('Unit Kendaraan (Laut)')
                                     ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
@@ -776,7 +775,7 @@ class ShipmentResource extends Resource
                                                     '%s / %s — %s (%s → %s)',
                                                     $v->vessel?->name ?: '-',
                                                     $v->voyage_no,
-                                                    $etd = $v->etd ? Carbon::parse($v->etd)->format('d M Y H:i'): '-',
+                                                    $etd = $v->etd ? Carbon::parse($v->etd)->format('d M Y H:i') : '-',
                                                     $v->portFrom?->code ?: $v->portFrom?->name ?: '-',
                                                     $v->portTo?->code   ?: $v->portTo?->name   ?: '-',
                                                 ),
@@ -1097,6 +1096,7 @@ class ShipmentResource extends Resource
                         return "{$done}/{$total} • {$pct}% • {$pname}";
                     })
                     ->toggleable(),
+                    
                 TextColumn::make('etd')->label('ETD')->badge()->dateTime('d M Y H:i')->color('gray')->sortable(),
                 TextColumn::make('eta')->label('ETA')->badge()->dateTime('d M Y H:i')
                     ->color(function ($state) {
@@ -1334,21 +1334,41 @@ class ShipmentResource extends Resource
 
     public static function mutateFormDataBeforeSave(array $data): array
     {
-        $mode = $data['mode'] ?? null;
-        $cargo = $data['cargo_type'] ?? null;
-        $isSea = $mode === ShipmentMode::Sea->value;
-        $isGeneral = $cargo === CargoType::General->value;
-        $isVehicle = $cargo === CargoType::Vehicle->value;
-        $isGeneralFcl = $isSea && $isGeneral && (($data['service_option'] ?? null) === 'fcl');
+        $str = fn($k) => isset($data[$k]) ? trim((string) $data[$k]) : null;
+
+        $mode   = $str('mode');
+        $cargo  = $str('cargo_type');
+        $opt    = $str('service_option');
+        $kind   = $str('vehicle_kind');
+        $load   = $str('vehicle_loading');
+
+        $isSea      = $mode === ShipmentMode::Sea->value;
+        $isGeneral  = $cargo === CargoType::General->value;
+        $isVehicle  = $cargo === CargoType::Vehicle->value;
+        $isGeneralFcl = $isSea && $isGeneral && ($opt === 'fcl');
+
         if ($isVehicle) {
-            if (empty($data['vehicle_kind']) || empty($data['vehicle_loading'])) {
+            $validLoad = $kind === 'motorcycle' ? ['regular', 'flat_rack'] : ['regular', 'rack'];
+            if (empty($kind)) {
                 throw ValidationException::withMessages([
-                    'vehicle_kind'    => 'Jenis unit wajib diisi.',
-                    'vehicle_loading' => 'Metode muat unit wajib diisi.',
+                    'vehicle_kind' => 'Jenis unit wajib diisi.',
                 ]);
             }
-            $data['service_option'] = null;
+            if (empty($load) || !in_array($load, $validLoad, true)) {
+                throw ValidationException::withMessages([
+                    'vehicle_loading' => 'Metode muat unit wajib diisi dan harus sesuai dengan jenis unit.',
+                ]);
+            }
+            $data['vehicle_kind']    = $kind;
+            $data['vehicle_loading'] = $load;
+            $data['service_option']  = null;
+            $data['container_size']  = null;
+            $data['container_qty']   = null;
+        } else {
+            $data['vehicle_kind']    = null;
+            $data['vehicle_loading'] = null;
         }
+
         if ($isGeneralFcl) {
             if (empty($data['container_size']) || empty($data['container_qty'])) {
                 throw ValidationException::withMessages([
@@ -1356,15 +1376,36 @@ class ShipmentResource extends Resource
                     'container_qty'  => 'Jumlah kontainer wajib diisi.',
                 ]);
             }
+        } else {
+            if ($isSea && $isGeneral && $opt === 'lcl') {
+                $data['container_size'] = null;
+                $data['container_qty']  = null;
+            }
         }
+
         if ($isSea && ($isGeneralFcl || $isVehicle)) {
-            $loading = $data['vehicle_loading'] ?? null;
-            $sealRequired = !($isVehicle && $loading === 'flat_rack');
             $errs = [];
-            if (empty($data['container_no'])) $errs['container_no'] = 'No. Kontainer wajib diisi.';
-            if ($sealRequired && empty($data['seal_no'])) $errs['seal_no'] = 'Seal No. wajib diisi.';
-            if (!empty($errs)) throw ValidationException::withMessages($errs);
+            $containerNo = $str('container_no');
+            $sealNo      = $str('seal_no');
+            $sealRequired = !($isVehicle && $load === 'flat_rack');
+
+            if (empty($containerNo)) {
+                $errs['container_no'] = 'No. Kontainer wajib diisi.';
+            }
+            if ($sealRequired && empty($sealNo)) {
+                $errs['seal_no'] = 'Seal No. wajib diisi.';
+            }
+            if (!empty($errs)) {
+                throw ValidationException::withMessages($errs);
+            }
+
+            $data['container_no'] = $containerNo ? strtoupper($containerNo) : $containerNo;
+            $data['seal_no']      = $sealNo ? strtoupper($sealNo) : $sealNo;
+        } else {
+            $data['container_no'] = null;
+            $data['seal_no']      = null;
         }
+
         return $data;
     }
 }

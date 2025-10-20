@@ -20,10 +20,10 @@ class BackfillShipmentTracksForKpiSeeder extends Seeder
                     if (empty($t->remarks) && !empty($t->note)) $t->remarks = $t->note;
                     if (empty($t->note) && !empty($t->remarks)) $t->note = $t->remarks;
 
-                    if ($t->status === 'stuffing')       $t->status = TrackStatus::StuffingStart->value;
-                    if ($t->status === 'unloading')      $t->status = TrackStatus::StrippingStart->value;
-                    if ($t->status === 'vessel_depart')  $t->status = TrackStatus::VesselATD->value;
-                    if ($t->status === 'vessel_arrival') $t->status = TrackStatus::VesselATA->value;
+                    if ($t->status === 'stuffing')       $t->status = TrackStatus::Stuffing->value;
+                    if ($t->status === 'unloading')      $t->status = TrackStatus::Unloading->value;
+                    if ($t->status === 'vessel_depart')  $t->status = TrackStatus::VesselDepart->value;
+                    if ($t->status === 'vessel_arrival') $t->status = TrackStatus::VesselArrival->value;
 
                     $t->saveQuietly();
                 }
