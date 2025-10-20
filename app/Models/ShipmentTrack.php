@@ -42,6 +42,16 @@ class ShipmentTrack extends Model
         return $this->belongsTo(User::class, 'updated_by');
     }
 
+    public function setStatusAttribute($value): void
+    {
+        $enum = $value instanceof TrackStatus ? $value : TrackStatus::normalize((string) $value);
+        if (!$enum) {
+            throw ValidationException::withMessages(['status' => 'Status tidak dikenal: ' . (string) $value]);
+        }
+        $this->attributes['status'] = $enum->value;
+        $this->attributes['status_normalized'] = true; 
+    }
+
     protected static function booted(): void
     {
         static::creating(function (ShipmentTrack $track) {
@@ -50,10 +60,14 @@ class ShipmentTrack extends Model
                 $track->created_by ??= $uid;
                 $track->updated_by ??= $uid;
             }
-            $track->tracked_at ??= now();
         });
 
         static::saving(function (ShipmentTrack $track) {
+            // Normalisasi status bila diset sebagai string
+            if (!($track->status instanceof TrackStatus)) {
+                $track->status = TrackStatus::normalize((string) $track->status);
+            }
+
             $shipment = $track->shipment()->with('tracks')->first();
             if (!$shipment) return;
 
@@ -66,6 +80,7 @@ class ShipmentTrack extends Model
                 throw ValidationException::withMessages(['status' => 'Status tidak valid untuk moda ini.']);
             }
 
+            // Validasi kronologi waktu
             if ($track->tracked_at) {
                 for ($i = 0; $i < $idx; $i++) {
                     $prev = $shipment->tracks->firstWhere('status', $order[$i]->value);
@@ -81,19 +96,8 @@ class ShipmentTrack extends Model
                 }
             }
 
-            if (in_array($statusVal, [TrackStatus::Cancelled->value], true)) {
-                foreach ($order as $k => $st) {
-                    if ($k > $idx) {
-                        $next = $shipment->tracks->firstWhere('status', $st->value);
-                        if ($next && $next->tracked_at) {
-                            $next->tracked_at = null;
-                            $next->saveQuietly();
-                        }
-                    }
-                }
-            }
-
-            if (in_array($statusVal, [TrackStatus::Delivered->value], true)) {
+            // Jika Cancelled/Delivered diisi, kosongkan langkah sesudahnya
+            if (in_array($statusVal, [TrackStatus::Cancelled->value, TrackStatus::Delivered->value], true)) {
                 foreach ($order as $k => $st) {
                     if ($k > $idx) {
                         $next = $shipment->tracks->firstWhere('status', $st->value);
@@ -131,6 +135,7 @@ class ShipmentTrack extends Model
             $newStatus = $reached?->status?->toShipmentStatus();
             if ($newStatus && (string)$shipment->status !== $newStatus->value) {
                 $shipment->status = $newStatus->value;
+
                 if ($newStatus === ShipmentStatus::Delivered) {
                     if (Shipment::hasCol('delivered_at')) {
                         $shipment->delivered_at = $reached?->tracked_at ?: now();
@@ -138,6 +143,7 @@ class ShipmentTrack extends Model
                     $shipment->cancelled_at = null;
                     $shipment->cancelled_by = null;
                 }
+
                 if ($newStatus === ShipmentStatus::Cancelled) {
                     if (Shipment::hasCol('cancelled_at')) {
                         $shipment->cancelled_at = $shipment->cancelled_at ?: now();
@@ -147,6 +153,7 @@ class ShipmentTrack extends Model
                         $shipment->delivered_at = null;
                     }
                 }
+
                 $shipment->saveQuietly();
             }
         });

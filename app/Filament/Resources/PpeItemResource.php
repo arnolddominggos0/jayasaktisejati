@@ -33,7 +33,6 @@ class PpeItemResource extends Resource
         'damaged'  => 'Rusak',
         'lost'     => 'Hilang',
         'disposed' => 'Disposed',
-        // 'assigned' sengaja TIDAK disediakan di form, karena assignment via PpeAssignment
     ];
 
     private const STATUS_COLORS = [

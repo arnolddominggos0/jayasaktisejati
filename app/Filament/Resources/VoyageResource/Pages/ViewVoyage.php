@@ -3,9 +3,9 @@
 namespace App\Filament\Resources\VoyageResource\Pages;
 
 use App\Filament\Resources\VoyageResource;
-use Filament\Resources\Pages\ListRecords;
+use Filament\Resources\Pages\ViewRecord;
 
-class ListVoyages extends ListRecords
+class ViewVoyage extends ViewRecord
 {
     protected static string $resource = VoyageResource::class;
 }

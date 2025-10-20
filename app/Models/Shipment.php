@@ -4,11 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use App\Enums\{ShipmentStatus, ShipmentMode, ServiceType, CargoType, DeliveryScope, RequestType, TrackStatus};
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
+use App\Models\Office;
 
 class Shipment extends Model
 {
@@ -101,9 +103,9 @@ class Shipment extends Model
         'units'               => 'array',
     ];
 
-    protected static array $colCache = [];
+    public static array $colCache = [];
 
-    protected static function hasCol(string $name): bool
+    public static function hasCol(string $name): bool
     {
         if (!array_key_exists($name, self::$colCache)) {
             self::$colCache[$name] = Schema::hasColumn('shipments', $name);
@@ -355,9 +357,22 @@ class Shipment extends Model
         return $track;
     }
 
+    public function allowedTrackStatuses(array $ordered, int $lookahead = 3): array
+    {
+        $latest = $this->latestTrack?->status;
+        $cur = $latest instanceof TrackStatus ? $latest : TrackStatus::tryFrom((string) $latest);
+        if (!$cur) return array_slice($ordered, 0, $lookahead + 1);
+
+        $idx = array_search($cur, $ordered, true);
+        if ($idx === false) return array_slice($ordered, 0, $lookahead + 1);
+
+        $end = min(count($ordered) - 1, $idx + $lookahead);
+        return array_slice($ordered, $idx, $end - $idx + 1);
+    }
+
     public function ensureTrackSkeleton(): void
     {
-        $order = \App\Enums\TrackStatus::orderForMode($this->mode);
+        $order = TrackStatus::orderForMode($this->mode);
         $existing = $this->tracks()->pluck('status')->map(fn($s) => $s instanceof \BackedEnum ? $s->value : (string)$s)->all();
         $toCreate = array_filter($order, fn($st) => !in_array($st->value, $existing, true));
         foreach ($toCreate as $st) {
@@ -376,6 +391,11 @@ class Shipment extends Model
     public function scopeHistory($q)
     {
         return $q->whereIn('status', array_map(fn($e) => $e->value, ShipmentStatus::completed()));
+    }
+
+    public function events()
+    {
+        return $this->hasMany(ShipmentEvent::class, 'shipment_id', 'id');
     }
 
     public function getCompletedAtAttribute(): ?Carbon
@@ -467,96 +487,73 @@ class Shipment extends Model
     {
         return $this->belongsTo(Customer::class);
     }
-
     public function branch()
     {
         return $this->belongsTo(Branch::class);
     }
-
     public function driver()
     {
         return $this->belongsTo(Driver::class, 'driver_id');
     }
-
     public function receiver()
     {
         return $this->belongsTo(Customer::class, 'receiver_id');
     }
-
     public function schedule()
     {
         return $this->belongsTo(FleetSchedule::class, 'schedule_id');
     }
-
     public function voyage()
     {
         return $this->belongsTo(Voyage::class, 'voyage_id');
     }
-
     public function armada()
     {
         return $this->belongsTo(Armada::class, 'armada_id');
     }
-
     public function cancelledBy()
     {
         return $this->belongsTo(User::class, 'cancelled_by');
     }
-
     public function lastEditor()
     {
         return $this->belongsTo(User::class, 'last_edited_by');
     }
-
     public function originOffice()
     {
         return $this->belongsTo(Office::class, 'origin_office_id');
     }
-
     public function assignedDepot()
     {
         return $this->belongsTo(Depot::class, 'assigned_depot_id');
     }
-
     public function destinationOffice()
     {
         return $this->belongsTo(Office::class, 'destination_office_id');
     }
-
     public function tracks()
     {
         return $this->hasMany(ShipmentTrack::class, 'shipment_id', 'id');
     }
-
     public function latestTrack()
     {
         return $this->hasOne(ShipmentTrack::class, 'shipment_id', 'id')->latestOfMany('tracked_at');
     }
 
-    public function getLatestTrackStatusAttribute(): ?TrackStatus
-    {
-        return $this->latestTrack?->status;
-    }
-
-    public function getLatestTrackedAtAttribute(): ?\Illuminate\Support\Carbon
-    {
-        return $this->latestTrack?->tracked_at;
-    }
-
     public function originCity()
     {
-        return $this->belongsTo(\App\Models\City::class, 'origin_city_id');
+        return $this->belongsTo(City::class, 'origin_city_id');
     }
 
     public function destinationCity()
     {
-        return $this->belongsTo(\App\Models\City::class, 'destination_city_id');
+        return $this->belongsTo(City::class, 'destination_city_id');
     }
 
     public function getRouteLabelAttribute(): string
     {
         $origin = $this->originCity?->name ?? $this->origin ?? $this->origin_name ?? $this->pol_name ?? $this->from;
-        $dest = $this->destinationCity?->name ?? $this->destination ?? $this->destination_name ?? $this->pod_name ?? $this->to;
+        $dest   = $this->destinationCity?->name ?? $this->destination ?? $this->destination_name ?? $this->pod_name ?? $this->to;
         return trim(($origin ?: '—') . ' → ' . ($dest ?: '—'));
     }
 
@@ -570,54 +567,6 @@ class Shipment extends Model
     {
         $st = $this->status instanceof ShipmentStatus ? $this->status : ShipmentStatus::tryFrom((string)$this->status);
         return in_array($st, [ShipmentStatus::Delivered, ShipmentStatus::Cancelled], true);
-    }
-
-    public function getContainerMapAttribute(): array
-    {
-        $containers = collect($this->containers ?? [])
-            ->filter(fn($c) => !empty($c['container_no']))
-            ->mapWithKeys(function ($c) {
-                $no = trim((string) $c['container_no']);
-                return [$no => [
-                    'container_no' => $no,
-                    'seal_no'      => $c['seal_no'] ?? null,
-                    'lcl_count'    => 0,
-                    'unit_count'   => 0,
-                ]];
-            })->all();
-
-        foreach (($this->lcl_items ?? []) as $row) {
-            $ref = trim((string) ($row['container_no_ref'] ?? ''));
-            if ($ref !== '' && isset($containers[$ref])) {
-                $containers[$ref]['lcl_count']++;
-            }
-        }
-
-        foreach (($this->units ?? []) as $row) {
-            $ref = trim((string) ($row['container_no_ref'] ?? ''));
-            $qty = (int) ($row['qty'] ?? 1);
-            if ($ref !== '' && isset($containers[$ref])) {
-                $containers[$ref]['unit_count'] += max(1, $qty);
-            }
-        }
-
-        return array_values($containers);
-    }
-
-    public function getContainerSummaryAttribute(): ?string
-    {
-        $map = $this->container_map;
-        if (empty($map)) return null;
-        $parts = [];
-        foreach ($map as $c) {
-            $seal = $c['seal_no'] ? " / {$c['seal_no']}" : '';
-            $detail = [];
-            if ($c['lcl_count'] > 0) $detail[] = "{$c['lcl_count']} koli LCL";
-            if ($c['unit_count'] > 0) $detail[] = "{$c['unit_count']} unit";
-            $det = $detail ? ' • ' . implode(', ', $detail) : '';
-            $parts[] = "{$c['container_no']}{$seal}{$det}";
-        }
-        return implode('  |  ', $parts);
     }
 
     public function kpiBranchId(): ?int
@@ -684,7 +633,6 @@ class Shipment extends Model
         $dw = $this->diffDaysNullable($ms['pickup'],  $ms['onboard']);
         $sa = $this->diffDaysNullable($ms['onboard'], $ms['arrived']);
         $dr = $this->diffDaysNullable($ms['arrived'], $ms['deliv']);
-
         $tt = ($dw !== null && $sa !== null && $dr !== null) ? ($dw + $sa + $dr) : null;
 
         $okDw = is_null($dw) ? null : $dw <= ($t['dwelling_days'] ?? PHP_INT_MAX);
@@ -742,7 +690,7 @@ class Shipment extends Model
             ->sortBy('tracked_at')
             ->values();
 
-        $toVal = fn($s) => $s instanceof \App\Enums\TrackStatus ? $s->value : (string) $s;
+        $toVal = fn($s) => $s instanceof TrackStatus ? $s->value : (string) $s;
 
         $firstWhereAny = function (array $statuses) use ($tracks, $toVal) {
             foreach ($tracks as $t) {
@@ -764,22 +712,22 @@ class Shipment extends Model
         };
 
         $dwellingStarts = [
-            \App\Enums\TrackStatus::Pickup->value,
-            \App\Enums\TrackStatus::Handover->value,
-            \App\Enums\TrackStatus::Stuffing->value,
-            \App\Enums\TrackStatus::DeliveryToPort->value,
-            \App\Enums\TrackStatus::Stacking->value,
+            TrackStatus::Pickup->value,
+            TrackStatus::Handover->value,
+            TrackStatus::Stuffing->value,
+            TrackStatus::DeliveryToPort->value,
+            TrackStatus::Stacking->value,
         ];
         $onboardMarks = [
-            \App\Enums\TrackStatus::UnitLoading->value,
-            \App\Enums\TrackStatus::OnShip->value,
-            \App\Enums\TrackStatus::VesselDepart->value,
+            TrackStatus::UnitLoading->value,
+            TrackStatus::OnShip->value,
+            TrackStatus::VesselDepart->value,
         ];
         $arrivedMarks = [
-            \App\Enums\TrackStatus::VesselArrival->value,
-            \App\Enums\TrackStatus::Unloading->value,
+            TrackStatus::VesselArrival->value,
+            TrackStatus::Unloading->value,
         ];
-        $deliveredMark = \App\Enums\TrackStatus::Delivered->value;
+        $deliveredMark = TrackStatus::Delivered->value;
 
         $pickup  = $firstWhereAny($dwellingStarts) ?: $this->requested_at;
         $onboard = $firstWhereAny($onboardMarks);
