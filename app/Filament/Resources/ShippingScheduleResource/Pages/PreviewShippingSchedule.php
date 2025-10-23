@@ -4,7 +4,6 @@ namespace App\Filament\Resources\ShippingScheduleResource\Pages;
 
 use App\Filament\Resources\ShippingScheduleResource;
 use App\Models\ShippingSchedule;
-use App\Supports\ScheduleExport;
 use Filament\Resources\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
 
@@ -29,13 +28,12 @@ class PreviewShippingSchedule extends Page
 
         $this->rows = $items->filter(function ($it) {
             $x = is_array($it->extra) ? $it->extra : [];
-            // skip baris vendor lain: ada LTS tapi JSS kosong
             return !(!empty($x['lts'] ?? null) && empty($x['jss'] ?? null));
         })->map(function ($it) {
             $x = is_array($it->extra) ? $it->extra : [];
 
             $vesselName = $it->vessel->name ?? '';
-            $vesselName = preg_replace('~/.*$~', '', (string)$vesselName); 
+            $vesselName = preg_replace('~/.*$~', '', (string)$vesselName);
             $vesselName = trim($vesselName);
 
             $fmt = 'd-M';
@@ -72,7 +70,6 @@ class PreviewShippingSchedule extends Page
             ];
         })->values()->all();
     }
-
 
     public function getTitle(): string|Htmlable
     {

@@ -18,7 +18,9 @@ class ShippingScheduleItem extends Model
         'etd',
         'eta',
         'service',
+        'jss',
         'extra',
+        'voyage_id',
     ];
 
     protected $casts = [
@@ -30,10 +32,8 @@ class ShippingScheduleItem extends Model
     protected $appends = [
         'cargo_plan',
         'vessel_capacity',
-        'jss',
         'dwelling',
-        'voyage',   // alias untuk berjaga-jaga
-        'lts',      // <-- TAM minta ini tampil
+        'voyage',
     ];
 
     public function schedule(): BelongsTo
@@ -71,19 +71,9 @@ class ShippingScheduleItem extends Model
         return Attribute::get(fn() => $this->extra['vessel_capacity'] ?? ($this->extra['capacity'] ?? null));
     }
 
-    protected function jss(): Attribute
-    {
-        return Attribute::get(fn() => $this->extra['jss'] ?? null);
-    }
-
     protected function dwelling(): Attribute
     {
         return Attribute::get(fn() => $this->extra['dwelling'] ?? null);
-    }
-
-    protected function lts(): Attribute
-    {
-        return Attribute::get(fn() => $this->extra['lts'] ?? null);
     }
 
     protected function voyage(): Attribute

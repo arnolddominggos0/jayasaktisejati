@@ -28,6 +28,7 @@ class VoyagePlan extends Model
     {
         return $this->belongsTo(Voyage::class);
     }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

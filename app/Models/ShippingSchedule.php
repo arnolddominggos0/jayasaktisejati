@@ -13,6 +13,8 @@ use App\Models\Port;
 use App\Models\ShippingScheduleItem;
 use App\Models\ShippingLine;
 use App\Models\Vessel;
+use App\Models\Voyage;
+use App\Enums\VoyagePlanState;
 
 class ShippingSchedule extends Model
 {
@@ -53,9 +55,9 @@ class ShippingSchedule extends Model
         return $this->belongsTo(Port::class, 'pod_id');
     }
 
-    public function items()
+    public function items(): HasMany
     {
-        return $this->hasMany(\App\Models\ShippingScheduleItem::class, 'schedule_id');
+        return $this->hasMany(ShippingScheduleItem::class, 'schedule_id');
     }
 
     public function isFinal(): bool
@@ -67,8 +69,10 @@ class ShippingSchedule extends Model
     {
         $value = trim((string)$value);
         if ($value === '') return null;
+
         $dt = self::parseDateTime($value);
         if ($dt) return $dt;
+
         $year = null;
         if (preg_match('/^\d{4}\-\d{2}$/', (string)$this->period_ym)) {
             [$y] = explode('-', $this->period_ym);
@@ -76,6 +80,7 @@ class ShippingSchedule extends Model
         } else {
             $year = (int)date('Y');
         }
+
         $try = ['d-M', 'd/M', 'd M', 'M d'];
         foreach ($try as $fmt) {
             try {
@@ -86,6 +91,7 @@ class ShippingSchedule extends Model
             } catch (\Throwable $e) {
             }
         }
+
         $ts = strtotime($value . ' ' . $year);
         return $ts ? Carbon::parse(date('Y-m-d H:i:s', $ts)) : null;
     }
@@ -96,9 +102,12 @@ class ShippingSchedule extends Model
         ?string $attachmentPath = null,
         ?string $approvedByName = null,
         ?int $userId = null,
-        ?string $lineHint = null
+        ?string $lineHint = null,
+        bool $alsoPromoteVoyages = true
     ): array {
-        if ($this->isFinal()) return ['rows' => 0, 'voyages' => 0, 'items' => 0];
+        if ($this->isFinal()) {
+            return ['rows' => 0, 'voyages' => 0, 'items' => 0];
+        }
 
         $rows = self::parseDelimited($tableText);
         $createdItems = 0;
@@ -146,7 +155,7 @@ class ShippingSchedule extends Model
                 'direct'           => $direct,
             ], fn($v) => $v !== null && $v !== '');
 
-            $this->items()->updateOrCreate(
+            $item = $this->items()->updateOrCreate(
                 [
                     'vessel_id'        => $vesselId,
                     'voyage_no'        => $voyNo ?: null,
@@ -164,18 +173,63 @@ class ShippingSchedule extends Model
             );
 
             $createdItems++;
+
+            if ($alsoPromoteVoyages) {
+                $this->promoteItemToVoyage($item, $userId);
+            }
         }
 
-        $this->state            = \App\Enums\ScheduleState::Final->value;
+        $this->state            = ScheduleState::Final->value;
         $this->finalized_at     = now();
-        $this->final_source     = 'customer_email';
+        $this->final_source     = 'customer_whatsapp';
         $this->final_attachment = $attachmentPath;
         $this->final_note       = $finalNote;
         $this->approved_by_name = $approvedByName;
         $this->approved_at      = now();
         $this->save();
 
-        return ['rows' => count($rows), 'voyages' => 0, 'items' => $createdItems];
+        $voyageCount = $alsoPromoteVoyages
+            ? Voyage::whereHas('plans', fn($q) => $q->where('state', VoyagePlanState::Final->value))->count()
+            : 0;
+
+        return ['rows' => count($rows), 'voyages' => $voyageCount, 'items' => $createdItems];
+    }
+
+    public function promoteItemToVoyage(ShippingScheduleItem $item, ?int $userId = null): Voyage
+    {
+        $voyage = Voyage::firstOrCreate(
+            [
+                'vessel_id'        => $item->vessel_id,
+                'shipping_line_id' => $item->shipping_line_id,
+                'voyage_no'        => $item->voyage_no,
+                'port_from_id'     => $item->pol_id,
+                'port_to_id'       => $item->pod_id,
+            ],
+            [
+                'service'          => $item->service,
+            ]
+        );
+
+        $payload = array_filter([
+            'etd' => optional($item->etd)->toDateTimeString(),
+            'eta' => optional($item->eta)->toDateTimeString(),
+        ]);
+
+        $voyage->plans()->create([
+            'state'        => VoyagePlanState::Final->value,
+            'payload'      => $payload,
+            'notes'        => 'Generated from ShippingSchedule#' . $this->id,
+            'source'       => 'shipping_schedule',
+            'finalized_at' => now(),
+            'created_by'   => $userId,
+        ]);
+
+        if (!$item->voyage_id) {
+            $item->voyage_id = $voyage->id;
+            $item->save();
+        }
+
+        return $voyage;
     }
 
     public static function storeAttachment(?\Illuminate\Http\UploadedFile $file = null): ?string
@@ -257,7 +311,6 @@ class ShippingSchedule extends Model
             'cargo_plan'      => 'cargo_plan',
             'dwelling'        => 'dwelling',
             'jss'             => 'jss',
-            'lts'             => 'lts',
             'vessel_capacity' => 'vessel_capacity',
             'capacity'        => 'capacity',
             'direct'          => 'direct',

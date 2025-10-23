@@ -11,7 +11,7 @@ class PlansRelationManager extends RelationManager
 {
     protected static string $relationship = 'plans';
     protected static ?string $title = 'Rencana Final';
-    protected static ?string $recordTitleAttribute = 'state';
+    protected static ?string $recordTitleAttribute = 'state'    ;
 
     public function table(Table $table): Table
     {

@@ -15,8 +15,19 @@ class UpcomingVoyages extends BaseWidget
     {
         return Voyage::query()
             ->onlyFinal()
-            ->whereNotNull('voyages.id')
-            ->orderByRaw("COALESCE((select (payload->>'etd')::timestamp from voyage_plans where voyage_plans.voyage_id = voyages.id and state = 'final' order by created_at desc limit 1), now()) asc");
+            ->orderByRaw("
+                COALESCE(
+                    (
+                        select (payload->>'etd')::timestamp
+                        from voyage_plans
+                        where voyage_plans.voyage_id = voyages.id
+                          and state = 'final'
+                        order by finalized_at desc, id desc
+                        limit 1
+                    ),
+                    now()
+                ) asc
+            ");
     }
 
     protected function getTableColumns(): array
@@ -32,4 +43,3 @@ class UpcomingVoyages extends BaseWidget
         ];
     }
 }
-    

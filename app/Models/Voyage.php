@@ -24,18 +24,22 @@ class Voyage extends Model
     {
         return $this->belongsTo(Vessel::class);
     }
+
     public function shippingLine(): BelongsTo
     {
         return $this->belongsTo(ShippingLine::class);
     }
+
     public function portFrom(): BelongsTo
     {
         return $this->belongsTo(Port::class, 'port_from_id');
     }
+
     public function portTo(): BelongsTo
     {
         return $this->belongsTo(Port::class, 'port_to_id');
     }
+
     public function plans(): HasMany
     {
         return $this->hasMany(VoyagePlan::class);
@@ -43,7 +47,11 @@ class Voyage extends Model
 
     public function currentPlan(): ?VoyagePlan
     {
-        return $this->plans()->where('state', VoyagePlanState::Final->value)->latest()->first();
+        return $this->plans()
+            ->where('state', VoyagePlanState::Final->value)
+            ->latest('finalized_at')
+            ->latest('id')
+            ->first();
     }
 
     public function hasFinalPlan(): bool
@@ -65,23 +73,22 @@ class Voyage extends Model
         if ($state !== VoyagePlanState::Final) {
             throw new \RuntimeException('Voyage hanya menerima plan final.');
         }
-        if ($this->hasFinalPlan()) {
-            return $this->currentPlan();
-        }
+
         $payload = $this->normalizePayload($payload);
+
         return $this->plans()->create([
-            'state' => $state->value,
-            'payload' => $payload,
-            'notes' => $notes,
-            'source' => $source,
+            'state'        => $state->value,
+            'payload'      => $payload,
+            'notes'        => $notes,
+            'source'       => $source,
             'finalized_at' => now(),
-            'created_by' => $userId,
+            'created_by'   => $userId,
         ]);
     }
 
-    public function scopeOnlyFinal(Builder $q): Builder
+    public function scopeOnlyFinal(Builder $query): Builder
     {
-        return $q->whereHas('plans', fn($s) => $s->where('state', VoyagePlanState::Final->value));
+        return $query->whereHas('plans', fn($s) => $s->where('state', 'final'));
     }
 
     public function getPlanEtdAttribute(): ?Carbon
@@ -94,5 +101,19 @@ class Voyage extends Model
     {
         $p = $this->currentPlan()?->payload['eta'] ?? null;
         return $p ? Carbon::parse($p) : null;
+    }
+
+    public function getLabelAttribute(): string
+    {
+        $line   = $this->shippingLine?->name ?? '-';
+        $vessel = $this->vessel?->name ?? '-';
+        $voy    = $this->voyage_no ?: '-';
+        $pol    = $this->portFrom?->code ?: '-';
+        $pod    = $this->portTo?->code ?: '-';
+
+        $etd = $this->plan_etd?->format('d M') ?: '-';
+        $eta = $this->plan_eta?->format('d M') ?: '-';
+
+        return "{$line} • {$vessel} • VOY {$voy} • {$pol}→{$pod} • {$etd} → {$eta}";
     }
 }
