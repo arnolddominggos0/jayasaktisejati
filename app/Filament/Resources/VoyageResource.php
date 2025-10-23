@@ -17,13 +17,12 @@ use Filament\Tables\Table;
 
 class VoyageResource extends Resource
 {
-    protected static ?string $model = Voyage::class;
     protected static ?string $navigationGroup = 'Pelayaran & Kapal';
-    protected static ?string $navigationLabel = 'Jadwal Kapal';
-    protected static ?string $pluralLabel = 'Jadwal Kapal';
+    protected static ?string $navigationLabel = 'Voyage (Master)';
+    protected static ?string $pluralLabel = 'Voyage (Master)';
     protected static ?string $navigationIcon = 'heroicon-m-calendar-days';
-    protected static ?string $modelLabel = 'Jadwal Kapal';
-    protected static ?int    $navigationSort  = 10;
+    protected static ?string $modelLabel = 'Voyage (Master)';
+    protected static ?int    $navigationSort  = 9;
 
     public static function form(Forms\Form $form): Forms\Form
     {
