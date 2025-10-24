@@ -103,7 +103,6 @@ class ShipmentTrackingResource extends Resource
 
                 TextColumn::make('eta')->label('ETA')->dateTime('d M Y')->placeholder('—')->toggleable(),
 
-                // KPI khusus monitoring
                 TextColumn::make('kpi_summary')
                     ->label('KPI Manado')
                     ->state(fn(Shipment $r) => $r->kpiManadoSummaryText() ?? '-')

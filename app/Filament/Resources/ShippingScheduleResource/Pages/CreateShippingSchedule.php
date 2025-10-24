@@ -2,13 +2,17 @@
 
 namespace App\Filament\Resources\ShippingScheduleResource\Pages;
 
+<<<<<<< HEAD
 use App\Enums\ScheduleState;
+=======
+>>>>>>> 1dcaff98d6e0ae89c5b689574805eed309eb1f47
 use App\Filament\Resources\ShippingScheduleResource;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateShippingSchedule extends CreateRecord
 {
     protected static string $resource = ShippingScheduleResource::class;
+<<<<<<< HEAD
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
@@ -23,4 +27,6 @@ class CreateShippingSchedule extends CreateRecord
     {
         return 'Buat Jadwal (Draft)';
     }
+=======
+>>>>>>> 1dcaff98d6e0ae89c5b689574805eed309eb1f47
 }

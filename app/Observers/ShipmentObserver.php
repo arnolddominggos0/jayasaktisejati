@@ -80,9 +80,9 @@ class ShipmentObserver
 
             if ($codesOrNames) {
                 $portIds = Port::where(function ($w) use ($codesOrNames) {
-                        $w->whereIn('code', array_map('strtoupper', $codesOrNames))
-                          ->orWhereIn('name', $codesOrNames);
-                    })
+                    $w->whereIn('code', array_map('strtoupper', $codesOrNames))
+                        ->orWhereIn('name', $codesOrNames);
+                })
                     ->pluck('id')
                     ->all();
             }

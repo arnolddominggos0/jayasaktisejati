@@ -14,7 +14,6 @@ use Filament\Pages\Page;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -31,7 +30,6 @@ class AdminDashboard extends Page implements HasForms
     public ?string $mode    = null;
     public string $period   = 'weekly';
 
-    // Brand
     public string $brandHex = '#0137A1';
 
     public function mount(): void
@@ -105,7 +103,7 @@ class AdminDashboard extends Page implements HasForms
             ->count();
 
         $pendingPickup = (clone $q)
-            ->whereIn('status', [ShipmentStatus::Pending, ShipmentStatus::Pickup])
+            ->whereIn('status', [ShipmentStatus::Pending->value, ShipmentStatus::Pickup->value])
             ->count();
 
         $armadaAktif = Armada::query()
@@ -221,7 +219,7 @@ class AdminDashboard extends Page implements HasForms
 
         $avgDays = $avg ? round($avg, 1) : 0.0;
 
-        $targetDays = 12; // silakan sesuaikan
+        $targetDays = 12;
         $progress   = $avgDays > 0 ? max(0, min(100, (int) round(($targetDays / max($avgDays, 0.01)) * 50))) : 0;
 
         return [

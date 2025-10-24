@@ -208,20 +208,6 @@ class ShipmentHistoryResource extends Resource
                     ->searchable()
                     ->preload(),
 
-                Filter::make('manado_kpi_target')
-                    ->label('Target KPI Manado')
-                    ->query(function (Builder $q) {
-                        $cfg = config('jss_kpi.manado', []);
-                        $branchIds = array_map('intval', $cfg['branch_ids'] ?? []);
-                        $cityIds   = array_map('intval', $cfg['coverage_city_ids'] ?? []);
-                        $depotIds  = array_map('intval', $cfg['depot_ids'] ?? []);
-                        $q->where(function ($w) use ($branchIds, $cityIds, $depotIds) {
-                            if (!empty($branchIds)) $w->orWhereIn('branch_id', $branchIds);
-                            if (!empty($cityIds))   $w->orWhereIn('destination_city_id', $cityIds);
-                            if (!empty($depotIds))  $w->orWhereIn('assigned_depot_id', $depotIds);
-                        });
-                    }),
-
                 Filter::make('completed_range')
                     ->label('Rentang Selesai')
                     ->form([

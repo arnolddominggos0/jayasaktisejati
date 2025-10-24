@@ -14,15 +14,27 @@ class UpcomingVoyages extends BaseWidget
     protected function getTableQuery(): Builder
     {
         return Voyage::query()
-            ->whereDate('etd', '>=', now()->toDateString())
-            ->whereDate('etd', '<=', now()->addDays(30)->toDateString())
-            ->orderBy('etd');
+            ->onlyFinal()
+            ->orderByRaw("
+                COALESCE(
+                    (
+                        select (payload->>'etd')::timestamp
+                        from voyage_plans
+                        where voyage_plans.voyage_id = voyages.id
+                          and state = 'final'
+                        order by finalized_at desc, id desc
+                        limit 1
+                    ),
+                    now()
+                ) asc
+            ");
     }
 
     protected function getTableColumns(): array
     {
         return [
-            Tables\Columns\TextColumn::make('etd')->date()->label('ETD'),
+            Tables\Columns\TextColumn::make('plan_etd')->dateTime()->label('ETD'),
+            Tables\Columns\TextColumn::make('plan_eta')->dateTime()->label('ETA'),
             Tables\Columns\TextColumn::make('shippingLine.name')->label('Line'),
             Tables\Columns\TextColumn::make('vessel.name')->label('Vessel'),
             Tables\Columns\TextColumn::make('voyage_no')->label('Voyage'),

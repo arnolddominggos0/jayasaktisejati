@@ -39,8 +39,7 @@ class InitialSetupSeeder extends Seeder
             $admin->syncRoles(['super_admin']);
         }
 
-        // Faker untuk seed
-        $faker   = \Faker\Factory::create();      // default
+        $faker   = \Faker\Factory::create();     
         $fakerId = \Faker\Factory::create('id_ID');
 
         $companies = [

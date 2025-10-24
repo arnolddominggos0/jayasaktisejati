@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         Schema::create('ports', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 10)->unique(); // mis: IDTPP (Tanjung Priok), IDBIT (Bitung)
+            $table->string('code', 10)->unique(); 
             $table->string('name');
             $table->string('city')->nullable();
             $table->string('country')->default('ID');

@@ -2,77 +2,120 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\VoyageResource\Pages\CreateVoyage;
-use App\Filament\Resources\VoyageResource\Pages\EditVoyage;
 use App\Filament\Resources\VoyageResource\Pages\ListVoyages;
+use App\Filament\Resources\VoyageResource\Pages\ViewVoyage;
+use App\Filament\Resources\VoyageResource\RelationManagers\PlansRelationManager;
+use App\Models\Port;
 use App\Models\Voyage;
-use Filament\Forms;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\Filter;
+use Filament\Forms\Components\DatePicker;
+use Illuminate\Database\Eloquent\Builder;
 
 class VoyageResource extends Resource
 {
     protected static ?string $navigationGroup = 'Pelayaran & Kapal';
+<<<<<<< HEAD
     protected static ?string $navigationLabel = 'Voyage (Master)';
     protected static ?string $pluralLabel = 'Voyage (Master)';
     protected static ?string $navigationIcon = 'heroicon-m-calendar-days';
     protected static ?string $modelLabel = 'Voyage (Master)';
     protected static ?int    $navigationSort  = 9;
+=======
+    protected static ?string $navigationLabel = 'Jadwal Kapal';
+    protected static ?string $navigationIcon = 'heroicon-m-rocket-launch';
+    protected static ?int $navigationSort = 11;
+>>>>>>> 1dcaff98d6e0ae89c5b689574805eed309eb1f47
 
-    public static function form(Forms\Form $form): Forms\Form
+    public static function form(\Filament\Forms\Form $form): \Filament\Forms\Form
     {
-        return $form->schema([
-            Select::make('shipping_line_id')->relationship('shippingLine', 'name')->label('Shipping Line')->required(),
-            Select::make('vessel_id')->relationship('vessel', 'name')->label('Vessel')->required(),
-            TextInput::make('voyage_no')->label('Voyage No')->required(),
-            Select::make('port_from_id')
-                ->relationship('portFrom', 'name')
-                ->label('POL')
-                ->required()
-                ->searchable()
-                ->preload(),
-
-            Select::make('port_to_id')
-                ->relationship('portTo', 'name')
-                ->label('POD')
-                ->required()
-                ->searchable()
-                ->preload(),
-
-            DatePicker::make('etd')->label('ETD')->required(),
-            DatePicker::make('eta')->label('ETA'),
-            TextInput::make('service')->label('Service')->maxLength(50),
-        ])->columns(2);
+        return $form->schema([]);
     }
 
-    public static function table(Table $table): Tables\Table
+    public static function table(Table $table): Table
     {
-        return $table->columns([
-            TextColumn::make('shippingLine.name')->label('Line'),
-            TextColumn::make('vessel.name')->label('Vessel'),
-            TextColumn::make('voyage_no')->label('Voyage'),
-            TextColumn::make('portFrom.code')->label('POL')->badge(),
-            TextColumn::make('portTo.code')->label('POD')->badge(),
-            TextColumn::make('etd')->date()->label('ETD'),
-            TextColumn::make('eta')->date()->label('ETA'),
-        ])->actions([
-            Tables\Actions\EditAction::make()->label('Ubah'),
-        ])->bulkActions([
-            Tables\Actions\DeleteBulkAction::make()->label('Hapus'),
-        ]);
+        return $table
+            ->modifyQueryUsing(function (Builder $query) {
+                $bitungIds = Port::query()
+                    ->where('code', 'IDBIT')
+                    ->orWhere('name', 'ilike', '%Bitung%')
+                    ->orWhere('name', 'ilike', '%Manado%')
+                    ->pluck('id')->all();
+
+                $query->onlyFinal();
+                if (!empty($bitungIds)) {
+                    $query->whereIn('port_to_id', $bitungIds);
+                }
+            })
+            ->columns([
+                Tables\Columns\TextColumn::make('plan_etd')->label('ETD')->dateTime()->sortable(),
+                Tables\Columns\TextColumn::make('plan_eta')->label('ETA')->dateTime()->sortable(),
+                Tables\Columns\TextColumn::make('shippingLine.name')->label('Line')->wrap()->searchable(),
+                Tables\Columns\TextColumn::make('vessel.name')->label('Vessel')->wrap()->searchable(),
+                Tables\Columns\TextColumn::make('voyage_no')->label('Voyage')->searchable(),
+                Tables\Columns\TextColumn::make('portFrom.code')->label('POL')->badge(),
+                Tables\Columns\TextColumn::make('portTo.code')->label('POD')->badge(),
+                Tables\Columns\TextColumn::make('plans_count')->counts('plans')->label('Revisi Final'),
+            ])
+            ->filters([
+                SelectFilter::make('port_to_id')
+                    ->label('POD')
+                    ->relationship('portTo', 'name')
+                    ->preload()
+                    ->default(fn() => Port::query()
+                        ->where('code', 'IDBIT')
+                        ->orWhere('name', 'ilike', '%Bitung%')
+                        ->orWhere('name', 'ilike', '%Manado%')->value('id')),
+
+                Filter::make('etd_between')
+                    ->form([
+                        DatePicker::make('from')->label('ETD dari'),
+                        DatePicker::make('to')->label('ETD sampai'),
+                    ])
+                    ->query(function (Builder $query, array $data) {
+                        $query->whereHas('plans', function (Builder $p) use ($data) {
+                            if ($data['from'] ?? null) {
+                                $p->whereRaw("(payload->>'etd')::timestamp >= ?", [$data['from'] . ' 00:00:00']);
+                            }
+                            if ($data['to'] ?? null) {
+                                $p->whereRaw("(payload->>'etd')::timestamp <= ?", [$data['to'] . ' 23:59:59']);
+                            }
+                            $p->where('state', 'final');
+                        });
+                    }),
+            ])
+            ->actions([
+                Tables\Actions\ViewAction::make()->label('Detail'),
+            ])
+            ->defaultSort('plan_etd', 'asc');
+    }
+
+    public static function getRelations(): array
+    {
+        return [PlansRelationManager::class];
     }
 
     public static function getPages(): array
     {
         return [
-            'index'  => ListVoyages::route('/'),
-            'create' => CreateVoyage::route('/create'),
-            'edit'   => EditVoyage::route('/{record}/edit'),
+            'index' => ListVoyages::route('/'),
+            'view'  => ViewVoyage::route('/{record}'),
         ];
+    }
+
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+    public static function canDelete($record): bool
+    {
+        return false;
     }
 }

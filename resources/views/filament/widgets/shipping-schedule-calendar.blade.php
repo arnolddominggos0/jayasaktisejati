@@ -59,7 +59,7 @@
             }
 
             .wrap {
-                overflow-x: auto;
+                overflow-x: auto;   
             }
         </style>
 

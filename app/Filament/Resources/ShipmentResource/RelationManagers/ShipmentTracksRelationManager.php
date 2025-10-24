@@ -2,94 +2,62 @@
 
 namespace App\Filament\Resources\ShipmentResource\RelationManagers;
 
-use App\Enums\TrackStatus;
-use App\Models\Shipment;
-use App\Models\ShipmentTrack;
-use Filament\Facades\Filament;
+use Filament\Forms;
+use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\TextInputColumn;
-use Illuminate\Support\Carbon;
 
 class ShipmentTracksRelationManager extends RelationManager
 {
     protected static string $relationship = 'tracks';
-    protected static ?string $title = 'Riwayat Tracking';
+    protected static ?string $title = 'Timeline';
+    protected static ?string $recordTitleAttribute = 'status';
+
+    public function form(Form $form): Form
+    {
+        return $form->schema([
+            Forms\Components\Select::make('status')
+                ->label('Status')
+                ->options(function () {
+                    /** @var \App\Models\Shipment $shipment */
+                    $shipment = $this->getOwnerRecord();
+                    $order = \App\Enums\TrackStatus::orderForMode($shipment?->mode);
+                    $out = [];
+                    foreach ($order as $s) $out[$s->value] = $s->label();
+                    return $out;
+                })
+                ->required()
+                ->native(false),
+
+            Forms\Components\DateTimePicker::make('tracked_at')
+                ->label('Waktu')
+                ->seconds(false)
+                ->required(),
+
+            Forms\Components\TextInput::make('location')
+                ->label('Lokasi')
+                ->maxLength(120),
+
+            Forms\Components\Textarea::make('note')
+                ->label('Catatan')
+                ->rows(3),
+        ])->columns(2);
+    }
 
     public function table(Table $table): Table
     {
-        return $table
-            ->recordClasses(fn ($record) => empty($record->tracked_at) ? 'opacity-60' : '')
-            ->columns([
-                TextColumn::make('status')
-                    ->label('Status')
-                    ->badge()
-                    ->formatStateUsing(function ($state) {
-                        if ($state instanceof TrackStatus) return $state->label();
-                        $try = TrackStatus::tryFrom((string) $state);
-                        return $try ? $try->label() : (string) $state;
-                    })
-                    ->color(fn ($state) => match (($state instanceof TrackStatus ? $state->value : $state)) {
-                        'delivered' => 'success',
-                        'hold' => 'warning',
-                        'cancelled' => 'danger',
-                        default => 'primary',
-                    })
-                    ->sortable(),
+        return $table->columns([
+            TextColumn::make('status')
+                ->label('Status')
+                ->formatStateUsing(fn($state) => \App\Enums\TrackStatus::normalize($state)?->label() ?? (string) $state)
+                ->badge(),
 
-                // Inline edit waktu (tanpa formatStateUsing)
-                TextInputColumn::make('tracked_at')
-                    ->label('Waktu (YYYY-MM-DD HH:mm)')
-                    ->placeholder('—')
-                    ->extraAttributes(['class' => 'font-mono text-sm'])
-                    ->rules(['nullable','date'])
-                    ->afterStateUpdated(function ($state, ShipmentTrack $record) {
-                        $record->tracked_at = blank($state) ? null : Carbon::parse($state);
-                        $record->updated_by = Filament::auth()?->id() ?? auth()->id();
-                        $record->save();
-                    }),
-
-                TextInputColumn::make('location')
-                    ->label('Lokasi')
-                    ->placeholder('—')
-                    ->rules(['nullable','string','max:120'])
-                    ->afterStateUpdated(function ($state, ShipmentTrack $record) {
-                        $record->location = $state ?: null;
-                        $record->updated_by = Filament::auth()?->id() ?? auth()->id();
-                        $record->save();
-                    }),
-
-                TextInputColumn::make('note')
-                    ->label('Catatan')
-                    ->placeholder('—')
-                    ->rules(['nullable','string','max:500'])
-                    ->afterStateUpdated(function ($state, ShipmentTrack $record) {
-                        $record->note = $state ?: null;
-                        $record->updated_by = Filament::auth()?->id() ?? auth()->id();
-                        $record->save();
-                    }),
-            ])
-            ->defaultSort('tracked_at', 'asc')
-            ->paginated(false)
-            ->emptyStateHeading('Belum ada timeline.')
-            ->emptyStateDescription('Klik Generate Timeline untuk membuat rencana langkah otomatis.')
-            ->headerActions([
-                Action::make('generate_timeline')
-                    ->label('Generate Timeline')
-                    ->icon('heroicon-m-sparkles')
-                    ->requiresConfirmation()
-                    ->action(function () {
-                        $s = $this->getOwnerRecord();
-                        if ($s instanceof Shipment) {
-                            $s->ensureTrackSkeleton();
-                        }
-                    })
-                    ->successNotificationTitle('Timeline otomatis dibuat'),
-            ])
-            // nol row action, biar gak “panel kontrol kapal”
-            ->actions([]);
+            TextColumn::make('tracked_at')->label('Waktu')->dateTime('d M Y H:i')->placeholder('—'),
+            TextColumn::make('location')->label('Lokasi')->limit(30)->wrap(),
+            TextColumn::make('note')->label('Catatan')->limit(40)->wrap(),
+            TextColumn::make('updated_at')->label('Update')->since()->toggleable(isToggledHiddenByDefault: true),
+        ])
+            ->defaultSort('tracked_at', 'asc');
     }
 }

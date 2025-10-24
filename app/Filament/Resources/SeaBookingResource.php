@@ -19,6 +19,7 @@ use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class SeaBookingResource extends Resource
 {
@@ -120,10 +121,16 @@ class SeaBookingResource extends Resource
         ]);
     }
 
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['shippingLine', 'voyage.vessel', 'voyage.portFrom', 'voyage.portTo', 'depot']);
+            ->with([
+                'shippingLine',
+                'voyage.vessel',
+                'voyage.portFrom',
+                'voyage.portTo',
+                'depot'
+            ]);
     }
 
     public static function getPages(): array

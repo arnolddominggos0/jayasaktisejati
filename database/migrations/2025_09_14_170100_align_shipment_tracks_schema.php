@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         if (Schema::hasColumn('shipment_tracks', 'user_id') && ! Schema::hasColumn('shipment_tracks', 'created_by')) {
             Schema::table('shipment_tracks', function (Blueprint $t) {
-                $t->renameColumn('user_id', 'created_by'); // butuh doctrine/dbal jika kolom dipakai FK
+                $t->renameColumn('user_id', 'created_by');
             });
         }
 

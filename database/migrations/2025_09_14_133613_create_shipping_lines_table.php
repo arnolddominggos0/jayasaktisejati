@@ -9,7 +9,7 @@ return new class extends Migration {
     {
         Schema::create('shipping_lines', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->unique(); // mis: TANTO, MERATUS, SPIL
+            $table->string('code')->unique(); 
             $table->string('name');
             $table->string('contact')->nullable();
             $table->string('phone')->nullable();

@@ -60,6 +60,8 @@ class Shipment extends Model
         'vehicle_plate',
         'pickup_date',
         'driver_id',
+        'vehicle_kind',
+        'vehicle_loading',
         'status',
         'notes',
         'delivered_at',
@@ -74,6 +76,7 @@ class Shipment extends Model
         'lcl_items',
         'units',
     ];
+
 
     protected $casts = [
         'status'              => ShipmentStatus::class,
@@ -296,7 +299,7 @@ class Shipment extends Model
         if ($this->status !== ShipmentStatus::Cancelled) {
             return;
         }
-        $this->status       = ShipmentStatus::Pending;
+        $this->status       = ShipmentStatus::Pending->value;
         if (self::hasCol('cancelled_at')) {
             $this->cancelled_at = null;
         }
@@ -357,7 +360,7 @@ class Shipment extends Model
 
     public function ensureTrackSkeleton(): void
     {
-        $order = \App\Enums\TrackStatus::orderForMode($this->mode);
+        $order = TrackStatus::orderForMode($this->mode);
         $existing = $this->tracks()->pluck('status')->map(fn($s) => $s instanceof \BackedEnum ? $s->value : (string)$s)->all();
         $toCreate = array_filter($order, fn($st) => !in_array($st->value, $existing, true));
         foreach ($toCreate as $st) {
@@ -742,7 +745,7 @@ class Shipment extends Model
             ->sortBy('tracked_at')
             ->values();
 
-        $toVal = fn($s) => $s instanceof \App\Enums\TrackStatus ? $s->value : (string) $s;
+        $toVal = fn($s) => $s instanceof TrackStatus ? $s->value : (string) $s;
 
         $firstWhereAny = function (array $statuses) use ($tracks, $toVal) {
             foreach ($tracks as $t) {
@@ -764,22 +767,22 @@ class Shipment extends Model
         };
 
         $dwellingStarts = [
-            \App\Enums\TrackStatus::Pickup->value,
-            \App\Enums\TrackStatus::Handover->value,
-            \App\Enums\TrackStatus::Stuffing->value,
-            \App\Enums\TrackStatus::DeliveryToPort->value,
-            \App\Enums\TrackStatus::Stacking->value,
+            TrackStatus::Pickup->value,
+            TrackStatus::Handover->value,
+            TrackStatus::Stuffing->value,
+            TrackStatus::DeliveryToPort->value,
+            TrackStatus::Stacking->value,
         ];
         $onboardMarks = [
-            \App\Enums\TrackStatus::UnitLoading->value,
-            \App\Enums\TrackStatus::OnShip->value,
-            \App\Enums\TrackStatus::VesselDepart->value,
+            TrackStatus::UnitLoading->value,
+            TrackStatus::OnShip->value,
+            TrackStatus::VesselDepart->value,
         ];
         $arrivedMarks = [
-            \App\Enums\TrackStatus::VesselArrival->value,
-            \App\Enums\TrackStatus::Unloading->value,
+            TrackStatus::VesselArrival->value,
+            TrackStatus::Unloading->value,
         ];
-        $deliveredMark = \App\Enums\TrackStatus::Delivered->value;
+        $deliveredMark = TrackStatus::Delivered->value;
 
         $pickup  = $firstWhereAny($dwellingStarts) ?: $this->requested_at;
         $onboard = $firstWhereAny($onboardMarks);

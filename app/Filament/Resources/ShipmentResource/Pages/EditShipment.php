@@ -36,8 +36,8 @@ class EditShipment extends EditRecord
                 ->label('Batalkan')
                 ->icon('heroicon-m-x-circle')
                 ->color('danger')
-                ->visible(fn () => ($this->record->status instanceof ShipmentStatus)
-                    ? $this->record->status !== ShipmentStatus::Cancelled
+                ->visible(fn() => ($this->record->status instanceof ShipmentStatus)
+                    ? $this->record->status !== ShipmentStatus::Cancelled->value
                     : (string) $this->record->status !== ShipmentStatus::Cancelled->value)
                 ->requiresConfirmation()
                 ->action('cancelShipment'),
@@ -46,7 +46,7 @@ class EditShipment extends EditRecord
                 ->label('Pulihkan')
                 ->icon('heroicon-m-arrow-path')
                 ->color('gray')
-                ->visible(fn () => ($this->record->status instanceof ShipmentStatus)
+                ->visible(fn() => ($this->record->status instanceof ShipmentStatus)
                     ? $this->record->status === ShipmentStatus::Cancelled
                     : (string) $this->record->status === ShipmentStatus::Cancelled->value)
                 ->requiresConfirmation()
@@ -108,6 +108,6 @@ class EditShipment extends EditRecord
     {
         $shipment = $this->record;
 
-        event(new ShipmentStatusUpdated($shipment, 'fc') );
-    }   
+        event(new ShipmentStatusUpdated($shipment, 'fc'));
+    }
 }

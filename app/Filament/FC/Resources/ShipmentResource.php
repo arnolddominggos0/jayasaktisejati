@@ -312,7 +312,7 @@ class ShipmentResource extends Resource
                             ->visible(fn(Shipment $record) => in_array($record->status?->value ?? (string)$record->status, ['draft', 'hold'], true))
                             ->requiresConfirmation()
                             ->action(function (Shipment $record) {
-                                $record->update(['status' => ShipmentStatus::Pending]);
+                                $record->update(['status' => ShipmentStatus::Pending->value]);
                                 Notification::make()->title('Status di-set ke Menunggu')->success()->send();
                             }),
 
