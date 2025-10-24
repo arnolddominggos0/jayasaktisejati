@@ -8,4 +8,9 @@ use Filament\Resources\Pages\ViewRecord;
 class ViewVoyage extends ViewRecord
 {
     protected static string $resource = VoyageResource::class;
+
+    public function getHeading(): string
+    {
+        return 'Detail Pelayaran';
+    }
 }

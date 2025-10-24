@@ -7,13 +7,11 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Lang;
 
-// Observers
 use App\Models\Shipment;
 use App\Models\ShipmentTrack;
 use App\Observers\ShipmentObserver;
 use App\Observers\ShipmentTrackObserver;
 
-// Livewire Widgets
 use Livewire\Livewire;
 use App\Filament\Pages\Dashboard\Widgets\{
     KpiOverview,
@@ -21,8 +19,10 @@ use App\Filament\Pages\Dashboard\Widgets\{
     ShipmentsByStatusChart,
     TrackingActivityTable,
     TodayManpowerWidget,
-    ActiveArmadaWidget
+    ActiveArmadaWidget,
+    ShippingScheduleCalendar
 };
+use App\Filament\Widgets\ShippingScheduleCalendar as WidgetsShippingScheduleCalendar;
 use App\Models\Customer;
 use App\Observers\CustomerObserver;
 
@@ -57,6 +57,7 @@ class AppServiceProvider extends ServiceProvider
             'app.filament.pages.dashboard.widgets.tracking-activity-table'  => TrackingActivityTable::class,
             'app.filament.pages.dashboard.widgets.today-manpower-widget'    => TodayManpowerWidget::class,
             'app.filament.pages.dashboard.widgets.active-armada-widget'     => ActiveArmadaWidget::class,
+            'app.filament.pages.dashboard.widgets.shipping-schedule-calendar' => WidgetsShippingScheduleCalendar::class,
         ];
 
         foreach ($aliases as $alias => $componentClass) {

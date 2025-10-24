@@ -6,8 +6,8 @@ use App\Enums\VoyagePlanState;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 class Voyage extends Model
 {
@@ -68,10 +68,15 @@ class Voyage extends Model
         return array_filter($out, fn($v) => !is_null($v));
     }
 
-    public function upsertPlan(VoyagePlanState $state, array $payload = [], ?string $notes = null, ?string $source = 'whatsapp', ?int $userId = null): VoyagePlan
-    {
+    public function upsertPlan(
+        VoyagePlanState $state,
+        array $payload = [],
+        ?string $notes = null,
+        ?string $source = 'whatsapp',
+        ?int $userId = null
+    ): VoyagePlan {
         if ($state !== VoyagePlanState::Final) {
-            throw new \RuntimeException('Voyage hanya menerima plan final.');
+            throw new \RuntimeException('Data Pelayaran hanya menerima rencana berstatus final.');
         }
 
         $payload = $this->normalizePayload($payload);
@@ -110,10 +115,8 @@ class Voyage extends Model
         $voy    = $this->voyage_no ?: '-';
         $pol    = $this->portFrom?->code ?: '-';
         $pod    = $this->portTo?->code ?: '-';
-
-        $etd = $this->plan_etd?->format('d M') ?: '-';
-        $eta = $this->plan_eta?->format('d M') ?: '-';
-
+        $etd    = $this->plan_etd?->format('d M') ?: '-';
+        $eta    = $this->plan_eta?->format('d M') ?: '-';
         return "{$line} • {$vessel} • VOY {$voy} • {$pol}→{$pod} • {$etd} → {$eta}";
     }
 }

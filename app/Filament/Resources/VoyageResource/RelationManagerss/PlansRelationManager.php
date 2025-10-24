@@ -10,14 +10,14 @@ use Filament\Tables\Columns\TextColumn;
 class PlansRelationManager extends RelationManager
 {
     protected static string $relationship = 'plans';
-    protected static ?string $title = 'Rencana Final';
-    protected static ?string $recordTitleAttribute = 'state'    ;
+    protected static ?string $title = 'Finalisasi Pelayaran';
+    protected static ?string $recordTitleAttribute = 'state';
 
     public function table(Table $table): Table
     {
         return $table
             ->columns([
-                TextColumn::make('state')->label('State')->badge()->colors(['success' => 'final']),
+                TextColumn::make('state')->label('Status')->badge()->colors(['success' => 'final']),
                 TextColumn::make('payload.etd')->label('ETD')->dateTime(),
                 TextColumn::make('payload.eta')->label('ETA')->dateTime(),
                 TextColumn::make('notes')->label('Catatan')->limit(60),

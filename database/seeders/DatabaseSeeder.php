@@ -16,12 +16,8 @@ class DatabaseSeeder extends Seeder
         // $this->call(DummyOperationalSeeder::class);
         // $this->call(FleetMPSeeder::class);
         // $this->call(FieldCoordinatorSeeder::class);
-<<<<<<< HEAD
         // $this->call(TestShipmentKpiWithTracksSeeder::class);
-=======
-        $this->call(BackfillShipmentTracksForKpiSeeder::class);
-        $this->call(ShippingLineSeed::class);
->>>>>>> 1dcaff98d6e0ae89c5b689574805eed309eb1f47
         $this->call(ShippingScheduleSeeder::class);
+        $this->call(VoyageTestSeeder::class);
     }
 }
