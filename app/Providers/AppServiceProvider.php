@@ -58,6 +58,10 @@ class AppServiceProvider extends ServiceProvider
             'app.filament.pages.dashboard.widgets.today-manpower-widget'    => TodayManpowerWidget::class,
             'app.filament.pages.dashboard.widgets.active-armada-widget'     => ActiveArmadaWidget::class,
             'app.filament.pages.dashboard.widgets.shipping-schedule-calendar' => WidgetsShippingScheduleCalendar::class,
+            'app.filament.widgets.shipping-schedule-calendar' => WidgetsShippingScheduleCalendar::class,
+            'app.filament.widgets.schedule-kpi-placeholder' => \App\Filament\Widgets\ScheduleKpiPlaceholder::class,
+            'app.filament.widgets.schedule-gantt-placeholder' => \App\Filament\Widgets\ScheduleGanttPlaceholder::class,
+            'app.filament.pages.shipping-schedule-resource.pages.overview-shipping-schedules' => \App\Filament\Resources\ShippingScheduleResource\Pages\OverviewShippingSchedules::class,
         ];
 
         foreach ($aliases as $alias => $componentClass) {

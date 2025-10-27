@@ -3,40 +3,28 @@
 namespace App\Filament\Resources\ShippingScheduleResource\Pages;
 
 use App\Filament\Resources\ShippingScheduleResource;
-use App\Filament\Widgets\ShippingScheduleCalendar;
-use Filament\Actions\CreateAction;
+use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 
 class ListShippingSchedules extends ListRecords
 {
     protected static string $resource = ShippingScheduleResource::class;
 
-    protected function hasTable(): bool
+    protected function getHeaderWidgets(): array
     {
-        return false;
+        return [];
     }
 
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            Actions\Action::make('toOverview')
+                ->label('Dashboard Jadwal')
+                ->icon('heroicon-o-chart-bar')
+                ->color('gray')
+                ->url(route('filament.admin.resources.shipping-schedules.overview')),
+            Actions\CreateAction::make()
+                ->label('Buat shipping schedule'),
         ];
-    }
-
-    protected function getHeaderWidgets(): array
-    {
-        return [
-            ShippingScheduleCalendar::class,
-        ];
-    }
-
-    protected function getFooterWidgets(): array
-    {
-        return [];
-    }
-
-    public function getTitle(): string
-    {
-        return 'Daftar Jadwal Kapal';
     }
 }
