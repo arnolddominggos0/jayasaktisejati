@@ -12,6 +12,7 @@ class ShippingSchedule extends Model
     use HasFactory;
 
     protected $fillable = [
+        'shipping_line_id',
         'code',
         'state',
         'etd',
@@ -44,7 +45,12 @@ class ShippingSchedule extends Model
 
     public function items()
     {
-        return $this->hasMany(ShippingScheduleItem::class);
+        return $this->hasMany(ShippingScheduleItem::class, 'shipping_schedule_id');
+    }
+
+    public function shippingLine()
+    {
+        return $this->belongsTo(ShippingLine::class);
     }
 
     public function setEmailFinalMeta(array $meta): void

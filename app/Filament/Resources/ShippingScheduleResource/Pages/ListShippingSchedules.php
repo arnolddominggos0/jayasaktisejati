@@ -23,8 +23,12 @@ class ListShippingSchedules extends ListRecords
                 ->icon('heroicon-o-chart-bar')
                 ->color('gray')
                 ->url(route('filament.admin.resources.shipping-schedules.overview')),
-            Actions\CreateAction::make()
-                ->label('Buat shipping schedule'),
+            Actions\CreateAction::make()->label('Buat shipping schedule'),
+            Actions\Action::make('kelola_lines')
+                ->label('Kelola Shipping Line')
+                ->icon('heroicon-o-wrench')
+                ->url(\App\Filament\Resources\ShippingLineResource::getUrl())
+                ->openUrlInNewTab(),
         ];
     }
 }

@@ -4,6 +4,9 @@ namespace App\Filament\Resources\ShippingScheduleResource\Pages;
 
 use Filament\Resources\Pages\Page;
 use App\Filament\Resources\ShippingScheduleResource;
+use App\Filament\Widgets\ScheduleGanttPlaceholder;
+use App\Filament\Widgets\ScheduleKpiPlaceholder;
+
 class OverviewShippingSchedules extends Page
 {
     protected static string $resource = ShippingScheduleResource::class;
@@ -12,12 +15,11 @@ class OverviewShippingSchedules extends Page
 
     protected function getHeaderWidgets(): array
     {
-        return [\App\Filament\Widgets\ScheduleKpiPlaceholder::class];
+        return [ScheduleKpiPlaceholder::class];
     }
 
     protected function getFooterWidgets(): array
     {
-        // Gantt full-width di bawah
-        return [\App\Filament\Widgets\ScheduleGanttPlaceholder::class];
+        return [ScheduleGanttPlaceholder::class];
     }
 }
