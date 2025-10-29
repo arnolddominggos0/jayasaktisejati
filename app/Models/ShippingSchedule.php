@@ -127,4 +127,8 @@ class ShippingSchedule extends Model
 
         $this->save();
     }
+    public function vessel()
+    {
+        return $this->belongsTo(Vessel::class);
+    }
 }

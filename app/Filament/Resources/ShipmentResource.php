@@ -75,7 +75,7 @@ class ShipmentResource extends Resource
             ->where('branch_id', $branchId)
             ->where('mode', $mode);
         if ($mode === ShipmentMode::Sea->value && $voyageId) {
-            $polId = Voyage::whereKey($voyageId)->value('port_from_id');
+            $polId = Voyage::whereKey($voyageId)->value('port_from_id   ');
             if ($polId) {
                 $byPol = (clone $q)->where('port_id', $polId)->orderBy('name')->value('id');
                 if ($byPol) return (int) $byPol;
@@ -1096,7 +1096,7 @@ class ShipmentResource extends Resource
                         return "{$done}/{$total} • {$pct}% • {$pname}";
                     })
                     ->toggleable(),
-                    
+
                 TextColumn::make('etd')->label('ETD')->badge()->dateTime('d M Y H:i')->color('gray')->sortable(),
                 TextColumn::make('eta')->label('ETA')->badge()->dateTime('d M Y H:i')
                     ->color(function ($state) {

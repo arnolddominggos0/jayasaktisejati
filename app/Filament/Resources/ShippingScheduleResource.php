@@ -2,12 +2,15 @@
 
 namespace App\Filament\Resources;
 
+use App\Models\ShippingLine;
 use App\Models\ShippingSchedule;
+use App\Models\Vessel;
 use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Filters\Filter;
@@ -66,6 +69,33 @@ class ShippingScheduleResource extends Resource
                     TextInput::make('approved_by_name')->label('Disetujui oleh')->maxLength(120),
                     TextInput::make('final_note')->label('Catatan Final')->maxLength(1000),
                 ]),
+            Select::make('shipping_line_id')
+                ->label('Shipping Line')
+                ->options(ShippingLine::orderBy('name')->pluck('name', 'id'))
+                ->live()
+                ->preload()
+                ->searchable()
+                ->dehydrated(false)
+                ->afterStateHydrated(function ($component, $state, $record) {
+                    if ($record && $record->vessel) {
+                        $component->state($record->vessel->shipping_line_id);
+                    }
+                })
+                ->required(),
+
+            Select::make('vessel_id')
+                ->label('Nama Kapal')
+                ->options(function (\Filament\Forms\Get $get) {
+                    $lineId = $get('shipping_line_id');
+                    return \App\Models\Vessel::query()
+                        ->when($lineId, fn($q) => $q->where('shipping_line_id', $lineId))
+                        ->orderBy('name')
+                        ->pluck('name', 'id');
+                })
+                ->preload()->searchable()->native(false)->required()
+                ->createOptionUsing(function (array $data) {
+                    return Vessel::create($data)->getKey();
+                }),
         ]);
     }
 
@@ -79,6 +109,8 @@ class ShippingScheduleResource extends Resource
                 Tables\Columns\TextColumn::make('etd')->label('ETD')->dateTime('d M Y H:i')->sortable(),
                 Tables\Columns\TextColumn::make('eta')->label('ETA')->dateTime('d M Y H:i')->sortable(),
                 Tables\Columns\TextColumn::make('cargo_plan_total')->label('Cargo Plan')->numeric(),
+                Tables\Columns\TextColumn::make('vessel.shippingLine.name')->label('Shipping Line')->sortable()->toggleable(),
+                Tables\Columns\TextColumn::make('vessel.name')->label('Kapal')->sortable()->searchable()->toggleable(),
                 Tables\Columns\BadgeColumn::make('state')->label('Status')->colors([
                     'warning' => 'draft',
                     'success' => 'final',
