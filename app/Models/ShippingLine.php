@@ -10,15 +10,16 @@ class ShippingLine extends Model
     protected $fillable = [
         'code',
         'name',
-        'contact',
-        'phone',
-        'email'
+        'contact_name',
+        'contact_phone',
+        'email',
     ];
 
     public function vessels(): HasMany
     {
         return $this->hasMany(Vessel::class);
     }
+
     public function voyages(): HasMany
     {
         return $this->hasMany(Voyage::class);

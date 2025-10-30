@@ -6,6 +6,8 @@ use App\Enums\ScheduleState;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ShippingSchedule extends Model
 {
@@ -13,6 +15,7 @@ class ShippingSchedule extends Model
 
     protected $fillable = [
         'shipping_line_id',
+        'vessel_id',
         'code',
         'state',
         'etd',
@@ -43,14 +46,19 @@ class ShippingSchedule extends Model
         'period_month' => 'date',
     ];
 
-    public function items()
+    public function items(): HasMany
     {
         return $this->hasMany(ShippingScheduleItem::class, 'shipping_schedule_id');
     }
 
-    public function shippingLine()
+    public function shippingLine(): BelongsTo
     {
         return $this->belongsTo(ShippingLine::class);
+    }
+
+    public function vessel(): BelongsTo
+    {
+        return $this->belongsTo(Vessel::class);
     }
 
     public function setEmailFinalMeta(array $meta): void
@@ -124,11 +132,6 @@ class ShippingSchedule extends Model
         $this->last_revision_at = now();
         $this->revision_count = (int) $this->revision_count + 1;
         $this->state = ScheduleState::Final;
-
         $this->save();
-    }
-    public function vessel()
-    {
-        return $this->belongsTo(Vessel::class);
     }
 }

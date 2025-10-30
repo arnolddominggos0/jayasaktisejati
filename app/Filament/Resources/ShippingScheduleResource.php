@@ -11,6 +11,7 @@ use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Filters\Filter;
@@ -31,30 +32,32 @@ class ShippingScheduleResource extends Resource
                 ->schema([
                     Select::make('shipping_line_id')
                         ->label('Shipping Line')
-                        ->relationship('shippingLine', 'name')
+                        ->options(ShippingLine::query()->orderBy('name')->pluck('name', 'id'))
+                        ->native(false)
                         ->searchable()
                         ->preload()
+                        ->required()
+                        ->live(),
+                    Select::make('vessel_id')
+                        ->label('Nama Kapal')
+                        ->options(function (Get $get) {
+                            $lineId = $get('shipping_line_id');
+                            return Vessel::query()
+                                ->when($lineId, fn($q) => $q->where('shipping_line_id', $lineId))
+                                ->orderBy('name')
+                                ->pluck('name', 'id');
+                        })
                         ->native(false)
-                        ->createOptionForm([
-                            TextInput::make('name')->label('Nama')->required()->maxLength(120),
-                            TextInput::make('code')->label('Kode')->maxLength(20),
-                            TextInput::make('contact_name')->label('PIC')->maxLength(120),
-                            TextInput::make('contact_phone')->label('Telepon')->maxLength(60),
-                            TextInput::make('email')->label('Email')->email()->maxLength(120),
-                        ])
-                        ->editOptionForm([
-                            TextInput::make('name')->required()->maxLength(120),
-                            TextInput::make('code')->maxLength(20),
-                            TextInput::make('contact_name')->label('PIC')->maxLength(120),
-                            TextInput::make('contact_phone')->label('Telepon')->maxLength(60),
-                            TextInput::make('email')->label('Email')->email()->maxLength(120),
-                        ])
-                        ->required(),
-
-                    TextInput::make('vessel_name')->label('Nama Kapal')->required()->maxLength(120),
+                        ->searchable()
+                        ->preload()
+                        ->required()
+                        ->live()
+                        ->afterStateUpdated(function (Set $set, $state) {
+                            $name = Vessel::query()->whereKey($state)->value('name');
+                            $set('vessel_name', $name);
+                        }),
                     TextInput::make('voyage_no')->label('Voyage No')->maxLength(40),
                 ]),
-
             Section::make('Waktu & Rencana')
                 ->columns(3)
                 ->schema([
@@ -62,40 +65,13 @@ class ShippingScheduleResource extends Resource
                     DateTimePicker::make('eta')->label('ETA')->seconds(false)->native(false)->required(),
                     TextInput::make('cargo_plan_total')->label('Cargo Plan')->numeric()->default(0),
                 ]),
-
             Section::make('Finalisasi (opsional)')
                 ->columns(2)
                 ->schema([
                     TextInput::make('approved_by_name')->label('Disetujui oleh')->maxLength(120),
                     TextInput::make('final_note')->label('Catatan Final')->maxLength(1000),
                 ]),
-            Select::make('shipping_line_id')
-                ->label('Shipping Line')
-                ->options(ShippingLine::orderBy('name')->pluck('name', 'id'))
-                ->live()
-                ->preload()
-                ->searchable()
-                ->dehydrated(false)
-                ->afterStateHydrated(function ($component, $state, $record) {
-                    if ($record && $record->vessel) {
-                        $component->state($record->vessel->shipping_line_id);
-                    }
-                })
-                ->required(),
-
-            Select::make('vessel_id')
-                ->label('Nama Kapal')
-                ->options(function (\Filament\Forms\Get $get) {
-                    $lineId = $get('shipping_line_id');
-                    return \App\Models\Vessel::query()
-                        ->when($lineId, fn($q) => $q->where('shipping_line_id', $lineId))
-                        ->orderBy('name')
-                        ->pluck('name', 'id');
-                })
-                ->preload()->searchable()->native(false)->required()
-                ->createOptionUsing(function (array $data) {
-                    return Vessel::create($data)->getKey();
-                }),
+            TextInput::make('vessel_name')->label('Nama Kapal (Snapshot)')->disabled()->dehydrated(true),
         ]);
     }
 
@@ -109,8 +85,6 @@ class ShippingScheduleResource extends Resource
                 Tables\Columns\TextColumn::make('etd')->label('ETD')->dateTime('d M Y H:i')->sortable(),
                 Tables\Columns\TextColumn::make('eta')->label('ETA')->dateTime('d M Y H:i')->sortable(),
                 Tables\Columns\TextColumn::make('cargo_plan_total')->label('Cargo Plan')->numeric(),
-                Tables\Columns\TextColumn::make('vessel.shippingLine.name')->label('Shipping Line')->sortable()->toggleable(),
-                Tables\Columns\TextColumn::make('vessel.name')->label('Kapal')->sortable()->searchable()->toggleable(),
                 Tables\Columns\BadgeColumn::make('state')->label('Status')->colors([
                     'warning' => 'draft',
                     'success' => 'final',

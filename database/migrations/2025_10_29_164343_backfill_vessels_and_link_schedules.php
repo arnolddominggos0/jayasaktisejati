@@ -6,10 +6,6 @@ use Illuminate\Support\Facades\DB;
 return new class extends Migration {
     public function up(): void
     {
-        // Asumsikan masih ada kolom legacy `vessel_name` di shipping_schedules.
-        // Jika beda, sesuaikan nama kolomnya.
-
-        // 1) Insert vessels unik per (shipping_line_id, lower(vessel_name))
         DB::statement(<<<'SQL'
             INSERT INTO vessels (shipping_line_id, name, created_at, updated_at)
             SELECT DISTINCT shipping_line_id,
@@ -25,7 +21,6 @@ return new class extends Migration {
               )
         SQL);
 
-        // 2) Link schedules ke vessels berdasarkan nama dan shipping line
         DB::statement(<<<'SQL'
             UPDATE shipping_schedules s
             SET vessel_id = v.id
@@ -37,6 +32,6 @@ return new class extends Migration {
 
     public function down(): void
     {
-        // Tidak rollback agar histori tetap aman
+        
     }
 };

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ShippingScheduleItem extends Model
 {
@@ -14,8 +15,6 @@ class ShippingScheduleItem extends Model
         'etd',
         'eta',
         'cargo_plan',
-        'vessel_name',
-        'vessel_capacity',
         'voyage_no',
         'jss',
         'lts',
@@ -27,7 +26,7 @@ class ShippingScheduleItem extends Model
         'eta' => 'datetime',
     ];
 
-    public function schedule()
+    public function schedule(): BelongsTo
     {
         return $this->belongsTo(ShippingSchedule::class, 'shipping_schedule_id');
     }
