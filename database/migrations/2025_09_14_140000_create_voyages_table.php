@@ -9,18 +9,18 @@ return new class extends Migration {
     {
         Schema::create('voyages', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('vessel_id')->constrained('vessels')->cascadeOnDelete();
-            $table->foreignId('shipping_line_id')->constrained('shipping_lines')->cascadeOnDelete();
-            $table->string('voyage_no'); // mis: 123N / 456S
-            $table->foreignId('port_from_id')->constrained('ports')->cascadeOnDelete();
-            $table->foreignId('port_to_id')->constrained('ports')->cascadeOnDelete();
-            $table->date('etd');
-            $table->date('eta')->nullable();
-            $table->string('service')->nullable(); 
+            $table->foreignId('vessel_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('pol_id')->constrained('ports')->cascadeOnDelete();
+            $table->foreignId('pod_id')->constrained('ports')->cascadeOnDelete();
+            $table->string('voyage_no');
+            $table->string('service')->nullable();
+            $table->timestamp('etd');
+            $table->timestamp('eta');
             $table->timestamps();
-
-            $table->index(['shipping_line_id','voyage_no']);
         });
     }
-    public function down(): void { Schema::dropIfExists('voyages'); }
+    public function down(): void
+    {
+        Schema::dropIfExists('voyages');
+    }
 };

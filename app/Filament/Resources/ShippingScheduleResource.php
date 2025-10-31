@@ -2,126 +2,53 @@
 
 namespace App\Filament\Resources;
 
-use App\Models\ShippingLine;
+use App\Enums\ScheduleState;
+use App\Filament\Resources\ShippingScheduleResource\Pages;
 use App\Models\ShippingSchedule;
-use App\Models\Vessel;
 use Filament\Forms;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Section;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Get;
-use Filament\Forms\Set;
+use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Filters\Filter;
+use Filament\Tables\Table;
 
 class ShippingScheduleResource extends Resource
 {
     protected static ?string $model = ShippingSchedule::class;
-    protected static ?string $navigationGroup = 'Pelayaran & Kapal';
+    protected static ?string $navigationGroup = 'Operasional Kapal';
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
-    protected static ?string $navigationLabel = 'Jadwal Kapal (TAM)';
-    protected static ?string $slug = 'shipping-schedules';
+    protected static ?string $navigationLabel = 'Shipping Schedule TAM';
 
-    public static function form(Forms\Form $form): Forms\Form
+    public static function form(Form $form): Form
     {
         return $form->schema([
-            Section::make('Informasi Kapal')
-                ->columns(3)
-                ->schema([
-                    Select::make('shipping_line_id')
-                        ->label('Shipping Line')
-                        ->options(ShippingLine::query()->orderBy('name')->pluck('name', 'id'))
-                        ->native(false)
-                        ->searchable()
-                        ->preload()
-                        ->required()
-                        ->live(),
-                    Select::make('vessel_id')
-                        ->label('Nama Kapal')
-                        ->options(function (Get $get) {
-                            $lineId = $get('shipping_line_id');
-                            return Vessel::query()
-                                ->when($lineId, fn($q) => $q->where('shipping_line_id', $lineId))
-                                ->orderBy('name')
-                                ->pluck('name', 'id');
-                        })
-                        ->native(false)
-                        ->searchable()
-                        ->preload()
-                        ->required()
-                        ->live()
-                        ->afterStateUpdated(function (Set $set, $state) {
-                            $name = Vessel::query()->whereKey($state)->value('name');
-                            $set('vessel_name', $name);
-                        }),
-                    TextInput::make('voyage_no')->label('Voyage No')->maxLength(40),
-                ]),
-            Section::make('Waktu & Rencana')
-                ->columns(3)
-                ->schema([
-                    DateTimePicker::make('etd')->label('ETD')->seconds(false)->native(false)->required(),
-                    DateTimePicker::make('eta')->label('ETA')->seconds(false)->native(false)->required(),
-                    TextInput::make('cargo_plan_total')->label('Cargo Plan')->numeric()->default(0),
-                ]),
-            Section::make('Finalisasi (opsional)')
-                ->columns(2)
-                ->schema([
-                    TextInput::make('approved_by_name')->label('Disetujui oleh')->maxLength(120),
-                    TextInput::make('final_note')->label('Catatan Final')->maxLength(1000),
-                ]),
-            TextInput::make('vessel_name')->label('Nama Kapal (Snapshot)')->disabled()->dehydrated(true),
+            Forms\Components\Select::make('voyage_id')->relationship('voyage', 'voyage_no')->searchable()->required()->label('Voyage'),
+            Forms\Components\Section::make('Ringkas Voyage')->schema([
+                Forms\Components\Placeholder::make('vessel')->content(fn($record) => optional(optional($record?->voyage)->vessel)->name ?: '-')->label('Kapal'),
+                Forms\Components\Placeholder::make('line')->content(fn($record) => optional(optional(optional($record?->voyage)->vessel)->shippingLine)->name ?: '-')->label('Shipping Line'),
+                Forms\Components\Placeholder::make('route')->content(fn($record) => optional($record?->voyage?->pol)->code . ' → ' . optional($record?->voyage?->pod)->code)->label('Rute'),
+                Forms\Components\Placeholder::make('etd')->content(fn($record) => optional($record?->voyage?->etd)?->format('d M Y H:i') ?: '-')->label('ETD'),
+                Forms\Components\Placeholder::make('eta')->content(fn($record) => optional($record?->voyage?->eta)?->format('d M Y H:i') ?: '-')->label('ETA'),
+            ])->columns(5),
+            Forms\Components\TextInput::make('cargo_plan')->numeric()->required()->default(0)->label('Cargo Plan'),
+            Forms\Components\Select::make('state')->options(ScheduleState::options())->required()->label('Status'),
+            Forms\Components\TextInput::make('approved_by_name')->label('Disetujui oleh'),
+            Forms\Components\Textarea::make('final_note')->label('Catatan Final'),
+            Forms\Components\TextInput::make('final_source')->label('Sumber'),
+            Forms\Components\FileUpload::make('final_attachment_path')->label('Lampiran')->directory('schedule-attachments')->preserveFilenames(),
+            Forms\Components\DateTimePicker::make('finalized_at')->label('Tanggal Final'),
         ]);
     }
 
-    public static function table(Tables\Table $table): Tables\Table
+    public static function table(\Filament\Tables\Table $table): \Filament\Tables\Table
     {
-        return $table
-            ->columns([
-                Tables\Columns\TextColumn::make('shippingLine.name')->label('Shipping Line')->badge()->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('vessel_name')->label('Kapal')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('voyage_no')->label('Voyage')->searchable(),
-                Tables\Columns\TextColumn::make('etd')->label('ETD')->dateTime('d M Y H:i')->sortable(),
-                Tables\Columns\TextColumn::make('eta')->label('ETA')->dateTime('d M Y H:i')->sortable(),
-                Tables\Columns\TextColumn::make('cargo_plan_total')->label('Cargo Plan')->numeric(),
-                Tables\Columns\BadgeColumn::make('state')->label('Status')->colors([
-                    'warning' => 'draft',
-                    'success' => 'final',
-                ])->sortable(),
-                Tables\Columns\TextColumn::make('updated_at')->since()->label('Diubah'),
-            ])
-            ->filters([
-                Filter::make('bulan')
-                    ->form([
-                        Forms\Components\Select::make('month')->label('Bulan')->options(collect(range(1, 12))->mapWithKeys(fn($m) => [$m => date('F', mktime(0, 0, 0, $m, 1))])->all()),
-                        Forms\Components\TextInput::make('year')->label('Tahun')->numeric()->default(now()->year),
-                    ])
-                    ->query(function ($query, array $data) {
-                        $y = (int)($data['year'] ?? now()->year);
-                        $m = (int)($data['month'] ?? 0);
-                        if ($m >= 1 && $m <= 12) {
-                            $start = now()->setDate($y, $m, 1)->startOfMonth();
-                            $end   = now()->setDate($y, $m, 1)->endOfMonth();
-                            $query->whereBetween('etd', [$start, $end]);
-                        }
-                    }),
-            ])
-            ->actions([
-                Tables\Actions\EditAction::make()->label('Ubah'),
-            ])
-            ->bulkActions([
-                Tables\Actions\DeleteBulkAction::make()->label('Hapus'),
-            ]);
+        return $table->columns([]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index'    => ShippingScheduleResource\Pages\ListShippingSchedules::route('/'),
-            'overview' => ShippingScheduleResource\Pages\OverviewShippingSchedules::route('/overview'),
-            'create'   => ShippingScheduleResource\Pages\CreateShippingSchedule::route('/create'),
-            'edit'     => ShippingScheduleResource\Pages\EditShippingSchedule::route('/{record}/edit'),
+            'index' => Pages\ListShippingSchedules::route('/'),
+            'create' => Pages\CreateShippingSchedule::route('/create'),
+            'edit' => Pages\EditShippingSchedule::route('/{record}/edit'),
         ];
     }
 }

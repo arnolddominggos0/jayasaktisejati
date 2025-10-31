@@ -9,13 +9,13 @@ return new class extends Migration {
     {
         Schema::create('shipping_lines', function (Blueprint $table) {
             $table->id();
-            $table->string('code')->unique(); 
+            $table->string('code')->unique();
             $table->string('name');
-            $table->string('contact')->nullable();
-            $table->string('phone')->nullable();
-            $table->string('email')->nullable();
             $table->timestamps();
         });
     }
-    public function down(): void { Schema::dropIfExists('shipping_lines'); }
+    public function down(): void
+    {
+        Schema::dropIfExists('shipping_lines');
+    }
 };

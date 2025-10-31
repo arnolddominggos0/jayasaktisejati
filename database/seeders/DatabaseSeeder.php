@@ -13,11 +13,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RolesAndUsersSeeder::class);
         $this->call(InitialSetupSeeder::class);
-        // $this->call(DummyOperationalSeeder::class);
-        // $this->call(FleetMPSeeder::class);
-        // $this->call(FieldCoordinatorSeeder::class);
-        // $this->call(TestShipmentKpiWithTracksSeeder::class);
-        $this->call(ShippingScheduleSeeder::class);
-        $this->call(VoyageTestSeeder::class);
+        $this->call(ShippingCoreSeeder::class);
+
     }
 }

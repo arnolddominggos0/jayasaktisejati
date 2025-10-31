@@ -9,12 +9,15 @@ return new class extends Migration {
     {
         Schema::create('ports', function (Blueprint $table) {
             $table->id();
-            $table->string('code', 10)->unique(); 
+            $table->string('code')->unique();
             $table->string('name');
             $table->string('city')->nullable();
-            $table->string('country')->default('ID');
             $table->timestamps();
         });
     }
-    public function down(): void { Schema::dropIfExists('ports'); }
+    public function down(): void
+    {
+        Schema::dropIfExists('ports');
+    }
 };
+    

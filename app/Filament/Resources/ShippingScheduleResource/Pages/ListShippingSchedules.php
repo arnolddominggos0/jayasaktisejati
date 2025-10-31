@@ -3,32 +3,35 @@
 namespace App\Filament\Resources\ShippingScheduleResource\Pages;
 
 use App\Filament\Resources\ShippingScheduleResource;
-use Filament\Actions;
+use App\Filament\Widgets\ShippingScheduleCalendar;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListShippingSchedules extends ListRecords
 {
     protected static string $resource = ShippingScheduleResource::class;
 
-    protected function getHeaderWidgets(): array
+    protected function hasTable(): bool
     {
-        return [];
+        return false;
     }
 
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('toOverview')
-                ->label('Dashboard Jadwal')
-                ->icon('heroicon-o-chart-bar')
-                ->color('gray')
-                ->url(route('filament.admin.resources.shipping-schedules.overview')),
-            Actions\CreateAction::make()->label('Buat shipping schedule'),
-            Actions\Action::make('kelola_lines')
-                ->label('Kelola Shipping Line')
-                ->icon('heroicon-o-wrench')
-                ->url(\App\Filament\Resources\ShippingLineResource::getUrl())
-                ->openUrlInNewTab(),
+            CreateAction::make(),
         ];
+    }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            ShippingScheduleCalendar::class,
+        ];
+    }
+
+    public function getTitle(): string
+    {
+        return 'Daftar Jadwal Kapal';
     }
 }

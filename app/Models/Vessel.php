@@ -8,11 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Vessel extends Model
 {
-    protected $fillable = ['name', 'shipping_line_id', 'imo', 'is_active'];
-
-    protected $casts = [
-        'is_active' => 'boolean',
-    ];
+    protected $fillable = ['shipping_line_id', 'name', 'code', 'imo', 'capacity'];
 
     public function shippingLine(): BelongsTo
     {
@@ -22,10 +18,5 @@ class Vessel extends Model
     public function voyages(): HasMany
     {
         return $this->hasMany(Voyage::class);
-    }
-
-    public function schedules(): HasMany
-    {
-        return $this->hasMany(ShippingSchedule::class);
     }
 }
