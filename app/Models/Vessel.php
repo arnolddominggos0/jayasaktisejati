@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\VesselCode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,5 +19,13 @@ class Vessel extends Model
     public function voyages(): HasMany
     {
         return $this->hasMany(Voyage::class);
+    }
+
+    protected static function booted()
+    {
+        static::creating(function ($vessel) {
+            $vessel->loadMissing('shippingLine');
+            $vessel->code = $vessel->code ?? VesselCode::for($vessel);
+        });
     }
 }

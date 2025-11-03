@@ -22,6 +22,8 @@ use App\Filament\Pages\Dashboard\Widgets\{
     ActiveArmadaWidget,
     ShippingScheduleCalendar
 };
+use App\Filament\Widgets\ScheduleGanttPlaceholder;
+use App\Filament\Widgets\ScheduleKpiPlaceholder;
 use App\Filament\Widgets\ShippingScheduleCalendar as WidgetsShippingScheduleCalendar;
 use App\Models\Customer;
 use App\Observers\CustomerObserver;
@@ -44,10 +46,8 @@ class AppServiceProvider extends ServiceProvider
         Carbon::setLocale('id');
         Date::setLocale('id');
 
-        // Observers
         Shipment::observe(ShipmentObserver::class);
         ShipmentTrack::observe(ShipmentTrackObserver::class);
-        // ShipmentTrackHistory::observe(ShipmentTrackHistoryObserver::class);
         Customer::observe(CustomerObserver::class);
 
         $aliases = [
@@ -59,9 +59,8 @@ class AppServiceProvider extends ServiceProvider
             'app.filament.pages.dashboard.widgets.active-armada-widget'     => ActiveArmadaWidget::class,
             'app.filament.pages.dashboard.widgets.shipping-schedule-calendar' => WidgetsShippingScheduleCalendar::class,
             'app.filament.widgets.shipping-schedule-calendar' => WidgetsShippingScheduleCalendar::class,
-            'app.filament.widgets.schedule-kpi-placeholder' => \App\Filament\Widgets\ScheduleKpiPlaceholder::class,
-            'app.filament.widgets.schedule-gantt-placeholder' => \App\Filament\Widgets\ScheduleGanttPlaceholder::class,
-            'app.filament.pages.shipping-schedule-resource.pages.overview-shipping-schedules' => \App\Filament\Resources\ShippingScheduleResource\Pages\OverviewShippingSchedules::class,
+            'app.filament.widgets.schedule-kpi-placeholder' => ScheduleKpiPlaceholder::class,
+            'app.filament.widgets.schedule-gantt-placeholder' => ScheduleGanttPlaceholder::class,
         ];
 
         foreach ($aliases as $alias => $componentClass) {

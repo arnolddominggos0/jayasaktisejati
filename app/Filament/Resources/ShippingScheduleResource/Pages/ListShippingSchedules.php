@@ -18,20 +18,16 @@ class ListShippingSchedules extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [
-            CreateAction::make(),
-        ];
+        return [CreateAction::make()->label('Buat Jadwal')];
     }
 
     protected function getHeaderWidgets(): array
     {
-        return [
-            ShippingScheduleCalendar::class,
-        ];
+        return [ShippingScheduleCalendar::class];
     }
 
     public function getTitle(): string
     {
-        return 'Daftar Jadwal Kapal';
+        return 'Daftar Jadwal Kapal TAM';
     }
 }

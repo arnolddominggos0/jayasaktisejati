@@ -2,51 +2,80 @@
 
 namespace App\Models;
 
+use App\Enums\ScheduleState;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ShippingSchedule extends Model
 {
     protected $fillable = [
+        'voyage_id',
         'shipping_line_id',
-        'code',
-        'state',
-        'etd',
-        'eta',
         'vessel_id',
         'vessel_name',
         'voyage_no',
-        'cargo_plan_total',
+        'cargo_plan',
+        'jss',
+        'dwelling_days',
+        'etd',
+        'eta',
+        'period_month',
+        'state',
+        'approved_by_name',
+        'final_note',
         'final_source',
         'final_attachment_path',
-        'final_note',
-        'approved_by_name',
-        'approved_at',
-        'final_email_message_id',
-        'final_email_subject',
-        'final_email_from',
-        'final_email_received_at',
-        'revision_count',
-        'last_revision_at',
-        'period_month',
+        'finalized_at',
+        'kpi_sailing_days',
+        'actual_sailing_days',
     ];
 
     protected $casts = [
+        'state' => ScheduleState::class,
         'etd' => 'datetime',
         'eta' => 'datetime',
-        'approved_at' => 'datetime',
-        'final_email_received_at' => 'datetime',
         'period_month' => 'date',
+        'finalized_at' => 'datetime',
     ];
+
+    public function voyage(): BelongsTo
+    {
+        return $this->belongsTo(Voyage::class);
+    }
 
     public function vessel(): BelongsTo
     {
         return $this->belongsTo(Vessel::class);
     }
 
-    public function items(): HasMany
+    public function shippingLine(): BelongsTo
     {
-        return $this->hasMany(ShippingScheduleItem::class, 'shipping_schedule_id');
+        return $this->belongsTo(ShippingLine::class);
+    }
+
+    public function canFinalize(): bool
+    {
+        $etd = $this->etd ?: $this->voyage?->etd;
+        $eta = $this->eta ?: $this->voyage?->eta;
+        return $etd && $eta && $eta->gt($etd) && ($this->cargo_plan ?? 0) > 0;
+    }
+
+    public function refreshActualSailing(): void
+    {
+        $atd = $this->voyage?->atd_at;
+        $ata = $this->voyage?->ata_at;
+
+        if (is_string($atd)) {
+            $atd = \Illuminate\Support\Carbon::parse($atd);
+        }
+        if (is_string($ata)) {
+            $ata = \Illuminate\Support\Carbon::parse($ata);
+        }
+
+        $this->actual_sailing_days = ($atd && $ata && $ata->gt($atd))
+            ? $atd->diffInDays($ata)
+            : null;
+
+        $this->saveQuietly();
     }
 }

@@ -13,4 +13,11 @@ class ShippingLine extends Model
     {
         return $this->hasMany(Vessel::class);
     }
+    protected static function booted()
+    {
+        static::creating(function ($vessel) {
+            $vessel->loadMissing('shippingLine');
+            $vessel->code = $vessel->code ?? VesselCode::for($vessel);
+        });
+    }
 }

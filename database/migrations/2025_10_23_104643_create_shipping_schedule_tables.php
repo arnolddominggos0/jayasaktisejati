@@ -7,19 +7,33 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::create('shipping_schedules', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('voyage_id')->unique()->constrained()->cascadeOnDelete();
-            $table->unsignedInteger('cargo_plan')->default(0);
-            $table->string('state')->default('draft');
-            $table->string('approved_by_name')->nullable();
-            $table->text('final_note')->nullable();
-            $table->string('final_source')->nullable();
-            $table->string('final_attachment_path')->nullable();
-            $table->timestamp('finalized_at')->nullable();
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('shipping_schedules')) {
+            Schema::create('shipping_schedules', function (Blueprint $t) {
+                $t->id();
+                $t->foreignId('voyage_id')->constrained('voyages')->cascadeOnDelete();
+                $t->foreignId('shipping_line_id')->nullable()->constrained('shipping_lines')->nullOnDelete();
+                $t->foreignId('vessel_id')->nullable()->constrained('vessels')->nullOnDelete();
+                $t->string('vessel_name', 255)->nullable();
+                $t->string('voyage_no', 50)->nullable()->index();
+                $t->unsignedSmallInteger('cargo_plan')->default(0);
+                $t->string('jss', 100)->nullable();
+                $t->unsignedSmallInteger('dwelling_days')->nullable();
+                $t->timestampTz('etd')->nullable()->index();
+                $t->timestampTz('eta')->nullable()->index();
+                $t->date('period_month')->nullable()->index();
+                $t->string('state', 20)->default('draft')->index();
+                $t->string('approved_by_name')->nullable();
+                $t->text('final_note')->nullable();
+                $t->string('final_source')->nullable();
+                $t->string('final_attachment_path')->nullable();
+                $t->timestampTz('finalized_at')->nullable();
+                $t->unsignedSmallInteger('kpi_sailing_days')->nullable();
+                $t->unsignedSmallInteger('actual_sailing_days')->nullable();
+                $t->timestampsTz();
+            });
+        }
     }
+
     public function down(): void
     {
         Schema::dropIfExists('shipping_schedules');
