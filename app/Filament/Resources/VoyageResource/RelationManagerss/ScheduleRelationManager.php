@@ -9,7 +9,7 @@ use Filament\Tables;
 
 class ScheduleRelationManager extends RelationManager
 {
-    protected static string $relationship = 'schedule';
+    protected static string $relationship = 'schedules';
     protected static ?string $title = 'Jadwal TAM';
 
     public function form(\Filament\Forms\Form $form): \Filament\Forms\Form
@@ -63,9 +63,9 @@ class ScheduleRelationManager extends RelationManager
                             $data['finalized_at'] = $data['finalized_at'] ?? now();
                         }
 
-                        return $owner->schedule()->create($data);
+                        return $owner->schedules()->create($data);
                     })
-                    ->visible(fn() => $this->getOwnerRecord()->schedule()->doesntExist()),
+                    ->visible(fn() => $this->getOwnerRecord()->schedules()->doesntExist()),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()

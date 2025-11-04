@@ -3,83 +3,107 @@
 <div class="space-y-5">
     <div class="flex items-center justify-between">
         <div>
-            <h2 class="text-xl font-semibold">Kalender Jadwal Kapal — {{ $d['month_label'] }}</h2>
+            <h2 class="text-xl font-semibold">Kalender Jadwal Kapal — {{ $d['month_label'] ?? '' }}</h2>
             <p class="text-xs text-gray-500">
                 Total Cargo Plan (ETD bulan ini):
                 <span class="font-semibold text-gray-700">{{ $d['total_plan'] ?? 0 }}</span>
             </p>
         </div>
-        <div class="flex gap-2">
-            <a href="?month={{ $d['prev'] }}" class="fi-btn fi-btn-size-sm fi-btn-color-gray">Bulan Sebelumnya</a>
-            <a href="?month={{ now()->format('Y-m') }}" class="fi-btn fi-btn-size-sm fi-btn-color-gray">Bulan Ini</a>
-            <a href="?month={{ $d['next'] }}" class="fi-btn fi-btn-size-sm fi-btn-color-gray">Bulan Berikutnya</a>
-        </div>
+
+        <div class="flex items-center gap-2 text-sm">
+    <label>Bulan:</label>
+    <select wire:model.live="monthNum" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+        @foreach ($d['month_options'] as $num => $label)
+            <option value="{{ $num }}">{{ $label }}</option>
+        @endforeach
+    </select>
+
+    <label>Tahun:</label>
+    <select wire:model.live="year" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+        @foreach ($d['year_options'] as $yy)
+            <option value="{{ $yy }}">{{ $yy }}</option>
+        @endforeach
+    </select>
+
+    <button
+        wire:click="$set('year', {{ now()->year }}); $set('monthNum', {{ now()->month }})"
+        class="text-blue-600 underline hover:text-blue-800 transition">
+        Bulan Ini
+    </button>
+</div>
+
     </div>
 
     <div class="overflow-x-auto rounded-xl border bg-white shadow">
-        <div class="max-h-[520px] overflow-y-auto">
-            <table class="min-w-[1100px] w-full border-collapse text-[13px] leading-tight">
-                <thead class="bg-gray-50 sticky top-0 z-10">
-                    <tr class="border-b">
-                        <th class="sticky left-0 bg-gray-50 px-3 py-2 text-left w-44">Lane</th>
-                        @php($today = now()->toDateString())
-                        @foreach (($d['days'] ?? []) as $day)
-                        @php
-                        $weekend = !empty($day['isWeekend']) ? 'bg-rose-50 text-rose-600' : 'text-gray-700';
-                        $isToday = (($day['date'] ?? null) === $today) ? 'ring-1 ring-blue-400 rounded-sm' : '';
-                        @endphp
-                        <th class="px-1.5 py-2 text-center font-medium {{ $weekend }} {{ $isToday }}">
-                            {{ $day['n'] ?? '' }}
+        <div class="max-h-[540px] overflow-y-auto">
+            <table class="min-w-[1200px] w-full border-collapse text-[12px] leading-tight">
+                <thead class="sticky top-0 z-10">
+                    <tr>
+                        <th class="sticky left-0 bg-gray-50 border border-gray-200 w-48 px-3 py-2 text-left text-[12px] font-semibold">
+                            Lane
                         </th>
+                        @foreach (($d['days'] ?? []) as $day)
+                            @php($isWeekend = !empty($day['isWeekend']))
+                            @php($isToday = (($day['date'] ?? null) === ($d['today'] ?? '')))
+                            <th class="border border-gray-200 text-center align-middle w-9 min-w-9 py-1
+                                       {{ $isWeekend ? 'bg-rose-50 text-rose-700' : 'bg-gray-50 text-gray-800' }}
+                                       {{ $isToday ? 'ring-1 ring-blue-400' : '' }}"
+                                title="{{ $day['date'] ?? '' }}">
+                                <div class="text-[10px] leading-3">{{ $day['dow'] ?? '' }}</div>
+                                <div class="text-[12px] font-semibold">{{ $day['n'] ?? '' }}</div>
+                            </th>
                         @endforeach
                     </tr>
                 </thead>
 
                 <tbody>
                     @foreach (($d['lanes'] ?? []) as $key => $label)
-                    <tr class="border-t">
-                        <td class="sticky left-0 bg-white font-semibold px-3 py-2 text-gray-800">
-                            {{ $label }}
-                        </td>
-
-                        @for ($i = 1; $i <= ($d['days_count'] ?? 0); $i++)
-                            @php
-                            $laneColor=match ($key) { 'plan_etd'=> 'bg-blue-50 border-blue-300 text-blue-800',
-                            'plan_eta' => 'bg-amber-50 border-amber-300 text-amber-800',
-                            'act_atd' => 'bg-emerald-50 border-emerald-300 text-emerald-800',
-                            'act_ata' => 'bg-purple-50 border-purple-300 text-purple-800',
-                            'sum_atd' => 'bg-gray-50 border-gray-200 text-gray-700',
-                            default => 'bg-gray-50 border-gray-200 text-gray-700',
-                            };
-                            $chips = $d['bucket'][$key][$i] ?? [];
-                            @endphp
-
-                            <td class="align-top px-1 py-1">
-                                <div class="space-y-1 min-h-[84px]">
-                                    @foreach ($chips as $chip)
-                                    @if ($key === 'sum_atd')
-                                    <div class="inline-flex items-center justify-center w-10 h-6 rounded-md border {{ $laneColor }} text-[11px]">
-                                        {{ $chip['label'] ?? '0' }}
-                                    </div>
-                                    @else
-                                    <div class="rounded-md border {{ $laneColor }} px-2 py-1 hover:shadow-sm transition">
-                                        <div class="font-semibold text-[11px]">{{ $chip['label'] ?? '' }}</div>
-                                        @if (!empty($chip['head']))
-                                        <div class="text-[11px]">{{ $chip['head'] }}</div>
-                                        @endif
-                                        @if (!empty($chip['sub']))
-                                        <div class="text-[10px] text-gray-600">{{ $chip['sub'] }}</div>
-                                        @endif
-                                    </div>
-                                    @endif
-                                    @endforeach
-                                </div>
+                        <tr>
+                            <td class="sticky left-0 bg-white border border-gray-200 px-3 py-2 font-semibold text-gray-800">
+                                {{ $label }}
                             </td>
+
+                            @for ($i = 1; $i <= ($d['days_count'] ?? 0); $i++)
+                                @php($laneColor = match ($key) {
+                                    'plan_etd' => 'bg-yellow-50 text-yellow-900',
+                                    'plan_eta' => 'bg-amber-50 text-amber-900',
+                                    'act_atd'  => 'bg-emerald-50 text-emerald-900',
+                                    'act_ata'  => 'bg-purple-50 text-purple-900',
+                                    'sum_atd'  => 'bg-orange-50 text-orange-900',
+                                    default    => 'bg-gray-50 text-gray-900',
+                                })
+                                @php($chips = $d['bucket'][$key][$i] ?? [])
+                                <td class="border border-gray-200 align-top p-0">
+                                    <div class="min-h-8 max-h-[68px] overflow-y-auto px-1 py-0.5 space-y-0.5">
+                                        @foreach ($chips as $chip)
+                                            @if ($key === 'sum_atd')
+                                                <div class="mx-auto my-0.5 h-6 w-8 text-center text-[11px] font-semibold {{ $laneColor }} rounded-sm border border-gray-200 flex items-center justify-center">
+                                                    {{ $chip['short'] ?? $chip['label'] ?? '0' }}
+                                                </div>
+                                            @else
+                                                <div class="h-6 px-1.5 text-[11px] leading-6 truncate {{ $laneColor }} rounded-sm border border-gray-200"
+                                                     title="{{ ($chip['label'] ?? '') . ' | ' . ($chip['head'] ?? '') . ' | ' . ($chip['sub'] ?? '') }}">
+                                                    {{ $chip['short'] ?? $chip['label'] ?? '' }}
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                </td>
                             @endfor
-                    </tr>
+                        </tr>
                     @endforeach
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <div class="text-[11px] text-gray-600">
+        <div class="flex items-center gap-3">
+            <span class="inline-block h-3 w-3 rounded-sm bg-yellow-200 border border-yellow-300"></span> ETD/ETA Plan
+            <span class="inline-block h-3 w-3 rounded-sm bg-emerald-200 border border-emerald-300"></span> ATD Actual
+            <span class="inline-block h-3 w-3 rounded-sm bg-purple-200 border border-purple-300"></span> ATA Actual
+            <span class="inline-block h-3 w-3 rounded-sm bg-orange-200 border border-orange-300"></span> Vol. ATD (sum)
+            <span class="ml-4 text-rose-700">Hari merah = weekend</span>
         </div>
     </div>
 </div>

@@ -6,10 +6,14 @@ use App\Enums\ScheduleState;
 use App\Filament\Resources\VoyageResource\Pages;
 use App\Filament\Resources\VoyageResource\RelationManagers\ScheduleRelationManager;
 use App\Models\Voyage;
-use Filament\Forms;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class VoyageResource extends Resource
@@ -22,32 +26,38 @@ class VoyageResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\Select::make('vessel_id')->relationship('vessel', 'name')->required()->searchable()->label('Kapal'),
-            Forms\Components\Select::make('pol_id')->relationship('pol', 'name')->required()->searchable()->label('POL'),
-            Forms\Components\Select::make('pod_id')->relationship('pod', 'name')->required()->searchable()->label('POD'),
-            Forms\Components\TextInput::make('voyage_no')->required()->maxLength(50)->label('Voyage No'),
-            Forms\Components\TextInput::make('service')->maxLength(50)->label('Service'),
-            Forms\Components\DateTimePicker::make('etd')->required()->label('ETD'),
-            Forms\Components\DateTimePicker::make('eta')->required()->label('ETA'),
-            Forms\Components\DateTimePicker::make('atd_at')->label('ATD (Actual)'),
-            Forms\Components\DateTimePicker::make('ata_at')->label('ATA (Actual)'),
+            Select::make('vessel_id')->relationship('vessel', 'name')->required()->searchable()->label('Kapal'),
+            Select::make('pol_id')->relationship('pol', 'name')->required()->searchable()->label('POL'),
+            Select::make('pod_id')->relationship('pod', 'name')->required()->searchable()->label('POD'),
+            TextInput::make('voyage_no')->required()->maxLength(50)->label('Voyage No'),
+            TextInput::make('service')->maxLength(50)->label('Service'),
+            DateTimePicker::make('etd')->required()->label('ETD'),
+            DateTimePicker::make('eta')->required()->label('ETA'),
+            DateTimePicker::make('atd_at')->label('ATD (Actual)'),
+            DateTimePicker::make('ata_at')->label('ATA (Actual)'),
         ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table->columns([
-            Tables\Columns\TextColumn::make('vessel.shippingLine.name')->label('Shipping Line')->sortable()->searchable(),
-            Tables\Columns\TextColumn::make('vessel.name')->label('Kapal')->sortable()->searchable(),
-            Tables\Columns\TextColumn::make('voyage_no')->label('Voyage')->sortable()->searchable(),
-            Tables\Columns\TextColumn::make('pol.code')->label('POL')->sortable(),
-            Tables\Columns\TextColumn::make('pod.code')->label('POD')->sortable(),
-            Tables\Columns\TextColumn::make('etd')->label('ETD')->dateTime()->sortable(),
-            Tables\Columns\TextColumn::make('eta')->label('ETA')->dateTime()->sortable(),
-            Tables\Columns\IconColumn::make('schedule.state')
+            TextColumn::make('vessel.shippingLine.name')->label('Pelayaran')->sortable()->searchable(),
+            TextColumn::make('vessel.name')->label('Kapal')->sortable()->searchable(),
+            TextColumn::make('voyage_no')->label('Voyage')->sortable()->searchable(),
+            TextColumn::make('pol.code')->label('POL')->sortable(),
+            TextColumn::make('pod.code')->label('POD')->sortable(),
+            TextColumn::make('etd')->label('ETD')->dateTime()->sortable(),
+            TextColumn::make('eta')->label('ETA')->dateTime()->sortable(),
+            IconColumn::make('final_tam')
                 ->boolean()
-                ->getStateUsing(fn($record) => optional($record->schedule)->state === ScheduleState::Final)
+                ->getStateUsing(
+                    fn($record) =>
+                    $record->schedules()
+                        ->where('state', ScheduleState::Final)
+                        ->exists()
+                )
                 ->label('Final TAM'),
+
         ])->actions([
             Tables\Actions\EditAction::make(),
         ])->bulkActions([

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Voyage extends Model
 {
@@ -37,5 +38,9 @@ class Voyage extends Model
     public function pod(): BelongsTo
     {
         return $this->belongsTo(Port::class, 'pod_id');
+    }
+    public function schedules(): HasOne
+    {
+        return $this->hasOne(ShippingSchedule::class, 'voyage_id');
     }
 }

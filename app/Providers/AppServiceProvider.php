@@ -26,7 +26,9 @@ use App\Filament\Widgets\ScheduleGanttPlaceholder;
 use App\Filament\Widgets\ScheduleKpiPlaceholder;
 use App\Filament\Widgets\ShippingScheduleCalendar as WidgetsShippingScheduleCalendar;
 use App\Models\Customer;
+use App\Models\ShippingSchedule;
 use App\Observers\CustomerObserver;
+use App\Observers\ShippingScheduleObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -49,6 +51,7 @@ class AppServiceProvider extends ServiceProvider
         Shipment::observe(ShipmentObserver::class);
         ShipmentTrack::observe(ShipmentTrackObserver::class);
         Customer::observe(CustomerObserver::class);
+        ShippingSchedule::observe(ShippingScheduleObserver::class);
 
         $aliases = [
             'app.filament.pages.dashboard.widgets.kpi-overview'             => KpiOverview::class,
