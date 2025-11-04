@@ -9,7 +9,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Vessel extends Model
 {
-    protected $fillable = ['shipping_line_id', 'name', 'code', 'imo', 'capacity'];
+    protected $fillable = [
+        'shipping_line_id',
+        'name',
+        'code',
+        'imo',
+        'capacity'
+    ];
 
     public function shippingLine(): BelongsTo
     {

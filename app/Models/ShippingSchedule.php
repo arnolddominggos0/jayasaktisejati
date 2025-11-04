@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ScheduleState;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 class ShippingSchedule extends Model
 {
@@ -66,10 +67,10 @@ class ShippingSchedule extends Model
         $ata = $this->voyage?->ata_at;
 
         if (is_string($atd)) {
-            $atd = \Illuminate\Support\Carbon::parse($atd);
+            $atd = Carbon::parse($atd);
         }
         if (is_string($ata)) {
-            $ata = \Illuminate\Support\Carbon::parse($ata);
+            $ata = Carbon::parse($ata);
         }
 
         $this->actual_sailing_days = ($atd && $ata && $ata->gt($atd))

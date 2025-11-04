@@ -24,8 +24,8 @@ return new class extends Migration {
                 if (!Schema::hasColumn('shipping_schedules', 'voyage_no')) {
                     $table->string('voyage_no', 50)->nullable()->index();
                 }
-                if (!Schema::hasColumn('shipping_schedules', 'cargo_plan_total')) {
-                    $table->integer('cargo_plan_total')->nullable();
+                if (!Schema::hasColumn('shipping_schedules', 'cargo_plan')) {
+                    $table->integer('cargo_plan')->nullable();
                 }
                 if (!Schema::hasColumn('shipping_schedules', 'state')) {
                     $table->string('state', 20)->default('draft')->index();
@@ -84,8 +84,8 @@ return new class extends Migration {
                 if (Schema::hasColumn('shipping_schedules', 'voyage_no')) {
                     $table->dropColumn('voyage_no');
                 }
-                if (Schema::hasColumn('shipping_schedules', 'cargo_plan_total')) {
-                    $table->dropColumn('cargo_plan_total');
+                if (Schema::hasColumn('shipping_schedules', 'cargo_plan')) {
+                    $table->dropColumn('cargo_plan');
                 }
                 if (Schema::hasColumn('shipping_schedules', 'vessel_id')) {
                     $table->dropConstrainedForeignId('vessel_id');

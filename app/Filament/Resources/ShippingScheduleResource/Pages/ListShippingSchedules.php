@@ -13,7 +13,7 @@ class ListShippingSchedules extends ListRecords
 
     protected function hasTable(): bool
     {
-        return false;
+        return true;
     }
 
     protected function getHeaderActions(): array
@@ -24,6 +24,11 @@ class ListShippingSchedules extends ListRecords
     protected function getHeaderWidgets(): array
     {
         return [ShippingScheduleCalendar::class];
+    }
+    
+    public function getHeaderWidgetsColumns(): int|string|array
+    {
+        return 1;
     }
 
     public function getTitle(): string
