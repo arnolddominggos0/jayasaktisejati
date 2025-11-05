@@ -29,7 +29,7 @@ class Voyage extends Model
 
     public function vessel(): BelongsTo
     {
-        return $this->belongsTo(Vessel::class);
+        return $this->belongsTo(Vessel::class, 'vessel_id');
     }
     public function pol(): BelongsTo
     {

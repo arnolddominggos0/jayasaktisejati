@@ -24,7 +24,7 @@ class Depot extends Model
     ];
 
     protected static function booted(): void
-    {
+    {+-
         static::saving(function (Depot $m) {
             if ($m->mode === 'sea_freight') $m->mode = 'sea';
             if (! in_array($m->mode, ['sea', 'land'], true)) $m->mode = 'land';

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\ScheduleState;
 use App\Filament\Resources\VoyageResource\Pages;
 use App\Filament\Resources\VoyageResource\RelationManagers\ScheduleRelationManager;
+use App\Models\Port;
 use App\Models\Voyage;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -26,11 +27,46 @@ class VoyageResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Select::make('vessel_id')->relationship('vessel', 'name')->required()->searchable()->label('Kapal'),
-            Select::make('pol_id')->relationship('pol', 'name')->required()->searchable()->label('POL'),
-            Select::make('pod_id')->relationship('pod', 'name')->required()->searchable()->label('POD'),
-            TextInput::make('voyage_no')->required()->maxLength(50)->label('Voyage No'),
-            TextInput::make('service')->maxLength(50)->label('Service'),
+            Select::make('vessel_id')
+                ->relationship('vessel', 'name')
+                ->required()
+                ->searchable()
+                ->preload()
+                ->label('Kapal'),
+            Select::make('pol_id')
+                ->relationship('pol', 'code')
+                ->required()
+                ->searchable()
+                ->preload()
+                ->getSearchResultsUsing(fn(string $search) => Port::query()
+                    ->when($search !== '', fn($q) => $q
+                        ->where('code', 'ilike', "%{$search}%")
+                        ->orWhere('name', 'ilike', "%{$search}%"))
+                    ->limit(50)
+                    ->pluck('code', 'id'))
+                ->getOptionLabelUsing(fn($value) => optional(Port::find($value))
+                    ?->code . ' — ' . optional(Port::find($value))?->name)
+                ->label('POL'),
+            Select::make('pod_id')
+                ->relationship('pod', 'code')
+                ->required()
+                ->searchable()
+                ->preload()
+                ->getSearchResultsUsing(fn(string $search) => Port::query()
+                    ->when($search !== '', fn($q) => $q
+                        ->where('code', 'ilike', "%{$search}%")
+                        ->orWhere('name', 'ilike', "%{$search}%"))
+                    ->limit(50)
+                    ->pluck('code', 'id'))
+                ->getOptionLabelUsing(fn($value) => optional(Port::find($value))
+                    ?->code . ' — ' . optional(Port::find($value))?->name)
+                ->label('POD'),
+            TextInput::make('voyage_no')
+                ->required()
+                ->maxLength(50)
+                ->label('Voyage No'),
+            TextInput::make('service')
+                ->maxLength(50)->label('Service'),
             DateTimePicker::make('etd')->required()->label('ETD'),
             DateTimePicker::make('eta')->required()->label('ETA'),
             DateTimePicker::make('atd_at')->label('ATD (Actual)'),
