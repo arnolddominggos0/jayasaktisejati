@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 class ShippingSchedule extends Model
 {
     use HasMonthlyOverlap;
+
     protected $fillable = [
         'voyage_id',
         'shipping_line_id',
@@ -33,16 +34,22 @@ class ShippingSchedule extends Model
         'finalized_at',
         'kpi_sailing_days',
         'actual_sailing_days',
+        'tam_payload',
+        'tam_version',
+        'tam_draft_path',
+        'tam_generated_at',
     ];
 
     protected $casts = [
-        'state' => ScheduleState::class,
-        'etd' => 'datetime',
-        'eta' => 'datetime',
-        'atd' => 'datetime',
-        'ata' => 'datetime',
+        'state'        => ScheduleState::class,
+        'etd'          => 'datetime',
+        'eta'          => 'datetime',
+        'atd'          => 'datetime',
+        'ata'          => 'datetime',
         'period_month' => 'date',
         'finalized_at' => 'datetime',
+        'tam_payload'  => 'array',
+        'tam_generated_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -60,19 +67,10 @@ class ShippingSchedule extends Model
         });
     }
 
-    public function mount()
-    {
-        $this->month = request('month', now()->format('Y-m'));
-    }
-
-    public function changeMonth($month)
-    {
-        $this->month = $month;
-    }
-
+    /* ===== Scopes ===== */
     public function scopeFinal(Builder $q): Builder
     {
-        return $q->where('state', 'final');
+        return $q->where('state', ScheduleState::Final);
     }
 
     public function scopeOverlapsMonth(Builder $q, int $year, int $month): Builder
@@ -90,36 +88,34 @@ class ShippingSchedule extends Model
         });
     }
 
-    public function setActualSailingDaysAttribute($value): void
-    {
-        $this->attributes['actual_sailing_days'] = is_null($value) ? null : (int) round($value);
-    }
-
-    public function setKpiSailingDaysAttribute($value): void
-    {
-        $this->attributes['kpi_sailing_days'] = is_null($value) ? null : (int) round($value);
-    }
-
+    /* ===== Relations ===== */
     public function voyage(): BelongsTo
     {
         return $this->belongsTo(Voyage::class);
     }
-
     public function vessel(): BelongsTo
     {
         return $this->belongsTo(Vessel::class);
     }
-
     public function shippingLine(): BelongsTo
     {
         return $this->belongsTo(ShippingLine::class);
     }
 
+    /* ===== Business rules ===== */
     public function canFinalize(): bool
     {
         $etd = $this->etd ?: $this->voyage?->etd;
         $eta = $this->eta ?: $this->voyage?->eta;
-        return $etd && $eta && $eta->gt($etd) && ($this->cargo_plan ?? 0) > 0;
+
+        if (! $etd || ! $eta || ! $eta->gt($etd) || ($this->cargo_plan ?? 0) <= 0) {
+            return false;
+        }
+
+        // Lock revisi H-6 dari ETD (kecuali role admin; cek di policy kalau mau)
+        $limit = $etd->copy()->subDays(6)->endOfDay();
+        $now   = now($etd->timezone ?: 'Asia/Jakarta');
+        return $now->lte($limit);
     }
 
     public function refreshActualSailing(): void
@@ -128,9 +124,11 @@ class ShippingSchedule extends Model
         $ata = $this->voyage?->ata_at;
         if (is_string($atd)) $atd = Carbon::parse($atd);
         if (is_string($ata)) $ata = Carbon::parse($ata);
+
         $this->actual_sailing_days = ($atd && $ata && $ata->gt($atd))
             ? (int) $atd->diffInDays($ata)
             : null;
+
         $this->saveQuietly();
     }
 
@@ -138,6 +136,7 @@ class ShippingSchedule extends Model
     {
         $voyNo = $this->voyage_no ?: $this->voyage?->voyage_no;
         if (!$voyNo) return null;
+
         $vessel = $this->vessel ?: $this->voyage?->vessel;
         $vesselCode = null;
         if ($vessel && !blank($vessel->code)) {
@@ -149,9 +148,7 @@ class ShippingSchedule extends Model
             $name = trim(str_replace(['K.M.', 'K.M', 'KM', '  '], ' ', $name));
             $parts = array_values(array_filter(explode(' ', $name)));
             if (count($parts) >= 2) {
-                $first = $parts[0];
-                $last  = $parts[count($parts) - 1];
-                $vesselCode = substr($first, 0, 1) . substr($last, 0, 2);
+                $vesselCode = substr($parts[0], 0, 1) . substr(end($parts), 0, 2);
             } elseif (count($parts) === 1) {
                 $vesselCode = substr($parts[0], 0, 3);
             } else {

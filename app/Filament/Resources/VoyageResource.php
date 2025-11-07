@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Actions\Schedule\CreateFromVoyage;
 use App\Enums\ScheduleState;
 use App\Filament\Resources\VoyageResource\Pages;
 use App\Filament\Resources\VoyageResource\RelationManagers\ScheduleRelationManager;
@@ -93,9 +94,13 @@ class VoyageResource extends Resource
                         ->exists()
                 )
                 ->label('Final TAM'),
-
         ])->actions([
             Tables\Actions\EditAction::make(),
+            Tables\Actions\Action::make('generateSchedule')
+                ->label('Generate Schedule')
+                ->icon('heroicon-o-calendar')
+                ->requiresConfirmation()
+                ->action(fn(Voyage $record) => CreateFromVoyage::run($record)),
         ])->bulkActions([
             Tables\Actions\DeleteBulkAction::make(),
         ]);
