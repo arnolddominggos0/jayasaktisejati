@@ -6,14 +6,13 @@ use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
         $this->call(RolesAndUsersSeeder::class);
         $this->call(InitialSetupSeeder::class);
         $this->call(ShippingCoreSeeder::class);
-
+        $this->call([
+            TamMonthlyScheduleSeeder::class,
+        ]);
     }
 }

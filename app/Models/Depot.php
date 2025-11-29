@@ -24,10 +24,15 @@ class Depot extends Model
     ];
 
     protected static function booted(): void
-    {+-
+    {
         static::saving(function (Depot $m) {
-            if ($m->mode === 'sea_freight') $m->mode = 'sea';
-            if (! in_array($m->mode, ['sea', 'land'], true)) $m->mode = 'land';
+            if ($m->mode === 'sea_freight') {
+                $m->mode = 'sea';
+            }
+
+            if (! in_array($m->mode, ['sea', 'land'], true)) {
+                $m->mode = 'land';
+            }
         });
     }
 
@@ -35,43 +40,63 @@ class Depot extends Model
     {
         return $this->belongsTo(Branch::class);
     }
+
     public function coordinator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'coordinator_user_id');
     }
+
     public function manpowers(): HasMany
     {
         return $this->hasMany(Manpower::class);
     }
+
     public function armadas(): HasMany
     {
         return $this->hasMany(Armada::class);
     }
+
     public function briefingSessions(): HasMany
     {
         return $this->hasMany(BriefingSession::class);
     }
+
     public function port(): BelongsTo
     {
         return $this->belongsTo(Port::class, 'port_id');
     }
+
     public function shipments(): HasMany
     {
-        return $this->hasMany(\App\Models\Shipment::class, 'assigned_depot_id');
+        return $this->hasMany(Shipment::class, 'assigned_depot_id');
     }
 
     public static function resolveIdFor(?int $branchId, ?string $mode, ?int $voyageId = null): ?int
     {
-        if (!$branchId || !$mode) return null;
+        if (! $branchId || ! $mode) {
+            return null;
+        }
+
         $mode = $mode === 'sea_freight' ? 'sea' : $mode;
-        $q = static::query()->where('branch_id', $branchId)->where('mode', $mode);
+
+        $q = static::query()
+            ->where('branch_id', $branchId)
+            ->where('mode', $mode);
+
         if ($mode === 'sea' && $voyageId) {
-            $polId = \App\Models\Voyage::whereKey($voyageId)->value('port_from_id');
+            $polId = Voyage::whereKey($voyageId)->value('pol_id');
             if ($polId) {
-                $byPol = (clone $q)->where('port_id', $polId)->orderBy('name')->value('id');
-                if ($byPol) return (int) $byPol;
+                $byPol = (clone $q)
+                    ->where('port_id', $polId)
+                    ->orderBy('name')
+                    ->value('id');
+
+                if ($byPol) {
+                    return (int) $byPol;
+                }
             }
         }
+
         return $q->orderBy('name')->value('id');
     }
 }

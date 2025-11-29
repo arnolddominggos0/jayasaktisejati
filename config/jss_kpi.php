@@ -2,11 +2,7 @@
 
 return [
     'manado' => [
-        'branch_ids' => [],
-        'coverage_city_ids' => [],
-        'depot_ids' => [],
-        'city_overrides' => [],
-        'customer_city_overrides' => [],
+        'customer_ids' => [14, 15],
         'thresholds' => [
             'dwelling_days' => 6,
             'sailing_days' => 10,

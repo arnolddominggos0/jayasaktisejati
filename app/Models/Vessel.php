@@ -14,7 +14,7 @@ class Vessel extends Model
         'name',
         'code',
         'imo',
-        'capacity'
+        'capacity',
     ];
 
     public function shippingLine(): BelongsTo
@@ -27,9 +27,9 @@ class Vessel extends Model
         return $this->hasMany(Voyage::class);
     }
 
-    protected static function booted()
+    protected static function booted(): void
     {
-        static::creating(function ($vessel) {
+        static::creating(function (Vessel $vessel) {
             $vessel->loadMissing('shippingLine');
             $vessel->code = $vessel->code ?? VesselCode::for($vessel);
         });

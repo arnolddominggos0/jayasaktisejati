@@ -110,6 +110,16 @@ return [
         'flags' => [],
     ],
 
+    'icons' => [
+        'sets' => [
+            'simple' => [
+                'prefix' => 'simple',
+                'path' => base_path('vendor/blade-ui-kit/blade-simple-icons/resources/svg'),
+            ],
+        ],
+    ],
+
+
     /*
     |--------------------------------------------------------------------------
     | System Route Prefix

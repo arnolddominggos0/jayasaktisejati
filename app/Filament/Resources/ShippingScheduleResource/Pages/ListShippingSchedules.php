@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\ShippingScheduleResource\Pages;
 
 use App\Filament\Resources\ShippingScheduleResource;
-use App\Filament\Widgets\ShippingScheduleCalendar;
+use App\Filament\Resources\ShippingScheduleResource\Widgets\ShippingScheduleCalendar;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
@@ -18,14 +18,18 @@ class ListShippingSchedules extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        return [CreateAction::make()->label('Buat Jadwal')];
+        return [
+            CreateAction::make()->label('Buat Jadwal'),
+        ];
     }
 
     protected function getHeaderWidgets(): array
     {
-        return [ShippingScheduleCalendar::class];
+        return [
+            ShippingScheduleCalendar::class,
+        ];
     }
-    
+
     public function getHeaderWidgetsColumns(): int|string|array
     {
         return 1;

@@ -31,15 +31,18 @@ class Voyage extends Model
     {
         return $this->belongsTo(Vessel::class, 'vessel_id');
     }
+
     public function pol(): BelongsTo
     {
         return $this->belongsTo(Port::class, 'pol_id');
     }
+
     public function pod(): BelongsTo
     {
         return $this->belongsTo(Port::class, 'pod_id');
     }
-    public function schedules(): HasOne
+
+    public function schedule(): HasOne
     {
         return $this->hasOne(ShippingSchedule::class, 'voyage_id');
     }

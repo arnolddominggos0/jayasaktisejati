@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\VoyageResource\RelationManagers;
 
 use App\Enums\ScheduleState;
+use Exception;
 use Filament\Forms;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
@@ -57,9 +58,10 @@ class ScheduleRelationManager extends RelationManager
                         if (($data['state'] ?? null) === ScheduleState::Final->value) {
                             $tmp = new \App\Models\ShippingSchedule($data);
                             $tmp->voyage()->associate($owner);
-                            if (!$tmp->canFinalize()) {
-                                throw new \Exception('Tidak bisa final: ETD/ETA wajib dan Cargo Plan > 0.');
+                            if (!$this->etd || !$this->eta || $this->cargo_plan_total <= 0) {
+                                throw new Exception("Tidak bisa final: ETD/ETA wajib dan Cargo Plan > 0.");
                             }
+
                             $data['finalized_at'] = $data['finalized_at'] ?? now();
                         }
 
@@ -74,9 +76,10 @@ class ScheduleRelationManager extends RelationManager
                         if ($next === ScheduleState::Final->value) {
                             $tmp = clone $record;
                             $tmp->fill($data);
-                            if (!$tmp->canFinalize()) {
-                                throw new \Exception('Tidak bisa final: ETD/ETA wajib dan Cargo Plan > 0.');
+                            if (!$this->etd || !$this->eta || $this->cargo_plan_total <= 0) {
+                                throw new Exception("Tidak bisa final: ETD/ETA wajib dan Cargo Plan > 0.");
                             }
+
                             $data['finalized_at'] = $data['finalized_at'] ?? now();
                         }
                         $record->update($data);
@@ -88,4 +91,3 @@ class ScheduleRelationManager extends RelationManager
             ->paginated(false);
     }
 }
-    

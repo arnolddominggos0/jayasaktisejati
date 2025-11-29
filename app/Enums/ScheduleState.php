@@ -16,4 +16,13 @@ enum ScheduleState: string
             self::Final->value => 'Final',
         ];
     }
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::Draft => 'Draft',
+            self::Feedback => 'Feedback',
+            self::Final => 'Final',
+        };
+    }
 }

@@ -10,8 +10,10 @@ class MonthParam
     {
         $val = ($month && preg_match('/^\d{4}-\d{2}$/', $month)) ? $month : now($tz)->format('Y-m');
         [$y, $m] = array_map('intval', explode('-', $val));
+
         $start = Carbon::createFromDate($y, $m, 1, $tz)->startOfDay();
         $end   = (clone $start)->endOfMonth()->endOfDay();
+
         return [
             'value'      => $val,
             'year'       => $y,
