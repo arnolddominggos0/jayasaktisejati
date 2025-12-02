@@ -13,3 +13,4 @@ yarn-error.log
 /storage/framework/views/
 /storage/framework/cache/
 /bootstrap/cache/*.php
+composer.lock

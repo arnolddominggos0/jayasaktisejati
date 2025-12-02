@@ -9,7 +9,7 @@
     $latestVal = optional($tracks->last())->status?->value;
 
     /** @var \BackedEnum[] $order */
-    $order = TrackStatus::order();
+    $order = TrackStatus::orderSea();
 
     $fmt   = fn($dt) => optional($dt)->timezone(config('app.timezone'))->format('d M Y, H:i');
     $label = fn($s)  => $s?->label() ?? (is_string($s) ? $s : '-');

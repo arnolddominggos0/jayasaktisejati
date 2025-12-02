@@ -387,13 +387,55 @@ class Shipment extends Model
         $this->save();
     }
 
-    public function appendTrack(TrackStatus $status, ?string $note = null, ?string $location = null): ShipmentTrack
+    public function currentTrackStatus(): ?TrackStatus
     {
-        $track = $this->tracks()->create([
-            'status'   => $status->value,
-            'note'     => $note,
-            'location' => $location,
-        ]);
+        $latest = $this->latestTrack;
+
+        return $latest?->status instanceof TrackStatus
+            ? $latest->status
+            : ($latest?->status ? TrackStatus::tryFrom((string) $latest->status) : null);
+    }
+
+    public function nextTrackStatus(): ?TrackStatus
+    {
+        $order = TrackStatus::orderForMode($this->mode);
+        $current = $this->currentTrackStatus();
+
+        if (! $current) {
+            return $order[0] ?? null;
+        }
+
+        $idx = array_search($current, $order, true);
+        if ($idx === false) {
+            return null;
+        }
+
+        return $order[$idx + 1] ?? null;
+    }
+
+    public function appendTrack(
+        TrackStatus $status, 
+        ?string $note = null, 
+        ?string $location = null,
+        ?array $attachments = null,
+        ?string $checkResult = null
+    ): ShipmentTrack {
+        $payload = [
+            'status'     => $status->value,
+            'note'       => $note,
+            'location'   => $location,
+            'tracked_at' => now(),
+        ];
+
+        if (! is_null($attachments)) {
+            $payload['attachments'] = array_values($attachments);
+        }
+
+        if (! is_null($checkResult)) {
+            $payload['check_result'] = $checkResult;
+        }
+
+        $track = $this->tracks()->create($payload);
 
         $ts = method_exists($track, 'getAttribute') && $track->getAttribute('tracked_at')
             ? $track->tracked_at
@@ -445,6 +487,27 @@ class Shipment extends Model
         return $track;
     }
 
+    public function autoAppendTrack(
+        ?string $note = null,
+        ?string $location = null,
+        ?array $attachments = null,
+        ?string $checkResult = null
+    ): ShipmentTrack {
+        $nextStatus = $this->nextTrackStatus();
+
+        if (! $nextStatus) {
+            throw new \DomainException('Tidak ada status pelacakan selanjutnya yang dapat ditambahkan.');
+        }
+
+        return $this->appendTrack(
+            $nextStatus,
+            $note,
+            $location,
+            $attachments,
+            $checkResult
+        );
+    }
+
     public function ensureTrackSkeleton(): void
     {
         $order = TrackStatus::orderForMode($this->mode);
@@ -458,7 +521,7 @@ class Shipment extends Model
         foreach ($toCreate as $st) {
             $this->tracks()->create([
                 'status'     => $st->value,
-                'tracked_at' => null,
+                'tracked_at' => now(),
             ]);
         }
     }

@@ -87,16 +87,33 @@ class ShipmentResource extends Resource
         return [
             Forms\Components\Select::make('track_status')
                 ->label('Status Lapangan')
-                ->options(collect(TrackStatus::order())->mapWithKeys(fn($e) => [$e->value => $e->label()]))
+                ->options(collect(TrackStatus::orderSea())->mapWithKeys(fn($e) => [$e->value => $e->label()]))
                 ->default(fn(?Shipment $record) => $record?->latest_track_status?->value)
                 ->helperText(fn(?Shipment $record) => $record?->latest_track_status
-                    ? 'Terakhir: ' . $record->latest_track_status->label()
+                    ? 'Status Saat Ini: ' . $record->latest_track_status->label()
                     : 'Belum ada track.')
                 ->searchable()
                 ->preload()
-                ->required()
+                ->disabled(true)
+                // ->required()
                 ->native(false)
-                ->columnSpan(6),
+                ->columnSpan(12)
+                ->live(),
+            
+            Forms\Components\Radio::make('check_result')
+                ->label('Checksheet Unit')
+                ->options(['ok' => 'OK', 'ng' => 'NG'])
+                ->visible(fn(Forms\Get $get) => in_array($get('track_status'), ['stuffing'], true))
+                ->requiredIf('track_status', ['stuffing']),
+
+            Forms\Components\FileUpload::make('attachments')
+                ->label('Lampiran foto / dokumen')
+                ->disk('public')
+                ->directory('shipment-tracks')
+                ->multiple()
+                ->visible(fn(Forms\Get $get) => in_array($get('track_status'), ['handover', 'stuffing', 'delivery_to_customer'], true))
+                ->required(fn(Forms\Get $get) => in_array($get('track_status'), ['handover', 'stuffing', 'delivery_to_customer'], true))
+                ->columnSpan(12),
 
             Forms\Components\Textarea::make('note')
                 ->label('Catatan Lapangan')
@@ -278,23 +295,43 @@ class ShipmentResource extends Resource
                     ->color('primary')
                     ->form(static::trackUpdateForm())
                     ->action(function (Shipment $record, array $data) {
-                        $status = TrackStatus::tryFrom($data['track_status'] ?? '');
-                        if (! $status) {
+                        $track = $record->autoAppendTrack(
+                            $data['note'] ?? null,
+                            null,
+                            $data['attachments'] ?? null,
+                            $data['check_result'] ?? null
+                        );
+
+                        if (! $track) {
                             \Filament\Notifications\Notification::make()
-                                ->title('Status tidak dikenal')
-                                ->danger()
+                                ->title('Tidak ada status berikutnya (sudah di step terakhir)')
+                                ->warning()
                                 ->send();
                             return;
                         }
+                        // $status = TrackStatus::tryFrom($data['track_status'] ?? '');
+                        // if (! $status) {
+                        //     \Filament\Notifications\Notification::make()
+                        //         ->title('Status tidak dikenal')
+                        //         ->danger()
+                        //         ->send();
+                        //     return;
+                        // }
 
-                        if ($record->latest_track_status?->value === $status->value) {
-                            $record->latestTrack?->update([
-                                'note'       => $data['note'] ?? $record->latestTrack?->note,
-                                'tracked_at' => now(),
-                            ]);
-                        } else {
-                            $record->appendTrack($status, $data['note'] ?? null);
-                        }
+                        // if ($record->latest_track_status?->value === $status->value) {
+                        //     $record->latestTrack?->update([
+                        //         'note'       => $data['note'] ?? $record->latestTrack?->note,
+                        //         'tracked_at' => now(),
+                        //     ]);
+                        // } else {
+                        //     $record->appendTrack(
+                        //         $status, 
+                        //         $data['note'] ?? null,
+                        //         null, 
+                        //         $data['attachments'] ?? null, 
+                        //         $data['check_result'] ?? null
+                        //     );
+                        // }
 
                         \Filament\Notifications\Notification::make()
                             ->title('Update lapangan tersimpan')

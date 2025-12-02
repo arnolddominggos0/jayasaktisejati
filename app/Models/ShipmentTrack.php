@@ -19,6 +19,8 @@ class ShipmentTrack extends Model
         'tracked_at',
         'location',
         'note',
+        'attachments',
+        'check_result',
         'created_by',
         'updated_by',
     ];
@@ -26,6 +28,7 @@ class ShipmentTrack extends Model
     protected $casts = [
         'tracked_at' => 'datetime',
         'status'     => TrackStatus::class,
+        'attachments' => 'array',
     ];
 
     public function shipment()
@@ -107,7 +110,7 @@ class ShipmentTrack extends Model
                 ->last();
 
             $newStatus = $reached?->status?->toShipmentStatus();
-            if ($newStatus && (string)$shipment->status !== $newStatus->value) {
+            if ($newStatus && $shipment->status !== $newStatus->value) {
                 $shipment->status = $newStatus->value;
 
                 if ($newStatus === ShipmentStatus::Delivered) {
