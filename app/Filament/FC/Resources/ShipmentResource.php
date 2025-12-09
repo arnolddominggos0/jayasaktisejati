@@ -94,7 +94,7 @@ class ShipmentResource extends Resource
                     : 'Belum ada track.')
                 ->searchable()
                 ->preload()
-                // ->disabled(true)
+                ->disabled(true)
                 // ->required()
                 ->native(false)
                 ->columnSpan(12)
