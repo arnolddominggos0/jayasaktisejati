@@ -418,7 +418,13 @@ class Shipment extends Model
         ?string $note = null, 
         ?string $location = null,
         ?array $attachments = null,
-        ?string $checkResult = null
+        ?array $checkseet = null,
+        ?string $planLoadingTimeAt = null,
+        ?string $planClosingTimeAt = null,
+        ?string $actualLoadingTimeAt = null,
+        ?string $actualClosingTimeAt = null,
+        ?string $actualUnloadingStartTimeAt = null,
+        ?string $actualUnloadingEndTimeAt = null
     ): ShipmentTrack {
         $payload = [
             'status'     => $status->value,
@@ -431,8 +437,36 @@ class Shipment extends Model
             $payload['attachments'] = array_values($attachments);
         }
 
-        if (! is_null($checkResult)) {
-            $payload['check_result'] = $checkResult;
+        if (! is_null($checkseet)) {
+            $payload['checkseet'] = $checkseet;
+        }
+
+        if (! is_null($planLoadingTimeAt)) {
+            $payload['plan_loading_time_at'] = $planLoadingTimeAt;
+        }
+
+        if (! is_null($planClosingTimeAt)) {
+            $payload['plan_closing_time_at'] = $planClosingTimeAt;
+        }
+
+        if (! is_null($actualLoadingTimeAt)) {
+            $payload['actual_loading_time_at'] = $actualLoadingTimeAt;
+        }
+
+        if (! is_null($actualClosingTimeAt)) {
+            $payload['actual_closing_time_at'] = $actualClosingTimeAt;
+        }
+
+        if ($status === TrackStatus::Unloading) {
+            $payload['actual_berthing_time_at'] = now();
+        }
+
+        if (! is_null($actualUnloadingStartTimeAt)) {
+            $payload['actual_unloading_start_time_at'] = $actualUnloadingStartTimeAt;
+        }
+
+        if (! is_null($actualUnloadingEndTimeAt)) {
+            $payload['actual_unloading_end_time_at'] = $actualUnloadingEndTimeAt;
         }
 
         $track = $this->tracks()->create($payload);
@@ -491,7 +525,13 @@ class Shipment extends Model
         ?string $note = null,
         ?string $location = null,
         ?array $attachments = null,
-        ?string $checkResult = null
+        ?array $checkseet = null,
+        ?string $planLoadingTimeAt = null,
+        ?string $planClosingTimeAt = null,
+        ?string $actualLoadingTimeAt = null,
+        ?string $actualClosingTimeAt = null,
+        ?string $actualUnloadingStartTimeAt = null,
+        ?string $actualUnloadingEndTimeAt = null,
     ): ShipmentTrack {
         $nextStatus = $this->nextTrackStatus();
 
@@ -504,8 +544,24 @@ class Shipment extends Model
             $note,
             $location,
             $attachments,
-            $checkResult
+            $checkseet, 
+            $planLoadingTimeAt,
+            $planClosingTimeAt,
+            $actualLoadingTimeAt,
+            $actualClosingTimeAt,
+            $actualUnloadingStartTimeAt,
+            $actualUnloadingEndTimeAt
         );
+    }
+
+    public function isWithinHMinus3Eta(): bool
+    {
+        if (!$this->eta) {
+            return false;
+        }
+
+        $hMinus3 = Carbon::parse($this->eta)->subDays(3)->startOfDay();
+        return now()->greaterThanOrEqualTo($hMinus3);
     }
 
     public function ensureTrackSkeleton(): void

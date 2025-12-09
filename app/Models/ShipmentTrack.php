@@ -21,6 +21,14 @@ class ShipmentTrack extends Model
         'note',
         'attachments',
         'check_result',
+        'checkseet',
+        'plan_loading_time_at',
+        'plan_closing_time_at',
+        'actual_loading_time_at',
+        'actual_closing_time_at',
+        'actual_berthing_time_at',
+        'actual_unloading_start_time_at',
+        'actual_unloading_end_time_at',
         'created_by',
         'updated_by',
     ];
@@ -29,6 +37,14 @@ class ShipmentTrack extends Model
         'tracked_at' => 'datetime',
         'status'     => TrackStatus::class,
         'attachments' => 'array',
+        'checkseet' => 'array',
+        'plan_loading_time_at' => 'datetime',
+        'plan_closing_time_at' => 'datetime',
+        'actual_loading_time_at' => 'datetime',
+        'actual_closing_time_at' => 'datetime',
+        'actual_berthing_time_at' => 'datetime',
+        'actual_unloading_start_time_at' => 'datetime',
+        'actual_unloading_end_time_at' => 'datetime',
     ];
 
     public function shipment()

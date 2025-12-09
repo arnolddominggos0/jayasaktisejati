@@ -16,6 +16,10 @@ enum TrackStatus: string
     case VesselDepart        = 'vessel_depart';
     case VesselArrival       = 'vessel_arrival';
     case Unloading           = 'unloading';
+
+    /// TODO: handover trucking
+    case HandoverTrucking    = 'handover_trucking';
+
     case DeliveryToCustomer  = 'delivery_to_customer';
     case Delivered           = 'delivered';
     case Hold                = 'hold';
@@ -34,6 +38,8 @@ enum TrackStatus: string
             self::VesselDepart       => 'Kapal Berangkat',
             self::VesselArrival      => 'Kapal Tiba',
             self::Unloading          => 'Pembongkaran',
+            /// TODO: handover trucking
+            self::HandoverTrucking   => 'Handover Trucking',
             self::DeliveryToCustomer => 'Antar ke Customer',
             self::Delivered          => 'Terkirim',
             self::Hold               => 'Ditahan',
