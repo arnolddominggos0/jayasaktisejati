@@ -87,7 +87,7 @@ class ShipmentResource extends Resource
         return [
             Forms\Components\Select::make('track_status')
                 ->label('Status Lapangan')
-                ->options(collect(TrackStatus::order())->mapWithKeys(fn($e) => [$e->value => $e->label()]))
+                ->options(collect(TrackStatus::orderSea())->mapWithKeys(fn($e) => [$e->value => $e->label()]))
                 ->default(fn(?Shipment $record) => $record?->latest_track_status?->value)
                 ->helperText(fn(?Shipment $record) => $record?->latest_track_status
                     ? 'Terakhir: ' . $record->latest_track_status->label()

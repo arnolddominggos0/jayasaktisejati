@@ -4,7 +4,7 @@ namespace App\Filament\Resources\ShippingScheduleResource\Pages;
 
 use App\Filament\Resources\ShippingScheduleResource;
 use App\Filament\Resources\ShippingScheduleResource\Widgets\ShippingScheduleCalendar;
-use Filament\Actions\CreateAction;
+use App\Filament\Resources\ShippingScheduleResource\Widgets\TamKpiSummary;
 use Filament\Resources\Pages\ListRecords;
 
 class ListShippingSchedules extends ListRecords
@@ -13,20 +13,29 @@ class ListShippingSchedules extends ListRecords
 
     protected function hasTable(): bool
     {
-        return true;
+        return false;
+    }
+
+    protected function hasFiltersForm(): bool
+    {
+        return false;
+    }
+
+    protected function hasSearchForm(): bool
+    {
+        return false;
     }
 
     protected function getHeaderActions(): array
     {
-        return [
-            CreateAction::make()->label('Buat Jadwal'),
-        ];
+        return [];
     }
 
     protected function getHeaderWidgets(): array
     {
         return [
             ShippingScheduleCalendar::class,
+            TamKpiSummary::class,
         ];
     }
 
@@ -37,6 +46,6 @@ class ListShippingSchedules extends ListRecords
 
     public function getTitle(): string
     {
-        return 'Daftar Jadwal Kapal TAM';
+        return 'Monitoring Jadwal Kapal TAM';
     }
 }

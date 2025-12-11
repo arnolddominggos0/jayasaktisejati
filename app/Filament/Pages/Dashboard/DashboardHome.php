@@ -11,9 +11,10 @@ use Illuminate\Contracts\Support\Htmlable;
 
 class DashboardHome extends Page
 {
-    protected static ?string $slug = 'dashboard';
-    protected static ?string $navigationLabel = 'Dashboard';
-    protected static ?int $navigationSort = -2;
+    protected static ?string $slug = 'dashboard-legacy';
+    protected static ?string $navigationLabel = null;
+    protected static ?int $navigationSort = null;
+    protected static bool $shouldRegisterNavigation = false;
     protected static string $view = 'filament.pages.dashboard-home';
 
     public static function getNavigationLabel(): string
@@ -30,9 +31,6 @@ class DashboardHome extends Page
             ?? (Filament::hasTopNavigation() ? 'heroicon-m-home' : 'heroicon-o-home');
     }
 
-    /**
-     * @return array<class-string<Widget>|WidgetConfiguration>
-     */
     public function getWidgets(): array
     {
         return [
@@ -42,16 +40,12 @@ class DashboardHome extends Page
             \App\Filament\Pages\Dashboard\Widgets\TrackingActivityTable::class,
             \App\Filament\Pages\Dashboard\Widgets\TodayManpowerWidget::class,
             \App\Filament\Pages\Dashboard\Widgets\ActiveArmadaWidget::class,
-            // \App\Filament\Pages\Dashboard\Widgets\LeadTimeCustomerWidget::class,
+            \App\Filament\Pages\Dashboard\Widgets\LeadTimeCustomerWidget::class,
         ];
     }
 
-    /**
-     * @return array<string, int|string|null>|int|string
-     */
     public function getColumns(): int | string | array
     {
-        // 12-grid:  -> kita atur di blade via CSS grid responsive
         return 3;
     }
 

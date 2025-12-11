@@ -2,15 +2,16 @@
 
 return [
     'manado' => [
-        'customer_ids' => [14, 15],
+        'customer_ids' => [31, 32],
         'thresholds' => [
             'dwelling_days' => 6,
-            'sailing_days' => 10,
-            'dooring_days' => 2,
-            'total_days' => [
+            'sailing_days'  => 10,
+            'dooring_days'  => 2,
+            'total_days'    => [
                 'normal' => 19,
                 'urgent' => 18,
             ],
         ],
     ],
 ];
+

@@ -13,7 +13,7 @@ use Filament\Tables\Table;
 class PortResource extends Resource
 {
     protected static ?string $model = Port::class;
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'Master Data Shipment';
     protected static ?string $navigationIcon = 'heroicon-o-map-pin';
     protected static ?string $navigationLabel = 'Pelabuhan';
 

@@ -6,20 +6,20 @@ use App\Enums\ShipmentStatus;
 
 enum TrackStatus: string
 {
-    case Pickup              = 'pickup';
-    case Handover            = 'handover';
-    case Stuffing            = 'stuffing';
-    case DeliveryToPort      = 'delivery_to_port';
-    case Stacking            = 'stacking';
-    case UnitLoading         = 'unit_loading';
-    case OnShip              = 'onship';
-    case VesselDepart        = 'vessel_depart';
-    case VesselArrival       = 'vessel_arrival';
-    case Unloading           = 'unloading';
-    case DeliveryToCustomer  = 'delivery_to_customer';
-    case Delivered           = 'delivered';
-    case Hold                = 'hold';
-    case Cancelled           = 'cancelled';
+    case Pickup             = 'pickup';
+    case Handover           = 'handover';
+    case Stuffing           = 'stuffing';
+    case DeliveryToPort     = 'delivery_to_port';
+    case Stacking           = 'stacking';
+    case UnitLoading        = 'unit_loading';
+    case OnShip             = 'onship';
+    case VesselDepart       = 'vessel_depart';
+    case VesselArrival      = 'vessel_arrival';
+    case Unloading          = 'unloading';
+    case DeliveryToCustomer = 'delivery_to_customer';
+    case Delivered          = 'delivered';
+    case Hold               = 'hold';
+    case Cancelled          = 'cancelled';
 
     public function label(): string
     {
@@ -72,6 +72,7 @@ enum TrackStatus: string
     {
         $val = $mode instanceof \BackedEnum ? strtolower((string) $mode->value) : strtolower((string) $mode);
         $landAliases = ['land', 'land_trucking', 'car_carrier', 'towing', 'truck'];
+
         return in_array($val, $landAliases, true) ? self::orderLand() : self::orderSea();
     }
 
@@ -87,12 +88,23 @@ enum TrackStatus: string
 
     public static function normalize(null|string|\BackedEnum|self $val): ?self
     {
-        if ($val instanceof self) return $val;
-        if ($val instanceof \BackedEnum) $val = (string) $val->value;
-        if ($val === null) return null;
+        if ($val instanceof self) {
+            return $val;
+        }
+
+        if ($val instanceof \BackedEnum) {
+            $val = (string) $val->value;
+        }
+
+        if ($val === null) {
+            return null;
+        }
 
         $key = strtolower(trim((string) $val));
-        if ($case = self::tryFrom($key)) return $case;
+
+        if ($case = self::tryFrom($key)) {
+            return $case;
+        }
 
         $map = [
             'stuffing_start'    => self::Stuffing,
@@ -104,6 +116,7 @@ enum TrackStatus: string
             'stripping_start'   => self::Unloading,
             'stacking_start'    => self::Stacking,
         ];
+
         return $map[$key] ?? null;
     }
 
@@ -117,8 +130,8 @@ enum TrackStatus: string
 
         $order = self::orderForMode($mode);
 
-        if (!$mask['show_planning']) {
-            $order = array_values(array_filter($order, fn(self $s) => !in_array($s, [
+        if (! $mask['show_planning']) {
+            $order = array_values(array_filter($order, fn(self $s) => ! in_array($s, [
                 self::Handover,
                 self::Stuffing,
                 self::DeliveryToPort,
@@ -126,21 +139,19 @@ enum TrackStatus: string
             ], true)));
         }
 
-        if (!$mask['show_terminal_detail']) {
-            $order = array_values(array_filter($order, fn(self $s) => !in_array($s, [
+        if (! $mask['show_terminal_detail']) {
+            $order = array_values(array_filter($order, fn(self $s) => ! in_array($s, [
                 self::UnitLoading,
                 self::VesselDepart,
                 self::VesselArrival,
             ], true)));
         }
 
-
-        if (!$mask['show_legacy']) {
+        if (! $mask['show_legacy']) {
         }
 
         return $order;
     }
-
 
     public static function finished(): array
     {

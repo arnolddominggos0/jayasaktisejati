@@ -15,11 +15,11 @@ class OverviewShippingSchedules extends Page
 
     protected function getHeaderWidgets(): array
     {
-        return [ScheduleKpiPlaceholder::class];
+        return [];
     }
 
     protected function getFooterWidgets(): array
     {
-        return [ScheduleGanttPlaceholder::class];
+        return [];
     }
 }

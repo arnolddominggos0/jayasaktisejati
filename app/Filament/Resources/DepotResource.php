@@ -23,7 +23,7 @@ class DepotResource extends Resource
 {
     protected static ?string $model = Depot::class;
 
-    protected static ?string $navigationGroup = 'Manajemen Armada';
+    protected static ?string $navigationGroup = 'Master Data Shipment';
     protected static ?string $navigationLabel = 'Depo';
     protected static ?string $pluralLabel     = 'Depo';
     protected static ?string $navigationIcon  = 'heroicon-m-building-office-2';

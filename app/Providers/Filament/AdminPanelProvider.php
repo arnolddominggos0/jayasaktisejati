@@ -2,7 +2,7 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Pages\Dashboard\DashboardHome;
+use App\Filament\Pages\AdminDashboard;
 use App\Http\Middleware\EnsurePanelRole;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -21,43 +21,35 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Widgets;
-use Illuminate\Database\Eloquent\Scope;
 
 class AdminPanelProvider extends PanelProvider
 {
     public function panel(Panel $panel): Panel
     {
         return $panel
-            ->default()
+            ->default(AdminDashboard::class)
             ->id('admin')
             ->path('admin')
             ->login()
             ->authGuard('web')
-
-            // Brand
             ->brandName('Jaya Sakti Sejati')
             ->brandLogo(fn() => view('filament.logo'))
             ->favicon(asset('images/favicon/favicon.ico'))
-
             ->sidebarCollapsibleOnDesktop()
             ->colors(['primary' => Color::hex('#0137A1')])
             ->viteTheme('resources/css/filament/admin/theme.css')
-
             ->renderHook(
                 PanelsRenderHook::TOPBAR_START,
                 fn() => Blade::render(view('filament.topbar.page-title')->render()),
             )
-
-
             ->renderHook(
                 PanelsRenderHook::USER_MENU_BEFORE,
                 fn() => Blade::render(view('filament.topbar.actions')->render()),
             )
-
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->pages([
-                DashboardHome::class,
+                AdminDashboard::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
@@ -70,7 +62,6 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make('Pengiriman')->collapsible(),
                 NavigationGroup::make('Manajemen Pengguna')->collapsible(),
             ])
-
             ->middleware([
                 EnsurePanelRole::class,
                 EncryptCookies::class,

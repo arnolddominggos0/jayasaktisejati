@@ -10,9 +10,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(RolesAndUsersSeeder::class);
         $this->call(InitialSetupSeeder::class);
-        $this->call(ShippingCoreSeeder::class);
-        $this->call([
-            TamMonthlyScheduleSeeder::class,
-        ]);
+        $this->call(VoyageSeeder::class);
     }
 }

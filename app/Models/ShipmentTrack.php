@@ -107,7 +107,7 @@ class ShipmentTrack extends Model
                 ->last();
 
             $newStatus = $reached?->status?->toShipmentStatus();
-            if ($newStatus && (string)$shipment->status !== $newStatus->value) {
+            if ($newStatus && $shipment->status !== $newStatus->value) {
                 $shipment->status = $newStatus->value;
 
                 if ($newStatus === ShipmentStatus::Delivered) {

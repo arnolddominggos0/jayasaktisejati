@@ -1,5 +1,4 @@
 <?php
-
 return [
     'overrides' => [
         'MALINO'     => 'ML',
@@ -9,6 +8,6 @@ return [
         'SALAM'      => 'SL',
         'SEJAHTERA'  => 'SA',
         'TANGGUH'    => 'TG',
-        'JAYA'       => 'J',
+        'JAYA'       => 'JY',
     ],
 ];

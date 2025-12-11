@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
 
+use function Symfony\Component\Clock\now;
+
 class Shipment extends Model
 {
     use HasFactory;
@@ -310,9 +312,10 @@ class Shipment extends Model
 
     public static function generateCode(?string $mode = null, ?int $year = null, ?int $month = null): string
     {
-        $now   = now();
-        $year  = $year ?: $now->year;
-        $month = $month ?: $now->month;
+        $now = \Illuminate\Support\Carbon::now();
+
+        $year  = $year ?? $now->year;
+        $month = $month ?? $now->month;
 
         $prefix   = 'JSS' . str_pad($month, 2, '0', STR_PAD_LEFT) . substr($year, -2);
         $modeCode = match (strtolower((string) $mode)) {
@@ -336,12 +339,14 @@ class Shipment extends Model
         return $prefix . str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
     }
 
+
     public static function computeEta(string $modeCode, string $priority, ?Carbon $base = null): Carbon
     {
         $base = $base?->copy() ?? now();
 
         if ($modeCode === 'SH') {
-            $days = strtolower($priority) === 'urgent' ? 17 : 19;
+            $days = strtolower($priority) === 'urgent' ? 18 : 19;
+
             return $base->addDays($days)->endOfDay();
         }
 
@@ -349,6 +354,7 @@ class Shipment extends Model
             ? $base->endOfDay()
             : $base->addDay()->endOfDay();
     }
+
 
     public function canCancel(): bool
     {
@@ -458,7 +464,7 @@ class Shipment extends Model
         foreach ($toCreate as $st) {
             $this->tracks()->create([
                 'status'     => $st->value,
-                'tracked_at' => null,
+                'tracked_at' => now(),
             ]);
         }
     }
@@ -818,17 +824,26 @@ class Shipment extends Model
     public function kpiManadoThresholds(): array
     {
         return config('jss_kpi.manado', [
-            'dwelling_days' => 5,
-            'sailing_days'  => 10,
-            'dooring_days'  => 2,
-            'total_days'    => ['normal' => 19, 'urgent' => 17],
+            'thresholds' => [
+                'dwelling_days' => 6,
+                'sailing_days'  => 10,
+                'dooring_days'  => 2,
+                'total_days'    => [
+                    'normal' => 19,
+                    'urgent' => 18,
+                ],
+            ],
         ])['thresholds'] ?? [
-            'dwelling_days' => 5,
+            'dwelling_days' => 6,
             'sailing_days'  => 10,
             'dooring_days'  => 2,
-            'total_days'    => ['normal' => 19, 'urgent' => 17],
+            'total_days'    => [
+                'normal' => 19,
+                'urgent' => 18,
+            ],
         ];
     }
+
 
     protected function diffDaysNullable($from, $to): ?int
     {
@@ -857,41 +872,61 @@ class Shipment extends Model
         $sa = $this->diffDaysNullable($ms['onboard'], $ms['arrived']);
         $dr = $this->diffDaysNullable($ms['arrived'], $ms['deliv']);
 
-        $tt = ($dw !== null && $sa !== null && $dr !== null) ? ($dw + $sa + $dr) : null;
+        $tt = ($dw !== null && $sa !== null && $dr !== null)
+            ? ($dw + $sa + $dr)
+            : null;
 
-        $okDw = is_null($dw) ? null : $dw <= ($t['dwelling_days'] ?? PHP_INT_MAX);
-        $okSa = is_null($sa) ? null : $sa <= ($t['sailing_days']  ?? PHP_INT_MAX);
-        $okDr = is_null($dr) ? null : $dr <= ($t['dooring_days']  ?? PHP_INT_MAX);
-        $okTt = is_null($tt) ? null : $tt <= (($t['total_days'][$priority] ?? null) ?? PHP_INT_MAX);
+        $limitDw = $t['dwelling_days'] ?? null;
+        $limitSa = $t['sailing_days']  ?? null;
+        $limitDr = $t['dooring_days']  ?? null;
+        $limitTt = $t['total_days'][$priority] ?? null;
+
+        $okDw = is_null($dw) ? null : $dw <= ($limitDw ?? PHP_INT_MAX);
+        $okSa = is_null($sa) ? null : $sa <= ($limitSa ?? PHP_INT_MAX);
+        $okDr = is_null($dr) ? null : $dr <= ($limitDr ?? PHP_INT_MAX);
+        $okTt = is_null($tt) ? null : $tt <= ($limitTt ?? PHP_INT_MAX);
+
+        $lateDays = (! is_null($tt) && ! is_null($limitTt))
+            ? max(0, $tt - $limitTt)
+            : null;
 
         return [
-            'applies'  => true,
-            'priority' => $priority,
+            'applies'   => true,
+            'priority'  => $priority,
+
+            'dwelling_days' => $dw,
+            'sailing_days'  => $sa,
+            'dooring_days'  => $dr,
+            'total_days'    => $tt,
+            'late_days'     => $lateDays,
+
             'summary'  => [
                 'dwelling' => [
                     'actual' => $dw,
-                    'limit'  => $t['dwelling_days'],
+                    'limit'  => $limitDw,
                     'status' => is_null($okDw) ? 'PENDING' : ($okDw ? 'OK' : 'LATE'),
                 ],
                 'sailing'  => [
                     'actual' => $sa,
-                    'limit'  => $t['sailing_days'],
+                    'limit'  => $limitSa,
                     'status' => is_null($okSa) ? 'PENDING' : ($okSa ? 'OK' : 'LATE'),
                 ],
                 'dooring'  => [
                     'actual' => $dr,
-                    'limit'  => $t['dooring_days'],
+                    'limit'  => $limitDr,
                     'status' => is_null($okDr) ? 'PENDING' : ($okDr ? 'OK' : 'LATE'),
                 ],
                 'total'    => [
                     'actual' => $tt,
-                    'limit'  => $t['total_days'][$priority] ?? null,
+                    'limit'  => $limitTt,
                     'status' => is_null($okTt) ? 'PENDING' : ($okTt ? 'OK' : 'LATE'),
                 ],
             ],
+
             'badge' => is_null($okTt) ? 'Pending' : ($okTt ? 'On Time' : 'Late'),
         ];
     }
+
 
     public function kpiManadoSummaryText(): ?string
     {
