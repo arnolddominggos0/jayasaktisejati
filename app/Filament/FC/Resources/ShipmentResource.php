@@ -90,17 +90,143 @@ class ShipmentResource extends Resource
                 ->options(collect(TrackStatus::orderSea())->mapWithKeys(fn($e) => [$e->value => $e->label()]))
                 ->default(fn(?Shipment $record) => $record?->latest_track_status?->value)
                 ->helperText(fn(?Shipment $record) => $record?->latest_track_status
-                    ? 'Terakhir: ' . $record->latest_track_status->label()
+                    ? 'Status Saat Ini: ' . $record->latest_track_status->label()
                     : 'Belum ada track.')
                 ->searchable()
                 ->preload()
-                ->required()
+                ->disabled(true)
+                // ->required()
                 ->native(false)
+                ->columnSpan(12)
+                ->live(),
+
+            Forms\Components\Checkbox::make('complete_current_step')
+                ->label('Step ini sudah selesai & lanjut ke status berikutnya')
+                ->helperText('Centang jika mau lanjut ke status berikutnya.')
+                ->visible(fn(Forms\Get $get, ?Shipment $record) => $record?->nextTrackStatus() !== null)
+                ->disabled(fn(?Shipment $record) => 
+                        $record?->latest_track_status?->value === TrackStatus::VesselDepart->value && 
+                        ! (auth()->user()->canUpdateVesselDepart($record) && $record->isWithinHMinus3Eta())
+                    )
+                ->helperText(fn(?Shipment $record) => 
+                        $record?->latest_track_status?->value === TrackStatus::VesselDepart->value
+                            ? (auth()->user()->canUpdateVesselDepart($record) && $record->isWithinHMinus3Eta()
+                                ? 'Anda bisa update status kapal berangkat'
+                                : 'Hanya FC depo tujuan & mulai H-3 ETA')
+                            : null
+                    )
+                ->columnSpan(12),
+
+            // case status handover
+            Forms\Components\DateTimePicker::make('plan_loading_time_at')
+                ->label('Plan Loading Time')
+                ->seconds(false)
+                ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::Handover->value)
+                ->required(true)
                 ->columnSpan(6),
+            
+            Forms\Components\DateTimePicker::make('plan_closing_time_at')
+                ->label('Plan Closing Time')
+                ->seconds(false)
+                ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::Handover->value)
+                ->required(true)
+                ->columnSpan(6),
+
+            // case status stuffing
+            Forms\Components\Repeater::make('checkseet')
+                ->label('Checksheet Unit')
+                ->collapsible(true)
+                ->orderColumn(false)
+                ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::Stuffing->value)
+                ->visible(fn(Forms\Get $get) => in_array($get('track_status'), [TrackStatus::Handover->value, TrackStatus::Stuffing->value, TrackStatus::Unloading->value, TrackStatus::DeliveryToCustomer->value], true))
+                ->itemLabel(fn(array $state): ?string => 'Unit - ' . $state['no_rangka'] ?? null)
+                ->default([])
+                ->live()
+                ->schema([
+                    Forms\Components\Radio::make('checkseet_status')
+                        ->label('Checkseet Status')
+                        ->options(['ok' => 'OK', 'ng' => 'NG'])
+                        ->required(),
+                    Forms\Components\TextInput::make('model')
+                        ->label('Model Mobil')
+                        ->required(),
+                    Forms\Components\TextInput::make('no_rangka')
+                        ->label('No. Rangka')
+                        ->required(),
+                    Forms\Components\TextInput::make('no_mesin')
+                        ->label('No. Mesin')
+                        ->required(),
+                    Forms\Components\TextInput::make('warna')
+                        ->label('Warna')
+                        ->required(),
+                    Forms\Components\FileUpload::make('attachments')
+                        ->label('Lampiran Unit')
+                        ->disk('public')
+                        ->directory('shipment-tracks/checkseet')
+                        ->multiple()
+                        ->maxFiles(10),
+                ])
+                ->columnSpan(12),
+
+            // case loading
+            Forms\Components\DateTimePicker::make('actual_loading_time_at')
+                ->label('Actual Loading Time')
+                ->seconds(false)
+                ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::UnitLoading->value)
+                ->required(true)
+                ->columnSpan(6),
+            
+            Forms\Components\DateTimePicker::make('actual_closing_time_at')
+                ->label('Actual Closing Time')
+                ->seconds(false)
+                ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::UnitLoading->value)
+                ->required(true)
+                ->columnSpan(6),
+            
+            // case stacking
+            Forms\Components\Checkbox::make('has_problem_stacking')
+                ->label('Ada Problem Stacking')
+                ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::Stacking->value)
+                ->live()
+                ->columnSpan(12),
+
+            // case sailing
+            Forms\Components\Checkbox::make('speed_below_10_knots')
+                ->label('Kapal di bawah < 10 Knots')
+                ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::VesselDepart->value)
+                ->live()
+                ->columnSpan(12),
+
+            // case unloading
+            Forms\Components\DateTimePicker::make('actual_unloading_start_time_at')
+                ->label('Actual Unloading Start Time')
+                ->seconds(false)
+                ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::Unloading->value)
+                ->required(true)
+                ->columnSpan(6),
+            
+            Forms\Components\DateTimePicker::make('actual_unloading_end_time_at')
+                ->label('Actual Unloading End Time')
+                ->seconds(false)
+                ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::Unloading->value)
+                ->required(true)
+                ->columnSpan(6),
+            
+            Forms\Components\FileUpload::make('attachments')
+                ->label('Lampiran foto / dokumen')
+                ->disk('public')
+                ->directory('shipment-tracks')
+                ->multiple()
+                ->visible(fn(Forms\Get $get) => in_array($get('track_status'), ['handover', 'delivery_to_customer'], true))
+                ->columnSpan(12),
 
             Forms\Components\Textarea::make('note')
                 ->label('Catatan Lapangan')
                 ->rows(4)
+                ->required(fn(Forms\Get $get) => 
+                        $get('track_status') === TrackStatus::Stacking->value && $get('has_problem_stacking') === true ||
+                        $get('track_status') === TrackStatus::VesselDepart->value && $get('speed_below_10_knots') === true
+                    )                
                 ->maxLength(1000)
                 ->columnSpan(12),
         ];
@@ -277,24 +403,74 @@ class ShipmentResource extends Resource
                     ->icon('heroicon-m-pencil-square')
                     ->color('primary')
                     ->form(static::trackUpdateForm())
+                    ->disabled(fn(Shipment $record) => 
+                            $record->currentTrackStatus()?->value === TrackStatus::VesselDepart->value &&
+                            auth()->user()->canUpdateVesselDepart($record) && $record->isWithinHMinus3Eta()
+                        )
                     ->action(function (Shipment $record, array $data) {
-                        $status = TrackStatus::tryFrom($data['track_status'] ?? '');
-                        if (! $status) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Status tidak dikenal')
-                                ->danger()
-                                ->send();
-                            return;
+                        $status = $record->currentTrackStatus() ?? $record->latest_track_status;
+                        
+                        $complete = (bool) ($data['complete_current_step'] ?? false);
+
+                        if ($complete) {
+                            try {
+                                $track = $record->autoAppendTrack(
+                                    $data['note'] ?? null,
+                                    null,
+                                    $data['attachments'] ?? null,
+                                    $data['checkseet'] ?? null,
+                                    $data['plan_loading_time_at'] ?? null,
+                                    $data['plan_closing_time_at'] ?? null,
+                                    $data['actual_loading_time_at'] ?? null,
+                                    $data['actual_closing_time_at'] ?? null,
+                                    $data['actual_unloading_start_time_at'] ?? null,
+                                    $data['actual_unloading_end_time_at'] ?? null
+                                );
+                            } catch (\Throwable $th) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title('Tidak ada status berikutnya (sudah di step terakhir)')
+                                    ->warning()
+                                    ->send();
+                                return;
+                            }
+                        } else {
+                            $record->appendTrack(
+                                $status,
+                                $data['note'] ?? null,
+                                null,
+                                $data['attachments'] ?? null,
+                                $data['checkseet'] ?? null,
+                                $data['plan_loading_time_at'] ?? null,
+                                $data['plan_closing_time_at'] ?? null,
+                                $data['actual_loading_time_at'] ?? null,
+                                $data['actual_closing_time_at'] ?? null,
+                                $data['remark_problem_stacking'] ?? null,
+                                $data['remark_speed_vessel'] ?? null,
+                            );
                         }
 
-                        if ($record->latest_track_status?->value === $status->value) {
-                            $record->latestTrack?->update([
-                                'note'       => $data['note'] ?? $record->latestTrack?->note,
-                                'tracked_at' => now(),
-                            ]);
-                        } else {
-                            $record->appendTrack($status, $data['note'] ?? null);
-                        }
+                        // if (! $status) {
+                        //     \Filament\Notifications\Notification::make()
+                        //         ->title('Status tidak dikenal')
+                        //         ->danger()
+                        //         ->send();
+                        //     return;
+                        // }
+
+                        // if ($record->latest_track_status?->value === $status->value) {
+                        //     $record->latestTrack?->update([
+                        //         'note'       => $data['note'] ?? $record->latestTrack?->note,
+                        //         'tracked_at' => now(),
+                        //     ]);
+                        // } else {
+                        //     $record->appendTrack(
+                        //         $status, 
+                        //         $data['note'] ?? null,
+                        //         null, 
+                        //         $data['attachments'] ?? null, 
+                        //         $data['check_result'] ?? null
+                        //     );
+                        // }
 
                         \Filament\Notifications\Notification::make()
                             ->title('Update lapangan tersimpan')

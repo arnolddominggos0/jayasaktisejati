@@ -58,4 +58,19 @@ class User extends Authenticatable implements FilamentUser
     {
         return 'web';
     }
+
+    public function canUpdateVesselDepart(Shipment $shipment): bool
+    {
+        if (!$this->hasRole('field_coordinator')) {
+            return false;
+        }
+
+        if (!$shipment->assigned_depot_id) {
+            return false;
+        }
+
+        return \App\Models\Depot::where('id', $shipment->assigned_depot_id)
+            ->where('coordinator_user_id', $this->id)
+            ->exists();
+    }
 }

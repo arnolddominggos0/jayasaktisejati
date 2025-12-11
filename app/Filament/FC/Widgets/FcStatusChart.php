@@ -49,8 +49,10 @@ class FcStatusChart extends ChartWidget
         foreach ($rows as $r) {
             $day = Carbon::parse($r->d)->format('Y-m-d');
             $idx = $days->search($day);
-            if ($idx !== false && isset($matrix[$r->status])) {
-                $matrix[$r->status][$idx] = (int) $r->c;
+            $status = $r->status instanceof \BackedEnum ? $r->status->value : (string) $r->status;
+
+            if ($idx !== false && isset($matrix[$status])) {
+                $matrix[$status][$idx] = (int) $r->c;
             }
         }
 

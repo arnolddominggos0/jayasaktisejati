@@ -6,20 +6,23 @@ use App\Enums\ShipmentStatus;
 
 enum TrackStatus: string
 {
-    case Pickup             = 'pickup';
-    case Handover           = 'handover';
-    case Stuffing           = 'stuffing';
-    case DeliveryToPort     = 'delivery_to_port';
-    case Stacking           = 'stacking';
-    case UnitLoading        = 'unit_loading';
-    case OnShip             = 'onship';
-    case VesselDepart       = 'vessel_depart';
-    case VesselArrival      = 'vessel_arrival';
-    case Unloading          = 'unloading';
-    case DeliveryToCustomer = 'delivery_to_customer';
-    case Delivered          = 'delivered';
-    case Hold               = 'hold';
-    case Cancelled          = 'cancelled';
+    case Pickup              = 'pickup';
+    case Handover            = 'handover';
+    case Stuffing            = 'stuffing';
+    case DeliveryToPort      = 'delivery_to_port';
+    case Stacking            = 'stacking';
+    case UnitLoading         = 'unit_loading';
+    case OnShip              = 'onship';
+    case VesselDepart        = 'vessel_depart';
+    case VesselArrival       = 'vessel_arrival';
+    case Unloading           = 'unloading';
+
+    case HandoverTrucking    = 'handover_trucking';
+
+    case DeliveryToCustomer  = 'delivery_to_customer';
+    case Delivered           = 'delivered';
+    case Hold                = 'hold';
+    case Cancelled           = 'cancelled';
 
     public function label(): string
     {
@@ -34,6 +37,7 @@ enum TrackStatus: string
             self::VesselDepart       => 'Kapal Berangkat',
             self::VesselArrival      => 'Kapal Tiba',
             self::Unloading          => 'Pembongkaran',
+            self::HandoverTrucking   => 'Handover Trucking',
             self::DeliveryToCustomer => 'Antar ke Customer',
             self::Delivered          => 'Terkirim',
             self::Hold               => 'Ditahan',
