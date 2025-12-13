@@ -192,41 +192,78 @@ class AdminDashboard extends Page implements HasForms
         return Cache::remember($cacheKey, now()->addSeconds(30), function () use ($start, $end) {
             $rows = $this->tamPortStockBaseQuery()
                 ->whereBetween('created_at', [$start, $end])
-                ->with(['tracks:id,shipment_id,status,tracked_at'])
+                ->with(['tracks' => function ($q) {
+                    $q->select('id','shipment_id','status','tracked_at')->orderBy('tracked_at','asc');
+                }])
                 ->get();
 
-            $items = []; $total = 0; $sumAge = 0; $over3 = 0;
+            $items = [];
+            $total = 0;
+            $sumAge = 0;
+            $over3 = 0;
 
             foreach ($rows as $s) {
-                $tracks = $s->tracks->filter(fn($t) => $t->tracked_at)->sortBy('tracked_at')->values();
-                if ($tracks->isEmpty()) continue;
+                $tracks = $s->tracks->filter(fn($t) => $t->tracked_at)->values();
+                if ($tracks->isEmpty()) {
+                    $statusLabel = null;
+                    $firstTrackedAt = $s->created_at;
+                } else {
+                    $statusLabel = $tracks->last()->status instanceof \BackedEnum ? $tracks->last()->status->value : (string) $tracks->last()->status;
+                    $firstTrackedAt = $tracks->first()->tracked_at;
+                }
 
-                $toVal = fn($st) => $st instanceof \BackedEnum ? $st->value : (string) $st;
-
-                $stackingAt = null;
+                $foundStackingAt = null;
                 foreach ($tracks as $t) {
-                    $val = $toVal($t->status);
-                    if (in_array($val, [TrackStatus::DeliveryToPort->value, TrackStatus::Stacking->value], true)) {
-                        $stackingAt = $t->tracked_at;
+                    $val = $t->status instanceof \BackedEnum ? $t->status->value : (string) $t->status;
+                    if (in_array($val, [TrackStatus::DeliveryToPort->value, TrackStatus::Stacking->value, TrackStatus::DeliveryToPort->value], true)) {
+                        $foundStackingAt = $t->tracked_at;
                         break;
                     }
                 }
-                if (! $stackingAt) continue;
 
-                $loadedAt = null;
+                if (! $foundStackingAt) {
+                    $foundStackingAt = null;
+                    foreach ($tracks as $t) {
+                        $val = $t->status instanceof \BackedEnum ? $t->status->value : (string) $t->status;
+                        if ($val === TrackStatus::DeliveryToPort->value || $val === TrackStatus::Stacking->value) {
+                            $foundStackingAt = $t->tracked_at;
+                            break;
+                        }
+                    }
+                }
+
+                if (! $foundStackingAt) {
+                    $latestVal = $tracks->last()?->status ?? null;
+                    $latestValStr = $latestVal instanceof \BackedEnum ? $latestVal->value : (string) $latestVal;
+                    if ($latestValStr === TrackStatus::DeliveryToPort->value || $latestValStr === TrackStatus::Stacking->value) {
+                        $foundStackingAt = $tracks->last()->tracked_at ?? null;
+                    }
+                }
+
+                if (! $foundStackingAt) continue;
+
+                $loaded = false;
                 foreach ($tracks as $t) {
-                    $val = $toVal($t->status);
+                    $val = $t->status instanceof \BackedEnum ? $t->status->value : (string) $t->status;
                     if (in_array($val, [TrackStatus::UnitLoading->value, TrackStatus::OnShip->value, TrackStatus::VesselDepart->value], true)) {
-                        $loadedAt = $t->tracked_at;
+                        $loaded = true;
                         break;
                     }
                 }
-                if ($loadedAt) continue;
+                if ($loaded) continue;
 
-                $age = Carbon::parse($stackingAt)->startOfDay()->diffInDays(now()->startOfDay());
-
-                $total++; $sumAge += $age; if ($age >= 3) $over3++;
-                $items[] = ['code' => $s->code, 'route' => $s->route_label, 'age_days' => $age, 'status' => $s->latestTrackStatus?->value ?? null];
+                $age = Carbon::parse($foundStackingAt)->startOfDay()->diffInDays(now()->startOfDay());
+                $total++;
+                $sumAge += $age;
+                if ($age >= 3) $over3++;
+                $items[] = [
+                    'shipment_id' => $s->id,
+                    'code' => $s->code,
+                    'route' => $s->route_label ?? null,
+                    'age_days' => $age,
+                    'latest_status' => $statusLabel,
+                    'stacking_at' => Carbon::parse($foundStackingAt)->toDateTimeString(),
+                ];
             }
 
             $avgAge = $total > 0 ? round($sumAge / $total, 1) : 0.0;

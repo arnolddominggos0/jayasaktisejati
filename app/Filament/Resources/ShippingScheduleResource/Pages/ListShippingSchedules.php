@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ShippingScheduleResource\Pages;
 
 use App\Filament\Resources\ShippingScheduleResource;
+use App\Filament\Resources\ShippingScheduleResource\Widgets\HidePaginationStyle;
 use App\Filament\Resources\ShippingScheduleResource\Widgets\ShippingScheduleCalendar;
 use App\Filament\Resources\ShippingScheduleResource\Widgets\TamKpiSummary;
 use Filament\Resources\Pages\ListRecords;
@@ -43,6 +44,7 @@ class ListShippingSchedules extends ListRecords
     {
         return 1;
     }
+
 
     public function getTitle(): string
     {

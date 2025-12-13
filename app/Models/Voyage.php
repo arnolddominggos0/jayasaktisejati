@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Log;
 
 class Voyage extends Model
 {
@@ -47,6 +48,7 @@ class Voyage extends Model
         'final_note',
         'final_source',
         'final_attachment_path',
+        'is_urgent',
     ];
 
     protected $attributes = [
@@ -71,6 +73,7 @@ class Voyage extends Model
         'cargo_actual'               => 'integer',
         'actual_sailing_days'        => 'decimal:2',
         'finalized_by'               => 'integer',
+        'is_urgent'                  => 'boolean',
     ];
 
     protected static function booted(): void
@@ -79,7 +82,6 @@ class Voyage extends Model
             if ($model->etd && ! $model->period_month) {
                 $model->period_month = $model->etd->copy()->startOfMonth();
             }
-
             if (! $model->jss && $model->vessel && $model->pod) {
                 $voyageNo = preg_replace('/\s+/', '', strtoupper((string) $model->voyage_no));
                 $vcode = strtoupper(preg_replace('/[^A-Z0-9]/', '', substr((string) ($model->vessel->name ?? 'VSL'), 0, 3)));
@@ -87,6 +89,12 @@ class Voyage extends Model
                 if ($voyageNo && $vcode && $podCode) {
                     $model->jss = 'VOY' . $voyageNo . $vcode . $podCode . 'JSS';
                 }
+            }
+            $model->is_final = true;
+            $model->finalized_at = $model->finalized_at ?? now();
+            if (Auth::check()) {
+                $model->finalized_by = $model->finalized_by ?? Auth::id();
+                $model->finalized_by_name = $model->finalized_by_name ?? Auth::user()->name;
             }
         });
 
@@ -96,19 +104,15 @@ class Voyage extends Model
                 $daysDecimal = $seconds / 86400;
                 $model->actual_sailing_days = max(0, round($daysDecimal, 2));
             }
-
             if ($model->is_delayed && $model->delay_reason && ! $model->delay_reported_at) {
                 $model->delay_reported_at = now();
             }
-
             if ($model->rescheduled_etd) {
                 $model->etd = $model->rescheduled_etd;
             }
-
             if ($model->rescheduled_eta) {
                 $model->eta = $model->rescheduled_eta;
             }
-
             if ($model->is_final && ! $model->finalized_at) {
                 $model->finalized_at = now();
                 if (Auth::check()) {
@@ -116,7 +120,6 @@ class Voyage extends Model
                     $model->finalized_by_name = Auth::user()->name;
                 }
             }
-
             if ($model->isDirty('cargo_actual') && $model->cargo_actual && ! $model->cargo_actual_reported_at) {
                 $model->cargo_actual_reported_at = now();
                 if (Auth::check()) {
@@ -127,19 +130,15 @@ class Voyage extends Model
 
         static::saved(function (self $model) {
             $model->syncSchedule();
-
             $originalEtd = $model->getOriginal('etd');
             $originalEta = $model->getOriginal('eta');
-
             $changedEtd = $originalEtd != $model->etd;
             $changedEta = $originalEta != $model->eta;
-
             if ($changedEtd || $changedEta) {
                 $oldEtd = $originalEtd ? \Illuminate\Support\Carbon::parse($originalEtd) : null;
                 $oldEta = $originalEta ? \Illuminate\Support\Carbon::parse($originalEta) : null;
                 $newEtd = $model->etd;
                 $newEta = $model->eta;
-
                 \App\Models\RescheduleLog::create([
                     'voyage_id' => $model->id,
                     'old_etd' => $oldEtd,
@@ -184,7 +183,6 @@ class Voyage extends Model
         if (is_null($this->cargo_plan) || is_null($this->cargo_actual)) {
             return null;
         }
-
         return $this->cargo_actual - $this->cargo_plan;
     }
 
@@ -193,7 +191,6 @@ class Voyage extends Model
         if (is_null($this->cargo_plan) || $this->cargo_plan == 0 || is_null($this->cargo_actual)) {
             return null;
         }
-
         return round(($this->cargo_actual / $this->cargo_plan) * 100, 2);
     }
 
@@ -202,25 +199,19 @@ class Voyage extends Model
         if (! $this->id) {
             return;
         }
-
         $voyage = $this;
-
         DB::transaction(function () use ($voyage) {
             try {
                 if (! Schema::hasTable('shipping_schedules') || ! Schema::hasColumn('shipping_schedules', 'voyage_id')) {
-                    \Log::error('syncSchedule aborted: shipping_schedules table or voyage_id column missing');
+                    Log::error('syncSchedule aborted: shipping_schedules table or voyage_id column missing');
                     return;
                 }
-
                 $schedule = $voyage->schedule()->firstOrNew(['voyage_id' => $voyage->id]);
-
                 $payload = [];
-
                 $setIfColumnExists = function ($col, $value) use (&$payload) {
                     if (! Schema::hasColumn('shipping_schedules', $col)) {
                         return;
                     }
-                    // cast booleans and empty strings to null if necessary
                     if ($value === '') {
                         $value = null;
                     }
@@ -228,10 +219,7 @@ class Voyage extends Model
                         $payload[$col] = $value;
                     }
                 };
-
-                // Always set voyage_id so schedule row gets created
                 $payload['voyage_id'] = $voyage->id;
-
                 $setIfColumnExists('shipping_line_id', $voyage->vessel?->shippingLine?->id ?? $schedule->shipping_line_id ?? null);
                 $setIfColumnExists('vessel_id', $voyage->vessel_id ?? $schedule->vessel_id ?? null);
                 $setIfColumnExists('pol_id', $voyage->pol_id ?? $schedule->pol_id ?? null);
@@ -252,18 +240,30 @@ class Voyage extends Model
                 $setIfColumnExists('final_note', $voyage->final_note ?? $schedule->final_note ?? null);
                 $setIfColumnExists('final_source', $voyage->final_source ?? $schedule->final_source ?? null);
                 $setIfColumnExists('final_attachment_path', $voyage->final_attachment_path ?? $schedule->final_attachment_path ?? null);
-                $setIfColumnExists('finalized_at', $voyage->finalized_at ?? $schedule->finalized_at ?? null);
                 $setIfColumnExists('vessel_name', $voyage->vessel?->name ?? $schedule->vessel_name ?? null);
                 $setIfColumnExists('finalized_by', $voyage->finalized_by ?? $schedule->finalized_by ?? null);
                 $setIfColumnExists('finalized_by_name', $voyage->finalized_by_name ?? $schedule->finalized_by_name ?? null);
+                $setIfColumnExists('finalized_at', $voyage->finalized_at ?? $schedule->finalized_at ?? null);
+                $setIfColumnExists('is_urgent', $voyage->is_urgent ?? $schedule->is_urgent ?? null);
 
                 if (Schema::hasColumn('shipping_schedules', 'state')) {
-                    if ($voyage->is_final || $voyage->finalized_at) {
-                        $payload['state'] = \App\Enums\ScheduleState::Final;
+                    $payload['state'] = \App\Enums\ScheduleState::Final->value;
+                }
+
+                if (isset($payload['state']) && $payload['state'] === \App\Enums\ScheduleState::Final->value) {
+                    if (Schema::hasColumn('shipping_schedules', 'finalized_at') && empty($payload['finalized_at'])) {
+                        $payload['finalized_at'] = $voyage->finalized_at ?? now();
+                    }
+                    if (Schema::hasColumn('shipping_schedules', 'finalized_by') && empty($payload['finalized_by'])) {
+                        $payload['finalized_by'] = $voyage->finalized_by ?? (Auth::check() ? Auth::id() : null);
+                    }
+                    if (Schema::hasColumn('shipping_schedules', 'finalized_by_name') && empty($payload['finalized_by_name'])) {
+                        $payload['finalized_by_name'] = $voyage->finalized_by_name ?? (Auth::check() ? Auth::user()->name : null);
                     }
                 }
 
                 $schedule->fill($payload);
+
                 if ($schedule->isDirty()) {
                     $schedule->save();
                 } elseif (! $schedule->exists) {
@@ -271,9 +271,24 @@ class Voyage extends Model
                         ['voyage_id' => $voyage->id],
                         $payload
                     );
+                    $schedule = $voyage->schedule()->first();
+                }
+
+                if (Schema::hasColumn('shipping_schedules', 'state') && ($schedule->getRawOriginal('state') ?? ($payload['state'] ?? null)) === \App\Enums\ScheduleState::Final->value) {
+                    if (! $voyage->is_final) {
+                        $voyage->is_final = true;
+                        $voyage->finalized_at = $voyage->finalized_at ?? $schedule->finalized_at ?? now();
+                        $voyage->finalized_by = $voyage->finalized_by ?? $schedule->finalized_by;
+                        $voyage->finalized_by_name = $voyage->finalized_by_name ?? $schedule->finalized_by_name;
+                        if (method_exists($voyage, 'saveQuietly')) {
+                            $voyage->saveQuietly();
+                        } else {
+                            $voyage->save();
+                        }
+                    }
                 }
             } catch (\Throwable $e) {
-                \Log::error('syncSchedule exception: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+                Log::error('syncSchedule exception: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
                 throw $e;
             }
         });

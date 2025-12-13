@@ -1766,8 +1766,15 @@ class ShipmentResource extends Resource
             optional(City::find($data['destination_city_id'] ?? null))->name ?? '-',
         );
 
+        if (empty($data['status'])) {
+            $data['status'] = \App\Enums\ShipmentStatus::Draft->value;
+        }
+
+        $data['delivered_at'] = $data['delivered_at'] ?? null;
+
         return $data;
     }
+
 
     public static function mutateFormDataBeforeSave(array $data): array
     {

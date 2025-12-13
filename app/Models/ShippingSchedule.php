@@ -27,10 +27,15 @@ class ShippingSchedule extends Model
         'final_source',
         'final_attachment_path',
         'finalized_at',
+        'finalized_by',
+        'finalized_by_name',
         'kpi_sailing_days',
         'actual_sailing_days',
         'vessel_name',
         'is_urgent',
+        'cargo_actual',
+        'cargo_actual_reported_at',
+        'cargo_actual_reported_by',
     ];
 
     protected $casts = [
@@ -39,6 +44,7 @@ class ShippingSchedule extends Model
         'period_month' => 'date',
         'finalized_at' => 'datetime',
         'state'        => ScheduleState::class,
+        'is_urgent'    => 'boolean',
     ];
 
     public function voyage(): BelongsTo

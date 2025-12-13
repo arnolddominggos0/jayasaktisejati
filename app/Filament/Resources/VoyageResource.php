@@ -51,7 +51,7 @@ class VoyageResource extends Resource
                             return Port::query()
                                 ->when($search !== '', function ($q) use ($search) {
                                     $q->where('code', 'ilike', "%{$search}%")
-                                      ->orWhere('name', 'ilike', "%{$search}%");
+                                        ->orWhere('name', 'ilike', "%{$search}%");
                                 })
                                 ->limit(50)
                                 ->pluck('code', 'id');
@@ -70,7 +70,7 @@ class VoyageResource extends Resource
                             return Port::query()
                                 ->when($search !== '', function ($q) use ($search) {
                                     $q->where('code', 'ilike', "%{$search}%")
-                                      ->orWhere('name', 'ilike', "%{$search}%");
+                                        ->orWhere('name', 'ilike', "%{$search}%");
                                 })
                                 ->limit(50)
                                 ->pluck('code', 'id');
@@ -107,79 +107,67 @@ class VoyageResource extends Resource
                         ->native(false)
                         ->disabled()
                         ->dehydrated(),
-                ])
-                ->columns(3),
-
-            Section::make('KPI TAM')
-                ->visible(fn($livewire) => $livewire instanceof EditRecord)
-                ->schema([
                     TextInput::make('cargo_plan')
                         ->label('Rencana Muatan (unit)')
                         ->numeric()
-                        ->minValue(0),
-                ]),
+                        ->minValue(0)
+                        ->required()
+                        ->visible(fn($livewire) => !($livewire instanceof EditRecord)),
+                ])
+                ->columns(3),
 
             Section::make('Delay (Jika ETA mundur)')
                 ->visible(fn($livewire) => $livewire instanceof EditRecord)
                 ->schema([
-
                     Toggle::make('is_delayed')
                         ->label('Voyage Delay?')
                         ->reactive()
                         ->inline(false)
                         ->afterStateUpdated(function ($state, callable $set, $get) {
                             if ($state) {
-
                                 $etd = $get('etd');
                                 if ($etd) {
-                                    $auto = \Illuminate\Support\Carbon::parse($etd)->addDay();
+                                    $auto = Carbon::parse($etd)->addDay();
                                     $set('rescheduled_etd', $auto->toDateTimeString());
                                 }
-
                                 $eta = $get('eta');
                                 if ($eta) {
-                                    $autoEta = \Illuminate\Support\Carbon::parse($eta)->addDay();
+                                    $autoEta = Carbon::parse($eta)->addDay();
                                     $set('rescheduled_eta', $autoEta->toDateTimeString());
                                 }
-
                                 $set('delay_reported_at', now()->toDateTimeString());
                             } else {
                                 $set('rescheduled_etd', null);
                                 $set('rescheduled_eta', null);
                             }
                         }),
-
                     Textarea::make('delay_reason')
                         ->label('Delay Reason')
                         ->rows(3)
                         ->visible(fn($get) => (bool) $get('is_delayed')),
-
                     DateTimePicker::make('rescheduled_etd')
                         ->label('ETD (Reschedule)')
                         ->required(fn($get) => (bool) $get('is_delayed'))
                         ->visible(fn($get) => (bool) $get('is_delayed'))
                         ->native(false)
-                        ->minDate(fn($get) => $get('etd'))
-                        ->hint('Tanggal minimal adalah ETD awal / ETD rencana'),
-
+                        ->minDate(fn($get) => $get('etd')),
                     DateTimePicker::make('rescheduled_eta')
                         ->label('ETA (Reschedule)')
                         ->required(fn($get) => (bool) $get('is_delayed'))
                         ->visible(fn($get) => (bool) $get('is_delayed'))
                         ->native(false)
-                        ->minDate(fn($get) => $get('rescheduled_etd'))
-                        ->hint('ETA tidak boleh lebih awal dari ETD'),
+                        ->minDate(fn($get) => $get('rescheduled_etd')),
                 ])
                 ->columns(2),
 
-            Section::make('Finalisasi') 
+            Section::make('Finalisasi')
                 ->visible(fn($livewire) => $livewire instanceof EditRecord)
                 ->schema([
                     Toggle::make('is_final')
                         ->label('Tandai Final')
                         ->inline(false)
                         ->reactive()
-                        ->visible(fn() => Auth::check() && (Auth::user() && method_exists(Auth::user(), 'hasRole') ? (Auth::user()->hasRole('approver') || Auth::user()->hasRole('admin')) : false))
+                        ->visible(fn() => Auth::check() && (Auth::user()->hasRole('approver') || Auth::user()->hasRole('admin')))
                         ->afterStateUpdated(function ($state, callable $set) {
                             if ($state) {
                                 $set('finalized_at', now()->toDateTimeString());
@@ -212,14 +200,12 @@ class VoyageResource extends Resource
                         ->label('ATD (Actual Departure)')
                         ->native(false)
                         ->live()
-                        ->nullable()
-                        ->placeholder('Belum tersedia'),
+                        ->nullable(),
                     DateTimePicker::make('ata_at')
                         ->label('ATA (Actual Arrival)')
                         ->native(false)
                         ->live()
-                        ->nullable()
-                        ->placeholder('Belum tersedia'),
+                        ->nullable(),
                     TextInput::make('actual_sailing_days')
                         ->label('Actual Sailing (hari)')
                         ->disabled()
@@ -256,79 +242,50 @@ class VoyageResource extends Resource
                     ->label('Pelayaran')
                     ->sortable()
                     ->searchable(),
-
                 TextColumn::make('vessel.name')
                     ->label('Kapal')
                     ->sortable()
                     ->searchable(),
-
                 TextColumn::make('voyage_no')
                     ->label('Voyage')
                     ->sortable()
                     ->searchable(),
-
                 TextColumn::make('pol.code')->label('POL')->sortable(),
                 TextColumn::make('pod.code')->label('POD')->sortable(),
-
                 TextColumn::make('period_month')
                     ->label('Periode')
                     ->date('M Y')
                     ->sortable(),
-
-                TextColumn::make('etd')
-                    ->label('ETD')
-                    ->dateTime()
-                    ->sortable(),
-
-                TextColumn::make('eta')
-                    ->label('ETA')
-                    ->dateTime()
-                    ->sortable(),
-
-                TextColumn::make('cargo_plan')
-                    ->label('Plan TAM')
-                    ->numeric()
-                    ->sortable()
-                    ->alignRight(),
-
-                TextColumn::make('cargo_actual')
-                    ->label('Actual TAM')
-                    ->numeric()
-                    ->alignRight()
-                    ->toggleable(isToggledHiddenByDefault: true),
-
+                TextColumn::make('etd')->label('ETD')->dateTime()->sortable(),
+                TextColumn::make('eta')->label('ETA')->dateTime()->sortable(),
+                TextColumn::make('cargo_plan')->label('Plan TAM')->numeric()->sortable()->alignRight(),
+                TextColumn::make('cargo_actual')->label('Actual TAM')->numeric()->alignRight()->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('cargo_achievement_percent')
                     ->label('Tercapai (%)')
-                    ->getStateUsing(fn (Voyage $record) => $record->cargo_achievement_percent)
-                    ->formatStateUsing(fn ($state) => is_null($state) ? '-' : number_format((float)$state, 2) . '%')
+                    ->getStateUsing(fn(Voyage $record) => $record->cargo_achievement_percent)
+                    ->formatStateUsing(fn($state) => is_null($state) ? '-' : number_format((float)$state, 2) . '%')
                     ->sortable('cargo_achievement_ratio')
-                    ->color(fn ($state) =>
-                        is_null($state) ? 'secondary' : ($state >= 100 ? 'success' : ($state >= 75 ? 'warning' : 'danger'))
-                    )
+                    ->color(fn($state) => is_null($state) ? 'secondary' : ($state >= 100 ? 'success' : ($state >= 75 ? 'warning' : 'danger')))
                     ->alignRight(),
-
                 TextColumn::make('status_label')
                     ->label('Status')
                     ->badge()
                     ->getStateUsing(function (Voyage $record) {
+                        if ($record->atd_at) return 'Sudah jalan';
                         if (! $record->etd) return 'Tidak diketahui';
-                        $etd = $record->etd->copy()->startOfDay();
-                        $today = now()->startOfDay();
-                        return $etd->lessThanOrEqualTo($today) ? 'Sudah jalan' : 'Belum jalan';
+                        return 'Belum jalan';
                     })
-                    ->color(fn ($state) => match ($state) {
+                    ->color(fn($state) => match ($state) {
                         'Sudah jalan' => 'success',
                         'Belum jalan' => 'warning',
-                        default       => 'gray',
+                        default => 'gray',
                     }),
-
                 TextColumn::make('actual_sailing_days')
                     ->label('Sailing (hari)')
-                    ->formatStateUsing(fn ($state) => is_null($state) ? '-' : ((int)floor((float)$state) . ' hari ' . (int)round(((float)$state - floor((float)$state)) * 24) . ' jam'))
+                    ->formatStateUsing(fn($state) => is_null($state) ? '-' : ((int)floor((float)$state) . ' hari ' . (int)round(((float)$state - floor((float)$state)) * 24) . ' jam'))
                     ->sortable()
                     ->toggleable()
                     ->alignRight(),
-
                 BooleanColumn::make('is_delayed')
                     ->label('Delay')
                     ->trueIcon('heroicon-o-exclamation-circle')
@@ -336,7 +293,6 @@ class VoyageResource extends Resource
                     ->trueColor('danger')
                     ->falseColor('gray')
                     ->toggleable(isToggledHiddenByDefault: true),
-
                 BooleanColumn::make('is_final')
                     ->label('Final')
                     ->trueIcon('heroicon-o-check-circle')
@@ -344,10 +300,10 @@ class VoyageResource extends Resource
                     ->trueColor('success')
                     ->falseColor('gray')
                     ->toggleable(isToggledHiddenByDefault: true),
-
                 TextColumn::make('finalized_by_name')->label('Finalized By')->toggleable(isToggledHiddenByDefault: true),
-
                 TextColumn::make('finalized_at')->label('Finalized At')->dateTime()->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('finalized_at')->label('Finalized At')->dateTime()->sortable(),
+                TextColumn::make('finalized_by_name')->label('Finalized By')->toggleable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('period_month')
@@ -359,7 +315,7 @@ class VoyageResource extends Resource
                             ->whereNotNull('period_month')
                             ->orderByDesc('period_month')
                             ->get()
-                            ->mapWithKeys(fn ($row) => [
+                            ->mapWithKeys(fn($row) => [
                                 $row->period_month->toDateString() => $row->period_month->format('M Y'),
                             ]);
                     })
@@ -372,11 +328,9 @@ class VoyageResource extends Resource
                     ])
                     ->query(function ($query, array $data) {
                         $value = $data['value'] ?? null;
-                        if (! $value) return $query;
-                        $today = now()->startOfDay();
                         return match ($value) {
-                            'upcoming' => $query->whereDate('etd', '>', $today),
-                            'past'     => $query->whereDate('etd', '<=', $today),
+                            'upcoming' => $query->whereNull('atd_at'),
+                            'past'     => $query->whereNotNull('atd_at'),
                             default    => $query,
                         };
                     }),
