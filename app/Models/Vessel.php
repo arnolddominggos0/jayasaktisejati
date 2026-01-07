@@ -71,6 +71,7 @@ class Vessel extends Model
         return null;
     }
 
+
     protected function twoLetterFromWord(string $w): string
     {
         $w = preg_replace('/[^A-Z0-9]/', '', Str::upper($w));

@@ -4,6 +4,7 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\AdminDashboard;
 use App\Http\Middleware\EnsurePanelRole;
+use App\Http\Middleware\ScopeByBranch;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -64,6 +65,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->middleware([
                 EnsurePanelRole::class,
+                ScopeByBranch::class,
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,

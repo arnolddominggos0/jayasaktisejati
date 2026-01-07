@@ -405,7 +405,7 @@ class ShipmentResource extends Resource
                     ->form(static::trackUpdateForm())
                     ->disabled(fn(Shipment $record) => 
                             $record->currentTrackStatus()?->value === TrackStatus::VesselDepart->value &&
-                            auth()->user()->canUpdateVesselDepart($record) && $record->isWithinHMinus3Eta()
+                            auth_user()->canUpdateVesselDepart($record) && $record->isWithinHMinus3Eta()
                         )
                     ->action(function (Shipment $record, array $data) {
                         $status = $record->currentTrackStatus() ?? $record->latest_track_status;

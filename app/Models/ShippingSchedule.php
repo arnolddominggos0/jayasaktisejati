@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\ScheduleState;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,41 +9,14 @@ class ShippingSchedule extends Model
 {
     protected $fillable = [
         'voyage_id',
-        'shipping_line_id',
-        'vessel_id',
-        'pol_id',
-        'pod_id',
-        'voyage_no',
-        'cargo_plan',
-        'jss',
-        'dwelling_days',
-        'etd',
-        'eta',
         'period_month',
+        'jss',
+        'cargo_plan',
         'state',
-        'approved_by_name',
-        'final_note',
-        'final_source',
-        'final_attachment_path',
-        'finalized_at',
-        'finalized_by',
-        'finalized_by_name',
-        'kpi_sailing_days',
-        'actual_sailing_days',
-        'vessel_name',
-        'is_urgent',
-        'cargo_actual',
-        'cargo_actual_reported_at',
-        'cargo_actual_reported_by',
     ];
 
     protected $casts = [
-        'etd'          => 'datetime',
-        'eta'          => 'datetime',
         'period_month' => 'date',
-        'finalized_at' => 'datetime',
-        'state'        => ScheduleState::class,
-        'is_urgent'    => 'boolean',
     ];
 
     public function voyage(): BelongsTo
@@ -52,18 +24,23 @@ class ShippingSchedule extends Model
         return $this->belongsTo(Voyage::class);
     }
 
-    public function vessel(): BelongsTo
+    public function getEtdDateAttribute()
     {
-        return $this->belongsTo(Vessel::class, 'vessel_id');
+        return $this->voyage?->etd;
     }
 
-    public function pol(): BelongsTo
+    public function getEtaDateAttribute()
     {
-        return $this->belongsTo(Port::class, 'pol_id');
+        return $this->voyage?->eta;
     }
 
-    public function pod(): BelongsTo
+    public function getAtdDateAttribute()
     {
-        return $this->belongsTo(Port::class, 'pod_id');
+        return $this->voyage?->atd_at;
+    }
+
+    public function getAtaDateAttribute()
+    {
+        return $this->voyage?->ata_at;
     }
 }

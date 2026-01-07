@@ -32,7 +32,7 @@ return [
     ],
 
     'tam' => [
-        'whatsapp_number' => '6285270909923',
+        'whatsapp' => '6281265559397',
     ],
 
 ];

@@ -8,6 +8,7 @@ use App\Models\Voyage;
 use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -19,6 +20,7 @@ use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\BooleanColumn;
 use Filament\Tables;
+use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -27,7 +29,7 @@ class VoyageResource extends Resource
 {
     protected static ?string $model = Voyage::class;
 
-    protected static ?string $navigationGroup = 'Monitoring Kapal';
+    protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
     protected static ?string $navigationIcon = 'heroicon-o-paper-airplane';
     protected static ?string $navigationLabel = 'Voyage';
 
@@ -42,6 +44,15 @@ class VoyageResource extends Resource
                         ->searchable()
                         ->preload()
                         ->label('Kapal'),
+
+                    Hidden::make('vessel_plan_id')
+                        ->default(request('vessel_plan_id')),
+
+                    DatePicker::make('period_month')
+                        ->default(request('period_month'))
+                        ->disabled()
+                        ->dehydrated(),
+
                     Select::make('pol_id')
                         ->relationship('pol', 'code')
                         ->required()
@@ -82,7 +93,9 @@ class VoyageResource extends Resource
                         ->label('POD'),
                     TextInput::make('voyage_no')
                         ->label('Voyage No')
-                        ->required()
+                        ->nullable()
+                        ->helperText('Boleh dikosongkan, bisa diisi saat jadwal sudah pasti')
+                        ->required(fn($livewire) => $livewire instanceof EditRecord)
                         ->maxLength(50),
                 ])
                 ->columns(2),
@@ -242,102 +255,63 @@ class VoyageResource extends Resource
                     ->label('Pelayaran')
                     ->sortable()
                     ->searchable(),
+
                 TextColumn::make('vessel.name')
                     ->label('Kapal')
                     ->sortable()
                     ->searchable(),
+
                 TextColumn::make('voyage_no')
                     ->label('Voyage')
                     ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->placeholder('-'),
+
                 TextColumn::make('pol.code')->label('POL')->sortable(),
                 TextColumn::make('pod.code')->label('POD')->sortable(),
+
                 TextColumn::make('period_month')
                     ->label('Periode')
                     ->date('M Y')
                     ->sortable(),
+
                 TextColumn::make('etd')->label('ETD')->dateTime()->sortable(),
                 TextColumn::make('eta')->label('ETA')->dateTime()->sortable(),
-                TextColumn::make('cargo_plan')->label('Plan TAM')->numeric()->sortable()->alignRight(),
-                TextColumn::make('cargo_actual')->label('Actual TAM')->numeric()->alignRight()->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('cargo_achievement_percent')
-                    ->label('Tercapai (%)')
-                    ->getStateUsing(fn(Voyage $record) => $record->cargo_achievement_percent)
-                    ->formatStateUsing(fn($state) => is_null($state) ? '-' : number_format((float)$state, 2) . '%')
-                    ->sortable('cargo_achievement_ratio')
-                    ->color(fn($state) => is_null($state) ? 'secondary' : ($state >= 100 ? 'success' : ($state >= 75 ? 'warning' : 'danger')))
-                    ->alignRight(),
-                TextColumn::make('status_label')
+
+                TextColumn::make('status_operasional')
                     ->label('Status')
                     ->badge()
                     ->getStateUsing(function (Voyage $record) {
                         if ($record->atd_at) return 'Sudah jalan';
-                        if (! $record->etd) return 'Tidak diketahui';
+                        if ($record->etd && $record->etd->isPast()) return 'Terlambat';
                         return 'Belum jalan';
                     })
                     ->color(fn($state) => match ($state) {
                         'Sudah jalan' => 'success',
-                        'Belum jalan' => 'warning',
-                        default => 'gray',
+                        'Terlambat'   => 'danger',
+                        default       => 'warning',
                     }),
-                TextColumn::make('actual_sailing_days')
-                    ->label('Sailing (hari)')
-                    ->formatStateUsing(fn($state) => is_null($state) ? '-' : ((int)floor((float)$state) . ' hari ' . (int)round(((float)$state - floor((float)$state)) * 24) . ' jam'))
-                    ->sortable()
-                    ->toggleable()
-                    ->alignRight(),
-                BooleanColumn::make('is_delayed')
-                    ->label('Delay')
-                    ->trueIcon('heroicon-o-exclamation-circle')
-                    ->falseIcon('heroicon-o-check')
-                    ->trueColor('danger')
-                    ->falseColor('gray')
-                    ->toggleable(isToggledHiddenByDefault: true),
-                BooleanColumn::make('is_final')
-                    ->label('Final')
-                    ->trueIcon('heroicon-o-check-circle')
-                    ->falseIcon('heroicon-o-clock')
-                    ->trueColor('success')
-                    ->falseColor('gray')
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('finalized_by_name')->label('Finalized By')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('finalized_at')->label('Finalized At')->dateTime()->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('finalized_at')->label('Finalized At')->dateTime()->sortable(),
-                TextColumn::make('finalized_by_name')->label('Finalized By')->toggleable(),
             ])
             ->filters([
-                Tables\Filters\SelectFilter::make('period_month')
+                SelectFilter::make('period_month')
                     ->label('Periode')
-                    ->options(function () {
-                        return Voyage::query()
+                    ->options(
+                        Voyage::query()
                             ->select('period_month')
                             ->distinct()
                             ->whereNotNull('period_month')
                             ->orderByDesc('period_month')
                             ->get()
                             ->mapWithKeys(fn($row) => [
-                                $row->period_month->toDateString() => $row->period_month->format('M Y'),
-                            ]);
-                    })
-                    ->default(now()->startOfMonth()->toDateString()),
-                Tables\Filters\SelectFilter::make('status_voyage')
-                    ->label('Status Voyage')
-                    ->options([
-                        'upcoming' => 'Belum jalan',
-                        'past'     => 'Sudah jalan',
-                    ])
-                    ->query(function ($query, array $data) {
-                        $value = $data['value'] ?? null;
-                        return match ($value) {
-                            'upcoming' => $query->whereNull('atd_at'),
-                            'past'     => $query->whereNotNull('atd_at'),
-                            default    => $query,
-                        };
-                    }),
+                                $row->period_month->toDateString()
+                                => $row->period_month->format('M Y'),
+                            ])
+                    ),
             ])
-            ->defaultSort('etd', 'desc')
-            ->actions([Tables\Actions\EditAction::make()])
-            ->bulkActions([Tables\Actions\DeleteBulkAction::make()]);
+            ->defaultSort('etd', 'asc')
+            ->actions([
+                Tables\Actions\EditAction::make(),
+            ]);
     }
 
     public static function getPages(): array

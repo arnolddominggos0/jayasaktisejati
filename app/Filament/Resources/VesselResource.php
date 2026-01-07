@@ -8,6 +8,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class VesselResource extends Resource
@@ -16,6 +17,7 @@ class VesselResource extends Resource
     protected static ?string $navigationGroup = 'Master Data Shipment';
     protected static ?string $navigationIcon = 'heroicon-o-lifebuoy';
     protected static ?string $navigationLabel = 'Kapal';
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function form(Form $form): Form
     {
@@ -30,17 +32,38 @@ class VesselResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([
-            Tables\Columns\TextColumn::make('shippingLine.name')->label('Shipping Line')->sortable()->searchable(),
-            Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
-            Tables\Columns\TextColumn::make('code'),
-            Tables\Columns\TextColumn::make('capacity'),
-        ])->actions([
-            Tables\Actions\EditAction::make(),
-        ])->bulkActions([
-            Tables\Actions\DeleteBulkAction::make(),
-        ]);
+        return $table
+            ->columns([
+                TextColumn::make('period_month')
+                    ->label('Periode')
+                    ->date('M Y')
+                    ->sortable(),
+
+                TextColumn::make('route_code')
+                    ->label('Rute'),
+
+                TextColumn::make('status')
+                    ->badge()
+                    ->formatStateUsing(fn($state) => $state->label())
+                    ->color(fn($state) => $state->color()),
+
+                TextColumn::make('max_gap')
+                    ->label('Max ETD Gap')
+                    ->getStateUsing(
+                        fn($record) =>
+                        $record->maxEtdGap() . ' hari'
+                    )
+                    ->color(
+                        fn($record) =>
+                        $record->maxEtdGap() > 6 ? 'danger' : 'success'
+                    ),
+            ])
+            ->actions([
+                Tables\Actions\EditAction::make(),
+            ])
+            ->defaultSort('period_month', 'desc');
     }
+
 
     public static function getPages(): array
     {

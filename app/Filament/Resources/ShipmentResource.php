@@ -91,6 +91,30 @@ class ShipmentResource extends Resource
         return $q->orderBy('name')->value('id');
     }
 
+    protected static function currentBranchId(): ?int
+    {
+        if (app()->bound('currentBranchId')) {
+            return app('currentBranchId');
+        }
+
+        return Filament::auth()->user()?->branch_id;
+    }
+
+
+    public static function getEloquentQuery(): Builder
+    {
+        $q = parent::getEloquentQuery();
+
+        $branchId = self::currentBranchId();
+
+        if ($branchId) {
+            $q->where('branch_id', $branchId);
+        }
+
+        return $q;
+    }
+
+
     protected static function resolveTimelineMask(Shipment $m): array
     {
         $cfg      = config('jss_timeline');
@@ -1072,9 +1096,25 @@ class ShipmentResource extends Resource
                         ]);
                 });
 
+                $branchId = app()->bound('currentBranchId')
+                    ? app('currentBranchId')
+                    : null;
+
+                if ($branchId) {
+                    $query->where('branch_id', $branchId);
+                }
+
+                $query->with([
+                    'originCity:id,name',
+                    'destinationCity:id,name',
+                    'destinationOffice:id,branch_id',
+                    'tracks:id,shipment_id,status,actual_at,tracked_at',
+                ]);
+
                 $user = Filament::auth()->user();
 
                 if (! ($user && method_exists($user, 'hasRole') && $user->hasRole('super_admin'))) {
+
                     if ($user?->branch_id) {
                         $query->where(function ($w) use ($user) {
                             $w->where('branch_id', $user->branch_id)
@@ -1089,13 +1129,6 @@ class ShipmentResource extends Resource
                         });
                     }
                 }
-
-                $query->with([
-                    'originCity:id,name',
-                    'destinationCity:id,name',
-                    'destinationOffice:id,branch_id',
-                    'tracks:id,shipment_id,status,actual_at,tracked_at',
-                ]);
             })
             ->columns([
                 TextColumn::make('code')
@@ -1532,19 +1565,30 @@ class ShipmentResource extends Resource
                     ->icon('heroicon-m-printer')
                     ->url(fn($record) => route('shipments.resi', ['shipment' => $record->id]) . '?download=1')
                     ->openUrlInNewTab(),
+
+                \Filament\Tables\Actions\Action::make('sendToFc')
+                    ->label('Kirim ke FC')
+                    ->icon('heroicon-m-paper-airplane')
+                    ->visible(fn(Shipment $r) => $r->status === ShipmentStatus::Draft)
+                    ->requiresConfirmation()
+                    ->action(fn(Shipment $r) => $r->sendToFc()),
             ])
             ->bulkActions([
                 BulkAction::make('export_selected')
                     ->label('Export Terpilih (CSV)')
-                    ->icon('heroicon-m-arrow-down-tray')
                     ->requiresConfirmation()
                     ->action(function (Collection $records) {
+                        $branchId = self::currentBranchId();
+
+                        if ($branchId) {
+                            $records = $records->where('branch_id', $branchId);
+                        }
+
                         if ($records->isEmpty()) {
                             Notification::make()
-                                ->title('Tidak ada baris terpilih')
+                                ->title('Tidak ada data yang dapat diexport')
                                 ->warning()
                                 ->send();
-
                             return;
                         }
 
@@ -1656,12 +1700,17 @@ class ShipmentResource extends Resource
     {
         $u = Filament::auth()->user();
 
-        if ($u && is_callable([$u, 'hasRole']) && call_user_func([$u, 'hasRole'], 'super_admin')) {
+        if ($u?->hasRole('super_admin')) {
             return true;
         }
 
-        return (bool) ($u?->can('update', $record));
+        $branchId = self::currentBranchId();
+
+        return $u
+            && $u->hasRole('office_admin')
+            && (int) $record->branch_id === (int) $branchId;
     }
+
 
     public static function canViewAny(): bool
     {
@@ -1687,12 +1736,12 @@ class ShipmentResource extends Resource
             $data['edit_delivery_contact'],
         );
 
-        if (empty($data['branch_id'])) {
-            $data['branch_id'] = Filament::auth()->user()?->branch_id;
-        }
+        $branchId = self::currentBranchId();
 
-        $mode  = $data['mode']        ?? null;
-        $cargo = $data['cargo_type']  ?? null;
+        $data['branch_id'] = $branchId;
+
+        $mode  = $data['mode']           ?? null;
+        $cargo = $data['cargo_type']     ?? null;
         $opt   = $data['service_option'] ?? null;
 
         if ($mode === ShipmentMode::Sea->value) {
@@ -1700,7 +1749,7 @@ class ShipmentResource extends Resource
 
             if (empty($data['assigned_depot_id'])) {
                 $data['assigned_depot_id'] = self::resolveDepotId(
-                    (int) ($data['branch_id'] ?? 0),
+                    (int) $branchId,
                     $mode,
                     (int) ($data['voyage_id'] ?? 0) ?: null
                 );
@@ -1708,7 +1757,7 @@ class ShipmentResource extends Resource
 
             if (empty($data['assigned_depot_id'])) {
                 throw ValidationException::withMessages([
-                    'assigned_depot_id' => 'Tidak ada Depo (mode laut) untuk cabang ini. Tambahkan depo di menu Depo.',
+                    'assigned_depot_id' => 'Tidak ada Depo (mode laut) untuk cabang ini.',
                 ]);
             }
         } elseif ($mode === ShipmentMode::Land->value) {
@@ -1718,142 +1767,8 @@ class ShipmentResource extends Resource
             };
         }
 
-        $isSea        = $mode === ShipmentMode::Sea->value;
-        $isGeneral    = $cargo === CargoType::General->value;
-        $isVehicle    = $cargo === CargoType::Vehicle->value;
-        $isGeneralFcl = $isSea && $isGeneral && (($data['service_option'] ?? null) === 'fcl');
-
-        if ($isVehicle) {
-            $data['service_option'] = null;
-
-            if (empty($data['vehicle_kind']) || empty($data['vehicle_loading'])) {
-                throw ValidationException::withMessages([
-                    'vehicle_kind'    => 'Jenis unit wajib diisi.',
-                    'vehicle_loading' => 'Metode muat unit wajib diisi.',
-                ]);
-            }
-        }
-
-        if ($isGeneralFcl) {
-            if (empty($data['container_size']) || empty($data['container_qty'])) {
-                throw ValidationException::withMessages([
-                    'container_size' => 'Ukuran kontainer wajib diisi.',
-                    'container_qty'  => 'Jumlah kontainer wajib diisi.',
-                ]);
-            }
-        }
-
-        if ($isSea && ($isGeneralFcl || $isVehicle)) {
-            $loading      = $data['vehicle_loading'] ?? null;
-            $sealRequired = ! ($isVehicle && $loading === 'flat_rack');
-            $errs         = [];
-
-            if (empty($data['container_no'])) {
-                $errs['container_no'] = 'No. Kontainer wajib diisi.';
-            }
-            if ($sealRequired && empty($data['seal_no'])) {
-                $errs['seal_no'] = 'Seal No. wajib diisi.';
-            }
-
-            if (! empty($errs)) {
-                throw ValidationException::withMessages($errs);
-            }
-        }
-
-        $data['route_summary'] = sprintf(
-            '%s → %s',
-            optional(City::find($data['origin_city_id'] ?? null))->name ?? '-',
-            optional(City::find($data['destination_city_id'] ?? null))->name ?? '-',
-        );
-
         if (empty($data['status'])) {
-            $data['status'] = \App\Enums\ShipmentStatus::Draft->value;
-        }
-
-        $data['delivered_at'] = $data['delivered_at'] ?? null;
-
-        return $data;
-    }
-
-
-    public static function mutateFormDataBeforeSave(array $data): array
-    {
-        $str = fn($k) => isset($data[$k]) ? trim((string) $data[$k]) : null;
-
-        $mode   = $str('mode');
-        $cargo  = $str('cargo_type');
-        $opt    = $str('service_option');
-        $kind   = $str('vehicle_kind');
-        $load   = $str('vehicle_loading');
-
-        $isSea        = $mode === ShipmentMode::Sea->value;
-        $isGeneral    = $cargo === CargoType::General->value;
-        $isVehicle    = $cargo === CargoType::Vehicle->value;
-        $isGeneralFcl = $isSea && $isGeneral && ($opt === 'fcl');
-
-        if ($isVehicle) {
-            $validLoad = $kind === 'motorcycle'
-                ? ['regular', 'flat_rack']
-                : ['regular', 'rack'];
-
-            if (empty($kind)) {
-                throw ValidationException::withMessages([
-                    'vehicle_kind' => 'Jenis unit wajib diisi.',
-                ]);
-            }
-
-            if (empty($load) || ! in_array($load, $validLoad, true)) {
-                throw ValidationException::withMessages([
-                    'vehicle_loading' => 'Metode muat unit wajib diisi dan harus sesuai dengan jenis unit.',
-                ]);
-            }
-
-            $data['vehicle_kind']    = $kind;
-            $data['vehicle_loading'] = $load;
-            $data['service_option']  = null;
-            $data['container_size']  = null;
-            $data['container_qty']   = null;
-        } else {
-            $data['vehicle_kind']    = null;
-            $data['vehicle_loading'] = null;
-        }
-
-        if ($isGeneralFcl) {
-            if (empty($data['container_size']) || empty($data['container_qty'])) {
-                throw ValidationException::withMessages([
-                    'container_size' => 'Ukuran kontainer wajib diisi.',
-                    'container_qty'  => 'Jumlah kontainer wajib diisi.',
-                ]);
-            }
-        } else {
-            if ($isSea && $isGeneral && $opt === 'lcl') {
-                $data['container_size'] = null;
-                $data['container_qty']  = null;
-            }
-        }
-
-        if ($isSea && ($isGeneralFcl || $isVehicle)) {
-            $errs         = [];
-            $containerNo  = $str('container_no');
-            $sealNo       = $str('seal_no');
-            $sealRequired = ! ($isVehicle && $load === 'flat_rack');
-
-            if (empty($containerNo)) {
-                $errs['container_no'] = 'No. Kontainer wajib diisi.';
-            }
-            if ($sealRequired && empty($sealNo)) {
-                $errs['seal_no'] = 'Seal No. wajib diisi.';
-            }
-
-            if (! empty($errs)) {
-                throw ValidationException::withMessages($errs);
-            }
-
-            $data['container_no'] = $containerNo ? strtoupper($containerNo) : $containerNo;
-            $data['seal_no']      = $sealNo ? strtoupper($sealNo) : $sealNo;
-        } else {
-            $data['container_no'] = null;
-            $data['seal_no']      = null;
+            $data['status'] = ShipmentStatus::Draft->value;
         }
 
         return $data;

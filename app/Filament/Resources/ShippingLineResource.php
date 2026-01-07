@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ShippingLineResource\Pages;
+use App\Filament\Resources\ShippingLineResource\RelationManagers\VesselsRelationManager;
 use App\Models\ShippingLine;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -44,6 +45,13 @@ class ShippingLineResource extends Resource
             'index' => Pages\ListShippingLines::route('/'),
             'create' => Pages\CreateShippingLine::route('/create'),
             'edit' => Pages\EditShippingLine::route('/{record}/edit'),
+        ];
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            VesselsRelationManager::class,
         ];
     }
 }

@@ -28,7 +28,8 @@ use App\Filament\Pages\Dashboard\Widgets\{
 };
 use App\Filament\Resources\ShippingScheduleResource\Widgets\ScheduleKpiPlaceholder;
 use App\Filament\Resources\ShippingScheduleResource\Widgets\ScheduleGanttPlaceholder;
-use App\Filament\Resources\ShippingScheduleResource\Widgets\ShippingScheduleCalendar;
+use App\Filament\Widgets\ShippingScheduleCalendar;
+use App\Filament\Widgets\ShippingScheduleTable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -59,6 +60,7 @@ class AppServiceProvider extends ServiceProvider
             'app.filament.widgets.schedule-kpi-placeholder'   => ScheduleKpiPlaceholder::class,
             'app.filament.widgets.schedule-gantt-placeholder' => ScheduleGanttPlaceholder::class,
             'app.filament.widgets.shipping-schedule-calendar' => ShippingScheduleCalendar::class,
+            'app.filament.widgets.shipping-schedule-table'    => ShippingScheduleTable::class,
         ];
 
         foreach ($aliases as $alias => $componentClass) {

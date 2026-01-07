@@ -133,6 +133,10 @@ class Shipment extends Model
                 $m->code = self::generateCode($mode);
             }
 
+            if (blank($m->status)) {
+                $m->status = ShipmentStatus::Draft;
+            }
+
             $reqType = $m->request_type?->value ?? (string) $m->request_type;
             if (blank($m->doc_number)) {
                 $m->doc_number = $reqType === RequestType::SPPB_DO->value
@@ -161,7 +165,9 @@ class Shipment extends Model
             }
         });
 
-        static::created(function () {});
+        static::created(function (Shipment $m) {
+            $m->ensureTrackSkeleton();
+        });
 
         static::saving(function (Shipment $m) {
             if ($m->mode === ShipmentMode::Sea) {
@@ -306,6 +312,19 @@ class Shipment extends Model
         });
     }
 
+    public function sendToFc(): void
+    {
+        if ($this->status !== ShipmentStatus::Draft) {
+            return;
+        }
+
+        $this->status = ShipmentStatus::Pending;
+        $this->saveQuietly();
+
+        $this->ensureTrackSkeleton();
+    }
+
+
     public static function generateCode(?string $mode = null, ?int $year = null, ?int $month = null): string
     {
         $now   = now();
@@ -415,110 +434,44 @@ class Shipment extends Model
         TrackStatus $status,
         ?string $note = null,
         ?string $location = null,
-        ?array $attachments = null,
-        ?array $checkseet = null,
-        ?string $planLoadingTimeAt = null,
-        ?string $planClosingTimeAt = null,
-        ?string $actualLoadingTimeAt = null,
-        ?string $actualClosingTimeAt = null,
-        ?string $actualUnloadingStartTimeAt = null,
-        ?string $actualUnloadingEndTimeAt = null
+        ?array $attachments = null
     ): ShipmentTrack {
-        $payload = [
-            'status'     => $status->value,
-            'note'       => $note,
-            'location'   => $location,
-            'tracked_at' => now(),
-            'attachments' => $attachments ? array_values($attachments) : null,
-        ];
 
-        if (! is_null($attachments)) {
-            $payload['attachments'] = array_values($attachments);
+        if ($this->status === ShipmentStatus::Draft) {
+            throw new \DomainException('Shipment masih draft dan belum dikirim ke FC.');
         }
 
-        if (! is_null($checkseet)) {
-            $payload['checkseet'] = $checkseet;
+        $track = $this->tracks()->where('status', $status->value)->first();
+
+        if (! $track) {
+            throw new \DomainException('Track skeleton tidak ditemukan.');
         }
 
-        if (! is_null($planLoadingTimeAt)) {
-            $payload['plan_loading_time_at'] = $planLoadingTimeAt;
+        if ($track->tracked_at) {
+            throw new \DomainException('Status ini sudah pernah dicapai.');
         }
 
-        if (! is_null($planClosingTimeAt)) {
-            $payload['plan_closing_time_at'] = $planClosingTimeAt;
-        }
-
-        if (! is_null($actualLoadingTimeAt)) {
-            $payload['actual_loading_time_at'] = $actualLoadingTimeAt;
-        }
-
-        if (! is_null($actualClosingTimeAt)) {
-            $payload['actual_closing_time_at'] = $actualClosingTimeAt;
-        }
-
-        if ($status === TrackStatus::Unloading) {
-            $payload['actual_berthing_time_at'] = now();
-        }
-
-        if (! is_null($actualUnloadingStartTimeAt)) {
-            $payload['actual_unloading_start_time_at'] = $actualUnloadingStartTimeAt;
-        }
-
-        if (! is_null($actualUnloadingEndTimeAt)) {
-            $payload['actual_unloading_end_time_at'] = $actualUnloadingEndTimeAt;
-        }
-
-        $track = $this->tracks()->create($payload);
-
-        $ts = method_exists($track, 'getAttribute') && $track->getAttribute('tracked_at')
-            ? $track->tracked_at
-            : now();
-
-        $isDwellingStart = in_array($status, [
-            TrackStatus::Pickup,
-            TrackStatus::Handover,
-            TrackStatus::Stuffing,
-            TrackStatus::DeliveryToPort,
-            TrackStatus::Stacking,
-        ], true);
-
-        $isOnboard = in_array($status, [
-            TrackStatus::UnitLoading,
-            TrackStatus::OnShip,
-            TrackStatus::VesselDepart,
-        ], true);
-
-        $isArrived = in_array($status, [
-            TrackStatus::VesselArrival,
-            TrackStatus::Unloading,
-        ], true);
-
-        if (self::hasCol('pickup_started_at') && $isDwellingStart && ! $this->pickup_started_at) {
-            $this->pickup_started_at = $ts;
-        }
-
-        if (self::hasCol('onboard_at') && $isOnboard && ! $this->onboard_at) {
-            $this->onboard_at = $ts;
-        }
-
-        if (self::hasCol('arrived_at') && $isArrived && ! $this->arrived_at) {
-            $this->arrived_at = $ts;
-        }
-
-        if (self::hasCol('delivered_at') && $status === TrackStatus::Delivered && ! $this->delivered_at) {
-            $this->delivered_at = $ts;
-        }
+        $track->updateQuietly([
+            'tracked_at'  => now(),
+            'note'        => $note,
+            'location'    => $location,
+            'attachments' => $attachments,
+        ]);
 
         if ($to = $status->toShipmentStatus()) {
-            if ($this->status !== $to) {
-                $this->status = $to;
-            }
-        }
+            $this->status = $to;
 
-        $this->saveQuietly();
+            if ($to === ShipmentStatus::Delivered) {
+                $this->delivered_at = $track->tracked_at;
+            }
+
+            $this->saveQuietly();
+        }
 
         return $track;
     }
+
+
 
     public function autoAppendTrack(
         ?string $note = null,
@@ -565,18 +518,20 @@ class Shipment extends Model
 
     public function ensureTrackSkeleton(): void
     {
+        if ($this->status === ShipmentStatus::Draft) {
+            return;
+        }
+
+        if ($this->tracks()->exists()) {
+            return;
+        }
+
         $order = TrackStatus::orderForMode($this->mode);
-        $existing = $this->tracks()
-            ->pluck('status')
-            ->map(fn($s) => $s instanceof \BackedEnum ? $s->value : (string) $s)
-            ->all();
 
-        $toCreate = array_filter($order, fn($st) => ! in_array($st->value, $existing, true));
-
-        foreach ($toCreate as $st) {
+        foreach ($order as $st) {
             $this->tracks()->create([
                 'status'     => $st->value,
-                // 'tracked_at' => now(),
+                'tracked_at' => null,
             ]);
         }
     }
@@ -1049,61 +1004,41 @@ class Shipment extends Model
     public function milestoneTimes(): array
     {
         $tracks = ($this->relationLoaded('tracks') ? $this->tracks : $this->tracks()->get())
-            ->filter(fn($t) => ! empty($t->status) && ! empty($t->tracked_at))
+            ->filter(fn($t) => ! empty($t->tracked_at))
             ->sortBy('tracked_at')
             ->values();
 
         $toVal = fn($s) => $s instanceof TrackStatus ? $s->value : (string) $s;
 
-        $firstWhereAny = function (array $statuses) use ($tracks, $toVal) {
-            foreach ($tracks as $t) {
-                if (in_array($toVal($t->status), $statuses, true)) {
-                    return $t->tracked_at;
-                }
-            }
+        $first = fn(array $set) => optional(
+            $tracks->first(fn($t) => in_array($toVal($t->status), $set, true))
+        )->tracked_at;
 
-            return null;
-        };
+        $last = fn(string $s) => optional(
+            $tracks->last(fn($t) => $toVal($t->status) === $s)
+        )->tracked_at;
 
-        $lastWhere = function (string $status) use ($tracks, $toVal) {
-            $ts = null;
-            foreach ($tracks as $t) {
-                if ($toVal($t->status) === $status) {
-                    $ts = $t->tracked_at;
-                }
-            }
-
-            return $ts;
-        };
-
-        $dwellingStarts = [
-            TrackStatus::Pickup->value,
-            TrackStatus::Handover->value,
-            TrackStatus::Stuffing->value,
-            TrackStatus::DeliveryToPort->value,
-            TrackStatus::Stacking->value,
+        return [
+            'pickup'  => $first([
+                TrackStatus::Pickup->value,
+                TrackStatus::Handover->value,
+                TrackStatus::Stuffing->value,
+                TrackStatus::DeliveryToPort->value,
+                TrackStatus::Stacking->value,
+            ]),
+            'onboard' => $first([
+                TrackStatus::UnitLoading->value,
+                TrackStatus::OnShip->value,
+                TrackStatus::VesselDepart->value,
+            ]),
+            'arrived' => $first([
+                TrackStatus::VesselArrival->value,
+                TrackStatus::Unloading->value,
+            ]),
+            'deliv'   => $last(TrackStatus::Delivered->value),
         ];
-
-        $onboardMarks = [
-            TrackStatus::UnitLoading->value,
-            TrackStatus::OnShip->value,
-            TrackStatus::VesselDepart->value,
-        ];
-
-        $arrivedMarks = [
-            TrackStatus::VesselArrival->value,
-            TrackStatus::Unloading->value,
-        ];
-
-        $deliveredMark = TrackStatus::Delivered->value;
-
-        $pickup  = $firstWhereAny($dwellingStarts) ?: $this->requested_at;
-        $onboard = $firstWhereAny($onboardMarks);
-        $arrived = $firstWhereAny($arrivedMarks);
-        $deliv   = $lastWhere($deliveredMark);
-
-        return compact('pickup', 'onboard', 'arrived', 'deliv');
     }
+
 
     public function scopeTamKpi(Builder $q): Builder
     {

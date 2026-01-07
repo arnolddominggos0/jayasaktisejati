@@ -2,52 +2,14 @@
 
 namespace App\Filament\Resources\ShippingScheduleResource\Pages;
 
-use App\Filament\Resources\ShippingScheduleResource;
-use App\Filament\Resources\ShippingScheduleResource\Widgets\HidePaginationStyle;
-use App\Filament\Resources\ShippingScheduleResource\Widgets\ShippingScheduleCalendar;
-use App\Filament\Resources\ShippingScheduleResource\Widgets\TamKpiSummary;
-use Filament\Resources\Pages\ListRecords;
+use Filament\Resources\Pages\Page;
 
-class ListShippingSchedules extends ListRecords
+class ListShippingSchedules extends Page
 {
-    protected static string $resource = ShippingScheduleResource::class;
+    protected static bool $shouldRegisterNavigation = false;
 
-    protected function hasTable(): bool
+    public function mount(): void
     {
-        return false;
-    }
-
-    protected function hasFiltersForm(): bool
-    {
-        return false;
-    }
-
-    protected function hasSearchForm(): bool
-    {
-        return false;
-    }
-
-    protected function getHeaderActions(): array
-    {
-        return [];
-    }
-
-    protected function getHeaderWidgets(): array
-    {
-        return [
-            ShippingScheduleCalendar::class,
-            TamKpiSummary::class,
-        ];
-    }
-
-    public function getHeaderWidgetsColumns(): int|string|array
-    {
-        return 1;
-    }
-
-
-    public function getTitle(): string
-    {
-        return 'Monitoring Jadwal Kapal TAM';
+        abort(404);
     }
 }

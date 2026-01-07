@@ -83,10 +83,20 @@ enum TrackStatus: string
     public function toShipmentStatus(): ?ShipmentStatus
     {
         return match ($this) {
-            self::Delivered          => ShipmentStatus::Delivered,
-            self::Hold               => ShipmentStatus::Hold,
-            self::Cancelled          => ShipmentStatus::Cancelled,
-            default                  => ShipmentStatus::Transit,
+            self::Delivered => ShipmentStatus::Delivered,
+            self::Hold      => ShipmentStatus::Hold,
+            self::Cancelled => ShipmentStatus::Cancelled,
+            self::Pickup,
+            self::Handover,
+            self::Stuffing,
+            self::DeliveryToPort,
+            self::Stacking,
+            self::UnitLoading,
+            self::OnShip,
+            self::VesselDepart,
+            self::VesselArrival,
+            self::Unloading,
+            self::DeliveryToCustomer => ShipmentStatus::Transit,
         };
     }
 

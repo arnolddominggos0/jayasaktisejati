@@ -7,10 +7,13 @@
         $lt         = $this->getLeadTimeSummary();
         $tam        = $this->getTamKpiSummary();
         $tamLate    = $this->getTamLateShipments();
+        
         $tamLead    = $this->getTamLeadTimeSeries();
         $tamEval    = $this->getTamLeadTimeEvaluation();
         $tamPort    = $this->getTamPortStock();
         $activities = $this->getRecentActivities();
+
+        $hasTamKpiData = !empty($tam) && ( ($tam['on_time'] ?? 0) > 0 || ($tam['late'] ?? 0) > 0 );
         $dashboardData = [
             'brandHex' => $this->brandHex,
             'spark'    => $kpi['sparkline'] ?? [],
