@@ -16,15 +16,31 @@ class VesselPlanAnalysis extends Widget
 
     protected function getViewData(): array
     {
-        $analysis = $this->record->analyze();
+        if (! $this->record) {
+            return [];
+        }
+
+        $total = $this->record->items()->count();
+        $sop   = $this->record->sopStatus();
 
         return [
-            'total'       => $this->record->items()->count(),
-            'maxGap'      => $analysis['max_gap'],
-            'idealGap'    => 6,
-            'statusLabel' => $analysis['ok'] ? 'SESUAI SOP' : 'MELANGGAR SOP',
-            'statusColor' => $analysis['ok'] ? 'text-green-600' : 'text-red-600',
-            'statusBg'    => $analysis['ok'] ? 'bg-green-50' : 'bg-red-50',
+            'total'    => $total,
+            'maxGap'   => $total > 0 ? $this->record->maxEtdGap() : 0,
+            'idealGap' => 6,
+
+            'statusLabel' => $sop['label'],
+
+            'statusColor' => match ($sop['color']) {
+                'success' => 'text-green-600',
+                'danger'  => 'text-red-600',
+                default   => 'text-gray-600',
+            },
+
+            'statusBg' => match ($sop['color']) {
+                'success' => 'bg-green-50',
+                'danger'  => 'bg-red-50',
+                default   => 'bg-gray-50',
+            },
         ];
     }
 }

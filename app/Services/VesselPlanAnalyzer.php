@@ -12,7 +12,7 @@ class VesselPlanAnalyzer
             ->orderBy('planned_etd')
             ->get();
 
-        $gaps = [];
+        $gaps = $this->etdGaps();
         $maxGap = 0;
 
         foreach ($items as $i => $item) {

@@ -20,7 +20,7 @@ class ShippingScheduleTable extends TableWidget
         $dt = Carbon::createFromFormat('Y-m', $this->period)->startOfMonth();
 
         return ShippingSchedule::query()
-            ->with([
+            ->with([    
                 'voyage.vessel.shippingLine',
                 'voyage.pol',
                 'voyage.pod',

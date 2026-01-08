@@ -1,26 +1,27 @@
-<x-filament::section>
-    <div class="flex items-center justify-between mb-3">
+<div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+    <div class="px-4 py-3 border-b flex items-center justify-between">
         <div class="font-semibold text-sm">
             Kalender Jadwal — {{ $calendar['month_label'] ?? '' }}
         </div>
-        <span class="text-xs text-gray-500">Tampilan bulanan</span>
+        <span class="text-xs text-gray-500">
+            Tampilan bulanan
+        </span>
     </div>
 
     <div class="overflow-x-auto">
-        <table class="min-w-[1500px] w-full border-collapse text-[11px] table-fixed">
+        <table class="min-w-[1400px] w-full border-collapse text-[11px]">
             <thead>
                 <tr>
-                    <th class="sticky left-0 z-20 bg-gray-100 border px-3 py-2 w-48 text-left">
-                        Lane / Event
+                    <th class="sticky left-0 z-10 bg-gray-100 border px-3 py-2 w-40 text-left">
+                        Lane
                     </th>
-
                     @foreach ($calendar['days'] as $day)
-                        <th class="border px-1 py-2 text-center w-14
-                            {{ $day['isWeekend'] ? 'bg-rose-50 text-rose-600' : 'bg-gray-50 text-gray-700' }}">
-                            <div class="text-[9px] uppercase tracking-wide">
+                        <th class="border px-1 py-2 text-center w-10
+                            {{ $day['isWeekend'] ? 'bg-rose-50 text-rose-600' : 'bg-gray-50' }}">
+                            <div class="text-[9px] uppercase">
                                 {{ $day['dow'] }}
                             </div>
-                            <div class="font-semibold text-xs">
+                            <div class="font-semibold">
                                 {{ $day['n'] }}
                             </div>
                         </th>
@@ -30,42 +31,36 @@
 
             <tbody>
                 @foreach ($calendar['lanes'] as $laneKey => $laneLabel)
-                    @foreach (['etd','eta','atd','ata'] as $event)
-                        <tr>
-                            <td class="sticky left-0 z-10 bg-white border px-3 py-2">
-                                <div class="font-medium">{{ $laneLabel }}</div>
-                                <div class="text-[10px] uppercase text-gray-400">
-                                    {{ strtoupper($event) }}
-                                </div>
-                            </td>
+                    <tr>
+                        <td class="sticky left-0 bg-white border px-3 py-2 font-medium">
+                            {{ $laneLabel }}
+                        </td>
 
-                            @for ($d = 1; $d <= $calendar['days_count']; $d++)
-                                <td class="border px-1 py-1 align-top">
-                                    @forelse ($calendar['bucket'][$laneKey][$event][$d] ?? [] as $chip)
-                                        <div class="
-                                            mb-1 rounded-md px-2 py-1 border
-                                            {{ str_starts_with($event, 'a')
-                                                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
-                                                : 'bg-primary-50 border-primary-200 text-primary-700' }}">
-                                            <div class="text-[10px] font-semibold leading-tight">
-                                                {{ $chip['vessel'] }}
+                        @for ($d = 1; $d <= $calendar['days_count']; $d++)
+                            <td class="border px-1 py-1 align-top">
+                                @if (!empty($calendar['bucket'][$laneKey][$d]))
+                                    @foreach ($calendar['bucket'][$laneKey][$d] as $chip)
+                                        <div class="mb-1 rounded bg-slate-50 border px-1 py-0.5 text-[10px] truncate">
+                                            <div class="font-semibold text-slate-700">
+                                                {{ $chip['short'] }}
                                             </div>
-                                            <div class="text-[9px] leading-tight">
+                                            <div class="text-slate-500">
                                                 {{ $chip['voyage_no'] }}
                                             </div>
-                                            <div class="text-[9px] text-gray-600 leading-tight">
-                                                {{ $chip['pol'] }} → {{ $chip['pod'] }}
-                                            </div>
                                         </div>
-                                    @empty
-                                        <span class="text-gray-300 text-xs">—</span>
-                                    @endforelse
-                                </td>
-                            @endfor
-                        </tr>
-                    @endforeach
+                                    @endforeach
+                                @else
+                                    <span class="text-gray-300">—</span>
+                                @endif
+                            </td>
+                        @endfor
+                    </tr>
                 @endforeach
             </tbody>
         </table>
     </div>
-</x-filament::section>
+
+    <div class="px-4 py-2 text-[11px] text-gray-600 border-t">
+        <span class="text-rose-600">Hari merah = weekend</span>
+    </div>
+</div>

@@ -17,6 +17,7 @@ class MonitoringKapalTam extends Page
 
     public string $period;
     public string $filter = 'all';
+
     public array $monthOptions = [];
     public array $calendar = [];
     public $rows;

@@ -4,90 +4,76 @@
 
     <div class="flex items-start justify-between pt-2">
         <div>
-            <h1 class="text-2xl font-bold leading-tight">
-                Monitoring Jadwal Kapal TAM
-            </h1>
+            <h1 class="text-2xl font-bold">Monitoring Jadwal Kapal TAM</h1>
             <p class="text-sm text-gray-500 mt-1">
                 Monitoring SLA dan evaluasi pelayaran kapal
             </p>
         </div>
 
         <div class="flex gap-2">
-            <div class="w-56">
-                <select
-                    wire:model.live="period"
-                    class="w-full rounded-xl border-gray-300 shadow-sm text-sm">
-                    @foreach ($monthOptions as $value => $label)
-                        <option value="{{ $value }}">{{ $label }}</option>
-                    @endforeach
-                </select>
-            </div>
+            <select wire:model.live="period"
+                class="w-56 rounded-xl border-gray-300 shadow-sm text-sm">
+                @foreach ($this->monthOptions as $value => $label)
+                    <option value="{{ $value }}">{{ $label }}</option>
+                @endforeach
+            </select>
 
-            <div class="w-48">
-                <select
-                    wire:model.live="filter"
-                    class="w-full rounded-xl border-gray-300 shadow-sm text-sm">
-                    <option value="all">Semua</option>
-                    <option value="ongoing">Sedang Berjalan</option>
-                    <option value="risk">Berisiko</option>
-                    <option value="late">Late</option>
-                </select>
-            </div>
+            <select wire:model.live="filter"
+                class="w-48 rounded-xl border-gray-300 shadow-sm text-sm">
+                <option value="all">Semua</option>
+                <option value="ongoing">Sedang Berjalan</option>
+                <option value="risk">Berisiko</option>
+                <option value="late">Late</option>
+            </select>
         </div>
     </div>
 
+    {{-- CALENDAR --}}
     <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
-        <div class="px-4 py-3 border-b flex items-center justify-between">
-            <div class="font-semibold text-sm">
-                Kalender Jadwal — {{ $calendar['month_label'] ?? '' }}
-            </div>
-            <span class="text-xs text-gray-500">
-                Tampilan bulanan
-            </span>
+        <div class="px-4 py-3 border-b font-semibold text-sm">
+            Kalender Jadwal — {{ $this->calendar['month_label'] ?? '' }}
         </div>
 
         <div class="overflow-x-auto">
-            <table class="min-w-[1500px] w-full border-collapse text-[11px] table-fixed">
+            <table class="min-w-[1400px] w-full border-collapse text-[11px]">
                 <thead>
                     <tr>
-                        <th class="sticky left-0 z-10 bg-gray-100 border px-3 py-2 w-48 text-left">
+                        <th class="sticky left-0 bg-gray-100 border px-3 py-2 w-40 text-left">
                             Lane
                         </th>
-                        @foreach ($calendar['days'] as $day)
-                            <th class="border px-1 py-2 text-center w-14
+                        @foreach ($this->calendar['days'] as $day)
+                            <th class="border px-1 py-2 text-center w-10
                                 {{ $day['isWeekend'] ? 'bg-rose-50 text-rose-600' : 'bg-gray-50' }}">
-                                <div class="text-[9px] uppercase">
-                                    {{ $day['dow'] }}
-                                </div>
-                                <div class="font-semibold">
-                                    {{ $day['n'] }}
-                                </div>
+                                <div class="text-[9px] uppercase">{{ $day['dow'] }}</div>
+                                <div class="font-semibold">{{ $day['n'] }}</div>
                             </th>
                         @endforeach
                     </tr>
                 </thead>
 
                 <tbody>
-                    @foreach ($calendar['lanes'] as $laneKey => $laneLabel)
+                    @foreach ($this->calendar['lanes'] as $laneKey => $laneLabel)
                         <tr>
                             <td class="sticky left-0 bg-white border px-3 py-2 font-medium">
                                 {{ $laneLabel }}
                             </td>
 
-                            @for ($d = 1; $d <= $calendar['days_count']; $d++)
+                            @for ($d = 1; $d <= $this->calendar['days_count']; $d++)
                                 <td class="border px-1 py-1 align-top">
-                                    @forelse ($calendar['bucket'][$laneKey][$d] ?? [] as $chip)
-                                        <div class="mb-1 rounded-md bg-primary-50 px-2 py-1">
-                                            <div class="text-[10px] font-semibold text-primary-700">
-                                                {{ $chip['short'] }}
+                                    @if (!empty($this->calendar['bucket'][$laneKey][$d]))
+                                        @foreach ($this->calendar['bucket'][$laneKey][$d] as $chip)
+                                            <div class="mb-1 rounded bg-slate-50 border px-1 py-0.5 text-[10px] truncate">
+                                                <div class="font-semibold text-slate-700">
+                                                    {{ $chip['short'] }}
+                                                </div>
+                                                <div class="text-slate-500">
+                                                    {{ $chip['voyage_no'] }}
+                                                </div>
                                             </div>
-                                            <div class="text-[9px] text-primary-600">
-                                                {{ $chip['voyage_no'] }}
-                                            </div>
-                                        </div>
-                                    @empty
+                                        @endforeach
+                                    @else
                                         <span class="text-gray-300">—</span>
-                                    @endforelse
+                                    @endif
                                 </td>
                             @endfor
                         </tr>
@@ -95,16 +81,17 @@
                 </tbody>
             </table>
         </div>
+
+        <div class="px-4 py-2 text-[11px] text-gray-600 border-t">
+            <span class="text-rose-600">Hari merah = weekend</span>
+        </div>
     </div>
 
+    {{-- TABLE MONITORING --}}
     <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
-        <div class="px-4 py-3 border-b flex items-center justify-between">
-            <div class="font-semibold text-sm">
-                Monitoring Kapal
-            </div>
-            <span class="text-xs text-gray-500">
-                {{ count($rows) }} voyage
-            </span>
+        <div class="px-4 py-3 border-b flex justify-between">
+            <div class="font-semibold text-sm">Monitoring Kapal</div>
+            <span class="text-xs text-gray-500">{{ count($this->rows) }} voyage</span>
         </div>
 
         <div class="overflow-x-auto">
@@ -123,56 +110,26 @@
                 </thead>
 
                 <tbody>
-                    @forelse ($rows as $r)
-                        @php $v = $r->voyage; @endphp
-                        <tr class="border-t hover:bg-gray-50 transition">
+                    @forelse ($this->rows as $r)
+                        @php($v = $r->voyage)
+                        <tr class="border-t">
                             <td class="px-4 py-3 font-semibold text-primary-700">
                                 {{ $r->jss }}
                             </td>
-
-                            <td class="px-4 py-3">
-                                {{ $v?->vessel?->name ?? '—' }}
-                            </td>
-
-                            <td class="px-4 py-3">
-                                {{ $v?->voyage_no ?? '—' }}
-                            </td>
-
-                            <td class="px-4 py-3 text-gray-600">
-                                {{ $v?->pol?->code }} → {{ $v?->pod?->code }}
-                            </td>
-
+                            <td class="px-4 py-3">{{ $v?->vessel?->name }}</td>
+                            <td class="px-4 py-3">{{ $v?->voyage_no }}</td>
+                            <td class="px-4 py-3">{{ $v?->pol?->code }} → {{ $v?->pod?->code }}</td>
                             <td class="px-4 py-3 text-center">
-                                {{ optional($v?->etd)->format('d M Y') ?? '—' }}
+                                {{ optional($v?->etd)->format('d M Y') }}
                             </td>
-
                             <td class="px-4 py-3 text-center">
-                                {{ optional($v?->ata_at)->format('d M Y') ?? '—' }}
+                                {{ optional($v?->ata_at)->format('d M Y') }}
                             </td>
-
-                            <td class="px-4 py-3 text-center font-semibold">
-                                @if ($v?->elapsed_sailing_days !== null)
-                                    <span class="
-                                        {{ $v->risk_level === 'risk'
-                                            ? 'text-red-600'
-                                            : ($v->risk_level === 'warning'
-                                                ? 'text-yellow-600'
-                                                : 'text-emerald-600') }}">
-                                        {{ $v->elapsed_sailing_days }} hari
-                                    </span>
-                                @else
-                                    —
-                                @endif
+                            <td class="px-4 py-3 text-center">
+                                {{ $v?->elapsed_sailing_days ?? '—' }}
                             </td>
-
-                            <td class="px-4 py-3 text-center font-semibold">
-                                @if ($v?->sla_days !== null)
-                                    <span class="{{ $v->sla_status === 'late' ? 'text-red-600' : 'text-emerald-600' }}">
-                                        {{ $v->sla_days }} hari
-                                    </span>
-                                @else
-                                    —
-                                @endif
+                            <td class="px-4 py-3 text-center">
+                                {{ $v?->sla_days ?? '—' }}
                             </td>
                         </tr>
                     @empty

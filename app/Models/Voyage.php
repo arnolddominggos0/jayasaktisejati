@@ -99,10 +99,24 @@ class Voyage extends Model
 
     public function getSlaStatusAttribute(): string
     {
-        if (! $this->ata_at) {
-            return 'ongoing';
+        if ($this->ata_at) {
+            return 'Selesai';
         }
 
-        return $this->sla_days <= 10 ? 'on_time' : 'late';
+        if ($this->atd_at && ! $this->ata_at) {
+            return $this->is_delayed ? 'Terlambat' : 'Berjalan';
+        }
+
+        return 'Belum jalan';
+    }
+
+    public function getStatusColorAttribute(): string
+    {
+        return match ($this->status_label) {
+            'Terlambat'   => 'danger',
+            'Berjalan'    => 'warning',
+            'Selesai'     => 'success',
+            default       => 'gray',
+        };
     }
 }

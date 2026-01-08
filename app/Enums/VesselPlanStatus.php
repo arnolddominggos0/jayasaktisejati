@@ -12,7 +12,7 @@ enum VesselPlanStatus: string
     {
         return match ($this) {
             self::Draft => 'Draft',
-            self::Sent  => 'Review TAM',
+            self::Sent  => 'Terkirim ke TAM',
             self::Final => 'Final',
         };
     }

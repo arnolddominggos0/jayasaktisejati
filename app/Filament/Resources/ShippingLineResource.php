@@ -15,8 +15,8 @@ class ShippingLineResource extends Resource
 {
     protected static ?string $model = ShippingLine::class;
     protected static ?string $navigationGroup = 'Master Data Shipment';
-    protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
     protected static ?string $navigationLabel = 'Pelayaran';
+    protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
 
     public static function form(Form $form): Form
     {

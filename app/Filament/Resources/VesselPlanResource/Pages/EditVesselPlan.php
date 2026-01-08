@@ -6,7 +6,6 @@ use App\Filament\Resources\VesselPlanResource;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanAnalysis;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanDashboard;
 use Filament\Actions\Action;
-use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
@@ -16,17 +15,10 @@ class EditVesselPlan extends EditRecord
 
     protected function getHeaderWidgets(): array
     {
-        if ($this->record->isFinal()) {
-            return [
-                VesselPlanDashboard::class,
-            ];
-        }
-
-        return [
-            VesselPlanAnalysis::class,
-        ];
+        return $this->record->isFinal()
+            ? [VesselPlanDashboard::class]
+            : [VesselPlanAnalysis::class];
     }
-
 
     public function getHeaderWidgetsColumns(): int
     {
@@ -37,45 +29,65 @@ class EditVesselPlan extends EditRecord
     {
         return [
 
-            Action::make('send_to_tam')
-                ->label('Kirim ke TAM (WA)')
+            Action::make('kirim_ke_tam')
+                ->label('Kirim ke TAM (WhatsApp)')
                 ->icon('heroicon-o-paper-airplane')
                 ->color('primary')
-                ->visible(fn() => $this->record->isDraft())
-                ->url(fn() => $this->record->waUrl())
-                ->openUrlInNewTab()
-                ->action(fn() => $this->record->markAsSent(auth_user()->id())),
+                ->visible(fn () => $this->record->isDraft())
+                ->disabled(fn () => ! $this->record->canSendToTam())
+                ->tooltip(fn () => $this->sendDisabledReason())
+                ->requiresConfirmation()
+                ->action(function () {
+
+                    $this->record->markAsSent(auth()->id());
+
+                    Notification::make()
+                        ->title('Draft Dikirim ke TAM')
+                        ->body('WhatsApp akan dibuka untuk mengirim draft jadwal.')
+                        ->success()
+                        ->send();
+
+                    $this->redirect($this->record->waUrl());
+                }),
 
             Action::make('finalize')
                 ->label('Finalisasi & Import Voyage')
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('success')
+                ->visible(fn () => $this->record->isSent())
                 ->requiresConfirmation()
-                ->visible(fn() => $this->record->isSent())
                 ->action(function () {
-                    $this->record->finalizeAndImport(auth_user()->id());
+
+                    $count = $this->record->generateVoyages(auth()->id());
 
                     Notification::make()
-                        ->title('Vessel Plan Final')
-                        ->body('Voyage berhasil dibuat.')
+                        ->title('Vessel Plan Difinalisasi')
+                        ->body("{$count} voyage berhasil dibuat.")
                         ->success()
                         ->send();
                 }),
 
-            Action::make('view_voyages')
-                ->label('Lihat Voyage')
-                ->icon('heroicon-o-eye')
-                ->color('gray')
-                ->visible(fn() => $this->record->isFinal())
-                ->url(
-                    fn() =>
-                    route('filament.admin.resources.voyages.index', [
-                        'tableFilters[vessel_plan_id][value]' => $this->record->id,
-                    ])
-                ),
-
-            DeleteAction::make()
-                ->visible(fn() => $this->record->isDraft()),
+            Action::make('hapus')
+                ->label('Hapus Vessel Plan')
+                ->color('danger')
+                ->visible(fn () => $this->record->isDraft())
+                ->requiresConfirmation()
+                ->action(fn () => $this->record->delete()),
         ];
+    }
+
+    protected function sendDisabledReason(): string
+    {
+        if ($this->record->items()->count() === 0) {
+            return 'Tambahkan jadwal kapal terlebih dahulu.';
+        }
+
+        $analysis = $this->record->analyze();
+
+        if (! ($analysis['ok'] ?? false)) {
+            return 'Jadwal melanggar SOP (jarak ETD terlalu jauh).';
+        }
+
+        return '';
     }
 }

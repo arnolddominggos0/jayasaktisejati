@@ -27,18 +27,18 @@ class VesselPlanItemRelationManager extends RelationManager
                         ->relationship('shippingLine', 'name')
                         ->required()
                         ->live()
-                        ->afterStateUpdated(fn ($set) => $set('vessel_id', null)),
+                        ->afterStateUpdated(fn($set) => $set('vessel_id', null)),
 
                     Select::make('vessel_id')
                         ->label('Kapal')
                         ->relationship(
                             'vessel',
                             'name',
-                            fn ($query, Get $get) =>
-                                $query->where('shipping_line_id', $get('shipping_line_id'))
+                            fn($query, Get $get) =>
+                            $query->where('shipping_line_id', $get('shipping_line_id'))
                         )
                         ->required()
-                        ->disabled(fn (Get $get) => blank($get('shipping_line_id'))),
+                        ->disabled(fn(Get $get) => blank($get('shipping_line_id'))),
                 ])
                 ->columns(2),
 
@@ -100,14 +100,14 @@ class VesselPlanItemRelationManager extends RelationManager
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
-                    ->visible(fn () => $this->getOwnerRecord()->isDraft()),
+                    ->visible(fn() => $this->getOwnerRecord()->isDraft()),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                    ->visible(fn () => $this->getOwnerRecord()->isDraft()),
+                    ->visible(fn() => $this->getOwnerRecord()->isDraft()),
 
                 Tables\Actions\DeleteAction::make()
-                    ->visible(fn () => $this->getOwnerRecord()->isDraft()),
+                    ->visible(fn() => $this->getOwnerRecord()->isDraft()),
             ])
             ->defaultSort('planned_etd');
     }

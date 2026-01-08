@@ -24,7 +24,7 @@ class VesselPlanItem extends Model
 
     public function plan(): BelongsTo
     {
-        return $this->belongsTo(VesselPlan::class);
+        return $this->belongsTo(VesselPlan::class, 'vessel_plan_id');
     }
 
     public function shippingLine(): BelongsTo
@@ -66,28 +66,10 @@ class VesselPlanItem extends Model
 
     protected static function booted(): void
     {
-        static::creating(function (VesselPlanItem $item) {
-            if (! $item->vessel_plan_id) {
-                return;
+        static::deleting(function (VesselPlanItem $item) {
+            if ($item->voyage) {
+                $item->voyage->delete();
             }
-
-            $plan = $item->plan;
-
-            if (! $plan || ! $plan->route_code) {
-                return;
-            }
-
-            [$polCode, $podCode] = explode('-', $plan->route_code);
-
-            $pol = Port::where('code', $polCode)->first();
-            $pod = Port::where('code', $podCode)->first();
-
-            if (! $pol || ! $pod) {
-                throw new \DomainException('POL / POD tidak ditemukan berdasarkan route.');
-            }
-
-            $item->pol_id = $pol->id;
-            $item->pod_id = $pod->id;
         });
     }
 }

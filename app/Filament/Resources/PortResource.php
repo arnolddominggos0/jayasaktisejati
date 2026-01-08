@@ -5,9 +5,11 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PortResource\Pages;
 use App\Models\Port;
 use Filament\Forms;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class PortResource extends Resource
@@ -20,18 +22,18 @@ class PortResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\TextInput::make('code')->required()->unique(ignoreRecord: true)->maxLength(20),
-            Forms\Components\TextInput::make('name')->required(),
-            Forms\Components\TextInput::make('city'),
+            TextInput::make('code')->required()->unique(ignoreRecord: true)->maxLength(20),
+            TextInput::make('name')->required(),
+            TextInput::make('city'),
         ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table->columns([
-            Tables\Columns\TextColumn::make('code')->sortable()->searchable(),
-            Tables\Columns\TextColumn::make('name')->sortable()->searchable(),
-            Tables\Columns\TextColumn::make('city'),
+            TextColumn::make('code')->sortable()->searchable(),
+            TextColumn::make('name')->sortable()->searchable(),
+            TextColumn::make('city'),
         ])->actions([
             Tables\Actions\EditAction::make(),
         ])->bulkActions([
