@@ -56,7 +56,12 @@ class MonitoringKapalTam extends Page
             ->forMonth($dt->year, $dt->month);
 
         $query = ShippingSchedule::query()
-            ->with(['voyage.vessel', 'voyage.pol', 'voyage.pod'])
+            ->with([
+                'voyage.vessel',
+                'voyage.pol',
+                'voyage.pod',
+                'vesselChecks',
+            ])
             ->whereDate('period_month', $dt->toDateString());
 
         if ($this->filter === 'ongoing') {

@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Actions\CreateShippingSchedule;
+use App\Actions\GenerateVesselChecks;
 use App\Enums\VesselPlanStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -91,7 +93,7 @@ class VesselPlan extends Model
     {
         $gaps = $this->etdGaps();
 
-        $numeric = array_filter($gaps, fn ($v) => is_int($v));
+        $numeric = array_filter($gaps, fn($v) => is_int($v));
         $maxGap  = empty($numeric) ? 0 : max($numeric);
 
         return [
@@ -168,7 +170,7 @@ class VesselPlan extends Model
 
             foreach ($this->items()->orderBy('planned_etd')->get() as $i => $item) {
 
-                Voyage::create([
+                $voyage = Voyage::create([
                     'vessel_plan_id' => $this->id,
                     'vessel_id'      => $item->vessel_id,
                     'pol_id'         => $this->pol_id,
@@ -183,6 +185,9 @@ class VesselPlan extends Model
                     'period_month' => $this->period_month,
                 ]);
 
+                $schedule = CreateShippingSchedule::run($voyage);
+                GenerateVesselChecks::run($schedule);
+
                 $count++;
             }
 
@@ -193,7 +198,6 @@ class VesselPlan extends Model
             return $count;
         });
     }
-
     protected function resolveRoute(): void
     {
         if ($this->pol_id && $this->pod_id) {
@@ -223,9 +227,23 @@ class VesselPlan extends Model
         ]);
     }
 
-    /* ==============================
-     | WHATSAPP
-     ============================== */
+    public static function generateForMonth(Carbon|string $month): self
+    {
+        $period = $month instanceof Carbon
+            ? $month->startOfMonth()
+            : Carbon::parse($month)->startOfMonth();
+
+        if (self::where('period_month', $period)->exists()) {
+            throw new DomainException(
+                'Vessel Plan untuk periode ini sudah ada.'
+            );
+        }
+
+        return self::create([
+            'period_month' => $period,
+            'status'       => VesselPlanStatus::Draft,
+        ]);
+    }
 
     public function waUrl(): string
     {

@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Actions\CreateShippingSchedule;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Voyage extends Model
 {
@@ -38,6 +40,16 @@ class Voyage extends Model
 
     protected static function booted(): void
     {
+
+        static::updated(function (Voyage $voyage) {
+            if (
+                $voyage->is_final &&
+                $voyage->wasChanged('is_final')
+            ) {
+                CreateShippingSchedule::run($voyage);
+            }
+        });
+
         static::saving(function (self $model) {
             if ($model->atd_at) {
                 $end = $model->ata_at ?? now();
@@ -50,6 +62,11 @@ class Voyage extends Model
     public function vessel()
     {
         return $this->belongsTo(Vessel::class);
+    }
+
+    public function vesselChecks(): HasMany
+    {
+        return $this->hasMany(VesselCheck::class);
     }
 
     public function pol()

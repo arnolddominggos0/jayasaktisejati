@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ShippingSchedule extends Model
 {
@@ -22,6 +23,11 @@ class ShippingSchedule extends Model
     public function voyage(): BelongsTo
     {
         return $this->belongsTo(Voyage::class);
+    }
+
+    public function vesselChecks(): HasMany
+    {
+        return $this->hasMany(VesselCheck::class);
     }
 
     public function getEtdDateAttribute()

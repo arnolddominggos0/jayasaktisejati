@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\VesselCheckStatus;
 use App\Filament\Resources\VoyageResource\Pages;
 use App\Models\Port;
 use App\Models\Voyage;
@@ -9,6 +10,7 @@ use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -205,6 +207,44 @@ class VoyageResource extends Resource
                         ->visible(fn($get) => (bool) $get('finalized_at')),
                 ])
                 ->columns(2),
+            Section::make('Vessel Check')
+                ->visible(
+                    fn($livewire) =>
+                    $livewire instanceof EditRecord &&
+                        $livewire->record->is_final
+                )
+                ->schema([
+                    Repeater::make('vesselChecks')
+                        ->relationship()
+                        ->disableItemCreation()
+                        ->disableItemDeletion()
+                        ->columns(3)
+                        ->schema([
+                            TextInput::make('day_code')
+                                ->disabled(),
+
+                            DateTimePicker::make('etd_current')
+                                ->required(),
+
+                            Select::make('status')
+                                ->options(
+                                    collect(VesselCheckStatus::cases())
+                                        ->mapWithKeys(fn($c) => [$c->value => $c->label()])
+                                        ->toArray()
+                                )
+                                ->required(),
+
+                            Textarea::make('delay_reason')
+                                ->visible(
+                                    fn($get) =>
+                                    $get('status') === VesselCheckStatus::DELAYED->value
+                                )
+                                ->columnSpanFull(),
+
+                            Textarea::make('note')
+                                ->columnSpanFull(),
+                        ]),
+                ]),
 
             Section::make('Actual (H-0)')
                 ->visible(fn($livewire) => $livewire instanceof EditRecord)
