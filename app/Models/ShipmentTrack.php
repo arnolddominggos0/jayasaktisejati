@@ -114,6 +114,18 @@ class ShipmentTrack extends Model
             $shipment = $track->shipment()->with('tracks')->first();
             if (!$shipment) return;
 
+            $hasRealTracking = $shipment->tracks
+            ->filter(fn($t) => !empty($t->tracked_at))
+            ->isNotEmpty();
+
+            if (!$hasRealTracking) {
+                if ($shipment->status !== ShipmentStatus::Draft->value) {
+                    $shipment->status = ShipmentStatus::Draft->value;
+                    $shipment->saveQuietly();
+                }
+                return;
+            }
+
             $order = TrackStatus::orderForMode($shipment->mode);
             $indexMap = [];
             foreach ($order as $i => $e) {

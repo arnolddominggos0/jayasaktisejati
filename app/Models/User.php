@@ -20,6 +20,7 @@ class User extends Authenticatable implements FilamentUser
         'password',
         'branch_id',
         'customer_id',
+        'port_id',
     ];
 
     protected $hidden = [
@@ -72,5 +73,10 @@ class User extends Authenticatable implements FilamentUser
         return \App\Models\Depot::where('id', $shipment->assigned_depot_id)
             ->where('coordinator_user_id', $this->id)
             ->exists();
+    }
+
+    public function port()
+    {
+        return $this->belongsTo(Port::class, 'port_id');
     }
 }

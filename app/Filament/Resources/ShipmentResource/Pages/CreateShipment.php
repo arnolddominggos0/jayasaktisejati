@@ -8,6 +8,7 @@ use App\Models\Shipment;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Database\Eloquent\Model;
 
 class CreateShipment extends CreateRecord
 {
@@ -73,5 +74,37 @@ class CreateShipment extends CreateRecord
         $data['eta'] = Shipment::computeEta($modeCode, $priority, $base)->toDateTimeString();
 
         return $data;
+    }
+
+    protected function handleRecordCreation(array $data): Model
+    {
+        $units = $data['units'] ?? null;
+
+        unset($data['units']);
+
+        $shipment = Shipment::create($data);
+
+        if (is_array($units) && count($units) > 0) {
+            $toInsert = [];
+            foreach ($units as $u) {
+                $toInsert[] = [
+                    'model_no'          => $u['model_no'] ?? null,
+                    'reg_no'            => $u['reg_no'] ?? null,
+                    'chassis_no'        => $u['chassis_no'] ?? null,
+                    'engine_no'         => $u['engine_no'] ?? null,
+                    'color'             => $u['color'] ?? null,
+                    'do_number'         => $u['do_number'] ?? null,
+                    'qty'               => isset($u['qty']) ? (int)$u['qty'] : 1,
+                    'container_display' => $u['container_display'] ?? null,
+                    'notes'             => $u['notes'] ?? null,
+                    'created_at'        => now(),
+                    'updated_at'        => now(),
+                ];
+            }
+
+            $shipment->units()->createMany($toInsert);
+        }
+
+        return $shipment;
     }
 }

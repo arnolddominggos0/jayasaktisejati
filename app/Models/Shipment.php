@@ -14,6 +14,7 @@ use App\Enums\{
     TrackStatus
 };
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -84,7 +85,9 @@ class Shipment extends Model
         'estimated_ready_at',
         'containers',
         'lcl_items',
-        'units',
+        // 'units',
+        'pol_id',
+        'pod_id',
     ];
 
     protected $casts = [
@@ -110,7 +113,9 @@ class Shipment extends Model
         'edited_fields'       => 'array',
         'containers'          => 'array',
         'lcl_items'           => 'array',
-        'units'               => 'array',
+        // 'units'               => 'array',
+        'pol_id'              => 'integer',
+        'pod_id'              => 'integer',
     ];
 
     protected static array $colCache = [];
@@ -165,8 +170,18 @@ class Shipment extends Model
             }
         });
 
-        static::created(function (Shipment $m) {
+        static::created(function (Shipment $mShipment $m) {
             $m->ensureTrackSkeleton();
+        
+            $firstStatus = $m->mode === ShipmentMode::Sea 
+                ? TrackStatus::Pickup 
+                : TrackStatus::Pickup;
+            
+            $m->tracks()->create([
+                'status' => $firstStatus,
+                'tracked_at' => now(),
+                'note' => 'Menunggu penjemputan',
+            ]);
         });
 
         static::saving(function (Shipment $m) {
@@ -422,7 +437,10 @@ class Shipment extends Model
             return $order[0] ?? null;
         }
 
-        $idx = array_search($current, $order, true);
+        $values = array_map(fn(TrackStatus $s) => $s->value, $order);
+        $currValue = $current->value;
+        $idx = array_search($currValue, $values, strict: true);
+
         if ($idx === false) {
             return null;
         }
@@ -729,6 +747,7 @@ class Shipment extends Model
     public function latestTrack()
     {
         return $this->hasOne(ShipmentTrack::class, 'shipment_id', 'id')
+            ->whereNotNull('tracked_at')
             ->latestOfMany('tracked_at');
     }
 
@@ -755,6 +774,21 @@ class Shipment extends Model
     public function destinationCity()
     {
         return $this->belongsTo(\App\Models\City::class, 'destination_city_id');
+    }
+
+    public function pol()
+    {
+        return $this->belongsTo(\App\Models\Port::class, 'pol_id');
+    }
+
+    public function pod()
+    {
+        return $this->belongsTo(Port::class, 'pod_id');
+    }
+
+    public function units()
+    {
+        return $this->hasMany(\App\Models\Unit::class, 'shipment_id', 'id');
     }
 
     public function getRouteLabelAttribute(): string
@@ -820,7 +854,13 @@ class Shipment extends Model
             }
         }
 
-        foreach (($this->units ?? []) as $row) {
+        $unitRows = $this->relationLoaded('units')
+            ? $this->units
+            : (is_array($this->getRawOriginal('units'))
+                ? collect($this->getRawOriginal('units'))
+                : collect());
+
+        foreach ($unitRows as $row) {
             $ref = trim((string) ($row['container_no_ref'] ?? ''));
             $qty = (int) ($row['qty'] ?? 1);
 
