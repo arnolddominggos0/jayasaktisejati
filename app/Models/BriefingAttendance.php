@@ -22,6 +22,8 @@ class BriefingAttendance extends Model
         'remark',
         'health_complaint',
         'created_by',
+        'rest_started_at',
+        'recheck_result',
     ];
 
     protected $casts = [
