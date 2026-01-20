@@ -320,8 +320,18 @@ class Shipment extends Model
             return;
         }
 
-        $this->status = ShipmentStatus::Pending;
-        $this->saveQuietly();
+        $user = Auth::user();
+
+        $depot = \App\Models\Depot::where('coordinator_user_id', $user->id)->first();
+
+        if (! $depot) {
+            throw new \DomainException('Depot untuk FC ini tidak ditemukan.');
+        }
+
+        $this->forceFill([
+            'status'            => ShipmentStatus::Pending,
+            'assigned_depot_id' => $depot->id,
+        ])->saveQuietly();
 
         $this->ensureTrackSkeleton();
     }
@@ -459,7 +469,7 @@ class Shipment extends Model
                     throw $e;
                 }
 
-                \DB::table('mp_check_overrides')->insert([
+                DB::table('mp_check_overrides')->insert([
                     'shipment_id'  => $this->id,
                     'depot_id'     => $depot->id,
                     'track_status' => $status->value,
@@ -518,7 +528,7 @@ class Shipment extends Model
     ): ShipmentTrack {
         $depotId = $this->assigned_depot_id;
 
-        \DB::table('mp_check_overrides')->insert([
+        DB::table('mp_check_overrides')->insert([
             'shipment_id' => $this->id,
             'depot_id'    => $depotId,
             'track_status' => $status->value,
