@@ -14,6 +14,7 @@ use App\Enums\{
     TrackStatus
 };
 use App\Services\MpCheckGate;
+use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -449,40 +450,16 @@ class Shipment extends Model
         ?array $attachments = null,
         ?array $override = null
     ): ShipmentTrack {
-
-        if (in_array($status, [
-            TrackStatus::Stuffing,
-            TrackStatus::UnitLoading,
-            TrackStatus::Unloading,
-        ], true)) {
-
-            $depot = $this->assignedDepot;
-
-            try {
-                MpCheckGate::ensureApproved($depot);
-            } catch (\DomainException $e) {
-                if (
-                    ! is_array($override)
-                    || empty($override['reason'])
-                    || ! Auth::user()?->hasRole('super_admin')
-                ) {
-                    throw $e;
-                }
-
-                DB::table('mp_check_overrides')->insert([
-                    'shipment_id'  => $this->id,
-                    'depot_id'     => $depot->id,
-                    'track_status' => $status->value,
-                    'override_by'  => Auth::id(),
-                    'reason'       => $override['reason'],
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
-                ]);
-            }
+        if ($this->status === ShipmentStatus::Draft) {
+            throw new DomainException('Shipment masih draft.');
         }
 
-        if ($this->status === ShipmentStatus::Draft) {
-            throw new \DomainException('Shipment masih draft dan belum dikirim ke FC.');
+        if (! $this->tracks()->exists()) {
+            $this->ensureTrackSkeleton();
+        }
+
+        if ($this->requiresMpCheck($status)) {
+            $this->handleMpCheck($status, $override);
         }
 
         $track = $this->tracks()
@@ -490,11 +467,11 @@ class Shipment extends Model
             ->first();
 
         if (! $track) {
-            throw new \DomainException('Track skeleton tidak ditemukan.');
+            throw new DomainException('Track skeleton tidak ditemukan.');
         }
 
         if ($track->tracked_at) {
-            throw new \DomainException('Status ini sudah pernah dicapai.');
+            throw new DomainException('Status ini sudah pernah dicapai.');
         }
 
         $track->updateQuietly([
@@ -518,66 +495,38 @@ class Shipment extends Model
     }
 
 
-    public function appendTrackWithOverride(
-        TrackStatus $status,
-        int $overrideBy,
-        string $reason,
-        ?string $note = null,
-        ?string $location = null,
-        ?array $attachments = null
-    ): ShipmentTrack {
-        $depotId = $this->assigned_depot_id;
-
-        DB::table('mp_check_overrides')->insert([
-            'shipment_id' => $this->id,
-            'depot_id'    => $depotId,
-            'track_status' => $status->value,
-            'override_by' => $overrideBy,
-            'reason'      => $reason,
-            'created_at'  => now(),
-            'updated_at'  => now(),
-        ]);
-
-        return $this->appendTrack(
-            $status,
-            $note,
-            $location,
-            $attachments
-        );
+    protected function requiresMpCheck(TrackStatus $status): bool
+    {
+        return in_array($status, [
+            TrackStatus::Stuffing,
+            TrackStatus::UnitLoading,
+            TrackStatus::Unloading,
+        ], true);
     }
 
+    protected function handleMpCheck(TrackStatus $status, ?array $override): void
+    {
+        try {
+            MpCheckGate::ensureApproved($this->assignedDepot);
+        } catch (DomainException $e) {
+            if (
+                ! is_array($override) ||
+                empty($override['reason']) ||
+                ! Auth::user()?->hasRole('super_admin')
+            ) {
+                throw $e;
+            }
 
-    public function autoAppendTrack(
-        ?string $note = null,
-        ?string $location = null,
-        ?array $attachments = null,
-        ?array $checkseet = null,
-        ?string $planLoadingTimeAt = null,
-        ?string $planClosingTimeAt = null,
-        ?string $actualLoadingTimeAt = null,
-        ?string $actualClosingTimeAt = null,
-        ?string $actualUnloadingStartTimeAt = null,
-        ?string $actualUnloadingEndTimeAt = null,
-    ): ShipmentTrack {
-        $nextStatus = $this->nextTrackStatus();
-
-        if (! $nextStatus) {
-            throw new \DomainException('Tidak ada status pelacakan selanjutnya yang dapat ditambahkan.');
+            DB::table('mp_check_overrides')->insert([
+                'shipment_id'  => $this->id,
+                'depot_id'     => $this->assigned_depot_id,
+                'track_status' => $status->value,
+                'override_by'  => Auth::id(),
+                'reason'       => $override['reason'],
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ]);
         }
-
-        return $this->appendTrack(
-            $nextStatus,
-            $note,
-            $location,
-            $attachments,
-            $checkseet,
-            $planLoadingTimeAt,
-            $planClosingTimeAt,
-            $actualLoadingTimeAt,
-            $actualClosingTimeAt,
-            $actualUnloadingStartTimeAt,
-            $actualUnloadingEndTimeAt
-        );
     }
 
     public function isWithinHMinus3Eta(): bool
@@ -600,11 +549,9 @@ class Shipment extends Model
             return;
         }
 
-        $order = TrackStatus::orderForMode($this->mode);
-
-        foreach ($order as $st) {
+        foreach (TrackStatus::orderForMode($this->mode) as $st) {
             $this->tracks()->create([
-                'status'     => $st->value,
+                'status' => $st->value,
                 'tracked_at' => null,
             ]);
         }

@@ -9,9 +9,17 @@ use App\Filament\FC\Resources\ShipmentResource\Pages\ViewShipment;
 use App\Models\Shipment;
 use App\Models\City;
 use App\Models\Depot;
+use DomainException;
 use Filament\Facades\Filament;
 use Filament\Forms;
+use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -71,7 +79,7 @@ class ShipmentResource extends Resource
         $q->where(function ($w) use ($depotId, $u) {
             if ($depotId) {
                 $w->where('assigned_depot_id', $depotId)
-                    ->orWhere('coordinator_id', $u->id);
+                  ->orWhere('coordinator_id', $u->id);
             } else {
                 $w->where('coordinator_id', $u->id);
             }
@@ -89,7 +97,7 @@ class ShipmentResource extends Resource
     protected static function trackUpdateForm(): array
     {
         return [
-            Forms\Components\Select::make('track_status')
+            Select::make('track_status')
                 ->label('Status Lapangan')
                 ->options(collect(TrackStatus::orderSea())->mapWithKeys(fn($e) => [$e->value => $e->label()]))
                 ->default(fn(?Shipment $record) => $record?->latest_track_status?->value)
@@ -99,7 +107,7 @@ class ShipmentResource extends Resource
                 ->columnSpan(12)
                 ->live(),
 
-            Forms\Components\Checkbox::make('complete_current_step')
+            Checkbox::make('complete_current_step')
                 ->label('Step ini sudah selesai & lanjut ke status berikutnya')
                 ->visible(fn(Forms\Get $get, ?Shipment $record) => $record?->nextTrackStatus() !== null)
                 ->disabled(
@@ -109,21 +117,21 @@ class ShipmentResource extends Resource
                 )
                 ->columnSpan(12),
 
-            Forms\Components\DateTimePicker::make('plan_loading_time_at')
+            DateTimePicker::make('plan_loading_time_at')
                 ->label('Plan Loading Time')
                 ->seconds(false)
                 ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::Handover->value)
                 ->required()
                 ->columnSpan(6),
 
-            Forms\Components\DateTimePicker::make('plan_closing_time_at')
+            DateTimePicker::make('plan_closing_time_at')
                 ->label('Plan Closing Time')
                 ->seconds(false)
                 ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::Handover->value)
                 ->required()
                 ->columnSpan(6),
 
-            Forms\Components\Repeater::make('checkseet')
+            Repeater::make('checkseet')
                 ->label('Checksheet Unit')
                 ->collapsible()
                 ->orderColumn(false)
@@ -135,14 +143,14 @@ class ShipmentResource extends Resource
                 ], true))
                 ->default([])
                 ->schema([
-                    Forms\Components\Radio::make('checkseet_status')
+                    Radio::make('checkseet_status')
                         ->options(['ok' => 'OK', 'ng' => 'NG'])
                         ->required(),
-                    Forms\Components\TextInput::make('model')->required(),
-                    Forms\Components\TextInput::make('no_rangka')->required(),
-                    Forms\Components\TextInput::make('no_mesin')->required(),
-                    Forms\Components\TextInput::make('warna')->required(),
-                    Forms\Components\FileUpload::make('attachments')
+                    TextInput::make('model')->required(),
+                    TextInput::make('no_rangka')->required(),
+                    TextInput::make('no_mesin')->required(),
+                    TextInput::make('warna')->required(),
+                    FileUpload::make('attachments')
                         ->disk('public')
                         ->directory('shipment-tracks/checkseet')
                         ->multiple(),
@@ -315,8 +323,8 @@ class ShipmentResource extends Resource
                         TrackStatus::Delivered => 'success',
                         TrackStatus::Cancelled => 'danger',
                         TrackStatus::Hold      => 'warning',
-                        null                              => 'gray',
-                        default                           => 'info',
+                        null                   => 'gray',
+                        default                => 'info',
                     })
                     ->sortable(false)
                     ->searchable(false),
@@ -345,27 +353,19 @@ class ShipmentResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
-
-                Tables\Actions\Action::make('updateTrackGeneric')
+                Tables\Actions\Action::make('updateTrack')
                     ->label('Update Lapangan')
                     ->icon('heroicon-m-pencil-square')
-                    ->color('primary')
                     ->form(static::trackUpdateForm())
-                    ->disabled(
-                        fn(Shipment $record) =>
-                        $record->currentTrackStatus()?->value === TrackStatus::VesselDepart->value &&
-                            auth_user()->canUpdateVesselDepart($record) && $record->isWithinHMinus3Eta()
-                    )
                     ->action(function (Shipment $record, array $data) {
-                        $status = $record->currentTrackStatus() ?? $record->latest_track_status;
 
-                        $complete = (bool) ($data['complete_current_step'] ?? false);
+                        $status = TrackStatus::from($data['track_status']);
 
                         $override = null;
 
                         if (
-                            auth_user()?->hasRole('super_admin')
-                            && ! empty($data['override_reason'])
+                            auth_user()?->hasRole('super_admin') &&
+                            ! empty($data['override_reason'])
                         ) {
                             $override = [
                                 'reason' => $data['override_reason'],
@@ -373,34 +373,19 @@ class ShipmentResource extends Resource
                         }
 
                         try {
-                            if ($complete) {
-                                $record->autoAppendTrack(
-                                    $data['note'] ?? null,
-                                    null,
-                                    $data['attachments'] ?? null,
-                                    $data['checkseet'] ?? null,
-                                    $data['plan_loading_time_at'] ?? null,
-                                    $data['plan_closing_time_at'] ?? null,
-                                    $data['actual_loading_time_at'] ?? null,
-                                    $data['actual_closing_time_at'] ?? null,
-                                    $data['actual_unloading_start_time_at'] ?? null,
-                                    $data['actual_unloading_end_time_at'] ?? null,
-                                    $override
-                                );
-                            } else {
-                                $record->appendTrack(
-                                    $status,
-                                    $data['note'] ?? null,
-                                    null,
-                                    $data['attachments'] ?? null,
-                                    $override
-                                );
-                            }
+                            $record->appendTrack(
+                                $status,
+                                $data['note'] ?? null,
+                                null,
+                                $data['attachments'] ?? null,
+                                $override
+                            );
+
                             Notification::make()
                                 ->title('Update lapangan tersimpan')
                                 ->success()
                                 ->send();
-                        } catch (\DomainException $e) {
+                        } catch (DomainException $e) {
                             Notification::make()
                                 ->title($e->getMessage())
                                 ->danger()
