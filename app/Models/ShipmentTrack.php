@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\TrackStatus;
-use App\Enums\ShipmentStatus;
 use Illuminate\Database\Eloquent\Model;
 use Filament\Facades\Filament;
 use Illuminate\Validation\ValidationException;
@@ -64,10 +63,16 @@ class ShipmentTrack extends Model
 
     public function setStatusAttribute($value): void
     {
-        $enum = $value instanceof TrackStatus ? $value : TrackStatus::normalize((string) $value);
-        if (!$enum) {
-            throw ValidationException::withMessages(['status' => 'Status tidak dikenal: ' . (string) $value]);
+        $enum = $value instanceof TrackStatus
+            ? $value
+            : TrackStatus::normalize((string) $value);
+
+        if (! $enum) {
+            throw ValidationException::withMessages([
+                'status' => 'Status tidak dikenal: ' . (string) $value,
+            ]);
         }
+
         $this->attributes['status'] = $enum->value;
         $this->attributes['status_normalized'] = true;
     }
@@ -82,8 +87,11 @@ class ShipmentTrack extends Model
             }
         });
 
-        static::saving(function ($m) {
-            $status = $m->status instanceof \BackedEnum ? $m->status->value : (string) $m->status;
+        static::saving(function (ShipmentTrack $track) {
+            $status = $track->status instanceof \BackedEnum
+                ? $track->status->value
+                : (string) $track->status;
+
             $map = [
                 'pickup'               => 10,
                 'handover'             => 20,
@@ -100,54 +108,14 @@ class ShipmentTrack extends Model
                 'hold'                 => 900,
                 'cancelled'            => 999,
             ];
-            $m->status_normalized = $map[$status] ?? 0;
+
+            $track->status_normalized = $map[$status] ?? 0;
         });
 
         static::updating(function (ShipmentTrack $track) {
             $uid = Filament::auth()?->id() ?: (auth()->check() ? auth()->id() : null);
             if ($uid) {
                 $track->updated_by = $uid;
-            }
-        });
-
-        static::saved(function (ShipmentTrack $track) {
-            $shipment = $track->shipment()->with('tracks')->first();
-            if (!$shipment) return;
-
-            $order = TrackStatus::orderForMode($shipment->mode);
-            $indexMap = [];
-            foreach ($order as $i => $e) {
-                $indexMap[$e->value] = $i;
-            }
-
-            $reached = $shipment->tracks
-                ->filter(fn($t) => !empty($t->tracked_at))
-                ->sortBy(fn($t) => $indexMap[$t->status instanceof TrackStatus ? $t->status->value : (string)$t->status] ?? 999)
-                ->last();
-
-            $newStatus = $reached?->status?->toShipmentStatus();
-            if ($newStatus && $shipment->status !== $newStatus->value) {
-                $shipment->status = $newStatus->value;
-
-                if ($newStatus === ShipmentStatus::Delivered) {
-                    if (Shipment::hasCol('delivered_at')) {
-                        $shipment->delivered_at = $reached?->tracked_at ?: now();
-                    }
-                    $shipment->cancelled_at = null;
-                    $shipment->cancelled_by = null;
-                }
-
-                if ($newStatus === ShipmentStatus::Cancelled) {
-                    if (Shipment::hasCol('cancelled_at')) {
-                        $shipment->cancelled_at = $shipment->cancelled_at ?: now();
-                    }
-                    $shipment->cancelled_by = $shipment->cancelled_by ?: (auth()->id() ?: null);
-                    if (Shipment::hasCol('delivered_at')) {
-                        $shipment->delivered_at = null;
-                    }
-                }
-
-                $shipment->saveQuietly();
             }
         });
     }

@@ -6,6 +6,8 @@ use App\Actions\CreateShippingSchedule;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class Voyage extends Model
 {
@@ -40,13 +42,58 @@ class Voyage extends Model
 
     protected static function booted(): void
     {
-
         static::updated(function (Voyage $voyage) {
+
             if (
                 $voyage->is_final &&
                 $voyage->wasChanged('is_final')
             ) {
                 CreateShippingSchedule::run($voyage);
+            }
+
+            if (
+                $voyage->wasChanged('ata_at') &&
+                $voyage->ata_at &&
+                $voyage->atd_at
+            ) {
+                $exists = DB::table('sla_results')
+                    ->where('voyage_id', $voyage->id)
+                    ->where('activity', 'sailing')
+                    ->exists();
+
+                if (! $exists) {
+                    $rule = DB::table('sla_rules')
+                        ->where('mode', 'sea')
+                        ->where('activity', 'sailing')
+                        ->where('pol_id', $voyage->pol_id)
+                        ->where('pod_id', $voyage->pod_id)
+                        ->where('is_active', true)
+                        ->first();
+
+                    if ($rule) {
+                        $actualDays = round(
+                            \Carbon\Carbon::parse($voyage->atd_at)
+                                ->diffInSeconds($voyage->ata_at) / 86400,
+                            2
+                        );
+
+                        $lateDays = max(0, $actualDays - $rule->target_days);
+
+                        DB::table('sla_results')->insert([
+                            'voyage_id'   => $voyage->id,
+                            'sla_rule_id' => $rule->id,
+                            'activity'    => 'sailing',
+                            'start_at'    => $voyage->atd_at,
+                            'end_at'      => $voyage->ata_at,
+                            'target_days' => $rule->target_days,
+                            'actual_days' => $actualDays,
+                            'status'      => $lateDays > 0 ? 'late' : 'on_time',
+                            'late_days'   => $lateDays,
+                            'created_at'  => now(),
+                            'updated_at'  => now(),
+                        ]);
+                    }
+                }
             }
         });
 
@@ -135,5 +182,11 @@ class Voyage extends Model
             'Selesai'     => 'success',
             default       => 'gray',
         };
+    }
+
+    public function slaSailing()
+    {
+        return $this->hasOne(SlaResult::class)
+            ->where('activity', 'sailing');
     }
 }
