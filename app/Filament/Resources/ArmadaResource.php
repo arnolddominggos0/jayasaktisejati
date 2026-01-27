@@ -33,6 +33,11 @@ class ArmadaResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-m-truck';
     protected static ?int    $navigationSort  = 10;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function form(Forms\Form $form): Forms\Form
     {
         $composePlate = function (Get $get): string {

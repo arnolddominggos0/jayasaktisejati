@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AttendanceStatus;
+use App\Enums\MPCheckStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,11 +20,19 @@ class BriefingSession extends Model
         'summary_headcount',
         'summary_sufficient',
         'summary_solution',
+        'mp_check_status',
+        'approved_at',
+        'approved_by',
+        'backup_required',
+        'backup_type',     // internal/external
+        'backup_notes',
     ];
 
     protected $casts = [
         'date' => 'date',
         'summary_sufficient' => 'boolean',
+        'mp_check_status' => MPCheckStatus::class,
+        'approved_at' => 'datetime',
     ];
 
     public function depot(): BelongsTo
@@ -43,7 +52,7 @@ class BriefingSession extends Model
 
     public function presentAttendances()
     {
-        return $this->hasMany(\App\Models\BriefingAttendance::class, 'session_id')
+        return $this->hasMany(BriefingAttendance::class, 'session_id')
             ->where('attendance_status', AttendanceStatus::Present->value);
     }
 

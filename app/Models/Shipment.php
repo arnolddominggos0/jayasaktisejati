@@ -13,10 +13,12 @@ use App\Enums\{
     RequestType,
     TrackStatus
 };
+use App\Services\MpCheckGate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
 
@@ -170,7 +172,7 @@ class Shipment extends Model
             }
         });
 
-        static::created(function (Shipment $mShipment $m) {
+        static::created(function (Shipment $m) {
             $m->ensureTrackSkeleton();
         
             $firstStatus = $m->mode === ShipmentMode::Sea 
@@ -452,14 +454,48 @@ class Shipment extends Model
         TrackStatus $status,
         ?string $note = null,
         ?string $location = null,
-        ?array $attachments = null
+        ?array $attachments = null,
+        ?array $override = null
     ): ShipmentTrack {
+
+        if (in_array($status, [
+            TrackStatus::Stuffing,
+            TrackStatus::UnitLoading,
+            TrackStatus::Unloading,
+        ], true)) {
+
+            $depot = $this->assignedDepot;
+
+            try {
+                MpCheckGate::ensureApproved($depot);
+            } catch (\DomainException $e) {
+                if (
+                    ! is_array($override)
+                    || empty($override['reason'])
+                    || ! Auth::user()?->hasRole('super_admin')
+                ) {
+                    throw $e;
+                }
+
+                \DB::table('mp_check_overrides')->insert([
+                    'shipment_id'  => $this->id,
+                    'depot_id'     => $depot->id,
+                    'track_status' => $status->value,
+                    'override_by'  => Auth::id(),
+                    'reason'       => $override['reason'],
+                    'created_at'   => now(),
+                    'updated_at'   => now(),
+                ]);
+            }
+        }
 
         if ($this->status === ShipmentStatus::Draft) {
             throw new \DomainException('Shipment masih draft dan belum dikirim ke FC.');
         }
 
-        $track = $this->tracks()->where('status', $status->value)->first();
+        $track = $this->tracks()
+            ->where('status', $status->value)
+            ->first();
 
         if (! $track) {
             throw new \DomainException('Track skeleton tidak ditemukan.');
@@ -489,6 +525,34 @@ class Shipment extends Model
         return $track;
     }
 
+
+    public function appendTrackWithOverride(
+        TrackStatus $status,
+        int $overrideBy,
+        string $reason,
+        ?string $note = null,
+        ?string $location = null,
+        ?array $attachments = null
+    ): ShipmentTrack {
+        $depotId = $this->assigned_depot_id;
+
+        \DB::table('mp_check_overrides')->insert([
+            'shipment_id' => $this->id,
+            'depot_id'    => $depotId,
+            'track_status' => $status->value,
+            'override_by' => $overrideBy,
+            'reason'      => $reason,
+            'created_at'  => now(),
+            'updated_at'  => now(),
+        ]);
+
+        return $this->appendTrack(
+            $status,
+            $note,
+            $location,
+            $attachments
+        );
+    }
 
 
     public function autoAppendTrack(

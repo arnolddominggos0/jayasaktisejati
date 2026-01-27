@@ -19,6 +19,11 @@ class ArmadaAssignmentResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-m-clipboard-document-check';
     protected static ?int    $navigationSort = 30;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([

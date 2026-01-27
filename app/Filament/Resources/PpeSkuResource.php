@@ -20,7 +20,7 @@ class PpeSkuResource extends Resource
 {
     protected static ?string $model = PpeSku::class;
 
-    protected static ?string $navigationGroup = 'APD & K3';
+    protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationLabel = 'Master SKU APD';
     protected static ?string $pluralLabel     = 'Master SKU APD';
     protected static ?string $modelLabel      = 'SKU APD';

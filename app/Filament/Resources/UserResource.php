@@ -30,7 +30,7 @@ class UserResource extends Resource
     protected static ?string $navigationLabel  = 'Pengguna';
     protected static ?string $pluralModelLabel = 'Pengguna';
     protected static ?string $modelLabel       = 'Pengguna';
-    protected static ?string $navigationGroup  = 'Manajemen Pengguna';
+    protected static ?string $navigationGroup  = 'Master Data';
     protected static ?int    $navigationSort   = 10;
 
     public static function canViewAny(): bool

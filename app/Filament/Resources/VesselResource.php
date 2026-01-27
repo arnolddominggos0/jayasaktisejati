@@ -14,7 +14,7 @@ use Filament\Tables\Table;
 class VesselResource extends Resource
 {
     protected static ?string $model = Vessel::class;
-    protected static ?string $navigationGroup = 'Master Data Shipment';
+    protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationIcon = 'heroicon-o-lifebuoy';
     protected static ?string $navigationLabel = 'Kapal';
     protected static bool $shouldRegisterNavigation = false;

@@ -25,6 +25,28 @@
             </div>
         </div>
 
+        <div class="grid grid-cols-4 gap-4">
+            <div class="rounded-2xl border bg-white p-4 shadow-sm">
+                <div class="text-xs text-gray-500">Total Voyage</div>
+                <div class="text-2xl font-bold">10</div>
+            </div>
+
+            <div class="rounded-2xl border bg-white p-4 shadow-sm">
+                <div class="text-xs text-gray-500">Voyage Depart</div>
+                <div class="text-2xl font-bold text-emerald-600">0</div>
+            </div>
+            
+            <div class="rounded-2xl border bg-white p-4 shadow-sm">
+                <div class="text-xs text-gray-500">Voyage Overdue</div>
+                <div class="text-2xl font-bold text-emerald-600">0</div>
+            </div>
+            
+            <div class="rounded-2xl border bg-white p-4 shadow-sm">
+                <div class="text-xs text-gray-500">Voyage Waiting</div>
+                <div class="text-2xl font-bold text-emerald-600">0</div>
+            </div>
+        </div>
+
         <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
             <div class="px-4 py-3 border-b font-semibold text-sm">
                 Kalender Jadwal — {{ $this->calendar['month_label'] ?? '' }}
@@ -82,57 +104,113 @@
             </div>
         </div>
 
-        <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
-            <div class="px-4 py-3 border-b flex justify-between">
-                <div class="font-semibold text-sm">Monitoring Kapal</div>
-                <span class="text-xs text-gray-500">{{ count($this->rows) }} voyage</span>
+        <div class="lg:grid lg:grid-cols-4 gap-6 rounded-2xl overflow-hidden">
+            <div class="col-span-3 bg-white rounded-2xl shadow-sm border overflow-hidden">
+                <div class="px-4 py-3 border-b flex justify-between">
+                    <div class="font-semibold text-sm">Monitoring Kapal</div>
+                    <span class="text-xs text-gray-500">{{ count($this->rows) }} voyage</span>
+                </div>
+    
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm border-collapse">
+                        <thead class="bg-gray-50">
+                            <tr class="text-xs uppercase text-gray-600">
+                                <th class="px-4 py-3 text-left">JSS</th>
+                                <th class="px-4 py-3 text-left">Kapal</th>
+                                <th class="px-4 py-3 text-left">Voyage</th>
+                                <th class="px-4 py-3 text-left">Rute</th>
+                                <th class="px-4 py-3 text-center">ETD</th>
+                                <th class="px-4 py-3 text-left">Vessel Check</th>
+                            </tr>
+                        </thead>
+    
+                        <tbody>
+                            @forelse ($this->rows as $r)
+                                @php($v = $r->voyage)
+                                <tr class="border-t align-top">
+                                    <td class="px-4 py-3 font-semibold text-primary-700">{{ $r->jss }}</td>
+                                    <td class="px-4 py-3">{{ $v?->vessel?->name }}</td>
+                                    <td class="px-4 py-3">{{ $v?->voyage_no }}</td>
+                                    <td class="px-4 py-3">{{ $v?->pol?->code }} → {{ $v?->pod?->code }}</td>
+                                    <td class="px-4 py-3 text-center">{{ optional($v?->etd)->format('d M Y') }}</td>
+                                    <td class="px-4 py-3 text-xs">
+                                        <div class="space-y-1 min-w-[180px]">
+                                            @foreach ($r->vesselChecks as $check)
+                                                @php($status = $check->status)
+                                                <div class="flex items-center justify-between gap-2 px-2 py-1 rounded-md text-[11px] {{ $status->color() }}">
+                                                    <span class="font-semibold">{{ $check->day_code }}</span>
+                                                    <span>{{ $check->check_date->format('d M') }}</span>
+                                                    <span class="font-semibold">{{ $status->label() }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="text-center py-8 text-gray-400">
+                                        Tidak ada data
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm border-collapse">
-                    <thead class="bg-gray-50">
-                        <tr class="text-xs uppercase text-gray-600">
-                            <th class="px-4 py-3 text-left">JSS</th>
-                            <th class="px-4 py-3 text-left">Kapal</th>
-                            <th class="px-4 py-3 text-left">Voyage</th>
-                            <th class="px-4 py-3 text-left">Rute</th>
-                            <th class="px-4 py-3 text-center">ETD</th>
-                            <th class="px-4 py-3 text-left">Vessel Check</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        @forelse ($this->rows as $r)
-                            @php($v = $r->voyage)
-                            <tr class="border-t align-top">
-                                <td class="px-4 py-3 font-semibold text-primary-700">{{ $r->jss }}</td>
-                                <td class="px-4 py-3">{{ $v?->vessel?->name }}</td>
-                                <td class="px-4 py-3">{{ $v?->voyage_no }}</td>
-                                <td class="px-4 py-3">{{ $v?->pol?->code }} → {{ $v?->pod?->code }}</td>
-                                <td class="px-4 py-3 text-center">{{ optional($v?->etd)->format('d M Y') }}</td>
-                                <td class="px-4 py-3 text-xs">
-                                    <div class="space-y-1 min-w-[180px]">
-                                        @foreach ($r->vesselChecks as $check)
-                                            @php($status = $check->status)
-                                            <div class="flex items-center justify-between gap-2 px-2 py-1 rounded-md text-[11px] {{ $status->color() }}">
-                                                <span class="font-semibold">{{ $check->day_code }}</span>
-                                                <span>{{ $check->check_date->format('d M') }}</span>
-                                                <span class="font-semibold">{{ $status->label() }}</span>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </td>
+            <div class="col-span-1 bg-white rounded-2xl shadow-sm border overflow-hidden">
+                <div class="px-4 py-3 border-b flex justify-between">
+                    <div class="font-semibold text-sm">Riwayat Pengiriman Kapal</div>
+                </div>
+    
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm border-collapse">
+                        <thead class="bg-gray-50">
+                            <tr class="text-xs uppercase text-gray-600">
+                                <th class="px-4 py-3 text-left">JSS</th>
+                                <th class="px-4 py-3 text-left">Kapal</th>
+                                <th class="px-4 py-3 text-left">Voyage</th>
+                                <th class="px-4 py-3 text-left">Rute</th>
+                                <th class="px-4 py-3 text-center">ETD</th>
+                                <th class="px-4 py-3 text-left">Vessel Check</th>
                             </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="text-center py-8 text-gray-400">
-                                    Tidak ada data
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+                        </thead>
+    
+                        <tbody>
+                            @forelse ($this->rows as $r)
+                                @php($v = $r->voyage)
+                                <tr class="border-t align-top">
+                                    <td class="px-4 py-3 font-semibold text-primary-700">{{ $r->jss }}</td>
+                                    <td class="px-4 py-3">{{ $v?->vessel?->name }}</td>
+                                    <td class="px-4 py-3">{{ $v?->voyage_no }}</td>
+                                    <td class="px-4 py-3">{{ $v?->pol?->code }} → {{ $v?->pod?->code }}</td>
+                                    <td class="px-4 py-3 text-center">{{ optional($v?->etd)->format('d M Y') }}</td>
+                                    <td class="px-4 py-3 text-xs">
+                                        <div class="space-y-1 min-w-[180px]">
+                                            @foreach ($r->vesselChecks as $check)
+                                                @php($status = $check->status)
+                                                <div class="flex items-center justify-between gap-2 px-2 py-1 rounded-md text-[11px] {{ $status->color() }}">
+                                                    <span class="font-semibold">{{ $check->day_code }}</span>
+                                                    <span>{{ $check->check_date->format('d M') }}</span>
+                                                    <span class="font-semibold">{{ $status->label() }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="6" class="text-center py-8 text-gray-400">
+                                        Tidak ada data
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
             </div>
+
+
         </div>
 
     </div>

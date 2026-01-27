@@ -29,7 +29,7 @@ class BriefingSessionResource extends Resource
 {
     protected static ?string $model = BriefingSession::class;
 
-    protected static ?string $navigationGroup = 'Manajemen MP';
+    protected static ?string $navigationGroup = 'Transaksi';
     protected static ?string $navigationLabel = 'Briefing MP';
     protected static ?string $pluralLabel     = 'Briefing MP';
     protected static ?string $modelLabel      = 'Sesi Briefing';

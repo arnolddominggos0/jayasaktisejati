@@ -21,7 +21,7 @@ class PpeItemResource extends Resource
 {
     protected static ?string $model = PpeItem::class;
 
-    protected static ?string $navigationGroup = 'APD & K3';
+    protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationLabel = 'Item APD';
     protected static ?string $pluralLabel     = 'Item APD';
     protected static ?string $modelLabel      = 'Item APD';

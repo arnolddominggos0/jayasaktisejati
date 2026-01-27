@@ -28,7 +28,7 @@ class BriefingAttendanceResource extends Resource
 {
     protected static ?string $model = BriefingAttendance::class;
 
-    protected static ?string $navigationGroup = 'Manajemen MP';
+    protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationLabel = 'Absensi Briefing';
     protected static ?string $pluralLabel     = 'Absensi Briefing';
     protected static ?string $modelLabel      = 'Absensi Briefing';
