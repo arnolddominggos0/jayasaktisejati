@@ -61,27 +61,34 @@ class MonitoringKapalTam extends Page
                 'voyage.pol',
                 'voyage.pod',
                 'vesselChecks',
+                'voyage.sailingSla',
             ])
             ->whereDate('period_month', $dt->toDateString());
 
         if ($this->filter === 'ongoing') {
-            $query->whereHas('voyage', fn ($q) =>
+            $query->whereHas(
+                'voyage',
+                fn($q) =>
                 $q->whereNotNull('atd_at')->whereNull('ata_at')
             );
         }
 
         if ($this->filter === 'risk') {
-            $query->whereHas('voyage', fn ($q) =>
+            $query->whereHas(
+                'voyage',
+                fn($q) =>
                 $q->whereNotNull('atd_at')
-                  ->whereNull('ata_at')
-                  ->where('actual_sailing_days', '>=', 8)
+                    ->whereNull('ata_at')
+                    ->where('actual_sailing_days', '>=', 8)
             );
         }
 
         if ($this->filter === 'late') {
-            $query->whereHas('voyage', fn ($q) =>
+            $query->whereHas(
+                'voyage',
+                fn($q) =>
                 $q->whereNotNull('ata_at')
-                  ->where('actual_sailing_days', '>', 10)
+                    ->where('actual_sailing_days', '>', 10)
             );
         }
 

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\CreateShippingSchedule;
+use App\Services\SlaEvaluator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -104,6 +105,10 @@ class Voyage extends Model
                     round($model->atd_at->diffInSeconds($end) / 86400, 2);
             }
         });
+
+        static::saved(function (Voyage $voyage) {
+            SlaEvaluator::evaluateVoyage($voyage);
+        });
     }
 
     public function vessel()
@@ -184,9 +189,59 @@ class Voyage extends Model
         };
     }
 
-    public function slaSailing()
+    public function sailingSla()
     {
-        return $this->hasOne(SlaResult::class)
+        return $this->hasOne(\App\Models\SlaResult::class)
             ->where('activity', 'sailing');
+    }
+
+
+    public function slaResults()
+    {
+        return $this->hasMany(SlaResult::class);
+    }
+
+    public function getSailingElapsedDaysAttribute(): ?float
+    {
+        if (! $this->atd_at || $this->ata_at) {
+            return null;
+        }
+
+        return round(
+            Carbon::parse($this->atd_at)->diffInSeconds(now()) / 86400,
+            2
+        );
+    }
+
+    public function getSailingTargetDaysAttribute(): ?int
+    {
+        if (! $this->pol_id || ! $this->pod_id) {
+            return null;
+        }
+
+        return SlaRule::query()
+            ->where('is_active', true)
+            ->where('mode', 'sea')
+            ->where('activity', 'sailing')
+            ->where('pol_id', $this->pol_id)
+            ->where('pod_id', $this->pod_id)
+            ->value('target_days');
+    }
+
+    public function getSailingProgressLevelAttribute(): ?string
+    {
+        if (! $this->sailing_elapsed_days || ! $this->sailing_target_days) {
+            return null;
+        }
+
+        if ($this->sailing_elapsed_days >= $this->sailing_target_days) {
+            return 'late';
+        }
+
+        if ($this->sailing_elapsed_days >= $this->sailing_target_days * 0.8) {
+            return 'warning';
+        }
+
+        return 'normal';
     }
 }
