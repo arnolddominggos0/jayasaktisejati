@@ -2,6 +2,8 @@
 
 namespace App\Supports;
 
+use App\Supports\RunningNumber;
+
 class Code
 {
     public static function customer(): string
@@ -10,7 +12,7 @@ class Code
         $prefix = strtoupper((string) ($cfg['prefix'] ?? 'CTM'));
         $pad    = (int) ($cfg['pad'] ?? 4);
 
-        $n = \App\Supports\RunningNumber::next($prefix);
+        $n = RunningNumber::next($prefix);
         return $prefix . '-' . str_pad((string) $n, $pad, '0', STR_PAD_LEFT);
     }
 }

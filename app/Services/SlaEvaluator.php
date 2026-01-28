@@ -2,9 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\SlaRule;
-use App\Models\SlaResult;
 use App\Models\Voyage;
+use App\Models\SlaResult;
+use App\Models\SlaRule;
 use Illuminate\Support\Carbon;
 
 class SlaEvaluator
@@ -16,45 +16,38 @@ class SlaEvaluator
         }
 
         $rule = SlaRule::query()
-            ->where('is_active', true)
             ->where('mode', 'sea')
             ->where('activity', 'sailing')
             ->where('pol_id', $voyage->pol_id)
             ->where('pod_id', $voyage->pod_id)
-            ->where(function ($q) {
-                $q->whereNull('valid_from')
-                  ->orWhere('valid_from', '<=', now());
-            })
-            ->where(function ($q) {
-                $q->whereNull('valid_to')
-                  ->orWhere('valid_to', '>=', now());
-            })
+            ->where('is_active', true)
             ->first();
 
         if (! $rule) {
             return;
         }
 
-        $start = Carbon::parse($voyage->atd_at);
-        $end   = Carbon::parse($voyage->ata_at);
+        $actualDays = round(
+            Carbon::parse($voyage->atd_at)
+                ->diffInSeconds($voyage->ata_at) / 86400,
+            2
+        );
 
-        $actualDays = round($start->diffInSeconds($end) / 86400, 2);
-        $lateDays   = max(0, round($actualDays - $rule->target_days, 2));
-        $status     = $lateDays > 0 ? 'late' : 'on_time';
+        $lateDays = max(0, $actualDays - $rule->target_days);
 
         SlaResult::updateOrCreate(
             [
-                'voyage_id'   => $voyage->id,
-                'sla_rule_id' => $rule->id,
-                'activity'    => 'sailing',
+                'voyage_id' => $voyage->id,
+                'activity'  => 'sailing',
             ],
             [
-                'start_at'    => $start,
-                'end_at'      => $end,
+                'sla_rule_id' => $rule->id,
+                'start_at'    => $voyage->atd_at,
+                'end_at'      => $voyage->ata_at,
                 'target_days' => $rule->target_days,
                 'actual_days' => $actualDays,
                 'late_days'   => $lateDays,
-                'status'      => $status,
+                'status'      => $lateDays > 0 ? 'late' : 'on_time',
             ]
         );
     }

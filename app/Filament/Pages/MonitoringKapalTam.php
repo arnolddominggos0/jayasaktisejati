@@ -6,6 +6,7 @@ use Filament\Pages\Page;
 use Illuminate\Support\Carbon;
 use App\Models\ShippingSchedule;
 use App\Models\Voyage;
+use App\Services\Kpi\TamSailingKpiService;
 use App\Supports\ShippingCalendar\MonthlyCalendarBuilder;
 
 class MonitoringKapalTam extends Page
@@ -21,6 +22,11 @@ class MonitoringKapalTam extends Page
     public array $monthOptions = [];
     public array $calendar = [];
     public $rows;
+
+    public array $kpi = [];
+
+    public ?int $delayVoyageId = null;
+    public ?string $delayReasonInput = null;
 
     public function mount(): void
     {
@@ -60,8 +66,8 @@ class MonitoringKapalTam extends Page
                 'voyage.vessel',
                 'voyage.pol',
                 'voyage.pod',
-                'vesselChecks',
                 'voyage.sailingSla',
+                'vesselChecks',
             ])
             ->whereDate('period_month', $dt->toDateString());
 
@@ -98,5 +104,32 @@ class MonitoringKapalTam extends Page
                     ->whereColumn('voyages.id', 'shipping_schedules.voyage_id')
             )
             ->get();
+
+        $this->kpi = app(TamSailingKpiService::class)
+            ->summaryForPeriod($dt->year, $dt->month);
+    }
+    public function openDelayReason(int $voyageId): void
+    {
+        $this->delayVoyageId = $voyageId;
+        $this->delayReasonInput = null;
+
+        $this->dispatch('open-delay-modal');
+    }
+
+    public function saveDelayReason(): void
+    {
+        $this->validate([
+            'delayReasonInput' => 'required|string|min:5',
+        ]);
+
+        Voyage::where('id', $this->delayVoyageId)
+            ->update([
+                'delay_reason' => $this->delayReasonInput,
+            ]);
+
+        $this->delayVoyageId = null;
+        $this->delayReasonInput = null;
+
+        $this->loadData();
     }
 }

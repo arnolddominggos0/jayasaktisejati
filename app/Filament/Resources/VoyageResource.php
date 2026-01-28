@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\VoyageDelayReason;
 use App\Filament\Resources\VoyageResource\Pages;
 use App\Models\Port;
 use App\Models\Voyage;
@@ -131,44 +132,57 @@ class VoyageResource extends Resource
             Section::make('Delay (Jika ETA mundur)')
                 ->visible(fn($livewire) => $livewire instanceof EditRecord)
                 ->schema([
+
                     Toggle::make('is_delayed')
                         ->label('Voyage Delay?')
                         ->reactive()
                         ->inline(false)
-                        ->afterStateUpdated(function ($state, callable $set, $get) {
-                            if ($state) {
-                                $etd = $get('etd');
-                                if ($etd) {
-                                    $auto = Carbon::parse($etd)->addDay();
-                                    $set('rescheduled_etd', $auto->toDateTimeString());
-                                }
-                                $eta = $get('eta');
-                                if ($eta) {
-                                    $autoEta = Carbon::parse($eta)->addDay();
-                                    $set('rescheduled_eta', $autoEta->toDateTimeString());
-                                }
-                                $set('delay_reported_at', now()->toDateTimeString());
-                            } else {
-                                $set('rescheduled_etd', null);
-                                $set('rescheduled_eta', null);
-                            }
+                        ->afterStateHydrated(function (Toggle $component, $state) {
+                            // pastikan toggle mengikuti data DB
+                            $component->state((bool) $state);
                         }),
-                    Textarea::make('delay_reason')
-                        ->label('Delay Reason')
-                        ->rows(3)
-                        ->visible(fn($get) => (bool) $get('is_delayed')),
+
+                    Select::make('delay_reason')
+                        ->label('Alasan Keterlambatan')
+                        ->options(
+                            collect(\App\Enums\VoyageDelayReason::cases())
+                                ->mapWithKeys(fn($c) => [$c->value => $c->label()])
+                                ->toArray()
+                        )
+                        ->required(fn($get) => (bool) $get('is_delayed'))
+                        ->visible(fn($get) => (bool) $get('is_delayed'))
+                        ->afterStateHydrated(function (Select $component, $state) {
+                            // enum value sudah string, langsung set
+                            $component->state($state);
+                        }),
+
                     DateTimePicker::make('rescheduled_etd')
                         ->label('ETD (Reschedule)')
+                        ->native(false)
                         ->required(fn($get) => (bool) $get('is_delayed'))
                         ->visible(fn($get) => (bool) $get('is_delayed'))
-                        ->native(false)
-                        ->minDate(fn($get) => $get('etd')),
+                        ->afterStateHydrated(function (DateTimePicker $component, $state, $record) {
+                            // fallback auto isi kalau kosong
+                            if (! $state && $record?->etd) {
+                                $component->state(
+                                    \Carbon\Carbon::parse($record->etd)->addDay()
+                                );
+                            }
+                        }),
+
                     DateTimePicker::make('rescheduled_eta')
                         ->label('ETA (Reschedule)')
+                        ->native(false)
                         ->required(fn($get) => (bool) $get('is_delayed'))
                         ->visible(fn($get) => (bool) $get('is_delayed'))
-                        ->native(false)
-                        ->minDate(fn($get) => $get('rescheduled_etd')),
+                        ->afterStateHydrated(function (DateTimePicker $component, $state, $record) {
+                            if (! $state && $record?->eta) {
+                                $component->state(
+                                    \Carbon\Carbon::parse($record->eta)->addDay()
+                                );
+                            }
+                        }),
+
                 ])
                 ->columns(2),
 
@@ -179,24 +193,28 @@ class VoyageResource extends Resource
                         ->label('Tandai Final')
                         ->inline(false)
                         ->reactive()
-                        ->visible(fn() => Auth::check() && (auth_user- ('approver') || Auth::user()->hasRole('admin')))
+                        ->visible(
+                            fn() =>
+                            Auth::check() &&
+                                Auth::user()->hasAnyRole(['approver', 'admin'])
+                        )
                         ->afterStateUpdated(function ($state, callable $set) {
                             if ($state) {
                                 $set('finalized_at', now()->toDateTimeString());
-                                if (Auth::check()) {
-                                    $set('finalized_by', Auth::id());
-                                    $set('finalized_by_name', Auth::user()->name);
-                                }
+                                $set('finalized_by', Auth::id());
+                                $set('finalized_by_name', Auth::user()->name);
                             } else {
                                 $set('finalized_at', null);
                                 $set('finalized_by', null);
                                 $set('finalized_by_name', null);
                             }
                         }),
+
                     TextInput::make('finalized_by_name')
                         ->label('Finalized By')
                         ->disabled()
                         ->visible(fn($get) => (bool) $get('finalized_by')),
+
                     DateTimePicker::make('finalized_at')
                         ->label('Waktu Finalisasi')
                         ->native(false)
@@ -208,34 +226,55 @@ class VoyageResource extends Resource
             Section::make('Actual (H-0)')
                 ->visible(fn($livewire) => $livewire instanceof EditRecord)
                 ->schema([
+
                     DateTimePicker::make('atd_at')
                         ->label('ATD (Actual Departure)')
                         ->native(false)
                         ->live()
-                        ->nullable(),
+                        ->nullable()
+                        ->afterStateHydrated(fn($component, $state) => $component->state($state)),
+
                     DateTimePicker::make('ata_at')
                         ->label('ATA (Actual Arrival)')
                         ->native(false)
                         ->live()
-                        ->nullable(),
+                        ->nullable()
+                        ->afterStateHydrated(fn($component, $state) => $component->state($state)),
+
                     TextInput::make('actual_sailing_days')
                         ->label('Actual Sailing (hari)')
                         ->disabled()
-                        ->dehydrated(false),
+                        ->dehydrated(false)
+                        ->afterStateHydrated(function ($component, $state, $record) {
+                            $component->state($record?->actual_sailing_days);
+                        }),
+
                     TextInput::make('cargo_actual')
                         ->label('Actual Muatan (unit)')
                         ->numeric()
-                        ->minValue(0),
+                        ->minValue(0)
+                        ->afterStateHydrated(function ($component, $state) {
+                            $component->state($state);
+                        }),
+
                     DateTimePicker::make('cargo_actual_reported_at')
                         ->label('Waktu Laporan Actual')
                         ->native(false)
-                        ->disabled(),
+                        ->disabled()
+                        ->afterStateHydrated(function ($component, $state) {
+                            $component->state($state);
+                        }),
+
                     TextInput::make('cargo_actual_reported_by')
                         ->label('Dilaporkan Oleh')
-                        ->maxLength(100)
-                        ->disabled(),
+                        ->disabled()
+                        ->afterStateHydrated(function ($component, $state) {
+                            $component->state($state);
+                        }),
+
                 ])
                 ->columns(3),
+
 
             Section::make('Catatan Tambahan')
                 ->schema([

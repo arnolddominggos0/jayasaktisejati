@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Actions\CreateShippingSchedule;
+use App\Enums\VoyageDelayReason;
 use App\Services\SlaEvaluator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -25,8 +26,11 @@ class Voyage extends Model
         'ata_at',
         'period_month',
         'actual_sailing_days',
+        'is_delayed',
         'delay_reason',
+        'cargo_actual',
     ];
+
 
     protected $attributes = [
         'kpi_sailing_days' => 10,
@@ -39,75 +43,32 @@ class Voyage extends Model
         'ata_at' => 'datetime',
         'period_month' => 'date',
         'actual_sailing_days' => 'decimal:2',
+        'delay_reason' => VoyageDelayReason::class,
+        'is_delayed' => 'boolean',
+        'cargo_actual' => 'integer',
     ];
 
     protected static function booted(): void
     {
         static::updated(function (Voyage $voyage) {
 
-            if (
-                $voyage->is_final &&
-                $voyage->wasChanged('is_final')
-            ) {
+            if ($voyage->wasChanged('is_final') && $voyage->is_final) {
                 CreateShippingSchedule::run($voyage);
             }
 
-            if (
-                $voyage->wasChanged('ata_at') &&
-                $voyage->ata_at &&
-                $voyage->atd_at
-            ) {
-                $exists = DB::table('sla_results')
-                    ->where('voyage_id', $voyage->id)
-                    ->where('activity', 'sailing')
-                    ->exists();
-
-                if (! $exists) {
-                    $rule = DB::table('sla_rules')
-                        ->where('mode', 'sea')
-                        ->where('activity', 'sailing')
-                        ->where('pol_id', $voyage->pol_id)
-                        ->where('pod_id', $voyage->pod_id)
-                        ->where('is_active', true)
-                        ->first();
-
-                    if ($rule) {
-                        $actualDays = round(
-                            \Carbon\Carbon::parse($voyage->atd_at)
-                                ->diffInSeconds($voyage->ata_at) / 86400,
-                            2
-                        );
-
-                        $lateDays = max(0, $actualDays - $rule->target_days);
-
-                        DB::table('sla_results')->insert([
-                            'voyage_id'   => $voyage->id,
-                            'sla_rule_id' => $rule->id,
-                            'activity'    => 'sailing',
-                            'start_at'    => $voyage->atd_at,
-                            'end_at'      => $voyage->ata_at,
-                            'target_days' => $rule->target_days,
-                            'actual_days' => $actualDays,
-                            'status'      => $lateDays > 0 ? 'late' : 'on_time',
-                            'late_days'   => $lateDays,
-                            'created_at'  => now(),
-                            'updated_at'  => now(),
-                        ]);
-                    }
-                }
+            if ($voyage->wasChanged(['atd_at', 'ata_at'])) {
+                SlaEvaluator::evaluateVoyage($voyage);
             }
         });
 
-        static::saving(function (self $model) {
-            if ($model->atd_at) {
-                $end = $model->ata_at ?? now();
-                $model->actual_sailing_days =
-                    round($model->atd_at->diffInSeconds($end) / 86400, 2);
+        static::saving(function (Voyage $voyage) {
+            if ($voyage->atd_at) {
+                $end = $voyage->ata_at ?? now();
+                $voyage->actual_sailing_days = round(
+                    $voyage->atd_at->diffInSeconds($end) / 86400,
+                    2
+                );
             }
-        });
-
-        static::saved(function (Voyage $voyage) {
-            SlaEvaluator::evaluateVoyage($voyage);
         });
     }
 
