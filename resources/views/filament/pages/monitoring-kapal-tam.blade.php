@@ -20,7 +20,7 @@
                 <select wire:model.live="filter" class="w-48 rounded-xl border-gray-300 shadow-sm text-sm">
                     <option value="all">Semua</option>
                     <option value="ongoing">Sedang Berjalan</option>
-                    <option value="risk">Berisiko</option>
+                    <option value="risk">Berisiko</option>''
                     <option value="late">Terlambat</option>
                 </select>
             </div>
