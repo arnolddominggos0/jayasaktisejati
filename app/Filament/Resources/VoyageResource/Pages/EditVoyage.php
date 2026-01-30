@@ -21,4 +21,9 @@ class EditVoyage extends EditRecord
     {
         return 'Edit Voyage';
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return $this->getResource()::getUrl('index');
+    }
 }

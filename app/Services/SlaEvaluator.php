@@ -23,13 +23,10 @@ class SlaEvaluator
             ->where('is_active', true)
             ->first();
 
-        if (! $rule) {
-            return;
-        }
+        if (! $rule) return;
 
         $actualDays = round(
-            Carbon::parse($voyage->atd_at)
-                ->diffInSeconds($voyage->ata_at) / 86400,
+            $voyage->atd_at->diffInSeconds($voyage->ata_at) / 86400,
             2
         );
 

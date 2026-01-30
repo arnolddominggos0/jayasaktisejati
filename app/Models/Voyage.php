@@ -16,51 +16,43 @@ class Voyage extends Model
     use HasFactory;
 
     protected $fillable = [
+        'shipping_line_id',
         'vessel_id',
         'pol_id',
         'pod_id',
         'voyage_no',
         'etd',
         'eta',
+        'period_month',
         'atd_at',
         'ata_at',
-        'period_month',
         'actual_sailing_days',
         'is_delayed',
         'delay_reason',
         'cargo_actual',
+        'cargo_actual_reported_at',
+        'cargo_actual_reported_by',
     ];
-
 
     protected $attributes = [
         'kpi_sailing_days' => 10,
     ];
 
     protected $casts = [
-        'etd' => 'datetime',
-        'eta' => 'datetime',
-        'atd_at' => 'datetime',
-        'ata_at' => 'datetime',
-        'period_month' => 'date',
-        'actual_sailing_days' => 'decimal:2',
-        'delay_reason' => VoyageDelayReason::class,
-        'is_delayed' => 'boolean',
-        'cargo_actual' => 'integer',
+        'etd'                     => 'datetime',
+        'eta'                     => 'datetime',
+        'atd_at'                  => 'datetime',
+        'ata_at'                  => 'datetime',
+        'period_month'            => 'date',
+        'actual_sailing_days'     => 'decimal:2',
+        'is_delayed'              => 'boolean',
+        'delay_reason'            => VoyageDelayReason::class,
+        'cargo_actual'            => 'integer',
+        'cargo_actual_reported_at' => 'datetime',
     ];
 
     protected static function booted(): void
     {
-        static::updated(function (Voyage $voyage) {
-
-            if ($voyage->wasChanged('is_final') && $voyage->is_final) {
-                CreateShippingSchedule::run($voyage);
-            }
-
-            if ($voyage->wasChanged(['atd_at', 'ata_at'])) {
-                SlaEvaluator::evaluateVoyage($voyage);
-            }
-        });
-
         static::saving(function (Voyage $voyage) {
             if ($voyage->atd_at) {
                 $end = $voyage->ata_at ?? now();
@@ -69,7 +61,29 @@ class Voyage extends Model
                     2
                 );
             }
+
+            if (
+                $voyage->isDirty('cargo_actual') &&
+                is_null($voyage->cargo_actual_reported_at)
+            ) {
+                $voyage->cargo_actual_reported_at = now();
+                $voyage->cargo_actual_reported_by = auth()->user()?->name;
+            }
         });
+
+        static::saved(function (Voyage $voyage) {
+            if (
+                $voyage->wasChanged(['atd_at', 'ata_at']) &&
+                $voyage->ata_at
+            ) {
+                SlaEvaluator::evaluateVoyage($voyage);
+            }
+        });
+    }
+
+    public function shippingLine()
+    {
+        return $this->belongsTo(ShippingLine::class);
     }
 
     public function vessel()
@@ -152,10 +166,9 @@ class Voyage extends Model
 
     public function sailingSla()
     {
-        return $this->hasOne(\App\Models\SlaResult::class)
+        return $this->hasOne(SlaResult::class)
             ->where('activity', 'sailing');
     }
-
 
     public function slaResults()
     {

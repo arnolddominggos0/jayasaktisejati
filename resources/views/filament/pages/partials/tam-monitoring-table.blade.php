@@ -66,13 +66,12 @@
                         </td>
 
                         {{-- Status SLA --}}
-                        <td class="px-4 py-3 text-center">
+                        <td class="text-center">
                             @if ($sla)
-                                <span class="inline-flex px-2 py-1 rounded-full text-xs font-semibold
-                                    {{ $sla->status === 'late'
-                                        ? 'bg-red-100 text-red-700'
-                                        : 'bg-green-100 text-green-700' }}">
-                                    {{ $sla->status === 'late' ? 'TERLAMBAT' : 'TEPAT WAKTU' }}
+                                <span
+                                    class="px-2 py-1 rounded-full text-xs font-semibold
+                                    {{ $sla->status === 'late' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700' }}">
+                                    {{ $sla->status === 'late' ? 'SLA Terlambat' : 'SLA Tercapai' }}
                                 </span>
                             @else
                                 —
@@ -80,25 +79,32 @@
                         </td>
 
                         {{-- Keterlambatan --}}
-                        <td class="px-4 py-3 text-center">
-                            @if ($sla && $sla->late_days > 0)
-                                <span class="text-red-600 font-semibold">
-                                    {{ number_format($sla->late_days, 2) }} hari
+                        <td class="text-center">
+                            @if ($v->is_delayed)
+                                <span
+                                    class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-700 text-xs font-semibold">
+                                    Jadwal Direvisi
                                 </span>
                             @else
-                                —
+                                <span class="text-gray-400">—</span>
                             @endif
                         </td>
 
+                        <td>
+                            {{ $v->is_delayed ? $v->delay_reason?->label() : '—' }}
+                        </td>
+
+
                         {{-- Alasan Keterlambatan --}}
                         <td class="px-4 py-3 text-sm">
-                            @if ($sla && $sla->status === 'late')
+                            @if ($v->is_delayed)
                                 @if ($v->delay_reason)
-                                    {{ \App\Enums\VoyageDelayReason::tryFrom($v->delay_reason)?->label()
-                                        ?? ucfirst($v->delay_reason) }}
+                                    <span class="text-orange-700 font-medium">
+                                        {{ $v->delay_reason->label() }}
+                                    </span>
                                 @else
                                     <span class="text-gray-400 italic">
-                                        Belum diisi
+                                        Alasan belum diisi
                                     </span>
                                 @endif
                             @else
@@ -111,7 +117,8 @@
                             <div class="space-y-1 min-w-[180px]">
                                 @foreach ($r->vesselChecks as $check)
                                     @php($status = $check->status)
-                                    <div class="flex items-center justify-between gap-2 px-2 py-1 rounded-md text-[11px]
+                                    <div
+                                        class="flex items-center justify-between gap-2 px-2 py-1 rounded-md text-[11px]
                                         {{ $status->color() }}">
                                         <span class="font-semibold">{{ $check->day_code }}</span>
                                         <span>{{ $check->check_date->format('d M') }}</span>
