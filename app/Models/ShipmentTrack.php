@@ -118,5 +118,58 @@ class ShipmentTrack extends Model
                 $track->updated_by = $uid;
             }
         });
+
+        static::saved(function (ShipmentTrack $track) {
+            $shipment = $track->shipment()->with('tracks')->first();
+            if (!$shipment) return;
+
+            $hasRealTracking = $shipment->tracks
+            ->filter(fn($t) => !empty($t->tracked_at))
+            ->isNotEmpty();
+
+            if (!$hasRealTracking) {
+                if ($shipment->status !== ShipmentStatus::Draft->value) {
+                    $shipment->status = ShipmentStatus::Draft->value;
+                    $shipment->saveQuietly();
+                }
+                return;
+            }
+
+            $order = TrackStatus::orderForMode($shipment->mode);
+            $indexMap = [];
+            foreach ($order as $i => $e) {
+                $indexMap[$e->value] = $i;
+            }
+
+            $reached = $shipment->tracks
+                ->filter(fn($t) => !empty($t->tracked_at))
+                ->sortBy(fn($t) => $indexMap[$t->status instanceof TrackStatus ? $t->status->value : (string)$t->status] ?? 999)
+                ->last();
+
+            $newStatus = $reached?->status?->toShipmentStatus();
+            if ($newStatus && $shipment->status !== $newStatus->value) {
+                $shipment->status = $newStatus->value;
+
+                if ($newStatus === ShipmentStatus::Delivered) {
+                    if (Shipment::hasCol('delivered_at')) {
+                        $shipment->delivered_at = $reached?->tracked_at ?: now();
+                    }
+                    $shipment->cancelled_at = null;
+                    $shipment->cancelled_by = null;
+                }
+
+                if ($newStatus === ShipmentStatus::Cancelled) {
+                    if (Shipment::hasCol('cancelled_at')) {
+                        $shipment->cancelled_at = $shipment->cancelled_at ?: now();
+                    }
+                    $shipment->cancelled_by = $shipment->cancelled_by ?: (auth()->id() ?: null);
+                    if (Shipment::hasCol('delivered_at')) {
+                        $shipment->delivered_at = null;
+                    }
+                }
+
+                $shipment->saveQuietly();
+            }
+        });
     }
 }

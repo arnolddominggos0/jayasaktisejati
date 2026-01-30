@@ -55,6 +55,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
 
 class ShipmentResource extends Resource
 {
@@ -1128,6 +1129,14 @@ class ShipmentResource extends Resource
                         });
                     }
                 }
+
+                $query->with([
+                    'originCity:id,name',
+                    'destinationCity:id,name',
+                    'destinationOffice:id,branch_id',
+                    'tracks:id,shipment_id,status,actual_at,tracked_at',
+                    'units:id,shipment_id,reg_no,chassis_no,model_no,qty'
+                ]);
             })
             ->columns([
                 TextColumn::make('code')
@@ -1303,7 +1312,7 @@ class ShipmentResource extends Resource
                 TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->getStateUsing(fn(Shipment $r) => $r->status?->label() ?? (is_string($r->status) ? $r->status : '-'))
+                    ->getStateUsing(fn(Shipment $r): ShipmentStatus|string|null => $r->status?->label() ?? (is_string($r->status) ? $r->status : '-'))
                     ->colors([
                         'gray'    => ['Draf'],
                         'warning' => ['Menunggu', 'Ditahan'],
