@@ -173,17 +173,18 @@ class Shipment extends Model
             }
         });
 
-        static::created(function (Shipment $mShipment $m) {
+        static::created(function (Shipment $m) {
+
             $m->ensureTrackSkeleton();
-        
-            $firstStatus = $m->mode === ShipmentMode::Sea 
-                ? TrackStatus::Pickup 
+
+            $firstStatus = $m->mode === ShipmentMode::Sea
+                ? TrackStatus::Pickup
                 : TrackStatus::Pickup;
-            
+
             $m->tracks()->create([
-                'status' => $firstStatus,
+                'status'     => $firstStatus,
                 'tracked_at' => now(),
-                'note' => 'Menunggu penjemputan',
+                'note'       => 'Menunggu penjemputan',
             ]);
         });
 

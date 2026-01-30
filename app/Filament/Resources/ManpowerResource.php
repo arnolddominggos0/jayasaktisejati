@@ -14,7 +14,7 @@ class ManpowerResource extends Resource
 {
     protected static ?string $model = Manpower::class;
 
-    protected static ?string $navigationGroup = 'Manajemen MP';
+    protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationLabel = 'Tenaga Kerja (MP)';
     protected static ?string $pluralLabel     = 'Tenaga Kerja (MP)';
     protected static ?string $navigationIcon  = 'heroicon-m-user-group';

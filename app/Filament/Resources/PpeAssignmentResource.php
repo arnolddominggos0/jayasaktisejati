@@ -23,7 +23,7 @@ class PpeAssignmentResource extends Resource
 {
     protected static ?string $model = PpeAssignment::class;
 
-    protected static ?string $navigationGroup = 'APD & K3';
+    protected static ?string $navigationGroup = 'Transaksi';
     protected static ?string $navigationLabel = 'Penugasan APD';
     protected static ?string $pluralLabel     = 'Penugasan APD';
     protected static ?string $modelLabel      = 'Penugasan APD';

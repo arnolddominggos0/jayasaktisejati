@@ -30,7 +30,7 @@ class VoyageResource extends Resource
 {
     protected static ?string $model = Voyage::class;
 
-    protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
+    protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationIcon = 'heroicon-o-paper-airplane';
     protected static ?string $navigationLabel = 'Voyage';
 
@@ -192,8 +192,46 @@ class VoyageResource extends Resource
 
                 ])
                 ->columns(2),
+            Section::make('Vessel Check')
+                ->visible(
+                    fn($livewire) =>
+                    $livewire instanceof EditRecord &&
+                        $livewire->record->is_final
+                )
+                ->schema([
+                    Repeater::make('vesselChecks')
+                        ->relationship()
+                        ->disableItemCreation()
+                        ->disableItemDeletion()
+                        ->columns(3)
+                        ->schema([
+                            TextInput::make('day_code')
+                                ->disabled(),
 
-            Section::make('Aktual (H-0)')
+                            DateTimePicker::make('etd_current')
+                                ->required(),
+
+                            Select::make('status')
+                                ->options(
+                                    collect(VesselCheckStatus::cases())
+                                        ->mapWithKeys(fn($c) => [$c->value => $c->label()])
+                                        ->toArray()
+                                )
+                                ->required(),
+
+                            Textarea::make('delay_reason')
+                                ->visible(
+                                    fn($get) =>
+                                    $get('status') === VesselCheckStatus::DELAYED->value
+                                )
+                                ->columnSpanFull(),
+
+                            Textarea::make('note')
+                                ->columnSpanFull(),
+                        ]),
+                ]),
+
+            Section::make('Actual (H-0)')
                 ->visible(fn($livewire) => $livewire instanceof EditRecord)
                 ->schema([
 

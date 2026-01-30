@@ -33,6 +33,11 @@ class ArmadaMaintenanceResource extends Resource
     protected static ?string $modelLabel       = 'Perawatan Armada';
     protected static ?int $navigationSort      = 20;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([

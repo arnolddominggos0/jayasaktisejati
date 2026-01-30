@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 class ShipmentTrackingResource extends Resource
 {
     protected static ?string $model = Shipment::class;
-    protected static ?string $navigationGroup  = 'Pengiriman';
+    protected static ?string $navigationGroup  = 'Transaksi';
     protected static ?string $navigationLabel  = 'Pelacakan & Monitoring';
     protected static ?string $modelLabel       = 'Pelacakan';
     protected static ?string $pluralModelLabel = 'Pelacakan';

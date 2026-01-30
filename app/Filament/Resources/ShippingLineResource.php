@@ -14,7 +14,7 @@ use Filament\Tables\Table;
 class ShippingLineResource extends Resource
 {
     protected static ?string $model = ShippingLine::class;
-    protected static ?string $navigationGroup = 'Master Data Shipment';
+    protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationLabel = 'Pelayaran';
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
 
