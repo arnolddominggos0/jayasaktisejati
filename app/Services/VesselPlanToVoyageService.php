@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\VesselPlanStatus;
 use App\Models\VesselPlan;
 use App\Models\Voyage;
 use Illuminate\Support\Facades\Auth;
@@ -12,7 +13,7 @@ class VesselPlanToVoyageService
 {
     public function generate(VesselPlan $plan): void
     {
-        if ($plan->status !== \App\Enums\VesselPlanStatus::Sent) {
+        if ($plan->status !== VesselPlanStatus::Sent) {
             throw new DomainException('Vessel Plan belum direview TAM.');
         }
 

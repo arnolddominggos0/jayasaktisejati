@@ -22,11 +22,7 @@ class MonitoringKapalTam extends Page
     public array $monthOptions = [];
     public array $calendar = [];
     public $rows;
-
     public array $kpi = [];
-
-    public ?int $delayVoyageId = null;
-    public ?string $delayReasonInput = null;
 
     public function mount(): void
     {
@@ -98,38 +94,9 @@ class MonitoringKapalTam extends Page
             );
         }
 
-        $this->rows = $query
-            ->orderByDesc(
-                Voyage::select('actual_sailing_days')
-                    ->whereColumn('voyages.id', 'shipping_schedules.voyage_id')
-            )
-            ->get();
+        $this->rows = $query->get();
 
         $this->kpi = app(TamSailingKpiService::class)
             ->summaryForPeriod($dt->year, $dt->month);
-    }
-    public function openDelayReason(int $voyageId): void
-    {
-        $this->delayVoyageId = $voyageId;
-        $this->delayReasonInput = null;
-
-        $this->dispatch('open-delay-modal');
-    }
-
-    public function saveDelayReason(): void
-    {
-        $this->validate([
-            'delayReasonInput' => 'required|string|min:5',
-        ]);
-
-        Voyage::where('id', $this->delayVoyageId)
-            ->update([
-                'delay_reason' => $this->delayReasonInput,
-            ]);
-
-        $this->delayVoyageId = null;
-        $this->delayReasonInput = null;
-
-        $this->loadData();
     }
 }

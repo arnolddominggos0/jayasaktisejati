@@ -42,7 +42,7 @@ class TamSailingKpiService
             ->where('is_active', true)
             ->first();
 
-        if (! $rule) return null;
+        if (! $rule) return null;   
 
         $actual = $this->actualDays($v);
 

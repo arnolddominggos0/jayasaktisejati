@@ -1,6 +1,6 @@
-<div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+<div class="bg-white rounded-2xl border overflow-hidden">
     <div class="px-4 py-3 border-b font-semibold text-sm">
-        Kalender Jadwal Pelayaran — {{ $this->calendar['month_label'] ?? '' }}
+        Kalender Jadwal Pelayaran — {{ $calendar['month_label'] }}
     </div>
 
     <div class="overflow-x-auto">
@@ -11,7 +11,8 @@
                         Rute
                     </th>
                     @foreach ($this->calendar['days'] as $day)
-                        <th class="border px-1 py-2 text-center w-10
+                        <th
+                            class="border px-1 py-2 text-center w-10
                             {{ $day['isWeekend'] ? 'bg-rose-50 text-rose-600' : 'bg-gray-50' }}">
                             <div class="text-[9px] uppercase tracking-wide">
                                 {{ $day['dow'] }}
@@ -35,7 +36,8 @@
                             <td class="border px-1 py-1 align-top">
                                 @if (!empty($this->calendar['bucket'][$laneKey][$d]))
                                     @foreach ($this->calendar['bucket'][$laneKey][$d] as $chip)
-                                        <div class="mb-1 rounded-md bg-slate-50 border px-1 py-0.5 text-[10px] truncate">
+                                        <div
+                                            class="mb-1 rounded-md bg-slate-50 border px-1 py-0.5 text-[10px] truncate">
                                             <div class="font-semibold text-slate-700">
                                                 {{ $chip['short'] }}
                                             </div>
@@ -54,10 +56,7 @@
             </tbody>
         </table>
     </div>
-
-    <div class="px-4 py-2 text-[11px] text-gray-600 border-t">
-        <span class="text-rose-600 font-medium">
-            tanggal merah = weekend
-        </span>
+    <div class="px-4 py-2 text-xs text-gray-600 border-t">
+        <span class="text-rose-600 font-medium">tanggal merah = weekend</span>
     </div>
 </div>
