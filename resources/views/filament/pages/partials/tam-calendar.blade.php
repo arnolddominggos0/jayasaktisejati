@@ -31,7 +31,6 @@
                         <td class="sticky left-0 bg-white border px-3 py-2 font-medium">
                             {{ $laneLabel }}
                         </td>
-
                         @for ($d = 1; $d <= $this->calendar['days_count']; $d++)
                             <td class="border px-1 py-1 align-top">
                                 @if (!empty($this->calendar['bucket'][$laneKey][$d]))

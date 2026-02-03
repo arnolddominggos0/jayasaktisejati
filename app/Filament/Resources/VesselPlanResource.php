@@ -17,7 +17,7 @@ class VesselPlanResource extends Resource
 
     protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
     protected static ?string $navigationLabel = 'Vessel Plan TAM';
-    protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
+    protected static ?string $navigationIcon = 'heroicon-o-calendar-days'; 
 
     public static function table(Table $table): Table
     {
