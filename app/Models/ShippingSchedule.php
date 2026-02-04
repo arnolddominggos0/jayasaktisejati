@@ -30,6 +30,11 @@ class ShippingSchedule extends Model
         return $this->hasMany(VesselCheck::class);
     }
 
+    public function vesselCheckCases(): HasMany
+    {
+        return $this->hasMany(VesselCheckCase::class);
+    }
+
     public function getEtdDateAttribute()
     {
         return $this->voyage?->etd;

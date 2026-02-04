@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Enums\VesselCheckStatus;
+use App\Enums\VesselCheckLogStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -15,26 +15,19 @@ class VesselCheck extends Model
         'etd_plan',
         'etd_current',
         'status',
-        'delay_reason',
         'note',
         'source',
-        'created_by',
     ];
 
     protected $casts = [
-        'check_date' => 'date',
-        'etd_plan' => 'datetime',
+        'check_date'  => 'date',
+        'etd_plan'    => 'datetime',
         'etd_current' => 'datetime',
-        'status' => VesselCheckStatus::class,
+        'status'      => VesselCheckLogStatus::class,
     ];
 
-    public function schedule(): BelongsTo
+    public function shippingSchedule(): BelongsTo
     {
         return $this->belongsTo(ShippingSchedule::class);
-    }
-
-    public function voyage()
-    {
-        return $this->belongsTo(Voyage::class);
     }
 }

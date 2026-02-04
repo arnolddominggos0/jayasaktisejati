@@ -18,10 +18,10 @@ class VesselCheckCase extends Model
     ];
 
     protected $casts = [
-        'opened_at'  => 'datetime',
-        'closed_at'  => 'datetime',
-        'delay_flag' => 'boolean',
-        'case_status'=> VesselCheckStatus::class,
+        'opened_at'   => 'datetime',
+        'closed_at'   => 'datetime',
+        'delay_flag'  => 'boolean',
+        'case_status' => VesselCheckStatus::class,
     ];
 
     public function shippingSchedule(): BelongsTo
@@ -29,19 +29,9 @@ class VesselCheckCase extends Model
         return $this->belongsTo(ShippingSchedule::class);
     }
 
-    public function logs(): HasMany
-    {
-        return $this->hasMany(VesselCheckLog::class);
-    }
-
     public function delays(): HasMany
     {
         return $this->hasMany(VesselCheckDelay::class);
-    }
-
-    public function requests(): HasMany
-    {
-        return $this->hasMany(VesselCheckRequest::class);
     }
 
     public function alternatives(): HasMany
@@ -49,16 +39,14 @@ class VesselCheckCase extends Model
         return $this->hasMany(VesselCheckAlternative::class);
     }
 
+    public function requests(): HasMany
+    {
+        return $this->hasMany(VesselCheckRequest::class);
+    }
+
     public function revisions(): HasMany
     {
         return $this->hasMany(VesselCheckScheduleRevision::class);
-    }
-
-    /* ===== Guard Helper ===== */
-
-    public function hasDelayAnalysis(): bool
-    {
-        return $this->delays()->exists();
     }
 
     public function hasApprovedAlternative(): bool
@@ -67,18 +55,5 @@ class VesselCheckCase extends Model
             ->where('approval_status', 'APPROVED')
             ->exists();
     }
-
-    public function hasPendingAlternative(): bool
-    {
-        return $this->alternatives()
-            ->where('approval_status', 'PENDING')
-            ->exists();
-    }
-
-    public function hasPendingRequest(): bool
-    {
-        return $this->requests()
-            ->where('status', 'SENT')
-            ->exists();
-    }
 }
+    
