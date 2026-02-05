@@ -13,7 +13,6 @@ use Illuminate\Support\Facades\DB;
 
 class VesselCheckService
 {
-    /* ================= DAILY CHECK ================= */
     public function recordDailyCheck(
         int $shippingScheduleId,
         string $dayCode,
@@ -40,7 +39,6 @@ class VesselCheckService
         );
     }
 
-    /* ================= OPEN ISSUE ================= */
     public function openIssueFromCheck(int $vesselCheckId): VesselCheckCase
     {
         $check = VesselCheck::with('shippingSchedule.vesselCheckCase')
@@ -62,7 +60,6 @@ class VesselCheckService
         ]);
     }
 
-    /* ================= ANALYZE ================= */
     public function analyzeDelay(int $caseId, array $data): void
     {
         $case = VesselCheckCase::findOrFail($caseId);

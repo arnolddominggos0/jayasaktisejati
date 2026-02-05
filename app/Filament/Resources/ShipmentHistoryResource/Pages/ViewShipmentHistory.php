@@ -165,7 +165,7 @@ class ViewShipmentHistory extends ViewRecord
                     ->label('Dibatalkan')
                     ->dateTime('d M Y H:i')
                     ->placeholder('—'),
-
+    
                 TextEntry::make('cancelledBy.name')
                     ->label('Dibatalkan Oleh')
                     ->placeholder('—'),

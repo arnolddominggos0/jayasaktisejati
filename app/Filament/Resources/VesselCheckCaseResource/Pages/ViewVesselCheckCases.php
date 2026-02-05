@@ -7,7 +7,7 @@ use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Components\RepeatableEntry;
+use Filament\Infolists\Components\Grid;
 
 class ViewVesselCheckCase extends ViewRecord
 {
@@ -15,78 +15,117 @@ class ViewVesselCheckCase extends ViewRecord
 
     public function infolist(Infolist $infolist): Infolist
     {
-        return $infolist
-            ->schema([
-                Section::make('Case Summary')
-                    ->schema([
+        return $infolist->schema([
+            Section::make('Ringkasan Kasus')
+                ->schema([
+                    Grid::make(2)->schema([
                         TextEntry::make('case_status')
+                            ->label('Status Kasus')
                             ->badge()
-                            ->formatStateUsing(
-                                fn($state) => $state instanceof \App\Enums\VesselCheckStatus
-                                    ? $state->value
-                                    : (string) $state
-                            ),
+                            ->formatStateUsing(fn($state) => $state->label())
+                            ->color(fn($state) => $state->color()),
 
                         TextEntry::make('delay_flag')
-                            ->label('Delay')
+                            ->label('Perubahan ETD')
                             ->badge()
-                            ->formatStateUsing(fn(bool $state) => $state ? 'YES' : 'NO')
-                            ->color(fn(bool $state) => $state ? 'danger' : 'gray'),
+                            ->formatStateUsing(fn($state) => $state ? 'Ya' : 'Tidak')
+                            ->color(fn($state) => $state ? 'danger' : 'success'),
 
-                        TextEntry::make('opened_at')->dateTime(),
-                        TextEntry::make('closed_at')->dateTime(),
+                        TextEntry::make('opened_at')
+                            ->label('Mulai Ditangani')
+                            ->dateTime(),
+
+                        TextEntry::make('closed_at')
+                            ->label('Selesai Ditangani')
+                            ->dateTime()
+                            ->visible(fn($record) => filled($record->closed_at)),
                     ]),
+                ]),
 
-                Section::make('Delay Analysis')
-                    ->visible(fn($record) => $record->delays->isNotEmpty())
-                    ->schema([
-                        RepeatableEntry::make('delays')
-                            ->schema([
-                                TextEntry::make('delay_category'),
-                                TextEntry::make('delay_reason'),
-                                TextEntry::make('delay_minutes')->label('Delay (minutes)'),
-                                TextEntry::make('impact_description'),
-                            ]),
+            Section::make('Analisis Keterlambatan')
+                ->visible(fn($record) => $record->delays()->exists())
+                ->schema([
+                    Grid::make(2)->schema([
+                        TextEntry::make('delays.delay_category')
+                            ->label('Kategori Keterlambatan'),
+
+                        TextEntry::make('delays.delay_minutes')
+                            ->label('Durasi Keterlambatan (menit)'),
+
+                        TextEntry::make('delays.delay_reason')
+                            ->label('Penyebab Keterlambatan')
+                            ->columnSpanFull(),
+
+                        TextEntry::make('delays.impact_description')
+                            ->label('Dampak Operasional')
+                            ->columnSpanFull(),
                     ]),
+                ]),
 
-                Section::make('Request Improvement')
-                    ->visible(fn($record) => $record->requests->isNotEmpty())
-                    ->schema([
-                        RepeatableEntry::make('requests')
-                            ->schema([
-                                TextEntry::make('request_type'),
-                                TextEntry::make('requested_to'),
-                                TextEntry::make('status')->badge(),
-                                TextEntry::make('request_note'),
-                                TextEntry::make('response_note'),
-                            ]),
+            Section::make('Permintaan Tindak Lanjut')
+                ->visible(fn($record) => $record->requests()->exists())
+                ->schema([
+                    Grid::make(2)->schema([
+                        TextEntry::make('requests.request_type')
+                            ->label('Jenis Permintaan'),
+
+                        TextEntry::make('requests.requested_to')
+                            ->label('Ditujukan Kepada'),
+
+                        TextEntry::make('requests.status')
+                            ->label('Status Permintaan')
+                            ->badge(),
+
+                        TextEntry::make('requests.request_note')
+                            ->label('Catatan Permintaan')
+                            ->columnSpanFull(),
+
+                        TextEntry::make('requests.response_note')
+                            ->label('Catatan Tanggapan')
+                            ->columnSpanFull()
+                            ->visible(fn($record) => filled(optional($record->requests->first())->response_note)),
                     ]),
+                ]),
 
-                Section::make('Alternative Vessel')
-                    ->visible(fn($record) => $record->alternatives->isNotEmpty())
-                    ->schema([
-                        RepeatableEntry::make('alternatives')
-                            ->schema([
-                                TextEntry::make('vessel.name')->label('Vessel'),
-                                TextEntry::make('voyage.voyage_no')->label('Voyage'),
-                                TextEntry::make('alt_etd')->dateTime(),
-                                TextEntry::make('approval_status')->badge(),
-                            ]),
+            Section::make('Alternatif Kapal')
+                ->visible(fn($record) => $record->alternatives()->exists())
+                ->schema([
+                    Grid::make(2)->schema([
+                        TextEntry::make('alternatives.vessel_name')
+                            ->label('Nama Kapal'),
+
+                        TextEntry::make('alternatives.voyage_no')
+                            ->label('Voyage'),
+
+                        TextEntry::make('alternatives.alt_etd')
+                            ->label('ETD Alternatif')
+                            ->dateTime(),
+
+                        TextEntry::make('alternatives.approval_status')
+                            ->label('Status Persetujuan')
+                            ->badge(),
                     ]),
+                ]),
 
-                Section::make('Schedule Revision')
-                    ->visible(fn($record) => $record->revisions->isNotEmpty())
-                    ->schema([
-                        RepeatableEntry::make('revisions')
-                            ->schema([
-                                TextEntry::make('oldVoyage.voyage_no')->label('Old Voyage'),
-                                TextEntry::make('newVoyage.voyage_no')->label('New Voyage'),
-                                TextEntry::make('old_etd')->dateTime(),
-                                TextEntry::make('new_etd')->dateTime(),
-                                TextEntry::make('revision_note'),
-                            ]),
+            Section::make('Perubahan Jadwal')
+                ->visible(fn($record) => $record->revisions()->exists())
+                ->schema([
+                    Grid::make(2)->schema([
+                        TextEntry::make('revisions.old_voyage')
+                            ->label('Voyage Sebelumnya'),
+
+                        TextEntry::make('revisions.new_voyage')
+                            ->label('Voyage Baru'),
+
+                        TextEntry::make('revisions.old_etd')
+                            ->label('ETD Sebelumnya')
+                            ->dateTime(),
+
+                        TextEntry::make('revisions.new_etd')
+                            ->label('ETD Terbaru')
+                            ->dateTime(),
                     ]),
-
-            ]);
+                ]),
+        ]);
     }
 }
