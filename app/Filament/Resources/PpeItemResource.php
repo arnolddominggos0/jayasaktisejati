@@ -29,7 +29,7 @@ class PpeItemResource extends Resource
     protected static ?int    $navigationSort  = 11;
 
     private const STATUSES = [
-        'in_stock' => 'In Stock',
+        'in_stock' => 'Tersedia',
         'damaged'  => 'Rusak',
         'lost'     => 'Hilang',
         'disposed' => 'Disposed',

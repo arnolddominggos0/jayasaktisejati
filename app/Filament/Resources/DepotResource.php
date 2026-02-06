@@ -28,7 +28,7 @@ class DepotResource extends Resource
     protected static ?string $pluralLabel     = 'Depo';
     protected static ?string $navigationIcon  = 'heroicon-m-building-office-2';
     protected static ?string $modelLabel      = 'Depo';
-    protected static ?int    $navigationSort  = 40;
+    protected static ?int    $navigationSort  = 4;
 
     public static function form(Forms\Form $form): Forms\Form
     {

@@ -32,8 +32,8 @@ class ViewVesselCheck extends ViewRecord
                         ->label('Hari Pemeriksaan')
                         ->badge()
                         ->color(fn($state) => match ($state) {
-                            'D-1' => 'danger',
-                            'D-2' => 'warning',
+                            'H-1' => 'danger',
+                            'H-2' => 'warning',
                             default => 'gray',
                         }),
 

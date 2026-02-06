@@ -18,6 +18,9 @@ class PortResource extends Resource
     protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationIcon = 'heroicon-o-map-pin';
     protected static ?string $navigationLabel = 'Pelabuhan';
+    protected static ?string $pluralLabel     = 'Pelabuhan';
+    protected static ?string $modelLabel      = 'Pelabuhan';
+    protected static ?int    $navigationSort  = 1;
 
     public static function form(Form $form): Form
     {

@@ -21,7 +21,7 @@ class ShipmentHistoryResource extends Resource
 {
     protected static ?string $model = Shipment::class;
 
-    protected static ?string $navigationGroup   = 'Pengiriman';
+    protected static ?string $navigationGroup   = 'Riwayat';
     protected static ?string $navigationLabel   = 'Riwayat Pengiriman';
     protected static ?string $modelLabel        = 'Riwayat Pengiriman';
     protected static ?string $pluralModelLabel  = 'Riwayat Pengiriman';

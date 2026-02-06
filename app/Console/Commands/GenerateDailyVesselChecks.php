@@ -41,7 +41,7 @@ class GenerateDailyVesselChecks extends Command
                 continue;
             }
 
-            $dayCode = "D-{$diff}";
+            $dayCode = "H-{$diff}";
 
             VesselCheck::updateOrCreate(
                 [

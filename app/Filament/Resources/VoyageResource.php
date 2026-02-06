@@ -33,6 +33,9 @@ class VoyageResource extends Resource
     protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationIcon = 'heroicon-o-paper-airplane';
     protected static ?string $navigationLabel = 'Voyage';
+    protected static ?string $pluralLabel     = 'Voyage';
+    protected static ?string $modelLabel      = 'Voyage';
+    protected static ?int    $navigationSort  = 4;
 
     public static function form(Form $form): Form
     {

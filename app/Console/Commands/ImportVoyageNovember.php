@@ -9,11 +9,13 @@ use App\Models\Shipment;
 use App\Models\Voyage;
 use App\Models\Port;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DateTime;
+use Illuminate\Support\Facades\Date;
 
 class ImportShipmentNovember extends Command
 {
     protected $signature = 'import:shipment-november {--year=2025}';
-    protected $description = 'Import Shipment November (historical) from Excel';
+    protected $description = 'Import Shipment November (h   istorical) from Excel';
 
     public function handle(): int
     {
@@ -23,7 +25,7 @@ class ImportShipmentNovember extends Command
         if (! file_exists($path)) {
             $this->error("File tidak ditemukan: {$path}");
             return self::FAILURE;
-        }
+        }   
 
         $sheets = Excel::toArray([], $path);
         $rows = $sheets[0] ?? [];
@@ -94,7 +96,7 @@ class ImportShipmentNovember extends Command
 
         if (is_numeric($value)) {
             return Carbon::instance(
-                \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value)
+                Date::excelToDateTimeObject($value)
             )->setYear($year)->startOfDay();
         }
 

@@ -12,8 +12,11 @@ use App\Supports\ShippingCalendar\MonthlyCalendarBuilder;
 class MonitoringKapalTam extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
-    protected static ?string $navigationLabel = 'Monitoring Jadwal TAM';
+    protected static ?string $navigationLabel = 'Monitoring Jadwal';
+    protected static ?string $pluralLabel     = 'Monitoring Jadwal Kapal';
+    protected static ?string $modelLabel      = 'Monitoring Jadwal Kapal';
     protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
+    protected static ?int    $navigationSort  = 2;
     protected static string $view = 'filament.pages.monitoring-kapal-tam';
 
     public string $period;

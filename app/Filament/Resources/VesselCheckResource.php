@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\VesselCheckResource\Pages;
 use App\Models\VesselCheck;
+use App\Services\VesselCheckService;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -13,7 +14,9 @@ class VesselCheckResource extends Resource
 {
     protected static ?string $model = VesselCheck::class;
 
-    protected static ?string $navigationLabel = 'Pemeriksaan Jadwal Kapal (H-3 s.d. H-1)';
+    protected static ?string $navigationLabel = 'Pemeriksaan Jadwal Kapal';
+    protected static ?string $pluralLabel     = 'Pemeriksaan Jadwal Kapal';
+    protected static ?string $modelLabel      = 'Pemeriksaan Jadwal Kapal';
     protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
     protected static ?string $navigationIcon  = 'heroicon-o-calendar-days';
     protected static ?int $navigationSort = 2;
@@ -22,6 +25,7 @@ class VesselCheckResource extends Resource
     {
         return $table
             ->defaultSort('check_date', 'asc')
+            ->defaultGroup('shippingSchedule.voyage.voyage_no')
 
             ->groups([
                 Tables\Grouping\Group::make('shippingSchedule.voyage.voyage_no')
@@ -32,8 +36,8 @@ class VesselCheckResource extends Resource
             ->columns([
                 TextColumn::make('day_code')
                     ->label('H')
-                    ->badge()
                     ->alignCenter()
+                    ->badge()
                     ->color(fn($state) => match ($state) {
                         'D-1' => 'danger',
                         'D-2' => 'warning',
@@ -59,34 +63,50 @@ class VesselCheckResource extends Resource
                 TextColumn::make('hasil_pemeriksaan')
                     ->label('Hasil Pemeriksaan')
                     ->badge()
-                    ->getStateUsing(function ($record) {
-                        if ($record->shippingSchedule->vesselCheckCase) {
-                            return 'Perlu Tindak Lanjut';
-                        }
+                    ->getStateUsing(
+                        fn($record) =>
+                        $record->shippingSchedule->vesselCheckCase
+                            ? 'Perlu Tindak Lanjut'
+                            : (
+                                $record->etd_plan->equalTo($record->etd_current)
+                                ? 'Aman'
+                                : 'Perlu Perhatian'
+                            )
+                    )
+                    ->color(
+                        fn($record) =>
+                        $record->shippingSchedule->vesselCheckCase
+                            ? 'danger'
+                            : (
+                                $record->etd_plan->equalTo($record->etd_current)
+                                ? 'success'
+                                : 'warning'
+                            )
+                    ),
 
-                        if (! $record->etd_plan->equalTo($record->etd_current)) {
-                            return 'Perlu Perhatian';
-                        }
-
-                        return 'Aman';
-                    })
-                    ->color(function ($record) {
-                        if ($record->shippingSchedule->vesselCheckCase) {
-                            return 'danger';
-                        }
-
-                        if (! $record->etd_plan->equalTo($record->etd_current)) {
-                            return 'warning';
-                        }
-
-                        return 'success';
-                    }),
-
-                TextColumn::make('shippingSchedule.vesselCheckCase.case_status')
+                TextColumn::make('tindak_lanjut')
                     ->label('Tindak Lanjut')
                     ->badge()
-                    ->formatStateUsing(fn($state) => $state?->label() ?? 'Belum Ada')
-                    ->color(fn($state) => $state?->color() ?? 'gray'),
+                    ->getStateUsing(
+                        fn($record) =>
+                        $record->etd_plan->equalTo($record->etd_current)
+                            ? '—'
+                            : (
+                                $record->shippingSchedule->vesselCheckCase
+                                ? 'Sedang Ditangani'
+                                : 'Perlu Dibuat'
+                            )
+                    )
+                    ->color(
+                        fn($record) =>
+                        $record->etd_plan->equalTo($record->etd_current)
+                            ? 'gray'
+                            : (
+                                $record->shippingSchedule->vesselCheckCase
+                                ? 'info'
+                                : 'danger'
+                            )
+                    ),
             ])
 
             ->actions([
@@ -115,9 +135,7 @@ class VesselCheckResource extends Resource
                     ->visible(
                         fn($record) =>
                         ! $record->etd_plan->equalTo($record->etd_current)
-                            || $record->shippingSchedule->vesselCheckCase
                     )
-                    ->requiresConfirmation()
                     ->action(function ($record) {
                         if ($record->shippingSchedule->vesselCheckCase) {
                             return redirect()->route(
@@ -126,13 +144,13 @@ class VesselCheckResource extends Resource
                             );
                         }
 
-                        app(\App\Services\VesselCheckService::class)
+                        app(VesselCheckService::class)
                             ->openIssueFromCheck($record->id);
                     }),
             ])
 
             ->emptyStateHeading('Belum ada data pemeriksaan')
-            ->emptyStateDescription('Pemeriksaan otomatis dibuat pada H-3, H-2, dan H-1 sebelum keberangkatan.');
+            ->emptyStateDescription('Pemeriksaan jadwal kapal otomatis dibuat pada H-3, H-2, dan H-1 sebelum keberangkatan.');
     }
 
     public static function getPages(): array

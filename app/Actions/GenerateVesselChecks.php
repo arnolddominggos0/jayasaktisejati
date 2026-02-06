@@ -19,9 +19,9 @@ class GenerateVesselChecks
         $etd = Carbon::parse($voyage->etd)->startOfDay();
 
         $map = [
-            'D-3' => $etd->copy()->subDays(3),
-            'D-2' => $etd->copy()->subDays(2),
-            'D-1' => $etd->copy()->subDays(1),
+            'H-3' => $etd->copy()->subDays(3),
+            'H-2' => $etd->copy()->subDays(2),
+            'H-1' => $etd->copy()->subDays(1),
         ];
 
         foreach ($map as $code => $date) {

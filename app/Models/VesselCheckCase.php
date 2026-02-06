@@ -55,5 +55,13 @@ class VesselCheckCase extends Model
             ->where('approval_status', 'APPROVED')
             ->exists();
     }
+    public function vesselChecks()
+    {
+        return $this->hasMany(VesselCheck::class);
+    }
+
+    public function vesselCheckCase()
+    {
+        return $this->hasOne(VesselCheckCase::class);
+    }
 }
-    
