@@ -100,14 +100,23 @@ class VesselPlanItemRelationManager extends RelationManager
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
-                    ->visible(fn() => $this->getOwnerRecord()->isDraft()),
+                    ->visible(
+                        fn() =>
+                        $this->getOwnerRecord()?->isEditable() ?? false
+                    ),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                    ->visible(fn() => $this->getOwnerRecord()->isDraft()),
+                    ->visible(
+                        fn() =>
+                        $this->getOwnerRecord()?->isEditable() ?? false
+                    ),
 
                 Tables\Actions\DeleteAction::make()
-                    ->visible(fn() => $this->getOwnerRecord()->isDraft()),
+                    ->visible(
+                        fn() =>
+                        $this->getOwnerRecord()?->isEditable() ?? false
+                    ),
             ])
             ->defaultSort('planned_etd');
     }

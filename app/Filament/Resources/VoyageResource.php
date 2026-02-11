@@ -2,16 +2,17 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\VesselCheckStatus;
 use App\Enums\VoyageDelayReason;
 use App\Filament\Resources\VoyageResource\Pages;
 use App\Models\Port;
-use App\Models\ShippingLine;
 use App\Models\Vessel;
 use App\Models\Voyage;
 use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -225,7 +226,7 @@ class VoyageResource extends Resource
                             Textarea::make('delay_reason')
                                 ->visible(
                                     fn($get) =>
-                                    $get('status') === VesselCheckStatus::DELAYED->value
+                                    $get('status') === VesselCheckStatus::ETD_DELAY->value
                                 )
                                 ->columnSpanFull(),
 
@@ -268,7 +269,7 @@ class VoyageResource extends Resource
                         ->afterStateUpdated(function ($state, callable $set) {
                             if ($state !== null) {
                                 $set('cargo_actual_reported_at', now());
-                                $set('cargo_actual_reported_by', auth()->user()?->name);
+                                $set('cargo_actual_reported_by', auth_user()?->name);
                             }
                         }),
 

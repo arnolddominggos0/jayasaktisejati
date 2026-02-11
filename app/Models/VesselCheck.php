@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class VesselCheck extends Model
 {
     protected $fillable = [
+        'vessel_check_id',
         'shipping_schedule_id',
         'check_date',
         'day_code',
@@ -24,10 +25,15 @@ class VesselCheck extends Model
         'etd_plan'    => 'datetime',
         'etd_current' => 'datetime',
         'status'      => VesselCheckLogStatus::class,
-    ];
+    ];  
 
     public function shippingSchedule(): BelongsTo
     {
         return $this->belongsTo(ShippingSchedule::class);
     }
-}
+
+    public function voyage(): BelongsTo
+    {
+        return $this->belongsTo(Voyage::class);
+    }
+}   

@@ -23,12 +23,17 @@ class VesselPlan extends Model
         'note',
         'sent_at',
         'sent_by',
+        'feedback_reason',
+        'feedback_by',
+        'feedback_at',
     ];
+
 
     protected $casts = [
         'period_month' => 'date',
         'status'       => VesselPlanStatus::class,
         'sent_at'      => 'datetime',
+        'feedback_at' => 'datetime',
     ];
 
 
@@ -51,8 +56,6 @@ class VesselPlan extends Model
     {
         return $this->hasMany(Voyage::class);
     }
-
-
 
     public function isDraft(): bool
     {
@@ -171,18 +174,21 @@ class VesselPlan extends Model
             foreach ($this->items()->orderBy('planned_etd')->get() as $i => $item) {
 
                 $voyage = Voyage::create([
-                    'vessel_plan_id' => $this->id,
-                    'vessel_id'      => $item->vessel_id,
-                    'pol_id'         => $this->pol_id,
-                    'pod_id'         => $this->pod_id,
-                    'voyage_no'      => sprintf(
+                    'vessel_plan_id'  => $this->id,
+
+                    'shipping_line_id' => $item->shipping_line_id,
+
+                    'vessel_id'       => $item->vessel_id,
+                    'pol_id'          => $this->pol_id,
+                    'pod_id'          => $this->pod_id,
+                    'voyage_no'       => sprintf(
                         'TAM-%s-%02d',
                         $this->period_month->format('ym'),
                         $i + 1
                     ),
-                    'etd'          => $item->planned_etd,
-                    'eta'          => $item->planned_eta,
-                    'period_month' => $this->period_month,
+                    'etd'             => $item->planned_etd,
+                    'eta'             => $item->planned_eta,
+                    'period_month'    => $this->period_month,
                 ]);
 
                 $schedule = CreateShippingSchedule::run($voyage);
@@ -198,6 +204,7 @@ class VesselPlan extends Model
             return $count;
         });
     }
+
     protected function resolveRoute(): void
     {
         if ($this->pol_id && $this->pod_id) {
@@ -252,6 +259,26 @@ class VesselPlan extends Model
         return 'https://wa.me/' . $phone . '?text=' . urlencode($this->waMessage());
     }
 
+    public function markAsRevision(string $reason, int $userId): void
+    {
+        if (! $this->isSent()) {
+            throw new DomainException('Hanya jadwal yang sudah dikirim bisa direvisi.');
+        }
+
+        $this->update([
+            'status'          => VesselPlanStatus::Revision,
+            'feedback_reason' => $reason,
+            'feedback_by'     => $userId,
+            'feedback_at'     => now(),
+        ]);
+    }
+
+    public function isRevision(): bool
+    {
+        return $this->status === VesselPlanStatus::Revision;
+    }
+
+
     public function waMessage(): string
     {
         $analysis = $this->analyze();
@@ -293,10 +320,6 @@ class VesselPlan extends Model
         };
     }
 
-    /* ==============================
-     | MODEL EVENTS
-     ============================== */
-
     protected static function booted(): void
     {
         static::creating(function (VesselPlan $plan) {
@@ -326,5 +349,32 @@ class VesselPlan extends Model
             $plan->route_code = "{$pol->code}-{$pod->code}";
             $plan->status ??= VesselPlanStatus::Draft;
         });
+    }
+    public function isEditable(): bool
+    {
+        return $this->isDraft() || $this->isRevision();
+    }
+
+    public function approve(int $userId): int
+    {
+        if (! $this->isSent()) {
+            throw new \DomainException('Hanya jadwal dengan status SENT yang bisa disetujui.');
+        }
+
+        return $this->generateVoyages($userId);
+    }
+
+    public function reject(string $reason, int $userId): void
+    {
+        if (! $this->isSent()) {
+            throw new \DomainException('Hanya jadwal dengan status SENT yang bisa ditolak.');
+        }
+
+        $this->update([
+            'status'          => \App\Enums\VesselPlanStatus::Revision,
+            'feedback_reason' => $reason,
+            'feedback_by'     => $userId,
+            'feedback_at'     => now(),
+        ]);
     }
 }

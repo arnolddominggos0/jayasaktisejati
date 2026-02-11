@@ -16,6 +16,7 @@ class Voyage extends Model
     use HasFactory;
 
     protected $fillable = [
+        'vessel_plan_id',  
         'shipping_line_id',
         'vessel_id',
         'pol_id',
@@ -33,6 +34,7 @@ class Voyage extends Model
         'cargo_actual_reported_at',
         'cargo_actual_reported_by',
     ];
+
 
     protected $attributes = [
         'kpi_sailing_days' => 10,
