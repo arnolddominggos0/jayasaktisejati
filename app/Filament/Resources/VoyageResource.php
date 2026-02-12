@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Enums\VesselCheckStatus;
 use App\Enums\VoyageDelayReason;
+use App\Enums\VoyageOperationalStatus;
 use App\Filament\Resources\VoyageResource\Pages;
 use App\Models\Port;
 use App\Models\Vessel;
@@ -21,8 +22,8 @@ use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -63,233 +64,113 @@ class VoyageResource extends Resource
                         ->default(request('vessel_plan_id')),
 
                     DatePicker::make('period_month')
-                        ->default(request('period_month'))
+                        ->label('Periode')
+                        ->displayFormat('M Y')
+                        ->native(false)
                         ->disabled()
                         ->dehydrated(),
 
                     Select::make('pol_id')
                         ->relationship('pol', 'code')
-                        ->required()
                         ->searchable()
                         ->preload()
-                        ->getSearchResultsUsing(function (string $search) {
-                            return Port::query()
-                                ->when($search !== '', function ($q) use ($search) {
-                                    $q->where('code', 'ilike', "%{$search}%")
-                                        ->orWhere('name', 'ilike', "%{$search}%");
-                                })
-                                ->limit(50)
-                                ->pluck('code', 'id');
-                        })
-                        ->getOptionLabelUsing(function ($value) {
-                            $port = Port::find($value);
-                            return $port ? "{$port->code} — {$port->name}" : null;
-                        })
+                        ->required()
                         ->label('POL'),
+
                     Select::make('pod_id')
                         ->relationship('pod', 'code')
-                        ->required()
                         ->searchable()
                         ->preload()
-                        ->getSearchResultsUsing(function (string $search) {
-                            return Port::query()
-                                ->when($search !== '', function ($q) use ($search) {
-                                    $q->where('code', 'ilike', "%{$search}%")
-                                        ->orWhere('name', 'ilike', "%{$search}%");
-                                })
-                                ->limit(50)
-                                ->pluck('code', 'id');
-                        })
-                        ->getOptionLabelUsing(function ($value) {
-                            $port = Port::find($value);
-                            return $port ? "{$port->code} — {$port->name}" : null;
-                        })
+                        ->required()
                         ->label('POD'),
+
                     TextInput::make('voyage_no')
                         ->label('No Voyage')
+                        ->maxLength(50)
                         ->nullable()
-                        ->helperText('Boleh dikosongkan, bisa diisi saat jadwal sudah pasti')
-                        ->required(fn($livewire) => $livewire instanceof EditRecord)
-                        ->maxLength(50),
+                        ->required(fn($livewire) => $livewire instanceof EditRecord),
                 ])
                 ->columns(2),
 
             Section::make('Rencana Keberangkatan')
                 ->schema([
                     DateTimePicker::make('etd')
+                        ->label('ETD (Plan)')
                         ->required()
                         ->live()
-                        ->label('ETD (Plan)')
                         ->afterStateUpdated(function ($state, callable $set) {
                             if ($state) {
                                 $set('period_month', Carbon::parse($state)->startOfMonth()->toDateString());
                             }
                         }),
+
                     DateTimePicker::make('eta')
-                        ->required()
-                        ->label('ETA (Plan)'),
-                    DatePicker::make('period_month')
-                        ->label('Periode')
-                        ->displayFormat('M Y')
-                        ->native(false)
-                        ->disabled()
-                        ->dehydrated(),
+                        ->label('ETA (Plan)')
+                        ->required(),
+
                     TextInput::make('cargo_plan')
                         ->label('Rencana Muatan (unit)')
                         ->numeric()
                         ->minValue(0)
                         ->required()
-                        ->visible(fn($livewire) => !($livewire instanceof EditRecord)),
+                        ->visible(fn($livewire) => ! ($livewire instanceof EditRecord)),
                 ])
                 ->columns(3),
 
-            Section::make('Perubahan Jadwal (Jika ETA/ETD direvisi)')
+            Section::make('Perubahan Jadwal')
                 ->visible(fn($livewire) => $livewire instanceof EditRecord)
                 ->schema([
 
                     Toggle::make('is_delayed')
                         ->label('Jadwal Berubah?')
-                        ->reactive()
-                        ->inline(false)
-                        ->afterStateHydrated(function (Toggle $component, $state) {
-                            $component->state((bool) $state);
-                        }),
+                        ->reactive(),
 
                     Select::make('delay_reason')
-                        ->label('Alasan Perubahan Jadwal')
+                        ->label('Alasan Perubahan')
                         ->options(
                             collect(VoyageDelayReason::cases())
                                 ->mapWithKeys(fn($c) => [$c->value => $c->label()])
                                 ->toArray()
                         )
-                        ->required(fn($get) => (bool) $get('is_delayed'))
-                        ->visible(fn($get) => (bool) $get('is_delayed'))
-                        ->afterStateHydrated(function (Select $component, $state) {
-                            $component->state($state);
-                        }),
+                        ->visible(fn($get) => $get('is_delayed'))
+                        ->required(fn($get) => $get('is_delayed')),
 
-                    DateTimePicker::make('rescheduled_etd')
+                    DateTimePicker::make('etd')
                         ->label('ETD Revisi')
                         ->native(false)
-                        ->required(fn($get) => (bool) $get('is_delayed'))
-                        ->visible(fn($get) => (bool) $get('is_delayed'))
-                        ->afterStateHydrated(function (DateTimePicker $component, $state, $record) {
-                            if (! $state && $record?->etd) {
-                                $component->state(
-                                    Carbon::parse($record->etd)->addDay()
-                                );
-                            }
-                        }),
+                        ->visible(fn($get) => $get('is_delayed'))
+                        ->required(fn($get) => $get('is_delayed')),
 
-                    DateTimePicker::make('rescheduled_eta')
+                    DateTimePicker::make('eta')
                         ->label('ETA Revisi')
                         ->native(false)
-                        ->required(fn($get) => (bool) $get('is_delayed'))
-                        ->visible(fn($get) => (bool) $get('is_delayed'))
-                        ->afterStateHydrated(function (DateTimePicker $component, $state, $record) {
-                            if (! $state && $record?->eta) {
-                                $component->state(
-                                    Carbon::parse($record->eta)->addDay()
-                                );
-                            }
-                        }),
+                        ->visible(fn($get) => $get('is_delayed'))
+                        ->required(fn($get) => $get('is_delayed')),
 
                 ])
                 ->columns(2),
-            Section::make('Vessel Check')
-                ->visible(
-                    fn($livewire) =>
-                    $livewire instanceof EditRecord &&
-                        $livewire->record->is_final
-                )
-                ->schema([
-                    Repeater::make('vesselChecks')
-                        ->relationship()
-                        ->disableItemCreation()
-                        ->disableItemDeletion()
-                        ->columns(3)
-                        ->schema([
-                            TextInput::make('day_code')
-                                ->disabled(),
-
-                            DateTimePicker::make('etd_current')
-                                ->required(),
-
-                            Select::make('status')
-                                ->options(
-                                    collect(VesselCheckStatus::cases())
-                                        ->mapWithKeys(fn($c) => [$c->value => $c->label()])
-                                        ->toArray()
-                                )
-                                ->required(),
-
-                            Textarea::make('delay_reason')
-                                ->visible(
-                                    fn($get) =>
-                                    $get('status') === VesselCheckStatus::ETD_DELAY->value
-                                )
-                                ->columnSpanFull(),
-
-                            Textarea::make('note')
-                                ->columnSpanFull(),
-                        ]),
-                ]),
 
             Section::make('Actual (H-0)')
                 ->visible(fn($livewire) => $livewire instanceof EditRecord)
                 ->schema([
-
-                    DateTimePicker::make('atd_at')
-                        ->label('ATD (Aktual Keberangkatan)')
-                        ->native(false)
-                        ->live()
-                        ->nullable()
-                        ->afterStateHydrated(fn($component, $state) => $component->state($state)),
-
-                    DateTimePicker::make('ata_at')
-                        ->label('ATA (Aktual Kedatangan)')
-                        ->native(false)
-                        ->live()
-                        ->nullable()
-                        ->afterStateHydrated(fn($component, $state) => $component->state($state)),
+                    DateTimePicker::make('atd_at')->label('ATD'),
+                    DateTimePicker::make('ata_at')->label('ATA'),
 
                     TextInput::make('actual_sailing_days')
                         ->label('Aktual Berlayar (hari)')
                         ->disabled()
-                        ->dehydrated(false)
-                        ->afterStateHydrated(function ($component, $state, $record) {
-                            $component->state($record?->actual_sailing_days);
-                        }),
+                        ->dehydrated(false),
 
                     TextInput::make('cargo_actual')
-                        ->label('Aktual Muatan (unit)')
+                        ->label('Aktual Muatan')
                         ->numeric()
-                        ->minValue(0)
-                        ->reactive()
-                        ->afterStateUpdated(function ($state, callable $set) {
-                            if ($state !== null) {
-                                $set('cargo_actual_reported_at', now());
-                                $set('cargo_actual_reported_by', auth_user()?->name);
-                            }
-                        }),
-
-                    DateTimePicker::make('cargo_actual_reported_at')
-                        ->label('Waktu Laporan Aktual')
-                        ->disabled()
-                        ->dehydrated(false),
-
-                    TextInput::make('cargo_actual_reported_by')
-                        ->label('Dilaporkan Oleh')
-                        ->disabled()
-                        ->dehydrated(false),
+                        ->minValue(0),
                 ])
                 ->columns(3),
 
-
-            Section::make('Catatan Tambahan')
+            Section::make('Catatan')
                 ->schema([
                     Textarea::make('final_note')
-                        ->label('Catatan')
                         ->rows(4),
                 ]),
         ]);
@@ -301,18 +182,18 @@ class VoyageResource extends Resource
             ->columns([
                 TextColumn::make('shippingLine.name')
                     ->label('Pelayaran')
-                    ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
 
                 TextColumn::make('vessel.name')
                     ->label('Kapal')
-                    ->sortable()
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
 
                 TextColumn::make('voyage_no')
                     ->label('Voyage')
-                    ->sortable()
                     ->searchable()
+                    ->sortable()
                     ->placeholder('-'),
 
                 TextColumn::make('pol.code')->label('POL')->sortable(),
@@ -326,19 +207,10 @@ class VoyageResource extends Resource
                 TextColumn::make('etd')->label('ETD')->dateTime()->sortable(),
                 TextColumn::make('eta')->label('ETA')->dateTime()->sortable(),
 
-                TextColumn::make('status_operasional')
+                TextColumn::make('operational_status_label')
                     ->label('Status')
                     ->badge()
-                    ->getStateUsing(function (Voyage $record) {
-                        if ($record->atd_at) return 'Sudah jalan';
-                        if ($record->etd && $record->etd->isPast()) return 'Terlambat';
-                        return 'Belum jalan';
-                    })
-                    ->color(fn($state) => match ($state) {
-                        'Sudah jalan' => 'success',
-                        'Terlambat'   => 'danger',
-                        default       => 'warning',
-                    }),
+                    ->color(fn(Voyage $record) => $record->operational_status_color),
             ])
             ->filters([
                 SelectFilter::make('period_month')
@@ -354,13 +226,43 @@ class VoyageResource extends Resource
                                 $row->period_month->toDateString()
                                 => $row->period_month->format('M Y'),
                             ])
-                    ),
+                    )
+                    ->query(function (Builder $query, array $data) {
+
+                        $value = $data['value'] ?? null;
+
+                        if (! $value) {
+                            return;
+                        }
+
+                        $date = \Carbon\Carbon::parse($value);
+
+                        $query->whereMonth('period_month', $date->month)
+                            ->whereYear('period_month', $date->year);
+                    })
+                    ->default(now()->startOfMonth()->toDateString()),
+
             ])
             ->defaultSort('etd', 'asc')
             ->actions([
                 Tables\Actions\EditAction::make(),
             ]);
     }
+
+    public static function getEloquentQuery(): Builder
+    {
+        $ratioExpr = "CASE 
+        WHEN voyages.cargo_plan IS NULL OR voyages.cargo_plan = 0 
+        THEN NULL 
+        ELSE (voyages.cargo_actual * 1.0 / voyages.cargo_plan) 
+    END";
+
+        return parent::getEloquentQuery()
+            ->select('voyages.*')
+            ->selectRaw("COALESCE(($ratioExpr), 0) AS cargo_achievement_ratio")
+            ->with(['shippingLine', 'pol', 'pod']);
+    }
+
 
     public static function getPages(): array
     {
@@ -369,15 +271,5 @@ class VoyageResource extends Resource
             'create' => Pages\CreateVoyage::route('/create'),
             'edit'   => Pages\EditVoyage::route('/{record}/edit'),
         ];
-    }
-
-    public static function getEloquentQuery(): Builder
-    {
-        $ratioExpr = "CASE WHEN voyages.cargo_plan IS NULL OR voyages.cargo_plan = 0 THEN NULL ELSE (voyages.cargo_actual * 1.0 / voyages.cargo_plan) END";
-
-        return parent::getEloquentQuery()
-            ->select('voyages.*')
-            ->selectRaw("COALESCE(($ratioExpr), 0) AS cargo_achievement_ratio")
-            ->with(['shippingLine', 'pol', 'pod']);
     }
 }
