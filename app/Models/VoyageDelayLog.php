@@ -14,6 +14,8 @@ class VoyageDelayLog extends Model
         'new_eta',
         'reason',
         'changed_by',
+        'snapshot_before',
+        'snapshot_after',
     ];
 
     protected $casts = [
@@ -21,6 +23,8 @@ class VoyageDelayLog extends Model
         'new_etd' => 'datetime',
         'old_eta' => 'datetime',
         'new_eta' => 'datetime',
+        'snapshot_before' => 'array',
+        'snapshot_after' => 'array',
     ];
 
     public function voyage()
