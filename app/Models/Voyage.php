@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Actions\CreateShippingSchedule;
 use App\Enums\VoyageDelayReason;
 use App\Enums\VoyageOperationalStatus;
 use App\Services\SlaEvaluator;
@@ -10,7 +9,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 
 class Voyage extends Model
 {
@@ -36,22 +34,21 @@ class Voyage extends Model
         'cargo_actual_reported_by',
     ];
 
-
     protected $attributes = [
         'kpi_sailing_days' => 10,
     ];
 
     protected $casts = [
-        'etd'                     => 'datetime',
-        'eta'                     => 'datetime',
-        'atd_at'                  => 'datetime',
-        'ata_at'                  => 'datetime',
-        'period_month'            => 'date',
-        'actual_sailing_days'     => 'decimal:2',
-        'is_delayed'              => 'boolean',
-        'delay_reason'            => VoyageDelayReason::class,
-        'cargo_actual'            => 'integer',
-        'cargo_actual_reported_at' => 'datetime',
+        'etd'                       => 'datetime',
+        'eta'                       => 'datetime',
+        'atd_at'                    => 'datetime',
+        'ata_at'                    => 'datetime',
+        'period_month'              => 'date',
+        'actual_sailing_days'       => 'decimal:2',
+        'is_delayed'                => 'boolean',
+        'delay_reason'              => VoyageDelayReason::class,
+        'cargo_actual'              => 'integer',
+        'cargo_actual_reported_at'  => 'datetime',
     ];
 
     protected static function booted(): void
