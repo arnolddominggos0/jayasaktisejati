@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\SlaStatus;
 use App\Models\Voyage;
 use App\Models\SlaResult;
 use App\Models\SlaRule;
-use Illuminate\Support\Carbon;
 
 class SlaEvaluator
 {
@@ -23,7 +23,9 @@ class SlaEvaluator
             ->where('is_active', true)
             ->first();
 
-        if (! $rule) return;
+        if (! $rule) {
+            return;
+        }
 
         $actualDays = round(
             $voyage->atd_at->diffInSeconds($voyage->ata_at) / 86400,
@@ -31,6 +33,12 @@ class SlaEvaluator
         );
 
         $lateDays = max(0, $actualDays - $rule->target_days);
+
+        $status = match (true) {
+            $lateDays > 0 => SlaStatus::LATE,
+            $actualDays >= ($rule->target_days - 1) => SlaStatus::RISK,
+            default => SlaStatus::ONTIME,
+        };
 
         SlaResult::updateOrCreate(
             [
@@ -44,7 +52,7 @@ class SlaEvaluator
                 'target_days' => $rule->target_days,
                 'actual_days' => $actualDays,
                 'late_days'   => $lateDays,
-                'status'      => $lateDays > 0 ? 'late' : 'on_time',
+                'status'      => $status,
             ]
         );
     }

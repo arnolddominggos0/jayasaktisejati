@@ -23,48 +23,59 @@ class Voyage extends Model
         'voyage_no',
         'etd',
         'eta',
+        'etb',
+        'atb_at',
         'period_month',
         'atd_at',
         'ata_at',
         'actual_sailing_days',
         'is_delayed',
         'delay_reason',
+        'cargo_plan',
         'cargo_actual',
         'cargo_actual_reported_at',
         'cargo_actual_reported_by',
-    ];
-
-    protected $attributes = [
-        'kpi_sailing_days' => 10,
+        'final_note',
     ];
 
     protected $casts = [
-        'etd'                       => 'datetime',
-        'eta'                       => 'datetime',
-        'atd_at'                    => 'datetime',
-        'ata_at'                    => 'datetime',
-        'period_month'              => 'date',
-        'actual_sailing_days'       => 'decimal:2',
-        'is_delayed'                => 'boolean',
-        'delay_reason'              => VoyageDelayReason::class,
-        'cargo_actual'              => 'integer',
-        'cargo_actual_reported_at'  => 'datetime',
+        'etd' => 'datetime',
+        'eta' => 'datetime',
+        'etb' => 'datetime',
+        'atb_at' => 'datetime',
+        'atd_at' => 'datetime',
+        'ata_at' => 'datetime',
+        'period_month' => 'date',
+        'actual_sailing_days' => 'decimal:2',
+        'is_delayed' => 'boolean',
+        'delay_reason' => VoyageDelayReason::class,
+        'cargo_plan' => 'integer',
+        'cargo_actual' => 'integer',
+        'cargo_actual_reported_at' => 'datetime',
     ];
 
     protected static function booted(): void
     {
-        static::saving(function (Voyage $voyage) {
+        static::updating(function (Voyage $voyage) {
 
-            if ($voyage->isDirty(['etd', 'eta']) && $voyage->exists) {
-
+            if (
+                $voyage->exists &&
+                ($voyage->isDirty('etd') || $voyage->isDirty('eta')) &&
+                (
+                    $voyage->getOriginal('etd') != $voyage->etd ||
+                    $voyage->getOriginal('eta') != $voyage->eta
+                )
+            ) {
                 VoyageDelayLog::create([
                     'voyage_id' => $voyage->id,
                     'old_etd'   => $voyage->getOriginal('etd'),
                     'new_etd'   => $voyage->etd,
                     'old_eta'   => $voyage->getOriginal('eta'),
                     'new_eta'   => $voyage->eta,
+                    'new_etb'   => $voyage->etb,
+                    'new_atb_at' => $voyage->atb_at,
                     'reason'    => $voyage->delay_reason?->value,
-                    'changed_by' => auth_user()?->name,
+                    'changed_by' => optional(auth()->user())->name,
                 ]);
 
                 $voyage->is_delayed = true;
@@ -83,60 +94,20 @@ class Voyage extends Model
                 is_null($voyage->cargo_actual_reported_at)
             ) {
                 $voyage->cargo_actual_reported_at = now();
-                $voyage->cargo_actual_reported_by = auth_user()?->name;
+                $voyage->cargo_actual_reported_by = optional(auth()->user())->name;
             }
         });
 
-
         static::saved(function (Voyage $voyage) {
-            if (
-                $voyage->wasChanged(['atd_at', 'ata_at']) &&
-                $voyage->ata_at
-            ) {
+            if ($voyage->atd_at && $voyage->ata_at) {
                 SlaEvaluator::evaluateVoyage($voyage);
             }
         });
+    }
 
-        static::updating(function (Voyage $voyage) {
-
-            if (
-                $voyage->is_delayed &&
-                ($voyage->isDirty('etd') || $voyage->isDirty('eta'))
-            ) {
-
-                VoyageDelayLog::create([
-                    'voyage_id' => $voyage->id,
-                    'old_etd'   => $voyage->getOriginal('etd'),
-                    'new_etd'   => $voyage->etd,
-                    'old_eta'   => $voyage->getOriginal('eta'),
-                    'new_eta'   => $voyage->eta,
-                    'reason'    => $voyage->delay_reason?->value,
-                    'changed_by' => auth_user()?->name,
-
-                    'snapshot_before' => [
-                        'voyage_no' => $voyage->getOriginal('voyage_no'),
-                        'shipping_line' => $voyage->shippingLine?->name,
-                        'vessel' => $voyage->vessel?->name,
-                        'pol' => $voyage->pol?->name,
-                        'pod' => $voyage->pod?->name,
-                        'etd' => $voyage->getOriginal('etd'),
-                        'eta' => $voyage->getOriginal('eta'),
-                        'status' => $voyage->operational_status,
-                    ],
-
-                    'snapshot_after' => [
-                        'voyage_no' => $voyage->voyage_no,
-                        'shipping_line' => $voyage->shippingLine?->name,
-                        'vessel' => $voyage->vessel?->name,
-                        'pol' => $voyage->pol?->name,
-                        'pod' => $voyage->pod?->name,
-                        'etd' => $voyage->etd,
-                        'eta' => $voyage->eta,
-                        'status' => $voyage->operational_status,
-                    ],
-                ]);
-            }
-        });
+    public function delayLogs(): HasMany
+    {
+        return $this->hasMany(VoyageDelayLog::class);
     }
 
     public function shippingLine()
@@ -149,21 +120,6 @@ class Voyage extends Model
         return $this->belongsTo(Vessel::class);
     }
 
-    public function vesselPlan()
-    {
-        return $this->belongsTo(VesselPlan::class, 'vessel_plan_id');
-    }
-
-    public function vesselPlanItem()
-    {
-        return $this->belongsTo(VesselPlanItem::class, 'vessel_plan_item_id');
-    }
-
-    public function vesselChecks(): HasMany
-    {
-        return $this->hasMany(VesselCheck::class);
-    }
-
     public function pol()
     {
         return $this->belongsTo(Port::class, 'pol_id');
@@ -174,13 +130,20 @@ class Voyage extends Model
         return $this->belongsTo(Port::class, 'pod_id');
     }
 
-    public function getElapsedSailingDaysAttribute(): ?int
+    public function sailingSla()
     {
-        if (! $this->atd_at) {
-            return null;
-        }
+        return $this->hasOne(SlaResult::class)
+            ->where('activity', 'sailing');
+    }
 
-        return $this->atd_at->diffInDays($this->ata_at ?? now());
+    public function slaResults()
+    {
+        return $this->hasMany(SlaResult::class);
+    }
+
+    public function vesselChecks(): HasMany
+    {
+        return $this->hasMany(VesselCheck::class);
     }
 
     public function getOperationalStatusAttribute(): string
@@ -209,114 +172,31 @@ class Voyage extends Model
     {
         return VoyageOperationalStatus::from($this->operational_status)->color();
     }
-    
-    public function getRiskLevelAttribute(): string
+
+    public function getOtbStatusAttribute(): ?string
     {
-        if (! $this->atd_at || $this->ata_at) {
-            return 'none';
-        }
-
-        if ($this->elapsed_sailing_days > 10) {
-            return 'risk';
-        }
-
-        if ($this->elapsed_sailing_days >= 8) {
-            return 'warning';
-        }
-
-        return 'normal';
-    }
-
-    public function getSlaDaysAttribute(): ?int
-    {
-        if (! $this->etd || ! $this->ata_at) {
+        if ($this->etb === null || $this->atb_at === null) {
             return null;
         }
 
-        return $this->etd->diffInDays($this->ata_at);
+        return $this->atb_at->lte($this->etb) ? 'ontime' : 'late';
     }
 
-    public function getSlaStatusAttribute(): string
+    public function getOtdStatusAttribute(): ?string
     {
-        if ($this->ata_at) {
-            return 'Selesai';
-        }
-
-        if ($this->atd_at && ! $this->ata_at) {
-            return $this->is_delayed ? 'Terlambat' : 'Berjalan';
-        }
-
-        return 'Belum jalan';
-    }
-
-    public function getStatusColorAttribute(): string
-    {
-        return match ($this->status_label) {
-            'Terlambat'   => 'danger',
-            'Berjalan'    => 'warning',
-            'Selesai'     => 'success',
-            default       => 'gray',
-        };
-    }
-
-    public function sailingSla()
-    {
-        return $this->hasOne(SlaResult::class)
-            ->where('activity', 'sailing');
-    }
-
-    public function delayLogs()
-    {
-        return $this->hasMany(VoyageDelayLog::class);
-    }
-
-
-    public function slaResults()
-    {
-        return $this->hasMany(SlaResult::class);
-    }
-
-    public function getSailingElapsedDaysAttribute(): ?float
-    {
-        if (! $this->atd_at || $this->ata_at) {
+        if ($this->etd === null || $this->atd_at === null) {
             return null;
         }
 
-        return round(
-            Carbon::parse($this->atd_at)->diffInSeconds(now()) / 86400,
-            2
-        );
+        return $this->atd_at->lte($this->etd) ? 'ontime' : 'late';
     }
 
-    public function getSailingTargetDaysAttribute(): ?int
+    public function getOtaStatusAttribute(): ?string
     {
-        if (! $this->pol_id || ! $this->pod_id) {
+        if ($this->eta === null || $this->ata_at === null) {
             return null;
         }
 
-        return SlaRule::query()
-            ->where('is_active', true)
-            ->where('mode', 'sea')
-            ->where('activity', 'sailing')
-            ->where('pol_id', $this->pol_id)
-            ->where('pod_id', $this->pod_id)
-            ->value('target_days');
-    }
-
-    public function getSailingProgressLevelAttribute(): ?string
-    {
-        if (! $this->sailing_elapsed_days || ! $this->sailing_target_days) {
-            return null;
-        }
-
-        if ($this->sailing_elapsed_days >= $this->sailing_target_days) {
-            return 'late';
-        }
-
-        if ($this->sailing_elapsed_days >= $this->sailing_target_days * 0.8) {
-            return 'warning';
-        }
-
-        return 'normal';
+        return $this->ata_at->lte($this->eta) ? 'ontime' : 'late';
     }
 }

@@ -5,16 +5,14 @@ namespace App\Filament\Pages;
 use Filament\Pages\Page;
 use Illuminate\Support\Carbon;
 use App\Models\ShippingSchedule;
-use App\Models\Voyage;
-use App\Services\Kpi\TamSailingKpiService;
+use App\Models\SlaResult;
+use App\Services\Monitoring\ShippingAchievementService;
 use App\Supports\ShippingCalendar\MonthlyCalendarBuilder;
 
 class MonitoringKapalTam extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
     protected static ?string $navigationLabel = 'Monitoring Jadwal';
-    protected static ?string $pluralLabel     = 'Monitoring Jadwal Kapal';
-    protected static ?string $modelLabel      = 'Monitoring Jadwal Kapal';
     protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
     protected static ?int    $navigationSort  = 2;
     protected static string $view = 'filament.pages.monitoring-kapal-tam';
@@ -26,6 +24,7 @@ class MonitoringKapalTam extends Page
     public array $calendar = [];
     public $rows;
     public array $kpi = [];
+    public array $achievement = [];
 
     public function mount(): void
     {
@@ -74,32 +73,48 @@ class MonitoringKapalTam extends Page
             $query->whereHas(
                 'voyage',
                 fn($q) =>
-                $q->whereNotNull('atd_at')->whereNull('ata_at')
+                $q->whereNotNull('atd_at')
+                    ->whereNull('ata_at')
             );
         }
 
         if ($this->filter === 'risk') {
             $query->whereHas(
-                'voyage',
-                fn($q) =>
-                $q->whereNotNull('atd_at')
-                    ->whereNull('ata_at')
-                    ->where('actual_sailing_days', '>=', 8)
+                'voyage.sailingSla',
+                fn($q) => $q->where('status', 'risk')
             );
         }
 
         if ($this->filter === 'late') {
             $query->whereHas(
-                'voyage',
-                fn($q) =>
-                $q->whereNotNull('ata_at')
-                    ->where('actual_sailing_days', '>', 10)
+                'voyage.sailingSla',
+                fn($q) => $q->where('status', 'late')
             );
         }
 
         $this->rows = $query->get();
 
-        $this->kpi = app(TamSailingKpiService::class)
-            ->summaryForPeriod($dt->year, $dt->month);
+        $slaQuery = SlaResult::query()
+            ->where('activity', 'sailing')
+            ->whereMonth('start_at', $dt->month)
+            ->whereYear('start_at', $dt->year);
+
+        $total  = $slaQuery->count();
+        $ontime = (clone $slaQuery)->where('status', 'ontime')->count();
+        $risk   = (clone $slaQuery)->where('status', 'risk')->count();
+        $late   = (clone $slaQuery)->where('status', 'late')->count();
+
+        $this->kpi = [
+            'total'  => $total,
+            'ontime' => $ontime,
+            'risk'   => $risk,
+            'late'   => $late,
+            'compliance' => $total > 0
+                ? round((($ontime + $risk) / $total) * 100, 2)
+                : null,
+        ];
+
+        $this->achievement = app(ShippingAchievementService::class)
+            ->summary($dt->year, $dt->month);
     }
 }

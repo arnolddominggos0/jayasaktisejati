@@ -12,13 +12,16 @@
                     <th class="px-4 py-3 text-left">Kapal</th>
                     <th class="px-4 py-3 text-left">Voyage</th>
                     <th class="px-4 py-3 text-left">Rute</th>
+
                     <th class="px-4 py-3 text-center">ETD</th>
+                    <th class="px-4 py-3 text-center">ATD</th>
+                    <th class="px-4 py-3 text-center">OTD</th>
 
-                    <th class="px-4 py-3 text-center">Status Jadwal (ETA/ETD)</th>
-                    <th class="px-4 py-3 text-left">Alasan Perubahan Jadwal</th>
+                    <th class="px-4 py-3 text-center">ETA</th>
+                    <th class="px-4 py-3 text-center">ATA</th>
+                    <th class="px-4 py-3 text-center">OTA</th>
 
-                    <th class="px-4 py-3 text-center">SLA Sailing</th>
-                    <th class="px-4 py-3 text-center">Status SLA</th>
+                    <th class="px-4 py-3 text-center">Transit SLA</th>
 
                     <th class="px-4 py-3 text-left">Pemeriksaan Kapal</th>
                 </tr>
@@ -30,6 +33,7 @@
                     @php($sla = $v?->sailingSla)
 
                     <tr class="border-t align-top">
+
                         {{-- JSS --}}
                         <td class="px-4 py-3 font-semibold text-primary-700">
                             {{ $r->jss }}
@@ -52,77 +56,76 @@
 
                         {{-- ETD --}}
                         <td class="px-4 py-3 text-center">
-                            {{ optional($v?->etd)->format('d M Y') ?? '—' }}
+                            {{ optional($v?->etd)->format('d M Y H:i') ?? '—' }}
                         </td>
 
-                        {{-- STATUS JADWAL --}}
+                        {{-- ATD --}}
                         <td class="px-4 py-3 text-center">
-                            @if ($v?->is_delayed)
-                                <span class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">
-                                    ETA Mundur
-                                </span>
-                            @else
-                                <span class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
-                                    Sesuai Jadwal
-                                </span>
-                            @endif
+                            {{ optional($v?->atd_at)->format('d M Y H:i') ?? '—' }}
                         </td>
 
-                        {{-- ALASAN PERUBAHAN JADWAL --}}
-                        <td class="px-4 py-3 text-sm">
-                            @if ($v?->is_delayed)
-                                @if ($v?->delay_reason)
-                                    <span class="text-orange-700 font-medium">
-                                        {{ $v->delay_reason->label() }}
-                                    </span>
-                                @else
-                                    <span class="text-gray-400 italic">
-                                        Alasan belum diisi
-                                    </span>
-                                @endif
+                        {{-- OTD --}}
+                        <td class="px-4 py-3 text-center">
+                            @if ($v?->otd_status === 'ontime')
+                                <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">
+                                    On Time
+                                </span>
+                            @elseif ($v?->otd_status === 'late')
+                                <span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">
+                                    Late
+                                </span>
                             @else
                                 —
                             @endif
                         </td>
 
-                        {{-- SLA SAILING --}}
+                        {{-- ETA --}}
+                        <td class="px-4 py-3 text-center">
+                            {{ optional($v?->eta)->format('d M Y H:i') ?? '—' }}
+                        </td>
+
+                        {{-- ATA --}}
+                        <td class="px-4 py-3 text-center">
+                            {{ optional($v?->ata_at)->format('d M Y H:i') ?? '—' }}
+                        </td>
+
+                        {{-- OTA --}}
+                        <td class="px-4 py-3 text-center">
+                            @if ($v?->ota_status === 'ontime')
+                                <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">
+                                    On Time
+                                </span>
+                            @elseif ($v?->ota_status === 'late')
+                                <span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">
+                                    Late
+                                </span>
+                            @else
+                                —
+                            @endif
+                        </td>
+
+                        {{-- Transit SLA --}}
                         <td class="px-4 py-3 text-center">
                             @if ($sla)
-                                <div class="font-semibold">
-                                    {{ number_format($sla->actual_days, 2) }}
-                                    / {{ $sla->target_days }}
+                                <span class="px-2 py-1 rounded-full text-xs font-semibold {{ $sla->status->color() }}">
+                                    {{ $sla->status->label() }}
+                                </span>
+                                <div class="text-[10px] text-gray-500 mt-1">
+                                    {{ number_format($sla->actual_days, 2) }} /
+                                    {{ $sla->target_days }} hari
                                 </div>
-                                <div class="text-[10px] text-gray-500">hari</div>
                             @else
                                 —
                             @endif
                         </td>
 
-                        {{-- STATUS SLA --}}
-                        <td class="px-4 py-3 text-center">
-                            @if ($sla)
-                                <span
-                                    class="px-2 py-1 rounded-full text-xs font-semibold
-                                    {{ $sla->status === 'late'
-                                        ? 'bg-red-100 text-red-700'
-                                        : 'bg-green-100 text-green-700' }}">
-                                    {{ $sla->status === 'late'
-                                        ? 'SLA Tidak Tercapai'
-                                        : 'SLA Tercapai' }}
-                                </span>
-                            @else
-                                —
-                            @endif
-                        </td>
-
-                        {{-- PEMERIKSAAN KAPAL --}}
+                        {{-- Pemeriksaan Kapal --}}
                         <td class="px-4 py-3 text-xs">
                             <div class="space-y-1 min-w-[180px]">
                                 @foreach ($r->vesselChecks as $check)
                                     @php($status = $check->status)
                                     <div
-                                        class="flex items-center justify-between gap-2 px-2 py-1 rounded-md text-[11px]
-                                        {{ $status->color() }}">
+                                        class="flex items-center justify-between gap-2 px-2 py-1 rounded-md text-[11px] {{ $status->color() }}">
                                         <span class="font-semibold">{{ $check->day_code }}</span>
                                         <span>{{ $check->check_date->format('d M') }}</span>
                                         <span class="font-semibold">{{ $status->label() }}</span>
@@ -130,10 +133,11 @@
                                 @endforeach
                             </div>
                         </td>
+
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="text-center py-8 text-gray-400">
+                        <td colspan="12" class="text-center py-8 text-gray-400">
                             Tidak ada data
                         </td>
                     </tr>

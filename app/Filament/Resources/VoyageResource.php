@@ -179,48 +179,39 @@ class VoyageResource extends Resource
             ->columns([
                 TextColumn::make('shippingLine.name')
                     ->label('Pelayaran')
-                    ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->searchable(),
 
                 TextColumn::make('vessel.name')
                     ->label('Kapal')
-                    ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->searchable(),
 
                 TextColumn::make('voyage_no')
                     ->label('Voyage')
-                    ->searchable()
                     ->sortable()
+                    ->searchable()
                     ->placeholder('-'),
 
-                TextColumn::make('pol.code')->label('POL')->sortable(),
-                TextColumn::make('pod.code')->label('POD')->sortable(),
+                TextColumn::make('pol.code')->label('POL'),
+                TextColumn::make('pod.code')->label('POD'),
 
                 TextColumn::make('period_month')
                     ->label('Periode')
-                    ->date('M Y')
-                    ->sortable(),
+                    ->date('M Y'),
 
                 TextColumn::make('etd')
                     ->label('ETD')
-                    ->dateTime()
-                    ->sortable()
-                    ->formatStateUsing(function ($state, Voyage $record) {
-                        $formatted = $state?->format('M d, Y H:i');
+                    ->dateTime(),
 
-                        if ($record->delay_logs_count > 0) {
-                            return $formatted . '🔁';
-                        }
-
-                        return $formatted;
-                    }),
-
-                TextColumn::make('eta')->label('ETA')->dateTime()->sortable(),
+                TextColumn::make('eta')
+                    ->label('ETA')
+                    ->dateTime(),
 
                 TextColumn::make('operational_status_label')
                     ->label('Status')
                     ->badge()
-                    ->color(fn(Voyage $record) => $record->operational_status_color),
+                    ->color(fn($record) => $record->operational_status_color),
 
                 TextColumn::make('is_delayed')
                     ->label('Delay')
@@ -228,102 +219,27 @@ class VoyageResource extends Resource
                     ->formatStateUsing(fn($state) => $state ? 'Ya' : 'Tidak')
                     ->color(fn($state) => $state ? 'danger' : 'gray'),
 
-                TextColumn::make('delay_reason')
-                    ->label('Alasan Delay')
-                    ->formatStateUsing(fn($state) => $state?->label())
-                    ->toggleable()
-                    ->placeholder('-'),
-
                 TextColumn::make('delay_logs_count')
                     ->label('Revisi')
                     ->counts('delayLogs')
                     ->badge()
                     ->color(fn($state) => $state > 0 ? 'warning' : 'gray')
                     ->action(
-                        Tables\Actions\Action::make('open_history')
+                        Tables\Actions\Action::make('history')
                             ->modalHeading('Riwayat Perubahan Jadwal')
                             ->modalSubmitAction(false)
-                            ->modalCancelActionLabel('Tutup')
-                            ->modalContent(function (Voyage $record) {
-                                return view('filament.voyage.delay-history', [
-                                    'logs' => $record->delayLogs,
-                                ]);
-                            })
-                    ),
-                TextColumn::make('sailing_progress_level')
-                    ->label('SLA')
-                    ->badge()
-                    ->color(fn($state) => match ($state) {
-                        'late' => 'danger',
-                        'warning' => 'warning',
-                        'normal' => 'success',
-                        default => 'gray',
-                    }),
-            ])
-            ->filters([
-                SelectFilter::make('period_month')
-                    ->label('Periode')
-                    ->options(
-                        Voyage::query()
-                            ->select('period_month')
-                            ->distinct()
-                            ->whereNotNull('period_month')
-                            ->orderByDesc('period_month')
-                            ->get()
-                            ->mapWithKeys(fn($row) => [
-                                $row->period_month->toDateString()
-                                => $row->period_month->format('M Y'),
-                            ])
-                    )
-                    ->query(function (Builder $query, array $data) {
-                        $value = $data['value'] ?? null;
-
-                        if (! $value) {
-                            return;
-                        }
-
-                        $date = Carbon::parse($value);
-
-                        $query->whereMonth('period_month', $date->month)
-                            ->whereYear('period_month', $date->year);
-                    })
-                    ->default(now()->startOfMonth()->toDateString()),
-
-                SelectFilter::make('is_delayed')
-                    ->label('Jadwal Berubah?')
-                    ->options([
-                        1 => 'Ya',
-                        0 => 'Tidak',
-                    ])
-                    ->query(
-                        fn($query, $data) =>
-                        $query->when(
-                            filled($data['value']),
-                            fn($q) => $q->where('is_delayed', $data['value'])
-                        )
+                            ->modalContent(
+                                fn($record) =>
+                                view('filament.voyage.delay-history', [
+                                    'logs' => $record->delayLogs()->latest()->get(),
+                                ])
+                            )
                     ),
             ])
             ->defaultSort('etd', 'asc')
             ->actions([
                 Tables\Actions\EditAction::make(),
-
-                Tables\Actions\Action::make('view_delay_history')
-                    ->label('')
-                    ->icon('heroicon-m-clock')
-                    ->visible(fn(Voyage $record) => $record->delay_logs_count > 0)
-                    ->modalHeading('Riwayat Perubahan Jadwal')
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel('Tutup')
-                    ->modalContent(function (Voyage $record) {
-                        return view(
-                            'filament.resources.voyage-resource.widgets.delay-history',
-                            [
-                                'logs' => $record->delayLogs,
-                            ]
-                        );
-                    })
-            ])
-            ->bulkActions([]);
+            ]);
     }
 
     public static function getEloquentQuery(): Builder
