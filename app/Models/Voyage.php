@@ -103,6 +103,7 @@ class Voyage extends Model
                 $voyage->is_delayed &&
                 ($voyage->isDirty('etd') || $voyage->isDirty('eta'))
             ) {
+
                 VoyageDelayLog::create([
                     'voyage_id' => $voyage->id,
                     'old_etd'   => $voyage->getOriginal('etd'),
@@ -111,6 +112,28 @@ class Voyage extends Model
                     'new_eta'   => $voyage->eta,
                     'reason'    => $voyage->delay_reason?->value,
                     'changed_by' => auth_user()?->name,
+
+                    'snapshot_before' => [
+                        'voyage_no' => $voyage->getOriginal('voyage_no'),
+                        'shipping_line' => $voyage->shippingLine?->name,
+                        'vessel' => $voyage->vessel?->name,
+                        'pol' => $voyage->pol?->name,
+                        'pod' => $voyage->pod?->name,
+                        'etd' => $voyage->getOriginal('etd'),
+                        'eta' => $voyage->getOriginal('eta'),
+                        'status' => $voyage->operational_status,
+                    ],
+
+                    'snapshot_after' => [
+                        'voyage_no' => $voyage->voyage_no,
+                        'shipping_line' => $voyage->shippingLine?->name,
+                        'vessel' => $voyage->vessel?->name,
+                        'pol' => $voyage->pol?->name,
+                        'pod' => $voyage->pod?->name,
+                        'etd' => $voyage->etd,
+                        'eta' => $voyage->eta,
+                        'status' => $voyage->operational_status,
+                    ],
                 ]);
             }
         });
@@ -186,7 +209,7 @@ class Voyage extends Model
     {
         return VoyageOperationalStatus::from($this->operational_status)->color();
     }
-
+    
     public function getRiskLevelAttribute(): string
     {
         if (! $this->atd_at || $this->ata_at) {
