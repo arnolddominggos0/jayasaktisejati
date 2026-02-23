@@ -168,9 +168,9 @@ class Voyage extends Model
         return VoyageOperationalStatus::from($this->operational_status)->label();
     }
 
-    public function getOperationalStatusColorAttribute(): string
+    public function getOperationalStatusEnumAttribute(): VoyageOperationalStatus
     {
-        return VoyageOperationalStatus::from($this->operational_status)->color();
+        return VoyageOperationalStatus::from($this->operational_status);
     }
 
     public function getOtbStatusAttribute(): ?string
@@ -198,5 +198,18 @@ class Voyage extends Model
         }
 
         return $this->ata_at->lte($this->eta) ? 'ontime' : 'late';
+    }
+
+    public function getOverdueDaysAttribute(): ?int
+    {
+        if (
+            $this->operational_status === VoyageOperationalStatus::DELAYED->value &&
+            $this->etd instanceof Carbon &&
+            $this->etd->isPast()
+        ) {
+            return $this->etd->diffInDays(now());
+        }
+
+        return null;
     }
 }
