@@ -6,24 +6,32 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
-        Schema::table('voyages', function (Blueprint $table) {
-            $table->timestamp('etb')->nullable()->after('eta');
-            $table->timestamp('atb_at')->nullable()->after('ata_at');
-        });
+        if (!Schema::hasColumn('voyages', 'etb')) {
+            Schema::table('voyages', function (Blueprint $table) {
+                $table->timestamp('etb')->nullable();
+            });
+        }
+
+        if (!Schema::hasColumn('voyages', 'atb_at')) {
+            Schema::table('voyages', function (Blueprint $table) {
+                $table->timestamp('atb_at')->nullable();
+            });
+        }
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::table('voyages', function (Blueprint $table) {
-            //
+
+            if (Schema::hasColumn('voyages', 'etb')) {
+                $table->dropColumn('etb');
+            }
+
+            if (Schema::hasColumn('voyages', 'atb_at')) {
+                $table->dropColumn('atb_at');
+            }
         });
     }
 };

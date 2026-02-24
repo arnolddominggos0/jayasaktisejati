@@ -1,79 +1,45 @@
-<div class="space-y-6">
+<div class="space-y-8">
 
-@if($rows->where('operational_status','delayed')->count())
-<div class="bg-red-50 border border-red-200 rounded-2xl p-6">
-    <div class="font-semibold text-red-700 mb-4 text-sm uppercase">
-        🚨 Critical - Terlambat
-    </div>
+    @php
+        $kritis = $rows->filter(fn($v) => $v->operational_status === 'delayed');
 
-    <div class="grid gap-4">
-        @foreach($rows->where('operational_status','delayed') as $v)
-        <div class="bg-white rounded-xl p-4 shadow-sm border border-red-100 flex justify-between items-center">
+        $berlayar = $rows->filter(fn($v) => $v->operational_status === 'sailing');
+    @endphp
 
-            <div>
-                <div class="font-semibold">
-                    {{ $v->vessel?->name }} — {{ $v->voyage_no }}
-                </div>
-                <div class="text-sm text-gray-500">
-                    {{ $v->pol?->code }} → {{ $v->pod?->code }}
-                </div>
-                <div class="text-xs text-red-600 mt-1">
-                    Overdue {{ $v->overdue_days }} hari
-                </div>
+
+
+    @if ($kritis->count())
+        <div class="bg-red-50 border border-red-200 rounded-2xl p-6 space-y-4">
+            <div class="font-semibold text-red-700 text-sm uppercase">
+                🚨 Kritis – Terlambat
             </div>
 
-            <div class="text-right text-sm">
-                <div>ETD: {{ optional($v->etd)->format('d M H:i') }}</div>
-                <div>ETA: {{ optional($v->eta)->format('d M H:i') }}</div>
-                <div class="text-xs text-gray-500 mt-1">
-                    {{ $v->delay_reason?->label() }}
-                </div>
-            </div>
-
+            @foreach ($kritis as $v)
+                @include('filament.pages.partials.voyage-card', ['v' => $v])
+            @endforeach
         </div>
-        @endforeach
-    </div>
-</div>
-@endif
+    @endif
 
 
-@if($rows->where('operational_status','completed')->count())
-<div class="bg-green-50 border border-green-200 rounded-2xl p-6">
-    <div class="font-semibold text-green-700 mb-4 text-sm uppercase">
-        ✅ Selesai
-    </div>
 
-    <div class="grid gap-4">
-        @foreach($rows->where('operational_status','completed') as $v)
-        <div class="bg-white rounded-xl p-4 shadow-sm border flex justify-between items-center">
-
-            <div>
-                <div class="font-semibold">
-                    {{ $v->vessel?->name }} — {{ $v->voyage_no }}
-                </div>
-                <div class="text-sm text-gray-500">
-                    {{ $v->pol?->code }} → {{ $v->pod?->code }}
-                </div>
+    @if ($berlayar->count())
+        <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6 space-y-4">
+            <div class="font-semibold text-blue-700 text-sm uppercase">
+                🚢 Sedang Berlayar
             </div>
 
-            <div class="text-right text-sm">
-                <div>ETD: {{ optional($v->etd)->format('d M H:i') }}</div>
-                <div>ETA: {{ optional($v->eta)->format('d M H:i') }}</div>
-
-                @if($v->sailingSla)
-                    <span class="px-2 py-1 text-xs rounded
-                        {{ $v->sailingSla->status === 'late'
-                            ? 'bg-red-100 text-red-600'
-                            : 'bg-green-100 text-green-600' }}">
-                        {{ strtoupper($v->sailingSla->status) }}
-                    </span>
-                @endif
-            </div>
-
+            @foreach ($berlayar as $v)
+                @include('filament.pages.partials.voyage-card', ['v' => $v])
+            @endforeach
         </div>
-        @endforeach
-    </div>
-</div>
-@endif
+    @endif
+
+
+
+    @if (!$kritis->count() && !$berlayar->count())
+        <div class="bg-white border rounded-2xl p-8 text-center text-gray-500">
+            Tidak ada pelayaran aktif pada periode ini.
+        </div>
+    @endif
 
 </div>

@@ -1,4 +1,5 @@
 <div class="space-y-10">
+
     <div class="space-y-4">
 
         <div class="text-sm font-semibold text-gray-600 uppercase tracking-wide">
@@ -8,9 +9,9 @@
         <div class="grid grid-cols-3 gap-6">
 
             @foreach ([
-                'otd' => 'OTD (Departure)',
-                'ota' => 'OTA (Arrival)',
-                'otb' => 'OTB (Berthing)',
+                'otd' => 'Ketepatan Berangkat (OTD)',
+                'ota' => 'Ketepatan Tiba (OTA)',
+                'otb' => 'Ketepatan Sandar (OTB)',
             ] as $key => $label)
 
                 @php
@@ -42,12 +43,12 @@
                             </div>
 
                             <div class="text-xs text-gray-500 mt-1">
-                                OK {{ $ok }} / {{ $total }}
+                                Tepat {{ $ok }} / {{ $total }}
                             </div>
                         </div>
 
                         <div class="text-sm font-semibold {{ $ngPercent > 0 ? 'text-red-500' : 'text-gray-400' }}">
-                            NG {{ $ngPercent }}%
+                            Tidak Tepat {{ $ngPercent }}%
                         </div>
 
                     </div>
@@ -57,7 +58,10 @@
             @endforeach
 
         </div>
+
     </div>
+
+
 
     <div class="space-y-4">
 
@@ -67,7 +71,6 @@
 
         <div class="grid grid-cols-2 gap-6">
 
-            {{-- Transit SLA --}}
             @php
                 $slaOk = $achievement['sla']['ok_percent'] ?? 0;
                 $slaNg = $achievement['sla']['ng_percent'] ?? 0;
@@ -96,13 +99,13 @@
                         </div>
 
                         <div class="text-xs text-gray-500 mt-1">
-                            OK {{ $achievement['sla']['ok'] ?? 0 }} /
+                            Tercapai {{ $achievement['sla']['ok'] ?? 0 }} /
                             {{ $slaTotal }}
                         </div>
                     </div>
 
                     <div class="text-sm font-semibold {{ $slaNg > 0 ? 'text-red-500' : 'text-gray-400' }}">
-                        NG {{ $slaNg }}%
+                        Tidak Tercapai {{ $slaNg }}%
                     </div>
 
                 </div>
@@ -110,7 +113,7 @@
             </div>
 
 
-            {{-- Ringkasan Operasional --}}
+
             <div class="bg-gray-50 rounded-2xl border border-gray-200 p-6">
 
                 <div class="text-xs text-gray-500 uppercase tracking-wide">
@@ -146,5 +149,31 @@
         </div>
 
     </div>
+
+
+
+    @php
+        $selesai = $rows->filter(fn($v) =>
+            $v->operational_status === 'completed'
+        );
+    @endphp
+
+    @if($selesai->count())
+        <div class="space-y-4">
+
+            <div class="text-sm font-semibold text-gray-600 uppercase tracking-wide">
+                Daftar Pelayaran Selesai
+            </div>
+
+            <div class="bg-white border rounded-2xl p-6 space-y-4">
+
+                @foreach($selesai as $v)
+                    @include('filament.pages.partials.voyage-card', ['v' => $v])
+                @endforeach
+
+            </div>
+
+        </div>
+    @endif
 
 </div>

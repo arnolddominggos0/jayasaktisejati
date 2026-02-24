@@ -151,6 +151,15 @@ class VoyageResource extends Resource
                 ->visible(fn($livewire) => $livewire instanceof EditRecord)
                 ->schema([
                     DateTimePicker::make('atd_at')->label('ATD'),
+
+                    DateTimePicker::make('etb')
+                        ->label('ETB (Estimasi Sandar)')
+                        ->native(false),
+
+                    DateTimePicker::make('atb_at')
+                        ->label('ATB (Aktual Sandar)')
+                        ->native(false),
+
                     DateTimePicker::make('ata_at')->label('ATA'),
 
                     TextInput::make('actual_sailing_days')

@@ -19,7 +19,7 @@ enum VoyageOperationalStatus: string
         };
     }
 
-    public function badgeClass(): string
+    public function color(): string
     {
         return match ($this) {
             self::SCHEDULED => 'bg-gray-100 text-gray-700',

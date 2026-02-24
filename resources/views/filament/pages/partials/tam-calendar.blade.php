@@ -1,4 +1,14 @@
-<div class="bg-white rounded-2xl border overflow-hidden">
+<div x-data="{
+    draggingId: null,
+    startDrag(id) { this.draggingId = id },
+    drop(date) {
+        if (this.draggingId) {
+            $wire.rescheduleVoyage(this.draggingId, date)
+            this.draggingId = null
+        }
+    }
+}" class="bg-white rounded-2xl border overflow-hidden">
+
     <div class="px-4 py-3 border-b font-semibold text-sm">
         Kalender Jadwal Pelayaran — {{ $calendar['month_label'] }}
     </div>
@@ -10,8 +20,8 @@
                     <th class="sticky left-0 bg-gray-100 border px-3 py-2 w-40 text-left">
                         Rute
                     </th>
-                    @foreach ($this->calendar['days'] as $day)
-                        <th
+                    @foreach ($calendar['days'] as $day)
+                        <th @dragover.prevent @drop="drop('{{ $day['date'] }}')"
                             class="border px-1 py-2 text-center w-10
                             {{ $day['isWeekend'] ? 'bg-rose-50 text-rose-600' : 'bg-gray-50' }}">
                             <div class="text-[9px] uppercase tracking-wide">
@@ -26,35 +36,39 @@
             </thead>
 
             <tbody>
-                @foreach ($this->calendar['lanes'] as $laneKey => $laneLabel)
+                @foreach ($calendar['lanes'] as $laneKey => $laneLabel)
                     <tr>
                         <td class="sticky left-0 bg-white border px-3 py-2 font-medium">
                             {{ $laneLabel }}
                         </td>
-                        @for ($d = 1; $d <= $this->calendar['days_count']; $d++)
-                            <td class="border px-1 py-1 align-top">
-                                @if (!empty($this->calendar['bucket'][$laneKey][$d]))
-                                    @foreach ($this->calendar['bucket'][$laneKey][$d] as $chip)
-                                        <div
-                                            class="mb-1 rounded-md bg-slate-50 border px-1 py-0.5 text-[10px] truncate">
-                                            <div class="font-semibold text-slate-700">
-                                                {{ $chip['short'] }}
-                                            </div>
-                                            <div class="text-slate-500">
-                                                {{ $chip['voyage_no'] }}
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                @else
-                                    <span class="text-gray-300">—</span>
-                                @endif
-                            </td>
-                        @endfor
+
+                        <td colspan="{{ $calendar['days_count'] }}" class="p-0">
+                            <div class="relative grid"
+                                style="grid-template-columns: repeat({{ $calendar['days_count'] }}, minmax(40px,1fr));">
+
+                                @foreach ($calendar['bars'][$laneKey] ?? [] as $bar)
+                                    <div draggable="true" @dragstart="startDrag({{ $bar['id'] }})"
+                                        title="{{ $bar['tooltip'] }}"
+                                        class="h-6 rounded text-white text-[10px] px-2 truncate cursor-move {{ $bar['color'] }}"
+                                        style="
+                        grid-column: {{ $bar['start'] }} / {{ $bar['end'] + 1 }};
+                    ">
+                                        {{ $bar['label'] }}
+                                    </div>
+                                @endforeach
+
+                                @for ($i = 1; $i <= $calendar['days_count']; $i++)
+                                    <div class="border-r border-gray-100"></div>
+                                @endfor
+
+                            </div>
+                        </td>
                     </tr>
                 @endforeach
             </tbody>
         </table>
     </div>
+
     <div class="px-4 py-2 text-xs text-gray-600 border-t">
         <span class="text-rose-600 font-medium">tanggal merah = weekend</span>
     </div>

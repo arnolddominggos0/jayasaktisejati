@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\SlaStatus;
 use App\Enums\VoyageDelayReason;
 use App\Enums\VoyageOperationalStatus;
 use App\Services\SlaEvaluator;
@@ -58,24 +59,22 @@ class Voyage extends Model
     {
         static::updating(function (Voyage $voyage) {
 
-            if (
-                $voyage->exists &&
-                ($voyage->isDirty('etd') || $voyage->isDirty('eta')) &&
-                (
-                    $voyage->getOriginal('etd') != $voyage->etd ||
-                    $voyage->getOriginal('eta') != $voyage->eta
-                )
-            ) {
+            $etdChanged = $voyage->isDirty('etd');
+            $etaChanged = $voyage->isDirty('eta');
+            $etbChanged = $voyage->isDirty('etb');
+
+            if ($voyage->exists && ($etdChanged || $etaChanged || $etbChanged)) {
+
                 VoyageDelayLog::create([
-                    'voyage_id' => $voyage->id,
-                    'old_etd'   => $voyage->getOriginal('etd'),
-                    'new_etd'   => $voyage->etd,
-                    'old_eta'   => $voyage->getOriginal('eta'),
-                    'new_eta'   => $voyage->eta,
-                    'new_etb'   => $voyage->etb,
-                    'new_atb_at' => $voyage->atb_at,
-                    'reason'    => $voyage->delay_reason?->value,
-                    'changed_by' => optional(auth()->user())->name,
+                    'voyage_id'   => $voyage->id,
+                    'old_etd'     => $voyage->getOriginal('etd'),
+                    'new_etd'     => $voyage->etd,
+                    'old_eta'     => $voyage->getOriginal('eta'),
+                    'new_eta'     => $voyage->eta,
+                    'new_etb'     => $voyage->etb,
+                    'new_atb_at'  => $voyage->atb_at,
+                    'reason'      => $voyage->delay_reason?->value,
+                    'changed_by'  => optional(auth()->user())->name,
                 ]);
 
                 $voyage->is_delayed = true;
@@ -94,13 +93,34 @@ class Voyage extends Model
                 is_null($voyage->cargo_actual_reported_at)
             ) {
                 $voyage->cargo_actual_reported_at = now();
-                $voyage->cargo_actual_reported_by = optional(auth()->user())->name;
+                $voyage->cargo_actual_reported_by = optional(auth_user())->name;
             }
         });
 
         static::saved(function (Voyage $voyage) {
+
             if ($voyage->atd_at && $voyage->ata_at) {
                 SlaEvaluator::evaluateVoyage($voyage);
+            }
+
+            if ($voyage->eta) {
+
+                $voyage->checkpoints()
+                    ->whereIn('type', ['eta_d2', 'eta_d1'])
+                    ->delete();
+
+                $voyage->checkpoints()->createMany([
+                    [
+                        'type' => 'eta_d2',
+                        'title' => 'Reminder ETA D-2',
+                        'scheduled_at' => $voyage->eta->copy()->subDays(2),
+                    ],
+                    [
+                        'type' => 'eta_d1',
+                        'title' => 'Reminder ETA D-1',
+                        'scheduled_at' => $voyage->eta->copy()->subDay(),
+                    ],
+                ]);
             }
         });
     }
@@ -211,5 +231,39 @@ class Voyage extends Model
         }
 
         return null;
+    }
+
+    public function getSlaStatusAttribute(): ?SlaStatus
+    {
+        return $this->sailingSla?->status;
+    }
+
+    public function getDelaySeverityAttribute(): string
+    {
+        if (!$this->overdue_days) return 'none';
+
+        return match (true) {
+            $this->overdue_days > 7 => 'critical',
+            $this->overdue_days >= 3 => 'medium',
+            default => 'minor',
+        };
+    }
+
+    public function checkpoints(): HasMany
+    {
+        return $this->hasMany(VoyageCheckpoint::class);
+    }
+
+    public function getSailingRiskAttribute(): bool
+    {
+        if (
+            $this->operational_status === 'sailing' &&
+            $this->eta &&
+            now()->diffInHours($this->eta, false) < 24
+        ) {
+            return true;
+        }
+
+        return false;
     }
 }

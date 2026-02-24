@@ -26,4 +26,32 @@ class EditVoyage extends EditRecord
     {
         return $this->getResource()::getUrl('index');
     }
+
+    protected function afterSave(): void
+    {
+        $voyage = $this->record;
+
+        if ($voyage->etb) {
+
+            $voyage->checkpoints()->updateOrCreate(
+                ['type' => 'etb'],
+                [
+                    'title' => 'Estimasi Sandar (ETB)',
+                    'scheduled_at' => $voyage->etb,
+                ]
+            );
+        }
+
+        if ($voyage->atb_at) {
+
+            $voyage->checkpoints()->updateOrCreate(
+                ['type' => 'atb'],
+                [
+                    'title' => 'Aktual Sandar (ATB)',
+                    'scheduled_at' => $voyage->atb_at,
+                    'checked_at' => $voyage->atb_at,
+                ]
+            );
+        }
+    }
 }
