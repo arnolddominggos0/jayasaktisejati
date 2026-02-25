@@ -9,11 +9,10 @@
         <div class="grid grid-cols-3 gap-6">
 
             @foreach ([
-                'otd' => 'Ketepatan Berangkat (OTD)',
-                'ota' => 'Ketepatan Tiba (OTA)',
-                'otb' => 'Ketepatan Sandar (OTB)',
-            ] as $key => $label)
-
+        'otd' => 'Ketepatan Berangkat (OTD)',
+        'ota' => 'Ketepatan Tiba (OTA)',
+        'otb' => 'Ketepatan Sandar (OTB)',
+    ] as $key => $label)
                 @php
                     $okPercent = $achievement[$key]['ok_percent'] ?? 0;
                     $ngPercent = $achievement[$key]['ng_percent'] ?? 0;
@@ -39,7 +38,7 @@
 
                         <div>
                             <div class="text-3xl font-bold {{ $total > 0 ? $warna : 'text-gray-400' }}">
-                                {{ $total > 0 ? $okPercent.'%' : '—' }}
+                                {{ $total > 0 ? $okPercent . '%' : '—' }}
                             </div>
 
                             <div class="text-xs text-gray-500 mt-1">
@@ -54,7 +53,6 @@
                     </div>
 
                 </div>
-
             @endforeach
 
         </div>
@@ -95,7 +93,7 @@
 
                     <div>
                         <div class="text-3xl font-bold {{ $slaTotal > 0 ? $slaWarna : 'text-gray-400' }}">
-                            {{ $slaTotal > 0 ? $slaOk.'%' : '—' }}
+                            {{ $slaTotal > 0 ? $slaOk . '%' : '—' }}
                         </div>
 
                         <div class="text-xs text-gray-500 mt-1">
@@ -128,7 +126,7 @@
                         </div>
                         <div class="text-lg font-semibold text-orange-600">
                             {{ ($achievement['rata_rata_delay_berangkat'] ?? 0) > 0
-                                ? $achievement['rata_rata_delay_berangkat'].' jam'
+                                ? $achievement['rata_rata_delay_berangkat'] . ' jam'
                                 : '—' }}
                         </div>
                     </div>
@@ -153,12 +151,12 @@
 
 
     @php
-        $selesai = $rows->filter(fn($v) =>
-            $v->operational_status === 'completed'
-        );
+        use App\Enums\VoyageOperationalStatus;
+
+        $selesai = $rows->filter(fn($v) => $v->operational_status_enum === VoyageOperationalStatus::COMPLETED);
     @endphp
 
-    @if($selesai->count())
+    @if ($selesai->count())
         <div class="space-y-4">
 
             <div class="text-sm font-semibold text-gray-600 uppercase tracking-wide">
@@ -167,7 +165,7 @@
 
             <div class="bg-white border rounded-2xl p-6 space-y-4">
 
-                @foreach($selesai as $v)
+                @foreach ($selesai as $v)
                     @include('filament.pages.partials.voyage-card', ['v' => $v])
                 @endforeach
 

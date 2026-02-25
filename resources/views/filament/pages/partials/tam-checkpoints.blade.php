@@ -9,6 +9,8 @@
             $overdue = $v->checkpoints->filter(fn($cp) =>
                 !$cp->checked_at && $cp->scheduled_at?->isPast()
             )->count();
+
+            $status = $v->operational_status_enum;
         @endphp
 
         @if($totalCp > 0)
@@ -16,15 +18,26 @@
 
             <div class="flex justify-between items-center">
 
+                {{-- LEFT --}}
                 <div>
-                    <div class="font-semibold">
-                        {{ $v->vessel?->name }} — {{ $v->voyage_no }}
+                    <div class="flex items-center gap-2">
+
+                        <div class="font-semibold">
+                            {{ $v->vessel?->name }} — {{ $v->voyage_no }}
+                        </div>
+
+                        <span class="px-2 py-0.5 text-xs rounded {{ $status->color() }}">
+                            {{ $status->label() }}
+                        </span>
+
                     </div>
-                    <div class="text-xs text-gray-500">
+
+                    <div class="text-xs text-gray-500 mt-1">
                         {{ $v->pol?->code }} → {{ $v->pod?->code }}
                     </div>
                 </div>
 
+                {{-- RIGHT --}}
                 <div class="flex gap-3 text-xs">
 
                     <span class="px-2 py-1 bg-gray-100 rounded">
@@ -55,7 +68,5 @@
 
         </div>
         @endif
-
     @endforeach
-
 </div>

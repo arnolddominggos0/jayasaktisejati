@@ -20,8 +20,6 @@
         </div>
     @endif
 
-
-
     @if ($berlayar->count())
         <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6 space-y-4">
             <div class="font-semibold text-blue-700 text-sm uppercase">

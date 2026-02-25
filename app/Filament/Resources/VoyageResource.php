@@ -217,10 +217,17 @@ class VoyageResource extends Resource
                     ->label('ETA')
                     ->dateTime(),
 
-                TextColumn::make('operational_status_label')
+                TextColumn::make('operational_status')
                     ->label('Status')
                     ->badge()
-                    ->color(fn($record) => $record->operational_status_color),
+                    ->formatStateUsing(
+                        fn($state) =>
+                        VoyageOperationalStatus::from($state)->label()
+                    )
+                    ->color(
+                        fn($state) =>
+                        VoyageOperationalStatus::from($state)->color()
+                    ),
 
                 TextColumn::make('is_delayed')
                     ->label('Delay')
