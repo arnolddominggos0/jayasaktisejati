@@ -41,20 +41,9 @@ class MonitoringKapalTam extends Page
         $this->loadData();
     }
 
-    public function updatedPeriod()
-    {
-        $this->loadData();
-    }
-
-    public function updatedMode()
-    {
-        $this->loadData();
-    }
-
-    public function updatedSearch()
-    {
-        $this->loadData();
-    }
+    public function updatedPeriod() { $this->loadData(); }
+    public function updatedMode() { $this->loadData(); }
+    public function updatedSearch() { $this->loadData(); }
 
     protected function loadData(): void
     {
@@ -71,14 +60,15 @@ class MonitoringKapalTam extends Page
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('voyage_no', 'like', "%{$this->search}%")
-                    ->orWhereHas(
-                        'vessel',
-                        fn($v) => $v->where('name', 'like', "%{$this->search}%")
-                    );
+                  ->orWhereHas('vessel',
+                      fn($v) => $v->where('name', 'like', "%{$this->search}%")
+                  );
             });
         }
 
         $this->rows = $query->get();
+
+        /* SUMMARY BASED ON ENUM */
 
         $this->summary = [
             'total' => $this->rows->count(),
@@ -97,8 +87,9 @@ class MonitoringKapalTam extends Page
             'no_ata' => $this->rows->whereNull('ata_at')->count(),
         ];
 
-        $days = [];
+        /* CALENDAR */
 
+        $days = [];
         for ($i = 1; $i <= $daysCount; $i++) {
             $d = $start->copy()->day($i);
             $days[] = [
@@ -117,7 +108,6 @@ class MonitoringKapalTam extends Page
         ];
 
         $bucket = [];
-
         foreach (array_keys($lanes) as $k) {
             $bucket[$k] = array_fill(1, $daysCount, []);
         }
@@ -126,56 +116,28 @@ class MonitoringKapalTam extends Page
 
             $status = $voyage->operational_status_enum;
 
-            $color = match ($status) {
-                VoyageOperationalStatus::DELAYED   => 'bg-red-700 text-white',
-                VoyageOperationalStatus::SAILING   => 'bg-blue-700 text-white',
-                VoyageOperationalStatus::COMPLETED => 'bg-emerald-700 text-white',
-                default                            => 'bg-gray-700 text-white',
-            };
-
             $chip = [
-                'short' => (string) ($voyage->vessel?->name ?? '-'),
-                'voyage_no' => (string) ($voyage->voyage_no ?? '-'),
-                'color' => $color,
-                'label' => (string) $status->label(),
-                'tooltip' =>
-                    'Vessel: ' . ($voyage->vessel?->name ?? '-') . ' | ' .
-                    'Voyage: ' . ($voyage->voyage_no ?? '-') . ' | ' .
-                    'POL: ' . ($voyage->pol?->name ?? '-') . ' | ' .
-                    'POD: ' . ($voyage->pod?->name ?? '-') . ' | ' .
-                    'Status: ' . $status->label(),
+                'short' => $voyage->vessel?->name ?? '-',
+                'voyage_no' => $voyage->voyage_no ?? '-',
+                'color' => $status->color(),
             ];
 
-            $etd = $voyage->etd;
-            $eta = $voyage->eta;
-            $atd = $voyage->atd_at;
-            $ata = $voyage->ata_at;
+            $map = [
+                'plan_etd' => $voyage->etd,
+                'plan_eta' => $voyage->eta,
+                'act_atd'  => $voyage->atd_at,
+                'act_ata'  => $voyage->ata_at,
+            ];
 
-            if ($etd && $etd->between($start, $end, true)) {
-                $bucket['plan_etd'][$etd->day][] = $chip;
-            }
-
-            if ($eta && $eta->between($start, $end, true)) {
-                $bucket['plan_eta'][$eta->day][] = $chip;
-            }
-
-            if ($atd && $atd->between($start, $end, true)) {
-                $bucket['act_atd'][$atd->day][] = $chip;
-            }
-
-            if ($ata && $ata->between($start, $end, true)) {
-                $bucket['act_ata'][$ata->day][] = $chip;
+            foreach ($map as $lane => $date) {
+                if ($date && $date->between($start, $end, true)) {
+                    $bucket[$lane][$date->day][] = $chip;
+                }
             }
         }
 
-        /*
-        |--------------------------------------------------------------------------
-        | FINAL CALENDAR STRUCTURE
-        |--------------------------------------------------------------------------
-        */
-
         $this->calendar = [
-            'month_label' => (string) $dt->translatedFormat('F Y'),
+            'month_label' => $dt->translatedFormat('F Y'),
             'days' => $days,
             'days_count' => $daysCount,
             'lanes' => $lanes,

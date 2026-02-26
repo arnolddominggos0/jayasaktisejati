@@ -37,6 +37,7 @@ class Voyage extends Model
         'cargo_actual_reported_at',
         'cargo_actual_reported_by',
         'final_note',
+        'closing_at',
     ];
 
     protected $casts = [
@@ -124,6 +125,7 @@ class Voyage extends Model
                 ]);
             }
         });
+
         static::updated(function ($voyage) {
 
             if ($voyage->wasChanged('atd_at') && $voyage->atd_at) {
@@ -185,9 +187,14 @@ class Voyage extends Model
         return $this->hasMany(VesselCheck::class);
     }
 
-    public function milestones()
+    public function milestones(): HasMany
     {
         return $this->hasMany(VoyageMilestone::class);
+    }
+
+    public function checkpoints(): HasMany
+    {
+        return $this->hasMany(VoyageCheckpoint::class);
     }
 
     public function getOperationalStatusEnumAttribute(): VoyageOperationalStatus
@@ -210,6 +217,40 @@ class Voyage extends Model
     public function getOperationalStatusAttribute(): string
     {
         return $this->operational_status_enum->value;
+    }
+
+    public function getOverdueDaysAttribute(): ?int
+    {
+        if (
+            $this->operational_status_enum === VoyageOperationalStatus::DELAYED &&
+            $this->etd?->isPast()
+        ) {
+            return $this->etd->diffInDays(now());
+        }
+
+        return null;
+    }
+
+    public function getSailingRiskAttribute(): bool
+    {
+        if (
+            $this->operational_status_enum !== VoyageOperationalStatus::SAILING ||
+            !$this->eta
+        ) {
+            return false;
+        }
+
+        $hours = now()->diffInHours($this->eta, false);
+
+        return $hours >= 0 && $hours <= 24;
+    }
+
+    public function getEtaOverdueAttribute(): bool
+    {
+        return
+            $this->operational_status_enum === VoyageOperationalStatus::SAILING &&
+            $this->eta &&
+            now()->gt($this->eta);
     }
 
     public function getOtbStatusAttribute(): ?SlaStatus
@@ -245,41 +286,17 @@ class Voyage extends Model
             : SlaStatus::LATE;
     }
 
-    public function getOverdueDaysAttribute(): ?int
-    {
-        if (
-            $this->operational_status_enum === VoyageOperationalStatus::DELAYED &&
-            $this->etd?->isPast()
-        ) {
-            return $this->etd->diffInDays(now());
-        }
-
-        return null;
-    }
-
     public function getSlaStatusAttribute(): ?SlaStatus
     {
         return $this->sailingSla?->status;
     }
 
-    public function getSailingRiskAttribute(): bool
-    {
-        return
-            $this->operational_status_enum === VoyageOperationalStatus::SAILING &&
-            $this->eta &&
-            now()->diffInHours($this->eta, false) < 24;
-    }
-
-    public function checkpoints(): HasMany
-    {
-        return $this->hasMany(VoyageCheckpoint::class);
-    }
-
     public function getMilestonesAttribute(): array
     {
-        if (! $this->checkpoints()->exists()) {
+        if (!$this->atd_at) {
             return [];
         }
+
         return [
             'd4'  => $this->atd_at->copy()->addDays(4),
             'd6'  => $this->atd_at->copy()->addDays(6),

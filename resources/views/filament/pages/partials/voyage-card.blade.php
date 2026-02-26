@@ -1,42 +1,38 @@
 @php
-    $milestones = collect($v->milestones);
+    $status = $v->operational_status_enum;
 @endphp
 
-@if($milestones->isNotEmpty())
-    <div class="mt-4 border-t pt-3 text-xs space-y-2">
+<div class="bg-white rounded-xl p-4 shadow-sm border flex justify-between items-start">
 
-        <div class="font-semibold text-gray-600 uppercase">
-            Monitoring Transit (H+)
+    <div>
+        <div class="font-semibold text-base">
+            {{ $v->vessel?->name }} — {{ $v->voyage_no }}
         </div>
 
-        @foreach($milestones->sortBy('milestone_date') as $ms)
-            <div class="bg-slate-50 rounded px-3 py-2 border">
+        <div class="text-sm text-gray-500">
+            {{ $v->pol?->code }} → {{ $v->pod?->code }}
+        </div>
 
-                <div class="font-medium">
-                    {{ strtoupper($ms->code) }}
-                    — {{ optional($ms->milestone_date)->format('d M Y') }}
-                </div>
-
-                @if($ms->position)
-                    <div class="text-gray-600">
-                        Posisi: {{ $ms->position }}
-                    </div>
-                @endif
-
-                @if($ms->speed_knots)
-                    <div class="text-gray-600">
-                        Kecepatan: {{ $ms->speed_knots }} Knots
-                    </div>
-                @endif
-
-                @if($ms->note)
-                    <div class="text-gray-700">
-                        {{ $ms->note }}
-                    </div>
-                @endif
-
+        @if ($v->overdue_days)
+            <div class="text-sm text-red-600 font-bold mt-1">
+                TERLAMBAT {{ $v->overdue_days }} HARI
             </div>
-        @endforeach
+        @endif
 
+        @if ($v->sailing_risk)
+            <div class="text-sm text-orange-600 font-semibold mt-1">
+                ⚠ ETA kurang dari 24 jam
+            </div>
+        @endif
     </div>
-@endif
+
+    <div class="text-right text-sm space-y-1">
+        <div>ETD: {{ optional($v->etd)->format('d M H:i') ?? '-' }}</div>
+        <div>ETA: {{ optional($v->eta)->format('d M H:i') ?? '-' }}</div>
+
+        <span class="px-2 py-1 text-xs rounded {{ $status->color() }}">
+            {{ $status->label() }}
+        </span>
+    </div>
+
+</div>
