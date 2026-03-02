@@ -2,27 +2,21 @@
 
 namespace App\Filament\Pages;
 
-use App\Enums\SlaStatus;
 use App\Enums\VoyageOperationalStatus;
 use App\Models\Voyage;
-use App\Models\VoyageCheckpoint;
 use Filament\Pages\Page;
 use Illuminate\Support\Carbon;
 
 class MonitoringKapalTam extends Page
 {
-    protected static ?string $navigationIcon = 'heroicon-o-squares-2x2';
-    protected static ?string $navigationLabel = 'Monitoring Kapal TAM';
-    protected static ?string $navigationGroup = 'Monitoring';
     protected static string $view = 'filament.pages.monitoring-kapal-tam';
 
     public string $period;
-    public string $mode = 'control';
+    public string $mode = 'calendar';
     public string $search = '';
 
     public array $monthOptions = [];
     public $rows;
-    public array $summary = [];
     public array $calendar = [];
 
     public function mount(): void
@@ -41,9 +35,14 @@ class MonitoringKapalTam extends Page
         $this->loadData();
     }
 
-    public function updatedPeriod() { $this->loadData(); }
-    public function updatedMode() { $this->loadData(); }
-    public function updatedSearch() { $this->loadData(); }
+    public function updatedPeriod()
+    {
+        $this->loadData();
+    }
+    public function updatedSearch()
+    {
+        $this->loadData();
+    }
 
     protected function loadData(): void
     {
@@ -53,63 +52,43 @@ class MonitoringKapalTam extends Page
         $daysCount = $dt->daysInMonth;
 
         $query = Voyage::query()
-            ->with(['vessel', 'pol', 'pod', 'sailingSla'])
+            ->with(['vessel'])
             ->whereMonth('period_month', $dt->month)
             ->whereYear('period_month', $dt->year);
 
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('voyage_no', 'like', "%{$this->search}%")
-                  ->orWhereHas('vessel',
-                      fn($v) => $v->where('name', 'like', "%{$this->search}%")
-                  );
+                    ->orWhereHas(
+                        'vessel',
+                        fn($v) => $v->where('name', 'like', "%{$this->search}%")
+                    );
             });
         }
 
         $this->rows = $query->get();
-
-        /* SUMMARY BASED ON ENUM */
-
-        $this->summary = [
-            'total' => $this->rows->count(),
-            'delayed' => $this->rows->filter(
-                fn($v) => $v->operational_status_enum === VoyageOperationalStatus::DELAYED
-            )->count(),
-            'sailing' => $this->rows->filter(
-                fn($v) => $v->operational_status_enum === VoyageOperationalStatus::SAILING
-            )->count(),
-            'completed' => $this->rows->filter(
-                fn($v) => $v->operational_status_enum === VoyageOperationalStatus::COMPLETED
-            )->count(),
-            'sla_fail' => $this->rows->filter(
-                fn($v) => $v->sla_status === SlaStatus::LATE
-            )->count(),
-            'no_ata' => $this->rows->whereNull('ata_at')->count(),
-        ];
-
-        /* CALENDAR */
 
         $days = [];
         for ($i = 1; $i <= $daysCount; $i++) {
             $d = $start->copy()->day($i);
             $days[] = [
                 'n' => $i,
-                'date' => $d->toDateString(),
                 'dow' => strtoupper($d->format('D')),
                 'isWeekend' => $d->isWeekend(),
+                'isToday' => $d->isToday(),
             ];
         }
 
         $lanes = [
-            'plan_etd' => 'ETD (Plan)',
-            'plan_eta' => 'ETA (Plan)',
-            'act_atd'  => 'ATD (Actual)',
-            'act_ata'  => 'ATA (Actual)',
+            'etd' => 'ETD (Plan)',
+            'eta' => 'ETA (Plan)',
+            'atd' => 'ATD (Actual)',
+            'ata' => 'ATA (Actual)',
         ];
 
         $bucket = [];
-        foreach (array_keys($lanes) as $k) {
-            $bucket[$k] = array_fill(1, $daysCount, []);
+        foreach (array_keys($lanes) as $lane) {
+            $bucket[$lane] = array_fill(1, $daysCount, []);
         }
 
         foreach ($this->rows as $voyage) {
@@ -117,22 +96,25 @@ class MonitoringKapalTam extends Page
             $status = $voyage->operational_status_enum;
 
             $chip = [
-                'short' => $voyage->vessel?->name ?? '-',
-                'voyage_no' => $voyage->voyage_no ?? '-',
-                'color' => $status->color(),
+                'vessel' => $voyage->vessel?->name ?? '-',
+                'voyage_no' => $voyage->voyage_no,
+                'status' => $status,
             ];
 
-            $map = [
-                'plan_etd' => $voyage->etd,
-                'plan_eta' => $voyage->eta,
-                'act_atd'  => $voyage->atd_at,
-                'act_ata'  => $voyage->ata_at,
-            ];
+            if ($voyage->etd && $voyage->etd->between($start, $end)) {
+                $bucket['etd'][$voyage->etd->day][] = $chip;
+            }
 
-            foreach ($map as $lane => $date) {
-                if ($date && $date->between($start, $end, true)) {
-                    $bucket[$lane][$date->day][] = $chip;
-                }
+            if ($voyage->eta && $voyage->eta->between($start, $end)) {
+                $bucket['eta'][$voyage->eta->day][] = $chip;
+            }
+
+            if ($voyage->atd_at && $voyage->atd_at->between($start, $end)) {
+                $bucket['atd'][$voyage->atd_at->day][] = $chip;
+            }
+
+            if ($voyage->ata_at && $voyage->ata_at->between($start, $end)) {
+                $bucket['ata'][$voyage->ata_at->day][] = $chip;
             }
         }
 
@@ -143,19 +125,5 @@ class MonitoringKapalTam extends Page
             'lanes' => $lanes,
             'bucket' => $bucket,
         ];
-    }
-
-    public function markCheckpointDone($checkpointId)
-    {
-        $checkpoint = VoyageCheckpoint::find($checkpointId);
-        if (!$checkpoint) return;
-
-        $checkpoint->update([
-            'checked_at' => now(),
-            'checked_by' => auth()->user()?->name,
-            'status' => 'ok',
-        ]);
-
-        $this->loadData();
     }
 }

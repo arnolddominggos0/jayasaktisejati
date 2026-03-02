@@ -38,6 +38,7 @@ class Voyage extends Model
         'cargo_actual_reported_by',
         'final_note',
         'closing_at',
+        'operational_status',
     ];
 
     protected $casts = [
@@ -108,18 +109,18 @@ class Voyage extends Model
             if ($voyage->eta) {
 
                 $voyage->checkpoints()
-                    ->whereIn('type', ['eta_d2', 'eta_d1'])
+                    ->whereIn('code', ['eta_d2', 'eta_d1'])
                     ->delete();
 
                 $voyage->checkpoints()->createMany([
                     [
-                        'type' => 'eta_d2',
-                        'title' => 'Reminder ETA D-2',
+                        'code' => 'eta_d2',
+                        'offset_days' => -2,
                         'scheduled_at' => $voyage->eta->copy()->subDays(2),
                     ],
                     [
-                        'type' => 'eta_d1',
-                        'title' => 'Reminder ETA D-1',
+                        'code' => 'eta_d1',
+                        'offset_days' => -1,
                         'scheduled_at' => $voyage->eta->copy()->subDay(),
                     ],
                 ]);
@@ -212,11 +213,6 @@ class Voyage extends Model
         }
 
         return VoyageOperationalStatus::SCHEDULED;
-    }
-
-    public function getOperationalStatusAttribute(): string
-    {
-        return $this->operational_status_enum->value;
     }
 
     public function getOverdueDaysAttribute(): ?int
