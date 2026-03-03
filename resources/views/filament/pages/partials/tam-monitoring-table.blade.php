@@ -6,12 +6,10 @@
         $berlayar = $rows->filter(fn($v) => $v->operational_status === 'sailing');
     @endphp
 
-
-
     @if ($kritis->count())
         <div class="bg-red-50 border border-red-200 rounded-2xl p-6 space-y-4">
             <div class="font-semibold text-red-700 text-sm uppercase">
-                🚨 Kritis – Terlambat
+                Terlambat
             </div>
 
             @foreach ($kritis as $v)
@@ -23,7 +21,7 @@
     @if ($berlayar->count())
         <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6 space-y-4">
             <div class="font-semibold text-blue-700 text-sm uppercase">
-                🚢 Sedang Berlayar
+                Sedang Berlayar
             </div>
 
             @foreach ($berlayar as $v)

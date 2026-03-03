@@ -18,14 +18,14 @@ enum VoyageOperationalStatus: string
             self::COMPLETED => 'Selesai',
         };
     }
-    
+
     public function color(): string
     {
-        return match ($this) {  
-            self::SCHEDULED => 'bg-gray-100 text-gray-700',
-            self::SAILING   => 'bg-blue-100 text-blue-700',
-            self::DELAYED   => 'bg-red-100 text-red-700',
-            self::COMPLETED => 'bg-green-100 text-green-700',
+        return match ($this) {
+            self::SCHEDULED => 'bg-gray-600 text-white',
+            self::SAILING   => 'bg-blue-600 text-white',
+            self::DELAYED   => 'bg-red-600 text-white',
+            self::COMPLETED => 'bg-green-600 text-white',
         };
     }
 }

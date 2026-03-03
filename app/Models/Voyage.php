@@ -282,6 +282,42 @@ class Voyage extends Model
             : SlaStatus::LATE;
     }
 
+    public function getDepartureDelayMinutesAttribute(): ?int
+    {
+        if (!$this->etd || !$this->atd_at) {
+            return null;
+        }
+
+        return $this->etd->diffInMinutes($this->atd_at);
+    }
+    public function getArrivalDelayMinutesAttribute(): ?int
+    {
+        if (!$this->eta || !$this->ata_at) {
+            return null;
+        }
+
+        return $this->ata_at->diffInMinutes($this->eta, false);
+    }
+
+    public function getDepartureDelaySeverityAttribute(): ?string
+    {
+        $minutes = $this->departure_delay_minutes;
+
+        if (is_null($minutes) || $minutes <= 0) {
+            return null;
+        }
+
+        if ($minutes <= 30) {
+            return 'minor';
+        }
+
+        if ($minutes <= 120) {
+            return 'moderate';
+        }
+
+        return 'major';
+    }
+
     public function getSlaStatusAttribute(): ?SlaStatus
     {
         return $this->sailingSla?->status;

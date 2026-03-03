@@ -19,13 +19,11 @@
                     $ok = $achievement[$key]['ok'] ?? 0;
                     $total = $achievement[$key]['total'] ?? 0;
 
-                    $warna = 'text-red-600';
-
-                    if ($okPercent >= 85) {
-                        $warna = 'text-green-600';
-                    } elseif ($okPercent >= 60) {
-                        $warna = 'text-orange-500';
-                    }
+                    $warna = match (true) {
+                        $okPercent >= 85 => 'text-green-600',
+                        $okPercent >= 60 => 'text-orange-500',
+                        default => 'text-red-600',
+                    };
                 @endphp
 
                 <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
@@ -59,8 +57,6 @@
 
     </div>
 
-
-
     <div class="space-y-4">
 
         <div class="text-sm font-semibold text-gray-600 uppercase tracking-wide">
@@ -74,13 +70,11 @@
                 $slaNg = $achievement['sla']['ng_percent'] ?? 0;
                 $slaTotal = $achievement['sla']['total'] ?? 0;
 
-                $slaWarna = 'text-red-600';
-
-                if ($slaOk >= 85) {
-                    $slaWarna = 'text-green-600';
-                } elseif ($slaOk >= 60) {
-                    $slaWarna = 'text-orange-500';
-                }
+                $slaWarna = match (true) {
+                    $slaOk >= 85 => 'text-green-600',
+                    $slaOk >= 60 => 'text-orange-500',
+                    default => 'text-red-600',
+                };
             @endphp
 
             <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
@@ -97,8 +91,7 @@
                         </div>
 
                         <div class="text-xs text-gray-500 mt-1">
-                            Tercapai {{ $achievement['sla']['ok'] ?? 0 }} /
-                            {{ $slaTotal }}
+                            Tercapai {{ $achievement['sla']['ok'] ?? 0 }} / {{ $slaTotal }}
                         </div>
                     </div>
 
@@ -109,8 +102,6 @@
                 </div>
 
             </div>
-
-
 
             <div class="bg-gray-50 rounded-2xl border border-gray-200 p-6">
 
@@ -147,31 +138,5 @@
         </div>
 
     </div>
-
-
-
-    @php
-        use App\Enums\VoyageOperationalStatus;
-
-        $selesai = $rows->filter(fn($v) => $v->operational_status_enum === VoyageOperationalStatus::COMPLETED);
-    @endphp
-
-    @if ($selesai->count())
-        <div class="space-y-4">
-
-            <div class="text-sm font-semibold text-gray-600 uppercase tracking-wide">
-                Daftar Pelayaran Selesai
-            </div>
-
-            <div class="bg-white border rounded-2xl p-6 space-y-4">
-
-                @foreach ($selesai as $v)
-                    @include('filament.pages.partials.voyage-card', ['v' => $v])
-                @endforeach
-
-            </div>
-
-        </div>
-    @endif
 
 </div>

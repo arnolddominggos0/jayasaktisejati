@@ -18,7 +18,6 @@
 
             <div class="flex justify-between items-center">
 
-                {{-- LEFT --}}
                 <div>
                     <div class="flex items-center gap-2">
 
@@ -37,7 +36,6 @@
                     </div>
                 </div>
 
-                {{-- RIGHT --}}
                 <div class="flex gap-3 text-xs">
 
                     <span class="px-2 py-1 bg-gray-100 rounded">

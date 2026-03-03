@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class VoyageMilestone extends Model
 {
     protected $fillable = [
+        'id',
         'voyage_id',
         'code',
         'milestone_date',
@@ -22,5 +23,19 @@ class VoyageMilestone extends Model
     public function voyage()
     {
         return $this->belongsTo(Voyage::class);
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function ($milestone) {
+
+            if ($milestone->actual_date && $milestone->milestone_date) {
+
+                $milestone->status =
+                    $milestone->actual_date <= $milestone->milestone_date
+                    ? 'ontime'
+                    : 'late';
+            }
+        });
     }
 }
