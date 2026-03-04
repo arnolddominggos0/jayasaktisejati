@@ -323,18 +323,19 @@ class Voyage extends Model
         return $this->sailingSla?->status;
     }
 
-    public function getMilestonesAttribute(): array
+    public function getMilestoneSeverityAttribute(): string
     {
-        if (!$this->atd_at) {
-            return [];
+        $overdue = $this->milestones->where('is_overdue', true)->count();
+        $dueToday = $this->milestones->where('is_due_today', true)->count();
+
+        if ($overdue > 0) {
+            return 'critical';
         }
 
-        return [
-            'd4'  => $this->atd_at->copy()->addDays(4),
-            'd6'  => $this->atd_at->copy()->addDays(6),
-            'd8'  => $this->atd_at->copy()->addDays(8),
-            'd10' => $this->atd_at->copy()->addDays(10),
-            'd12' => $this->atd_at->copy()->addDays(12),
-        ];
+        if ($dueToday > 0) {
+            return 'warning';
+        }
+
+        return 'ontrack';
     }
 }

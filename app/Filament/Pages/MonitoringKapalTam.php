@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\Voyage;
+use App\Models\VoyageMilestone;
 use Filament\Pages\Page;
 use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +21,10 @@ class MonitoringKapalTam extends Page
     public array $calendar = [];
     public array $summary = [];
     public array $achievement = [];
+
+    public $selectedMilestone = null;
+    public $showMilestoneModal = false;
+
 
     public function mount(): void
     {
@@ -54,7 +59,7 @@ class MonitoringKapalTam extends Page
     protected function baseQuery(Carbon $dt): Builder
     {
         return Voyage::query()
-            ->with(['vessel', 'sailingSla'])
+            ->with(['vessel', 'sailingSla', 'milestones'])
             ->whereYear('period_month', $dt->year)
             ->whereMonth('period_month', $dt->month)
             ->when($this->search, function ($query) {
@@ -76,7 +81,21 @@ class MonitoringKapalTam extends Page
         $end   = $dt->copy()->endOfMonth();
         $daysCount = $dt->daysInMonth;
 
-        $this->rows = $this->baseQuery($dt)->get();
+        $this->rows = Voyage::query()
+            ->with(['vessel', 'pol', 'pod', 'milestones'])
+            ->whereYear('period_month', $dt->year)
+            ->whereMonth('period_month', $dt->month)
+            ->when($this->search, function ($query) {
+                $query->where(function ($q) {
+                    $q->where('voyage_no', 'like', "%{$this->search}%")
+                        ->orWhereHas(
+                            'vessel',
+                            fn($v) =>
+                            $v->where('name', 'like', "%{$this->search}%")
+                        );
+                });
+            })
+            ->get();
 
         $this->buildSummary();
         $this->buildAchievement();
@@ -197,5 +216,17 @@ class MonitoringKapalTam extends Page
             'lanes' => $lanes,
             'bucket' => $bucket,
         ];
+    }
+
+    public function showMilestone($milestoneId)
+    {
+        $this->selectedMilestone = VoyageMilestone::with(
+            'voyage.vessel',
+            'voyage.pol',
+            'voyage.pod',
+            'port'
+        )->find($milestoneId);
+
+        $this->showMilestoneModal = true;
     }
 }

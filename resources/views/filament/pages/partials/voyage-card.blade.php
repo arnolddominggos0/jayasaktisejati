@@ -5,6 +5,7 @@
 <div class="bg-white rounded-xl p-4 shadow-sm border flex justify-between items-start">
 
     <div>
+
         <div class="font-semibold text-base">
             {{ $v->vessel?->name }} — {{ $v->voyage_no }}
         </div>
@@ -24,15 +25,24 @@
                 ⚠ ETA kurang dari 24 jam
             </div>
         @endif
+
+        @if ($v->eta_overdue)
+            <div class="text-sm text-red-600 font-semibold mt-1">
+                ETA Terlewati
+            </div>
+        @endif
+
     </div>
 
     <div class="text-right text-sm space-y-1">
+
         <div>ETD: {{ optional($v->etd)->format('d M H:i') ?? '-' }}</div>
         <div>ETA: {{ optional($v->eta)->format('d M H:i') ?? '-' }}</div>
 
         <span class="px-2 py-1 text-xs rounded {{ $status->color() }}">
             {{ $status->label() }}
         </span>
+
     </div>
 
 </div>
