@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\VoyageDelayReason;
 use App\Models\Voyage;
 use App\Models\VoyageMilestone;
 use Filament\Pages\Page;
@@ -124,22 +125,63 @@ class MonitoringKapalTam extends Page
         $total = $this->rows->count();
 
         $calc = function ($collection) use ($total) {
-            $ok = $collection->filter(fn($v) => $v !== null && $v->value === 'ontime')->count();
-            $ng = $collection->filter(fn($v) => $v !== null && $v->value === 'late')->count();
+
+            $ok = $collection->filter(
+                fn($v) => $v !== null && $v->value === 'ontime'
+            )->count();
+
+            $ng = $collection->filter(
+                fn($v) => $v !== null && $v->value === 'late'
+            )->count();
 
             return [
+
                 'total' => $total,
                 'ok' => $ok,
                 'ng' => $ng,
-                'ok_percent' => $total > 0 ? round(($ok / $total) * 100) : 0,
-                'ng_percent' => $total > 0 ? round(($ng / $total) * 100) : 0,
+
+                'ok_percent' => $total > 0
+                    ? round(($ok / $total) * 100)
+                    : 0,
+
+                'ng_percent' => $total > 0
+                    ? round(($ng / $total) * 100)
+                    : 0,
             ];
         };
 
+
+        $reasons = $this->rows
+            ->whereNotNull('delay_reason')
+            ->groupBy('delay_reason')
+            ->map->count()
+            ->sortDesc();
+
+        $topReason = $reasons->keys()->first();
+
+        $avgDelay = $this->rows
+            ->pluck('departure_delay_minutes')
+            ->filter(fn($v) => $v > 0)
+            ->avg();
+
+
         $this->achievement = [
+
             'otd' => $calc($this->rows->pluck('otd_status')),
+
             'ota' => $calc($this->rows->pluck('ota_status')),
+
             'otb' => $calc($this->rows->pluck('otb_status')),
+
+            'penyebab_terbanyak' =>
+            $topReason
+                ? VoyageDelayReason::from($topReason)->label()
+                : null,
+
+            'rata_rata_delay_berangkat' =>
+            $avgDelay
+                ? round($avgDelay / 60, 1)
+                : 0,
         ];
     }
 
@@ -148,6 +190,7 @@ class MonitoringKapalTam extends Page
         $days = [];
 
         for ($i = 1; $i <= $daysCount; $i++) {
+
             $d = $start->copy()->day($i);
 
             $days[] = [
@@ -158,6 +201,7 @@ class MonitoringKapalTam extends Page
             ];
         }
 
+
         $lanes = [
             'etd' => 'ETD (Plan)',
             'eta' => 'ETA (Plan)',
@@ -165,10 +209,13 @@ class MonitoringKapalTam extends Page
             'ata' => 'ATA (Actual)',
         ];
 
+
         $bucket = [];
+
         foreach (array_keys($lanes) as $lane) {
             $bucket[$lane] = array_fill(1, $daysCount, []);
         }
+
 
         foreach ($this->rows as $voyage) {
 
@@ -177,6 +224,7 @@ class MonitoringKapalTam extends Page
             $delayLabel = null;
 
             if ($delayMinutes !== null && $delayMinutes > 0) {
+
                 if ($delayMinutes >= 60) {
                     $delayLabel = 'Terlambat ' . round($delayMinutes / 60, 1) . ' jam';
                 } else {
@@ -184,7 +232,17 @@ class MonitoringKapalTam extends Page
                 }
             }
 
-            $chip = [
+
+            $planChip = [
+                'vessel' => $voyage->vessel?->name ?? '-',
+                'voyage_no' => $voyage->voyage_no,
+                'status' => $voyage->operational_status_enum,
+                'delay_label' => null,
+                'severity' => null,
+            ];
+
+
+            $actualChip = [
                 'vessel' => $voyage->vessel?->name ?? '-',
                 'voyage_no' => $voyage->voyage_no,
                 'status' => $voyage->operational_status_enum,
@@ -192,22 +250,27 @@ class MonitoringKapalTam extends Page
                 'severity' => $voyage->departure_delay_severity,
             ];
 
+
             if ($voyage->etd?->between($start, $end)) {
-                $bucket['etd'][$voyage->etd->day][] = $chip;
+                $bucket['etd'][$voyage->etd->day][] = $planChip;
             }
+
 
             if ($voyage->eta?->between($start, $end)) {
-                $bucket['eta'][$voyage->eta->day][] = $chip;
+                $bucket['eta'][$voyage->eta->day][] = $planChip;
             }
+
 
             if ($voyage->atd_at?->between($start, $end)) {
-                $bucket['atd'][$voyage->atd_at->day][] = $chip;
+                $bucket['atd'][$voyage->atd_at->day][] = $actualChip;
             }
 
+
             if ($voyage->ata_at?->between($start, $end)) {
-                $bucket['ata'][$voyage->ata_at->day][] = $chip;
+                $bucket['ata'][$voyage->ata_at->day][] = $actualChip;
             }
         }
+
 
         $this->calendar = [
             'month_label' => $start->translatedFormat('F Y'),

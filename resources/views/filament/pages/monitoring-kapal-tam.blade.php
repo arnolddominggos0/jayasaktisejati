@@ -255,7 +255,6 @@
         'otd' => 'OTD',
         'ota' => 'OTA',
         'otb' => 'OTB',
-        'sla' => 'SLA',
     ] as $key => $label)
                     @php
                         $data = $achievement[$key] ?? null;
