@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Validation\ValidationException;
 
 class VoyageMilestone extends Model
 {
@@ -28,11 +29,12 @@ class VoyageMilestone extends Model
     {
         static::saving(function ($milestone) {
 
-            if ($milestone->actual_date && $milestone->milestone_date) {
-                $milestone->status =
-                    $milestone->actual_date->lte($milestone->milestone_date)
-                    ? 'ontime'
-                    : 'late';
+            if ($milestone->actual_date && $milestone->actual_date->isFuture()) {
+
+                throw ValidationException::withMessages([
+                    'actual_date' => 'Tanggal laporan tidak boleh melewati tanggal saat ini.'
+                ]);
+
             }
 
             if (
@@ -40,25 +42,49 @@ class VoyageMilestone extends Model
                 $milestone->speed_knots < 10 &&
                 empty($milestone->note)
             ) {
-                throw new \Exception('Speed < 10 knots wajib isi catatan.');
+
+                throw ValidationException::withMessages([
+                    'note' => 'Speed < 10 knots wajib isi catatan.'
+                ]);
+
             }
+
+            if ($milestone->actual_date && $milestone->milestone_date) {
+
+                $milestone->status =
+                    $milestone->actual_date->lte($milestone->milestone_date)
+                    ? 'ontime'
+                    : 'late';
+
+            } else {
+
+                $milestone->status = null;
+
+            }
+
         });
     }
 
     public function getIsOverdueAttribute(): bool
     {
-        return
-            $this->actual_date === null &&
-            $this->milestone_date &&
-            now()->gt($this->milestone_date);
+
+        if (!$this->milestone_date || $this->actual_date) {
+            return false;
+        }
+
+        return now()->gt($this->milestone_date);
+
     }
 
     public function getIsDueTodayAttribute(): bool
     {
-        return
-            $this->actual_date === null &&
-            $this->milestone_date &&
-            now()->isSameDay($this->milestone_date);
+
+        if (!$this->milestone_date || $this->actual_date) {
+            return false;
+        }
+
+        return now()->isSameDay($this->milestone_date);
+
     }
 
     public function voyage(): BelongsTo
@@ -70,4 +96,5 @@ class VoyageMilestone extends Model
     {
         return $this->belongsTo(Port::class);
     }
+
 }

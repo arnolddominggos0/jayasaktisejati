@@ -61,41 +61,47 @@ class Voyage extends Model
     {
         static::updating(function (Voyage $voyage) {
 
-            if ($voyage->exists && (
+            if (
                 $voyage->isDirty('etd') ||
                 $voyage->isDirty('eta') ||
                 $voyage->isDirty('etb')
-            )) {
+            ) {
 
                 VoyageDelayLog::create([
-                    'voyage_id'   => $voyage->id,
-                    'old_etd'     => $voyage->getOriginal('etd'),
-                    'new_etd'     => $voyage->etd,
-                    'old_eta'     => $voyage->getOriginal('eta'),
-                    'new_eta'     => $voyage->eta,
-                    'new_etb'     => $voyage->etb,
-                    'new_atb_at'  => $voyage->atb_at,
-                    'reason'      => $voyage->delay_reason?->value,
-                    'changed_by'  => optional(auth()->user())->name,
+                    'voyage_id'  => $voyage->id,
+                    'old_etd'    => $voyage->getOriginal('etd'),
+                    'new_etd'    => $voyage->etd,
+                    'old_eta'    => $voyage->getOriginal('eta'),
+                    'new_eta'    => $voyage->eta,
+                    'new_etb'    => $voyage->etb,
+                    'new_atb_at' => $voyage->atb_at,
+                    'reason'     => $voyage->delay_reason?->value,
+                    'changed_by' => optional(auth()->user())->name,
                 ]);
 
                 $voyage->is_delayed = true;
             }
 
             if ($voyage->atd_at) {
+
                 $end = $voyage->ata_at ?? now();
-                $voyage->actual_sailing_days = round(
-                    $voyage->atd_at->diffInSeconds($end) / 86400,
-                    2
-                );
+
+                if ($end->gt($voyage->atd_at)) {
+
+                    $voyage->actual_sailing_days = round(
+                        $voyage->atd_at->diffInSeconds($end) / 86400,
+                        2
+                    );
+                }
             }
 
             if (
                 $voyage->isDirty('cargo_actual') &&
                 is_null($voyage->cargo_actual_reported_at)
             ) {
+
                 $voyage->cargo_actual_reported_at = now();
-                $voyage->cargo_actual_reported_by = optional(auth()->user())->name;
+                $voyage->cargo_actual_reported_by = optional(auth_user())->name;
             }
         });
 
@@ -107,26 +113,25 @@ class Voyage extends Model
 
             if ($voyage->eta) {
 
-                $voyage->checkpoints()
-                    ->whereIn('code', ['eta_d2', 'eta_d1'])
-                    ->delete();
-
-                $voyage->checkpoints()->createMany([
+                $voyage->checkpoints()->updateOrCreate(
+                    ['voyage_id' => $voyage->id, 'code' => 'eta_d2'],
                     [
-                        'code' => 'eta_d2',
                         'offset_days' => -2,
                         'scheduled_at' => $voyage->eta->copy()->subDays(2),
-                    ],
+                    ]
+                );
+
+                $voyage->checkpoints()->updateOrCreate(
+                    ['voyage_id' => $voyage->id, 'code' => 'eta_d1'],
                     [
-                        'code' => 'eta_d1',
                         'offset_days' => -1,
                         'scheduled_at' => $voyage->eta->copy()->subDay(),
-                    ],
-                ]);
+                    ]
+                );
             }
         });
 
-        static::updated(function ($voyage) {
+        static::updated(function (Voyage $voyage) {
 
             if ($voyage->wasChanged('atd_at') && $voyage->atd_at) {
 
@@ -135,11 +140,16 @@ class Voyage extends Model
                 foreach ($days as $d) {
 
                     $voyage->milestones()->updateOrCreate(
-                        ['code' => "d{$d}"],
+
                         [
-                            'milestone_date' =>
-                            $voyage->atd_at->copy()->addDays($d)
+                            'voyage_id' => $voyage->id,
+                            'code' => "d{$d}"
+                        ],
+
+                        [
+                            'milestone_date' => $voyage->atd_at->copy()->addDays($d)
                         ]
+
                     );
                 }
             }
@@ -199,15 +209,16 @@ class Voyage extends Model
 
     public function getOperationalStatusEnumAttribute(): VoyageOperationalStatus
     {
+
         if ($this->ata_at) {
             return VoyageOperationalStatus::COMPLETED;
         }
 
-        if ($this->atd_at && ! $this->ata_at) {
+        if ($this->atd_at) {
             return VoyageOperationalStatus::SAILING;
         }
 
-        if ($this->etd && $this->etd->isPast() && ! $this->atd_at) {
+        if ($this->etd && $this->etd->isPast() && !$this->atd_at) {
             return VoyageOperationalStatus::DELAYED;
         }
 
@@ -216,10 +227,12 @@ class Voyage extends Model
 
     public function getOverdueDaysAttribute(): ?int
     {
+
         if (
-            $this->operational_status_enum === VoyageOperationalStatus::DELAYED &&
-            $this->etd?->isPast()
+            $this->operational_status_enum === VoyageOperationalStatus::DELAYED
+            && $this->etd?->isPast()
         ) {
+
             return $this->etd->diffInDays(now());
         }
 
@@ -228,9 +241,10 @@ class Voyage extends Model
 
     public function getSailingRiskAttribute(): bool
     {
+
         if (
-            $this->operational_status_enum !== VoyageOperationalStatus::SAILING ||
-            !$this->eta
+            $this->operational_status_enum !== VoyageOperationalStatus::SAILING
+            || !$this->eta
         ) {
             return false;
         }
@@ -242,14 +256,16 @@ class Voyage extends Model
 
     public function getEtaOverdueAttribute(): bool
     {
+
         return
-            $this->operational_status_enum === VoyageOperationalStatus::SAILING &&
-            $this->eta &&
-            now()->gt($this->eta);
+            $this->operational_status_enum === VoyageOperationalStatus::SAILING
+            && $this->eta
+            && now()->gt($this->eta);
     }
 
     public function getOtbStatusAttribute(): ?SlaStatus
     {
+
         if (!$this->etb || !$this->atb_at) {
             return null;
         }
@@ -261,6 +277,7 @@ class Voyage extends Model
 
     public function getOtdStatusAttribute(): ?SlaStatus
     {
+
         if (!$this->etd || !$this->atd_at) {
             return null;
         }
@@ -272,6 +289,7 @@ class Voyage extends Model
 
     public function getOtaStatusAttribute(): ?SlaStatus
     {
+
         if (!$this->eta || !$this->ata_at) {
             return null;
         }
@@ -283,14 +301,17 @@ class Voyage extends Model
 
     public function getDepartureDelayMinutesAttribute(): ?int
     {
+
         if (!$this->etd || !$this->atd_at) {
             return null;
         }
 
         return $this->etd->diffInMinutes($this->atd_at);
     }
+
     public function getArrivalDelayMinutesAttribute(): ?int
     {
+
         if (!$this->eta || !$this->ata_at) {
             return null;
         }
@@ -300,6 +321,7 @@ class Voyage extends Model
 
     public function getDepartureDelaySeverityAttribute(): ?string
     {
+
         $minutes = $this->departure_delay_minutes;
 
         if (is_null($minutes) || $minutes <= 0) {
@@ -324,6 +346,7 @@ class Voyage extends Model
 
     public function getMilestoneSeverityAttribute(): string
     {
+
         $overdue = $this->milestones->where('is_overdue', true)->count();
         $dueToday = $this->milestones->where('is_due_today', true)->count();
 
@@ -336,5 +359,21 @@ class Voyage extends Model
         }
 
         return 'ontrack';
+    }
+
+    public function getDelayLabelAttribute(): ?string
+    {
+
+        $minutes = $this->departure_delay_minutes;
+
+        if (!$minutes || $minutes <= 0) {
+            return null;
+        }
+
+        if ($minutes >= 60) {
+            return 'Terlambat ' . round($minutes / 60, 1) . ' jam';
+        }
+
+        return 'Terlambat ' . $minutes . ' menit';
     }
 }

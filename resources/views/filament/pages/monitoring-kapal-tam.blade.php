@@ -2,6 +2,7 @@
     <div class="space-y-8">
 
         <div class="flex justify-between items-center">
+
             <div>
                 <h1 class="text-2xl font-bold">Monitoring Kapal TAM</h1>
                 <p class="text-sm text-gray-500">Sistem Operasional Pelayaran</p>
@@ -23,7 +24,10 @@
                 </select>
 
             </div>
+
         </div>
+
+
 
         <div class="flex gap-3 border-b pb-3">
 
@@ -33,8 +37,10 @@
     ] as $key => $label)
                 <button wire:click="$set('mode','{{ $key }}')"
                     class="px-4 py-2 rounded-lg text-sm font-semibold
-                {{ $mode === $key ? 'bg-gray-900 text-white' : 'bg-gray-100' }}">
+{{ $mode === $key ? 'bg-gray-900 text-white' : 'bg-gray-100' }}">
+
                     {{ $label }}
+
                 </button>
             @endforeach
 
@@ -65,6 +71,7 @@
             @endphp
 
 
+
             <div class="grid grid-cols-4 gap-4">
 
                 <div class="bg-red-600 text-white rounded-xl p-4">
@@ -90,8 +97,8 @@
             </div>
 
 
-            @if ($berlayar->count())
 
+            @if ($berlayar->count())
                 <div class="mt-10">
 
                     <div class="font-semibold text-blue-700 uppercase text-sm mb-4">
@@ -103,12 +110,11 @@
                     @endforeach
 
                 </div>
-
             @endif
 
 
-            @if ($tertunda->count())
 
+            @if ($tertunda->count())
                 <div class="mt-10">
 
                     <div class="font-semibold text-red-700 uppercase text-sm mb-4">
@@ -120,12 +126,11 @@
                     @endforeach
 
                 </div>
-
             @endif
 
 
-            @if ($terjadwal->count())
 
+            @if ($terjadwal->count())
                 <div class="mt-10">
 
                     <div class="font-semibold text-gray-700 uppercase text-sm mb-4">
@@ -137,8 +142,8 @@
                     @endforeach
 
                 </div>
-
             @endif
+
 
 
             @if (!$aktif->count())
@@ -150,6 +155,9 @@
         @endif
 
 
+
+
+        {{-- MODAL MILESTONE --}}
 
         @if ($showMilestoneModal && $selectedMilestone)
             <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
@@ -168,6 +176,7 @@
                         </button>
 
                     </div>
+
 
 
                     <div class="space-y-3 text-sm">
@@ -196,21 +205,7 @@
                         <div>
                             <div class="text-gray-500">Tanggal Milestone</div>
                             <div class="font-semibold">
-                                {{ optional($selectedMilestone->milestone_date)->format('d M Y H:i') }}
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="text-gray-500">Tanggal Dilaporkan</div>
-                            <div class="font-semibold">
-                                {{ optional($selectedMilestone->actual_date)->format('d M Y H:i') ?? '-' }}
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="text-gray-500">Kecepatan Kapal</div>
-                            <div class="font-semibold">
-                                {{ $selectedMilestone->speed_knots ? $selectedMilestone->speed_knots . ' knots' : '-' }}
+                                {{ optional($selectedMilestone->milestone_date)->format('d M Y') }}
                             </div>
                         </div>
 
@@ -221,23 +216,49 @@
                             </div>
                         </div>
 
+                    </div>
+
+
+
+                    <div class="border-t pt-4 mt-4 space-y-3 text-sm">
+
+                        <div>
+                            <div class="text-gray-500">Tanggal Dilaporkan</div>
+
+                            <input type="date" wire:model="milestoneForm.actual_date"
+                                class="w-full rounded-lg border-gray-300 text-sm">
+                        </div>
+
+
+
+                        <div>
+                            <div class="text-gray-500">Kecepatan Kapal</div>
+
+                            <input type="number" step="0.1" wire:model="milestoneForm.speed_knots"
+                                class="w-full rounded-lg border-gray-300 text-sm">
+                        </div>
+
+
+
                         <div>
                             <div class="text-gray-500">Catatan Monitoring</div>
 
-                            <div class="bg-gray-50 border rounded-lg p-3 mt-1">
-                                {{ $selectedMilestone->note ?? 'Tidak ada catatan.' }}
-                            </div>
-
+                            <textarea wire:model="milestoneForm.note" rows="3" class="w-full rounded-lg border-gray-300 text-sm"></textarea>
                         </div>
 
                     </div>
 
 
-                    <div class="mt-6 text-right">
+
+                    <div class="mt-6 flex justify-end gap-2">
 
                         <button wire:click="$set('showMilestoneModal', false)"
-                            class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm">
-                            Tutup
+                            class="px-4 py-2 border rounded-lg text-sm">
+                            Batal
+                        </button>
+
+                        <button wire:click="saveMilestone" class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm">
+                            Simpan
                         </button>
 
                     </div>
@@ -247,9 +268,49 @@
             </div>
         @endif
 
+
+
+
         @if ($mode === 'dashboard')
 
-            <div class="grid grid-cols-4 gap-6">
+            <div class="grid grid-cols-3 gap-6">
+
+                <div class="bg-white rounded-2xl border p-6 shadow-sm">
+                    <div class="text-xs text-gray-500 uppercase">
+                        Total Voyage
+                    </div>
+
+                    <div class="text-3xl font-bold mt-2">
+                        {{ $summary['total_voyage'] ?? 0 }}
+                    </div>
+                </div>
+
+
+                <div class="bg-white rounded-2xl border p-6 shadow-sm">
+                    <div class="text-xs text-gray-500 uppercase">
+                        Voyage Delay
+                    </div>
+
+                    <div class="text-3xl font-bold text-red-600 mt-2">
+                        {{ $summary['voyage_delay'] ?? 0 }}
+                    </div>
+                </div>
+
+
+                <div class="bg-white rounded-2xl border p-6 shadow-sm">
+                    <div class="text-xs text-gray-500 uppercase">
+                        Milestone Overdue
+                    </div>
+
+                    <div class="text-3xl font-bold text-orange-600 mt-2">
+                        {{ $summary['milestone_overdue'] ?? 0 }}
+                    </div>
+                </div>
+
+            </div>
+
+
+            <div class="grid grid-cols-4 gap-6 mt-6">
 
                 @foreach ([
         'otd' => 'OTD',
@@ -269,38 +330,56 @@
                     @endphp
 
                     <div class="bg-white rounded-2xl border p-6 shadow-sm">
-                        <div class="text-xs text-gray-500 uppercase">{{ $label }}</div>
+
+                        <div class="text-xs text-gray-500 uppercase">
+                            {{ $label }}
+                        </div>
+
                         <div class="mt-3 text-3xl font-bold {{ $total > 0 ? $color : 'text-gray-400' }}">
                             {{ $total > 0 ? $percent . '%' : '—' }}
                         </div>
+
                         <div class="text-xs text-gray-500 mt-1">
                             {{ $data['ok'] ?? 0 }} / {{ $total }}
                         </div>
+
                     </div>
                 @endforeach
 
             </div>
 
-            <div class="grid grid-cols-2 gap-6">
+
+
+            <div class="grid grid-cols-2 gap-6 mt-6">
 
                 <div class="bg-gray-50 rounded-2xl border p-6">
+
                     <div class="text-xs text-gray-500 uppercase">
                         Rata-rata Keterlambatan Berangkat
                     </div>
+
                     <div class="text-2xl font-bold text-orange-600 mt-2">
+
                         {{ ($achievement['rata_rata_delay_berangkat'] ?? 0) > 0
                             ? $achievement['rata_rata_delay_berangkat'] . ' jam'
                             : '—' }}
+
                     </div>
+
                 </div>
 
+
+
                 <div class="bg-gray-50 rounded-2xl border p-6">
+
                     <div class="text-xs text-gray-500 uppercase">
                         Penyebab Keterlambatan Terbanyak
                     </div>
+
                     <div class="text-2xl font-bold text-red-600 mt-2">
                         {{ $achievement['penyebab_terbanyak'] ?? '—' }}
                     </div>
+
                 </div>
 
             </div>
