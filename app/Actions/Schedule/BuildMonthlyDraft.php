@@ -4,7 +4,7 @@ namespace App\Actions\Schedule;
 
 use App\Exports\TamScheduleExport;
 use App\Models\ShippingSchedule;
-use App\Models\TamMonthlySchedule;
+use App\Supports\Kpi\TamMonthlyKpi;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -12,11 +12,11 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class BuildMonthlyDraft
 {
-    public static function run(int $year, int $month, string $version = 'v1.0'): TamMonthlySchedule
+    public static function run(int $year, int $month, string $version = 'v1.0'): TamMonthlyKpi
     {
         $period = Carbon::create($year, $month, 1)->startOfDay();
 
-        $batch = TamMonthlySchedule::firstOrNew(['period_month' => $period]);
+        $batch = TamMonthlyKpi::firstOrNew(['period_month' => $period]);
         $batch->version = $version;
 
         $rows = [];

@@ -76,7 +76,7 @@ class Voyage extends Model
                     'new_etb'    => $voyage->etb,
                     'new_atb_at' => $voyage->atb_at,
                     'reason'     => $voyage->delay_reason?->value,
-                    'changed_by' => optional(auth()->user())->name,
+                    'changed_by' => optional(auth_user())->name,
                 ]);
 
                 $voyage->is_delayed = true;
@@ -135,7 +135,7 @@ class Voyage extends Model
 
             if ($voyage->wasChanged('atd_at') && $voyage->atd_at) {
 
-                $days = [4, 6, 8, 10, 12];
+                $days = [2, 4, 6, 8, 10, 12];
 
                 foreach ($days as $d) {
 
