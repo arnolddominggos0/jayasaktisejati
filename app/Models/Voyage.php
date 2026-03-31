@@ -56,25 +56,60 @@ class Voyage extends Model
 
     protected static function booted(): void
     {
-        static::saving(function (Voyage $voyage) {
+        static::updating(function (Voyage $voyage) {
 
-            if ($voyage->isDirty(['etd', 'eta']) && $voyage->exists) {
+            if (
+                $voyage->exists &&
+                ($voyage->isDirty('etd') || $voyage->isDirty('eta'))
+            ) {
 
                 VoyageDelayLog::create([
                     'voyage_id' => $voyage->id,
+
                     'old_etd'   => $voyage->getOriginal('etd'),
                     'new_etd'   => $voyage->etd,
+
                     'old_eta'   => $voyage->getOriginal('eta'),
                     'new_eta'   => $voyage->eta,
-                    'reason'    => $voyage->delay_reason?->value,
+
+                    'reason'     => $voyage->delay_reason?->value,
                     'changed_by' => auth_user()?->name,
+
+                    'snapshot_before' => [
+                        'voyage_no'      => $voyage->getOriginal('voyage_no'),
+                        'shipping_line'  => $voyage->shippingLine?->name,
+                        'vessel'         => $voyage->vessel?->name,
+                        'pol'            => $voyage->pol?->code,
+                        'pod'            => $voyage->pod?->code,
+                        'etd'            => $voyage->getOriginal('etd'),
+                        'eta'            => $voyage->getOriginal('eta'),
+                        'status'         => $voyage->getOriginal('atd_at')
+                            ? 'SAILING'
+                            : 'SCHEDULED',
+                    ],
+
+                    'snapshot_after' => [
+                        'voyage_no'      => $voyage->voyage_no,
+                        'shipping_line'  => $voyage->shippingLine?->name,
+                        'vessel'         => $voyage->vessel?->name,
+                        'pol'            => $voyage->pol?->code,
+                        'pod'            => $voyage->pod?->code,
+                        'etd'            => $voyage->etd,
+                        'eta'            => $voyage->eta,
+                        'status'         => $voyage->operational_status,
+                    ],
                 ]);
 
                 $voyage->is_delayed = true;
             }
+        });
+
+
+        static::saving(function (Voyage $voyage) {
 
             if ($voyage->atd_at) {
                 $end = $voyage->ata_at ?? now();
+
                 $voyage->actual_sailing_days = round(
                     $voyage->atd_at->diffInSeconds($end) / 86400,
                     2
@@ -92,6 +127,7 @@ class Voyage extends Model
 
 
         static::saved(function (Voyage $voyage) {
+
             if (
                 $voyage->wasChanged(['atd_at', 'ata_at']) &&
                 $voyage->ata_at
@@ -99,48 +135,8 @@ class Voyage extends Model
                 SlaEvaluator::evaluateVoyage($voyage);
             }
         });
-
-        static::updating(function (Voyage $voyage) {
-
-            if (
-                $voyage->is_delayed &&
-                ($voyage->isDirty('etd') || $voyage->isDirty('eta'))
-            ) {
-
-                VoyageDelayLog::create([
-                    'voyage_id' => $voyage->id,
-                    'old_etd'   => $voyage->getOriginal('etd'),
-                    'new_etd'   => $voyage->etd,
-                    'old_eta'   => $voyage->getOriginal('eta'),
-                    'new_eta'   => $voyage->eta,
-                    'reason'    => $voyage->delay_reason?->value,
-                    'changed_by' => auth_user()?->name,
-
-                    'snapshot_before' => [
-                        'voyage_no' => $voyage->getOriginal('voyage_no'),
-                        'shipping_line' => $voyage->shippingLine?->name,
-                        'vessel' => $voyage->vessel?->name,
-                        'pol' => $voyage->pol?->name,
-                        'pod' => $voyage->pod?->name,
-                        'etd' => $voyage->getOriginal('etd'),
-                        'eta' => $voyage->getOriginal('eta'),
-                        'status' => $voyage->operational_status,
-                    ],
-
-                    'snapshot_after' => [
-                        'voyage_no' => $voyage->voyage_no,
-                        'shipping_line' => $voyage->shippingLine?->name,
-                        'vessel' => $voyage->vessel?->name,
-                        'pol' => $voyage->pol?->name,
-                        'pod' => $voyage->pod?->name,
-                        'etd' => $voyage->etd,
-                        'eta' => $voyage->eta,
-                        'status' => $voyage->operational_status,
-                    ],
-                ]);
-            }
-        });
     }
+
 
     public function shippingLine()
     {
@@ -212,7 +208,7 @@ class Voyage extends Model
     {
         return VoyageOperationalStatus::from($this->operational_status)->color();
     }
-    
+
     public function getRiskLevelAttribute(): string
     {
         if (! $this->atd_at || $this->ata_at) {
