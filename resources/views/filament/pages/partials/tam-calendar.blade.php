@@ -1,61 +1,146 @@
-<div class="bg-white rounded-2xl border overflow-hidden">
-    <div class="px-4 py-3 border-b font-semibold text-sm">
-        Kalender Jadwal Pelayaran — {{ $calendar['month_label'] }}
+<div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
+
+    <div class="px-6 py-4 border-b flex justify-between items-center">
+        <div class="font-semibold text-sm tracking-wide">
+            Kalender Jadwal Pelayaran — {{ $calendar['month_label'] }}
+        </div>
+
+        <div class="text-xs text-gray-500">
+            Hari merah = weekend
+        </div>
     </div>
 
     <div class="overflow-x-auto">
-        <table class="min-w-[1400px] w-full border-collapse text-[11px]">
-            <thead>
-                <tr>
-                    <th class="sticky left-0 bg-gray-100 border px-3 py-2 w-40 text-left">
-                        Rute
+        <table class="min-w-[1500px] w-full border-collapse text-[11px]">
+
+            <thead class="sticky top-0 z-30 bg-white">
+                <tr class="bg-gray-50">
+                    <th class="sticky left-0 z-20 bg-white border-r px-4 py-2 w-40 text-left font-semibold">
+                        Lane
                     </th>
-                    @foreach ($this->calendar['days'] as $day)
+
+                    @foreach ($calendar['days'] as $day)
                         <th
-                            class="border px-1 py-2 text-center w-10
-                            {{ $day['isWeekend'] ? 'bg-rose-50 text-rose-600' : 'bg-gray-50' }}">
+                            class="px-2 py-2 text-center border-r
+                            {{ $day['isWeekend'] ? 'bg-rose-50 text-rose-500' : 'text-gray-700' }}
+                            {{ $day['isToday'] ? 'bg-blue-50 border-b-2 border-blue-600' : '' }}">
+
                             <div class="text-[9px] uppercase tracking-wide">
                                 {{ $day['dow'] }}
                             </div>
+
                             <div class="font-semibold">
                                 {{ $day['n'] }}
                             </div>
                         </th>
                     @endforeach
+
                 </tr>
             </thead>
 
-            <tbody>
-                @foreach ($this->calendar['lanes'] as $laneKey => $laneLabel)
-                    <tr>
-                        <td class="sticky left-0 bg-white border px-3 py-2 font-medium">
+            <tbody class="divide-y">
+
+                @foreach ($calendar['lanes'] as $laneKey => $laneLabel)
+
+                    <tr class="align-top">
+
+                        <td class="sticky left-0 z-10 bg-white border-r px-4 py-4 font-medium text-gray-700">
                             {{ $laneLabel }}
                         </td>
-                        @for ($d = 1; $d <= $this->calendar['days_count']; $d++)
-                            <td class="border px-1 py-1 align-top">
-                                @if (!empty($this->calendar['bucket'][$laneKey][$d]))
-                                    @foreach ($this->calendar['bucket'][$laneKey][$d] as $chip)
-                                        <div
-                                            class="mb-1 rounded-md bg-slate-50 border px-1 py-0.5 text-[10px] truncate">
-                                            <div class="font-semibold text-slate-700">
-                                                {{ $chip['short'] }}
-                                            </div>
-                                            <div class="text-slate-500">
-                                                {{ $chip['voyage_no'] }}
-                                            </div>
+
+                        @for ($i = 1; $i <= $calendar['days_count']; $i++)
+
+                            <td class="border-r p-2 h-24 align-top">
+
+                                @foreach ($calendar['bucket'][$laneKey][$i] as $chip)
+
+                                    @php
+                                        $status = $chip['status'];
+                                        $delayLabel = $chip['delay_label'] ?? null;
+                                        $severity = $chip['severity'] ?? null;
+
+                                        $severityBorder = match ($severity) {
+                                            'minor' => 'ring-2 ring-yellow-400',
+                                            'moderate' => 'ring-2 ring-orange-400',
+                                            'major' => 'ring-2 ring-red-500',
+                                            default => '',
+                                        };
+                                    @endphp
+
+                                    <div
+                                        class="mb-2 rounded-lg px-2 py-2 text-[11px] font-semibold
+                                               shadow-sm hover:shadow-md transition
+                                               {{ $status->color() }}
+                                               {{ $severityBorder }}">
+
+                                        <div class="truncate text-[12px] font-bold">
+                                            {{ $chip['vessel'] }}
                                         </div>
-                                    @endforeach
-                                @else
-                                    <span class="text-gray-300">—</span>
-                                @endif
+
+                                        <div class="text-[10px] opacity-90">
+                                            {{ $chip['voyage_no'] }}
+                                        </div>
+
+                                        @if ($delayLabel)
+                                            <div class="text-[10px] font-bold mt-1">
+                                                {{ $delayLabel }}
+                                            </div>
+                                        @endif
+
+                                    </div>
+
+                                @endforeach
+
                             </td>
+
                         @endfor
+
                     </tr>
+
                 @endforeach
+
             </tbody>
+
         </table>
     </div>
-    <div class="px-4 py-2 text-xs text-gray-600 border-t">
-        <span class="text-rose-600 font-medium">tanggal merah = weekend</span>
+
+    <div class="px-6 py-3 border-t text-xs flex flex-wrap gap-6 text-gray-600">
+
+        <div class="flex items-center gap-2">
+            <span class="w-3 h-3 bg-green-600 rounded-full"></span>
+            Selesai
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="w-3 h-3 bg-blue-600 rounded-full"></span>
+            Berlayar
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="w-3 h-3 bg-red-600 rounded-full"></span>
+            Terlambat
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="w-3 h-3 bg-gray-600 rounded-full"></span>
+            Terjadwal
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="w-3 h-3 bg-yellow-400 rounded-full"></span>
+            Terlambat Ringan (≤30 menit)
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="w-3 h-3 bg-orange-400 rounded-full"></span>
+            Terlambat Sedang (≤2 jam)
+        </div>
+
+        <div class="flex items-center gap-2">
+            <span class="w-3 h-3 bg-red-500 rounded-full"></span>
+            Terlambat Berat (&gt;2 jam)
+        </div>
+
     </div>
+
 </div>

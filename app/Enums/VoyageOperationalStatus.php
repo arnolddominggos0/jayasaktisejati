@@ -22,10 +22,10 @@ enum VoyageOperationalStatus: string
     public function color(): string
     {
         return match ($this) {
-            self::SCHEDULED => 'gray',
-            self::SAILING   => 'warning',
-            self::DELAYED   => 'danger',
-            self::COMPLETED => 'success',
+            self::SCHEDULED => 'bg-gray-600 text-white',
+            self::SAILING   => 'bg-blue-600 text-white',
+            self::DELAYED   => 'bg-red-600 text-white',
+            self::COMPLETED => 'bg-green-600 text-white',
         };
     }
 }

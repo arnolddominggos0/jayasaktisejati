@@ -5,14 +5,14 @@ namespace App\Actions\Schedule;
 use App\Enums\ScheduleState;
 use App\Exports\TamScheduleExport;
 use App\Models\ShippingSchedule;
-use App\Models\TamMonthlySchedule;
+use App\Supports\Kpi\TamMonthlyKpi;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Maatwebsite\Excel\Facades\Excel;
+use Maatwebsite\Excel\Facades\Excel as ExcelFacade;
 
 class FinalizeFromBatch
 {
-    public static function run(TamMonthlySchedule $batch, string $approvedBy = 'System'): TamMonthlySchedule
+    public static function run(TamMonthlyKpi $batch, string $approvedBy = 'System'): TamMonthlyKpi
     {
         $ids = $batch->schedule_ids ?? [];
         if (empty($ids)) {

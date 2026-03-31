@@ -1,144 +1,41 @@
-<div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
-    <div class="px-4 py-3 border-b flex justify-between">
-        <div class="font-semibold text-sm">Monitoring Pelayaran</div>
-        <span class="text-xs text-gray-500">{{ count($this->rows) }} pelayaran</span>
-    </div>
+<div class="space-y-8">
 
-    <div class="overflow-x-auto">
-        <table class="w-full text-sm border-collapse">
-            <thead class="bg-gray-50">
-                <tr class="text-xs uppercase text-gray-600">
-                    <th class="px-4 py-3 text-left">JSS</th>
-                    <th class="px-4 py-3 text-left">Kapal</th>
-                    <th class="px-4 py-3 text-left">Voyage</th>
-                    <th class="px-4 py-3 text-left">Rute</th>
-                    <th class="px-4 py-3 text-center">ETD</th>
+    @php
+        $kritis = $rows->filter(fn($v) => $v->operational_status === 'delayed');
 
-                    <th class="px-4 py-3 text-center">Status Jadwal (ETA/ETD)</th>
-                    <th class="px-4 py-3 text-left">Alasan Perubahan Jadwal</th>
+        $berlayar = $rows->filter(fn($v) => $v->operational_status === 'sailing');
+    @endphp
 
-                    <th class="px-4 py-3 text-center">SLA Sailing</th>
-                    <th class="px-4 py-3 text-center">Status SLA</th>
+    @if ($kritis->count())
+        <div class="bg-red-50 border border-red-200 rounded-2xl p-6 space-y-4">
+            <div class="font-semibold text-red-700 text-sm uppercase">
+                Terlambat
+            </div>
 
-                    <th class="px-4 py-3 text-left">Pemeriksaan Kapal</th>
-                </tr>
-            </thead>
+            @foreach ($kritis as $v)
+                @include('filament.pages.partials.voyage-card', ['v' => $v])
+            @endforeach
+        </div>
+    @endif
 
-            <tbody>
-                @forelse ($this->rows as $r)
-                    @php($v = $r->voyage)
-                    @php($sla = $v?->sailingSla)
+    @if ($berlayar->count())
+        <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6 space-y-4">
+            <div class="font-semibold text-blue-700 text-sm uppercase">
+                Sedang Berlayar
+            </div>
 
-                    <tr class="border-t align-top">
-                        {{-- JSS --}}
-                        <td class="px-4 py-3 font-semibold text-primary-700">
-                            {{ $r->jss }}
-                        </td>
+            @foreach ($berlayar as $v)
+                @include('filament.pages.partials.voyage-card', ['v' => $v])
+            @endforeach
+        </div>
+    @endif
 
-                        {{-- Kapal --}}
-                        <td class="px-4 py-3">
-                            {{ $v?->vessel?->name ?? '—' }}
-                        </td>
 
-                        {{-- Voyage --}}
-                        <td class="px-4 py-3">
-                            {{ $v?->voyage_no ?? '—' }}
-                        </td>
 
-                        {{-- Rute --}}
-                        <td class="px-4 py-3">
-                            {{ $v?->pol?->code }} → {{ $v?->pod?->code }}
-                        </td>
+    @if (!$kritis->count() && !$berlayar->count())
+        <div class="bg-white border rounded-2xl p-8 text-center text-gray-500">
+            Tidak ada pelayaran aktif pada periode ini.
+        </div>
+    @endif
 
-                        {{-- ETD --}}
-                        <td class="px-4 py-3 text-center">
-                            {{ optional($v?->etd)->format('d M Y') ?? '—' }}
-                        </td>
-
-                        {{-- STATUS JADWAL --}}
-                        <td class="px-4 py-3 text-center">
-                            @if ($v?->is_delayed)
-                                <span class="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs font-semibold">
-                                    ETA Mundur
-                                </span>
-                            @else
-                                <span class="px-2 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
-                                    Sesuai Jadwal
-                                </span>
-                            @endif
-                        </td>
-
-                        {{-- ALASAN PERUBAHAN JADWAL --}}
-                        <td class="px-4 py-3 text-sm">
-                            @if ($v?->is_delayed)
-                                @if ($v?->delay_reason)
-                                    <span class="text-orange-700 font-medium">
-                                        {{ $v->delay_reason->label() }}
-                                    </span>
-                                @else
-                                    <span class="text-gray-400 italic">
-                                        Alasan belum diisi
-                                    </span>
-                                @endif
-                            @else
-                                —
-                            @endif
-                        </td>
-
-                        {{-- SLA SAILING --}}
-                        <td class="px-4 py-3 text-center">
-                            @if ($sla)
-                                <div class="font-semibold">
-                                    {{ number_format($sla->actual_days, 2) }}
-                                    / {{ $sla->target_days }}
-                                </div>
-                                <div class="text-[10px] text-gray-500">hari</div>
-                            @else
-                                —
-                            @endif
-                        </td>
-
-                        {{-- STATUS SLA --}}
-                        <td class="px-4 py-3 text-center">
-                            @if ($sla)
-                                <span
-                                    class="px-2 py-1 rounded-full text-xs font-semibold
-                                    {{ $sla->status === 'late'
-                                        ? 'bg-red-100 text-red-700'
-                                        : 'bg-green-100 text-green-700' }}">
-                                    {{ $sla->status === 'late'
-                                        ? 'SLA Tidak Tercapai'
-                                        : 'SLA Tercapai' }}
-                                </span>
-                            @else
-                                —
-                            @endif
-                        </td>
-
-                        {{-- PEMERIKSAAN KAPAL --}}
-                        <td class="px-4 py-3 text-xs">
-                            <div class="space-y-1 min-w-[180px]">
-                                @foreach ($r->vesselChecks as $check)
-                                    @php($status = $check->status)
-                                    <div
-                                        class="flex items-center justify-between gap-2 px-2 py-1 rounded-md text-[11px]
-                                        {{ $status->color() }}">
-                                        <span class="font-semibold">{{ $check->day_code }}</span>
-                                        <span>{{ $check->check_date->format('d M') }}</span>
-                                        <span class="font-semibold">{{ $status->label() }}</span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="10" class="text-center py-8 text-gray-400">
-                            Tidak ada data
-                        </td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
-    </div>
 </div>

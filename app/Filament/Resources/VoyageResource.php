@@ -147,6 +147,15 @@ class VoyageResource extends Resource
                 ->visible(fn ($livewire) => $livewire instanceof EditRecord)
                 ->schema([
                     DateTimePicker::make('atd_at')->label('ATD'),
+
+                    DateTimePicker::make('etb')
+                        ->label('ETB (Estimasi Sandar)')
+                        ->native(false),
+
+                    DateTimePicker::make('atb_at')
+                        ->label('ATB (Aktual Sandar)')
+                        ->native(false),
+
                     DateTimePicker::make('ata_at')->label('ATA'),
 
                     TextInput::make('actual_sailing_days')
@@ -175,30 +184,30 @@ class VoyageResource extends Resource
             ->columns([
                 TextColumn::make('shippingLine.name')
                     ->label('Pelayaran')
-                    ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->searchable(),
 
                 TextColumn::make('vessel.name')
                     ->label('Kapal')
-                    ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->searchable(),
 
                 TextColumn::make('voyage_no')
                     ->label('Voyage')
-                    ->searchable()
                     ->sortable()
+                    ->searchable()
                     ->placeholder('-'),
 
-                TextColumn::make('pol.code')->label('POL')->sortable(),
-                TextColumn::make('pod.code')->label('POD')->sortable(),
+                TextColumn::make('pol.code')->label('POL'),
+                TextColumn::make('pod.code')->label('POD'),
 
                 TextColumn::make('period_month')
                     ->label('Periode')
-                    ->date('M Y')
-                    ->sortable(),
+                    ->date('M Y'),
 
                 TextColumn::make('etd')
                     ->label('ETD')
+<<<<<<< HEAD
                     ->dateTime()
                     ->sortable(),
 
@@ -206,11 +215,29 @@ class VoyageResource extends Resource
                     ->label('ETA')
                     ->dateTime()
                     ->sortable(),
+=======
+                    ->dateTime(),
 
-                TextColumn::make('operational_status_label')
+                TextColumn::make('eta')
+                    ->label('ETA')
+                    ->dateTime(),
+>>>>>>> d57100641258bc6987f231ce9ebe9da2ef810e7f
+
+                TextColumn::make('operational_status')
                     ->label('Status')
                     ->badge()
+<<<<<<< HEAD
                     ->color(fn (Voyage $record) => $record->operational_status_color),
+=======
+                    ->formatStateUsing(
+                        fn($state) =>
+                        VoyageOperationalStatus::from($state)->label()
+                    )
+                    ->color(
+                        fn($state) =>
+                        VoyageOperationalStatus::from($state)->color()
+                    ),
+>>>>>>> d57100641258bc6987f231ce9ebe9da2ef810e7f
 
                 TextColumn::make('is_delayed')
                     ->label('Delay')
@@ -218,20 +245,24 @@ class VoyageResource extends Resource
                     ->formatStateUsing(fn ($state) => $state ? 'Ya' : 'Tidak')
                     ->color(fn ($state) => $state ? 'danger' : 'gray'),
 
+<<<<<<< HEAD
                 TextColumn::make('delay_reason')
                     ->label('Alasan Delay')
                     ->formatStateUsing(fn ($state) => $state?->label())
                     ->placeholder('-'),
 
+=======
+>>>>>>> d57100641258bc6987f231ce9ebe9da2ef810e7f
                 TextColumn::make('delay_logs_count')
                     ->label('Revisi')
                     ->counts('delayLogs')
                     ->badge()
                     ->color(fn ($state) => $state > 0 ? 'warning' : 'gray')
                     ->action(
-                        Tables\Actions\Action::make('open_history')
+                        Tables\Actions\Action::make('history')
                             ->modalHeading('Riwayat Perubahan Jadwal')
                             ->modalSubmitAction(false)
+<<<<<<< HEAD
                             ->modalCancelActionLabel('Tutup')
                             ->modalContent(fn (Voyage $record) =>
                                 view('filament.resources.voyage-resource.widgets.delay-history', [
@@ -268,12 +299,25 @@ class VoyageResource extends Resource
                               ->whereYear('period_month', $date->year);
                     })
                     ->default(now()->startOfMonth()->toDateString()),
+=======
+                            ->modalContent(
+                                fn($record) =>
+                                view('filament.voyage.delay-history', [
+                                    'logs' => $record->delayLogs()->latest()->get(),
+                                ])
+                            )
+                    ),
+>>>>>>> d57100641258bc6987f231ce9ebe9da2ef810e7f
             ])
             ->defaultSort('etd', 'asc')
             ->actions([
                 Tables\Actions\EditAction::make(),
+<<<<<<< HEAD
             ])
             ->bulkActions([]);
+=======
+            ]);
+>>>>>>> d57100641258bc6987f231ce9ebe9da2ef810e7f
     }
 
     public static function getEloquentQuery(): Builder
