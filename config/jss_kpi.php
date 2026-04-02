@@ -6,7 +6,7 @@ return [
         'thresholds' => [
             'dwelling_days' => 6,
             'sailing_days'  => 10,
-            'dooring_days'  => 2,
+            'dooring_days'  => 3,
             'total_days'    => [
                 'normal' => 19,
                 'urgent' => 18,

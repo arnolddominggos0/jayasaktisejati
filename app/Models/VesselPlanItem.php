@@ -64,6 +64,64 @@ class VesselPlanItem extends Model
             : null;
     }
 
+    public function getPlannedSailingDaysAttribute(): ?float
+    {
+        if (!$this->planned_etd || !$this->planned_eta) {
+            return null;
+        }
+
+        return round(
+            $this->planned_etd->diffInSeconds($this->planned_eta) / 86400,
+            2
+        );
+    }
+
+    public function getPlannedDwellingDaysAttribute(): int
+    {
+        return config('kpi.manado.thresholds.dwelling_days', 6);
+    }
+
+    public function getPlannedDooringDaysAttribute(): int
+    {
+        return config('kpi.manado.thresholds.dooring_days', 3);
+    }
+
+    public function getPlannedTotalDaysAttribute(): ?float
+    {
+        if (!$this->planned_sailing_days) {
+            return null;
+        }
+
+        return round(
+            $this->planned_dwelling_days +
+                $this->planned_sailing_days +
+                $this->planned_dooring_days,
+            2
+        );
+    }
+
+    public function getSopStatusAttribute(): string
+    {
+        $total = $this->planned_total_days;
+
+        if (!$total) {
+            return 'unknown';
+        }
+
+        $limit = config('kpi.manado.thresholds.total_days.normal', 19);
+
+        return $total <= $limit ? 'ok' : 'late';
+    }
+
+    public function getSopStatusLabelAttribute(): string
+    {
+        return match ($this->sop_status) {
+            'ok' => 'SESUAI SOP',
+            'late' => 'MELEBIHI SOP',
+            default => 'UNKNOWN',
+        };
+    }
+    
     protected static function booted(): void
     {
         static::deleting(function (VesselPlanItem $item) {

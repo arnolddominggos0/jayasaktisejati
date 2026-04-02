@@ -28,7 +28,6 @@ class VesselPlan extends Model
         'feedback_at',
     ];
 
-
     protected $casts = [
         'period_month' => 'date',
         'status'       => VesselPlanStatus::class,

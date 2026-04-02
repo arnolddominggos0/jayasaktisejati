@@ -27,8 +27,6 @@
 
         </div>
 
-
-
         <div class="flex gap-3 border-b pb-3">
 
             @foreach ([

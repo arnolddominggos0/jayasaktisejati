@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ShipmentStatus;
 use App\Enums\TrackStatus;
 use Illuminate\Database\Eloquent\Model;
 use Filament\Facades\Filament;
@@ -17,7 +18,7 @@ class ShipmentTrack extends Model
         'status_normalized',
         'tracked_at',
         'location',
-        'note',
+        'note', 
         'attachments',
         'check_result',
         'checkseet',
