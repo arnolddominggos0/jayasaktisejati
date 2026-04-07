@@ -1119,4 +1119,50 @@ class Shipment extends Model
     {
         return $q->tamKpi();
     }
+
+    public function getPlannedKpiAttribute(): array
+    {
+        return [
+            'dwelling' => config('kpi.manado.thresholds.dwelling_days', 6),
+            'sailing'  => config('kpi.manado.thresholds.sailing_days', 10),
+            'dooring'  => config('kpi.manado.thresholds.dooring_days', 3),
+            'total'    => config('kpi.manado.thresholds.total_days.normal', 19),
+        ];
+    }
+
+    public function getKpiEvaluationAttribute(): array
+    {
+        $plan = $this->planned_kpi;
+
+        return [
+            'dwelling' => $this->compare($this->dwelling_days, $plan['dwelling']),
+            'sailing'  => $this->compare($this->sailing_days, $plan['sailing']),
+            'dooring'  => $this->compare($this->dooring_days, $plan['dooring']),
+            'total'    => $this->compare($this->lead_time_days, $plan['total']),
+        ];
+    }
+
+    private function compare(?float $actual, ?float $target): array
+    {
+        if (is_null($actual) || is_null($target)) {
+            return [
+                'status' => 'unknown',
+                'diff'   => null,
+            ];
+        }
+
+        $diff = $actual - $target;
+
+        if ($diff <= 0) {
+            return [
+                'status' => 'ok',
+                'diff'   => round($diff, 2),
+            ];
+        }
+
+        return [
+            'status' => 'late',
+            'diff'   => round($diff, 2),
+        ];
+    }
 }

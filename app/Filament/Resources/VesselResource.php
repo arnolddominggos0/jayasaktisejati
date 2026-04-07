@@ -51,11 +51,11 @@ class VesselResource extends Resource
                     ->label('Max ETD Gap')
                     ->getStateUsing(
                         fn($record) =>
-                        $record->maxEtdGap() . ' hari'
+                        $record->analyze()['max_gap'] . ' hari'
                     )
                     ->color(
                         fn($record) =>
-                        $record->maxEtdGap() > 6 ? 'danger' : 'success'
+                        $record->analyze()['max_gap'] > 6 ? 'danger' : 'success'
                     ),
             ])
             ->actions([
