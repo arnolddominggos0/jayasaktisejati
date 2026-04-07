@@ -76,48 +76,48 @@ class VesselPlanItemRelationManager extends RelationManager
                     ->label('ETA')
                     ->dateTime(),
 
+                TextColumn::make('planned_sailing')
+                    ->label('Sailing (hari)')
+                    ->getStateUsing(function ($record) {
+                        if (!$record->planned_etd || !$record->planned_eta) {
+                            return '—';
+                        }
+
+                        return $record->planned_etd->diffInDays($record->planned_eta) . ' hari';
+                    }),
+
                 TextColumn::make('etd_gap')
-                    ->label('ETD Gap (hari)')
+                    ->label('ETD Gap')
                     ->alignCenter()
                     ->getStateUsing(function ($record) {
                         $plan = $this->getOwnerRecord();
-                        if (! $plan) {
-                            return '—';
-                        }
+                        if (! $plan) return '—';
 
                         $gap = $plan->etdGaps()[$record->id] ?? null;
                         return $gap === null ? '—' : "{$gap} hari";
                     })
                     ->color(function ($record) {
                         $plan = $this->getOwnerRecord();
-                        if (! $plan) {
-                            return null;
-                        }
+                        if (! $plan) return null;
 
                         $gap = $plan->etdGaps()[$record->id] ?? null;
-                        return $gap !== null && $gap > 6 ? 'danger' : null;
+                        return $gap !== null && $gap > 6 ? 'danger' : 'success';
                     }),
             ])
+
             ->headerActions([
                 Tables\Actions\CreateAction::make()
-                    ->visible(
-                        fn() =>
-                        $this->getOwnerRecord()?->isEditable() ?? false
-                    ),
+                    ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
             ])
+
             ->actions([
                 Tables\Actions\EditAction::make()
-                    ->visible(
-                        fn() =>
-                        $this->getOwnerRecord()?->isEditable() ?? false
-                    ),
+                    ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
 
                 Tables\Actions\DeleteAction::make()
-                    ->visible(
-                        fn() =>
-                        $this->getOwnerRecord()?->isEditable() ?? false
-                    ),
+                    ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
             ])
+
             ->defaultSort('planned_etd');
     }
 }

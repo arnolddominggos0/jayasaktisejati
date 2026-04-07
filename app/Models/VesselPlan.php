@@ -8,7 +8,6 @@ use App\Enums\VesselPlanStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use DomainException;
 
@@ -28,14 +27,12 @@ class VesselPlan extends Model
         'feedback_at',
     ];
 
-
     protected $casts = [
         'period_month' => 'date',
         'status'       => VesselPlanStatus::class,
         'sent_at'      => 'datetime',
-        'feedback_at' => 'datetime',
+        'feedback_at'  => 'datetime',
     ];
-
 
     public function pol(): BelongsTo
     {
@@ -72,13 +69,42 @@ class VesselPlan extends Model
         return $this->status === VesselPlanStatus::Final;
     }
 
+    public function isRevision(): bool
+    {
+        return $this->status === VesselPlanStatus::Revision;
+    }
+
+    public function isEditable(): bool
+    {
+        return $this->isDraft() || $this->isRevision();
+    }
+
+    public function canSendToTam(): bool
+    {
+        if (! $this->isDraft()) {
+            return false;
+        }
+
+        if (! $this->items()->exists()) {
+            return false;
+        }
+
+        $analysis = $this->analyze();
+
+        if (! ($analysis['ok'] ?? false)) {
+            return false;
+        }
+
+        if (($analysis['max_gap'] ?? 0) > 6) {
+            return false;
+        }
+
+        return true;
+    }
 
     public function etdGaps(): array
     {
-        $items = $this->items()
-            ->orderBy('planned_etd')
-            ->get();
-
+        $items = $this->items()->orderBy('planned_etd')->get();
         $gaps = [];
 
         foreach ($items as $i => $item) {
@@ -92,23 +118,56 @@ class VesselPlan extends Model
         return $gaps;
     }
 
-    public function analyze(): array
+    public function maxEtdGap(): int
     {
         $gaps = $this->etdGaps();
 
-        $numeric = array_filter($gaps, fn($v) => is_int($v));
-        $maxGap  = empty($numeric) ? 0 : max($numeric);
+        $filtered = array_filter($gaps, fn($gap) => !is_null($gap));
 
-        return [
-            'gaps'     => $gaps,
-            'max_gap' => $maxGap,
-            'ok'      => $maxGap <= 6,
-        ];
+        return !empty($filtered) ? max($filtered) : 0;
     }
 
-    public function maxEtdGap(): int
+    public function analyze(): array
     {
-        return (int) $this->analyze()['max_gap'];
+        $items = $this->items()->get();
+
+        if ($items->isEmpty()) {
+            return [
+                'ok' => false,
+                'reason' => 'no_items',
+                'max_gap' => 0,
+            ];
+        }
+
+        $gaps = $this->etdGaps();
+        $filteredGaps = array_filter($gaps, fn($gap) => !is_null($gap));
+        $maxGap = !empty($filteredGaps) ? max($filteredGaps) : 0;
+
+        $dwelling = config('kpi.manado.thresholds.dwelling_days', 6);
+        $dooring  = config('kpi.manado.thresholds.dooring_days', 3);
+        $limit    = config('kpi.manado.thresholds.total_days.normal', 19);
+
+        $sailingDays = $items->map(function ($item) {
+            if (!$item->planned_etd || !$item->planned_eta) {
+                return null;
+            }
+
+            return $item->planned_etd->diffInDays($item->planned_eta);
+        })->filter();
+
+        $avgSailing = $sailingDays->avg() ?? 0;
+
+        $total = $dwelling + $avgSailing + $dooring;
+
+        return [
+            'dwelling'    => $dwelling,
+            'sailing_avg' => round($avgSailing, 2),
+            'dooring'     => $dooring,
+            'total'       => round($total, 2),
+            'limit'       => $limit,
+            'max_gap'     => $maxGap,
+            'ok'          => $total <= $limit,
+        ];
     }
 
     public function sopStatus(): array
@@ -130,23 +189,16 @@ class VesselPlan extends Model
                 'ok'    => true,
             ]
             : [
-                'label' => 'MELANGGAR SOP',
+                'label' => 'MELEBIHI SOP',
                 'color' => 'danger',
                 'ok'    => false,
             ];
     }
 
-    public function canSendToTam(): bool
-    {
-        return $this->isDraft()
-            && $this->items()->exists()
-            && $this->sopStatus()['ok'] === true;
-    }
-
     public function markAsSent(int $userId): void
     {
         if (! $this->canSendToTam()) {
-            throw new DomainException('Jadwal belum siap dikirim ke TAM.');
+            throw new DomainException('Jadwal belum memenuhi syarat untuk dikirim.');
         }
 
         $this->update([
@@ -156,113 +208,10 @@ class VesselPlan extends Model
         ]);
     }
 
-    public function generateVoyages(int $userId): int
-    {
-        if (! $this->isSent()) {
-            throw new DomainException('Vessel Plan harus status SENT.');
-        }
-
-        $this->resolveRoute();
-
-        if ($this->voyages()->exists()) {
-            throw new DomainException('Voyage sudah pernah dibuat.');
-        }
-
-        return DB::transaction(function () {
-            $count = 0;
-
-            foreach ($this->items()->orderBy('planned_etd')->get() as $i => $item) {
-
-                $voyage = Voyage::create([
-                    'vessel_plan_id'  => $this->id,
-
-                    'shipping_line_id' => $item->shipping_line_id,
-
-                    'vessel_id'       => $item->vessel_id,
-                    'pol_id'          => $this->pol_id,
-                    'pod_id'          => $this->pod_id,
-                    'voyage_no'       => sprintf(
-                        'TAM-%s-%02d',
-                        $this->period_month->format('ym'),
-                        $i + 1
-                    ),
-                    'etd'             => $item->planned_etd,
-                    'eta'             => $item->planned_eta,
-                    'period_month'    => $this->period_month,
-                ]);
-
-                $schedule = CreateShippingSchedule::run($voyage);
-                GenerateVesselChecks::run($schedule);
-
-                $count++;
-            }
-
-            $this->update([
-                'status' => VesselPlanStatus::Final,
-            ]);
-
-            return $count;
-        });
-    }
-
-    protected function resolveRoute(): void
-    {
-        if ($this->pol_id && $this->pod_id) {
-            return;
-        }
-
-        $polCode = config('tam.route.pol_code');
-        $podCode = config('tam.route.pod_code');
-
-        if (! $polCode || ! $podCode) {
-            throw new DomainException('Konfigurasi POL / POD TAM belum diatur.');
-        }
-
-        $pol = Port::where('code', $polCode)->first();
-        $pod = Port::where('code', $podCode)->first();
-
-        if (! $pol || ! $pod) {
-            throw new DomainException(
-                "Port TAM tidak ditemukan (POL={$polCode}, POD={$podCode})"
-            );
-        }
-
-        $this->updateQuietly([
-            'pol_id'     => $pol->id,
-            'pod_id'     => $pod->id,
-            'route_code' => "{$pol->code}-{$pod->code}",
-        ]);
-    }
-
-    public static function generateForMonth(Carbon|string $month): self
-    {
-        $period = $month instanceof Carbon
-            ? $month->startOfMonth()
-            : Carbon::parse($month)->startOfMonth();
-
-        if (self::where('period_month', $period)->exists()) {
-            throw new DomainException(
-                'Vessel Plan untuk periode ini sudah ada.'
-            );
-        }
-
-        return self::create([
-            'period_month' => $period,
-            'status'       => VesselPlanStatus::Draft,
-        ]);
-    }
-
-    public function waUrl(): string
-    {
-        $phone = config('services.tam.whatsapp');
-
-        return 'https://wa.me/' . $phone . '?text=' . urlencode($this->waMessage());
-    }
-
     public function markAsRevision(string $reason, int $userId): void
     {
         if (! $this->isSent()) {
-            throw new DomainException('Hanya jadwal yang sudah dikirim bisa direvisi.');
+            throw new DomainException('Hanya yang sudah dikirim yang bisa direvisi.');
         }
 
         $this->update([
@@ -273,11 +222,42 @@ class VesselPlan extends Model
         ]);
     }
 
-    public function isRevision(): bool
+    public function markAsFinal(int $userId): void
     {
-        return $this->status === VesselPlanStatus::Revision;
+        if (! $this->isSent()) {
+            throw new DomainException('Hanya yang sudah dikirim yang bisa difinalisasi.');
+        }
+
+        DB::transaction(function () {
+
+            $this->update([
+                'status' => VesselPlanStatus::Final,
+            ]);
+
+            foreach ($this->items as $item) {
+
+                $voyage = $item->voyage;
+
+                if (!$voyage) {
+                    continue;
+                }
+
+                $schedule = CreateShippingSchedule::run($voyage);
+
+                GenerateVesselChecks::run($schedule);
+            }
+        });
     }
 
+    public function approve(int $userId): void
+    {
+        $this->markAsFinal($userId);
+    }
+
+    public function reject(string $reason, int $userId): void
+    {
+        $this->markAsRevision($reason, $userId);
+    }
 
     public function waMessage(): string
     {
@@ -298,9 +278,16 @@ class VesselPlan extends Model
             $lines[] = '';
         }
 
-        $lines[] = 'Analisa SOP:';
-        $lines[] = '- Max ETD Gap: ' . ($analysis['max_gap'] ?? 0) . ' hari';
-        $lines[] = '- Status: ' . (($analysis['ok'] ?? false) ? 'SESUAI SOP' : 'MELANGGAR SOP');
+        $lines[] = 'Analisa KPI:';
+        $lines[] = '- Dwelling : ' . $analysis['dwelling'] . ' hari';
+        $lines[] = '- Sailing  : ' . $analysis['sailing_avg'] . ' hari';
+        $lines[] = '- Dooring  : ' . $analysis['dooring'] . ' hari';
+        $lines[] = '- Total    : ' . $analysis['total'] . ' hari';
+        $lines[] = '- Batas    : ' . $analysis['limit'] . ' hari';
+        $lines[] = '- Status   : ' . ($analysis['ok'] ? 'SESUAI SOP' : 'MELEBIHI SOP');
+        $lines[] = '';
+        $lines[] = 'Kualitas Jadwal:';
+        $lines[] = '- Max ETD Gap : ' . $analysis['max_gap'] . ' hari';
         $lines[] = '';
         $lines[] = 'Mohon konfirmasi / revisinya.';
         $lines[] = 'Terima kasih.';
@@ -318,63 +305,5 @@ class VesselPlan extends Model
             $hour < 18 => 'Selamat sore',
             default    => 'Selamat malam',
         };
-    }
-
-    protected static function booted(): void
-    {
-        static::creating(function (VesselPlan $plan) {
-
-            if (! config('tam.route.force')) {
-                return;
-            }
-
-            $polCode = config('tam.route.pol_code');
-            $podCode = config('tam.route.pod_code');
-
-            if (! $polCode || ! $podCode) {
-                throw new DomainException('Konfigurasi POL / POD TAM belum diatur.');
-            }
-
-            $pol = Port::where('code', $polCode)->first();
-            $pod = Port::where('code', $podCode)->first();
-
-            if (! $pol || ! $pod) {
-                throw new DomainException(
-                    "Port TAM tidak ditemukan (POL={$polCode}, POD={$podCode})"
-                );
-            }
-
-            $plan->pol_id = $pol->id;
-            $plan->pod_id = $pod->id;
-            $plan->route_code = "{$pol->code}-{$pod->code}";
-            $plan->status ??= VesselPlanStatus::Draft;
-        });
-    }
-    public function isEditable(): bool
-    {
-        return $this->isDraft() || $this->isRevision();
-    }
-
-    public function approve(int $userId): int
-    {
-        if (! $this->isSent()) {
-            throw new \DomainException('Hanya jadwal dengan status SENT yang bisa disetujui.');
-        }
-
-        return $this->generateVoyages($userId);
-    }
-
-    public function reject(string $reason, int $userId): void
-    {
-        if (! $this->isSent()) {
-            throw new \DomainException('Hanya jadwal dengan status SENT yang bisa ditolak.');
-        }
-
-        $this->update([
-            'status'          => \App\Enums\VesselPlanStatus::Revision,
-            'feedback_reason' => $reason,
-            'feedback_by'     => $userId,
-            'feedback_at'     => now(),
-        ]);
     }
 }

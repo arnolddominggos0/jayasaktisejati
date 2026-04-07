@@ -7,25 +7,11 @@ use App\Models\Voyage;
 use App\Models\VoyageMilestone;
 use Filament\Pages\Page;
 use Illuminate\Support\Carbon;
-<<<<<<< HEAD
-use App\Services\Kpi\TamSailingKpiService;
-use App\Services\Monitoring\TamMonitoringQueryService;
-use App\Supports\ShippingCalendar\MonthlyCalendarBuilder;
-
-class MonitoringKapalTam extends Page
-{
-    protected static ?string $navigationIcon = 'heroicon-o-calendar-days';
-    protected static ?string $navigationLabel = 'Monitoring Jadwal';
-    protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
-    protected static ?int    $navigationSort  = 2;
-    protected static string  $view = 'filament.pages.monitoring-kapal-tam';
-=======
 use Illuminate\Database\Eloquent\Builder;
 
 class MonitoringKapalTam extends Page
 {
     protected static string $view = 'filament.pages.monitoring-kapal-tam';
->>>>>>> d57100641258bc6987f231ce9ebe9da2ef810e7f
 
     public string $period;
     public string $mode = 'control';
@@ -63,10 +49,6 @@ class MonitoringKapalTam extends Page
         $this->loadData();
     }
 
-<<<<<<< HEAD
-        $this->generateMonthOptions();
-        $this->loadData();
-=======
     public function updatedSearch(): void
     {
         $this->loadData();
@@ -103,7 +85,6 @@ class MonitoringKapalTam extends Page
                         );
                 });
             });
->>>>>>> d57100641258bc6987f231ce9ebe9da2ef810e7f
     }
 
     protected function loadData(): void
@@ -154,23 +135,7 @@ class MonitoringKapalTam extends Page
         ];
     }
 
-<<<<<<< HEAD
-    protected function generateMonthOptions(): void
-    {
-        $start = now()->subMonths(12)->startOfMonth();
-        $end   = now()->addMonths(12)->startOfMonth();
-
-        while ($start <= $end) {
-            $this->monthOptions[$start->format('Y-m')] =
-                $start->translatedFormat('F Y');
-            $start->addMonth();
-        }
-    }
-
-    protected function loadData(): void
-=======
     protected function buildAchievement(): void
->>>>>>> d57100641258bc6987f231ce9ebe9da2ef810e7f
     {
         $total = $this->rows->count();
 
@@ -194,13 +159,6 @@ class MonitoringKapalTam extends Page
                     ? round(($ok / $total) * 100)
                     : 0,
 
-<<<<<<< HEAD
-        $this->calendar = app(MonthlyCalendarBuilder::class)
-            ->forMonth($dt->year, $dt->month);
-
-        $this->rows = app(TamMonitoringQueryService::class)
-            ->getRows($this->period, $this->filter);
-=======
                 'ng_percent' => $total > 0
                     ? round(($ng / $total) * 100)
                     : 0,
@@ -360,7 +318,6 @@ class MonitoringKapalTam extends Page
             'milestoneForm.speed_knots' => 'nullable|numeric|min:0|max:40',
             'milestoneForm.note' => 'nullable|string|max:500',
         ]);
->>>>>>> d57100641258bc6987f231ce9ebe9da2ef810e7f
 
         $this->selectedMilestone->update([
             'actual_date' => $this->milestoneForm['actual_date'],

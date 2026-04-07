@@ -42,6 +42,18 @@ class VesselPlanResource extends Resource
                     ->counts('items')
                     ->label('Jumlah Jadwal'),
 
+                TextColumn::make('kpi_total')
+                    ->label('Total KPI')
+                    ->getStateUsing(fn ($record) => $record->analyze()['total'] . ' hari')
+                    ->color(fn ($record) => $record->analyze()['ok'] ? 'success' : 'danger'),
+
+                TextColumn::make('kpi_breakdown')
+                    ->label('Dw/Sa/Dr')
+                    ->getStateUsing(function ($record) {
+                        $a = $record->analyze();
+                        return "{$a['dwelling']} / {$a['sailing_avg']} / {$a['dooring']}";
+                    }),
+
                 TextColumn::make('status_sop')
                     ->label('Status SOP')
                     ->badge()
@@ -58,7 +70,21 @@ class VesselPlanResource extends Resource
             ->actions([
 
                 Tables\Actions\EditAction::make()
-                    ->label('Ubah'),
+                    ->visible(fn($record) => $record?->isEditable()),
+
+                Tables\Actions\Action::make('send')
+                    ->label('Kirim')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->color('primary')
+                    ->action(fn ($record) => $record->markAsSent(auth()->id()))
+                    ->visible(fn ($record) => $record?->isDraft()),
+
+                Tables\Actions\Action::make('approve')
+                    ->label('Finalisasi')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->action(fn ($record) => $record->approve(auth()->id()))
+                    ->visible(fn ($record) => $record?->isSent()),
 
                 Tables\Actions\Action::make('feedback')
                     ->label('Kembalikan')
@@ -70,14 +96,8 @@ class VesselPlanResource extends Resource
                             ->required()
                             ->rows(4),
                     ])
-                    ->action(function ($record, array $data) {
-                        $record->markAsRevision(
-                            $data['reason'],
-                            auth()->id()
-                        );
-                    })
-                    ->visible(fn($record) => $record?->isSent() ?? false),
-
+                    ->action(fn ($record, $data) => $record->reject($data['reason'], auth()->id()))
+                    ->visible(fn ($record) => $record?->isSent()),
             ])
             ->defaultSort('period_month', 'desc');
     }
