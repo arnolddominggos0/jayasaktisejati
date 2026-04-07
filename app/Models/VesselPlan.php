@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
-use App\Actions\CreateShippingSchedule;
-use App\Actions\GenerateVesselChecks;
 use App\Enums\VesselPlanStatus;
+use App\Services\VesselPlanAnalyzer;
+use App\Services\WhatsappService;
+use App\Services\WhatsappMessageBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,12 +15,14 @@ use DomainException;
 class VesselPlan extends Model
 {
     protected $fillable = [
+        'customer_id',
         'period_month',
         'pol_id',
         'pod_id',
         'route_code',
         'status',
-        'note',
+        'draft_kpi_total',
+        'final_kpi_total',
         'sent_at',
         'sent_by',
         'feedback_reason',
@@ -34,24 +37,19 @@ class VesselPlan extends Model
         'feedback_at'  => 'datetime',
     ];
 
-    public function pol(): BelongsTo
-    {
-        return $this->belongsTo(Port::class, 'pol_id');
-    }
-
-    public function pod(): BelongsTo
-    {
-        return $this->belongsTo(Port::class, 'pod_id');
-    }
-
     public function items(): HasMany
     {
         return $this->hasMany(VesselPlanItem::class);
     }
 
-    public function voyages(): HasMany
+    public function customer(): BelongsTo
     {
-        return $this->hasMany(Voyage::class);
+        return $this->belongsTo(Customer::class);
+    }
+
+    public function getWhatsappPhoneAttribute(): ?string
+    {
+        return $this->customer?->pic_phone ?? $this->customer?->phone;
     }
 
     public function isDraft(): bool
@@ -79,172 +77,92 @@ class VesselPlan extends Model
         return $this->isDraft() || $this->isRevision();
     }
 
-    public function canSendToTam(): bool
-    {
-        if (! $this->isDraft()) {
-            return false;
-        }
-
-        if (! $this->items()->exists()) {
-            return false;
-        }
-
-        $analysis = $this->analyze();
-
-        if (! ($analysis['ok'] ?? false)) {
-            return false;
-        }
-
-        if (($analysis['max_gap'] ?? 0) > 6) {
-            return false;
-        }
-
-        return true;
-    }
-
-    public function etdGaps(): array
-    {
-        $items = $this->items()->orderBy('planned_etd')->get();
-        $gaps = [];
-
-        foreach ($items as $i => $item) {
-            $next = $items[$i + 1] ?? null;
-
-            $gaps[$item->id] = $next
-                ? $item->planned_etd->diffInDays($next->planned_etd)
-                : null;
-        }
-
-        return $gaps;
-    }
-
-    public function maxEtdGap(): int
-    {
-        $gaps = $this->etdGaps();
-
-        $filtered = array_filter($gaps, fn($gap) => !is_null($gap));
-
-        return !empty($filtered) ? max($filtered) : 0;
-    }
-
     public function analyze(): array
     {
-        $items = $this->items()->get();
-
-        if ($items->isEmpty()) {
-            return [
-                'ok' => false,
-                'reason' => 'no_items',
-                'max_gap' => 0,
-            ];
-        }
-
-        $gaps = $this->etdGaps();
-        $filteredGaps = array_filter($gaps, fn($gap) => !is_null($gap));
-        $maxGap = !empty($filteredGaps) ? max($filteredGaps) : 0;
-
-        $dwelling = config('kpi.manado.thresholds.dwelling_days', 6);
-        $dooring  = config('kpi.manado.thresholds.dooring_days', 3);
-        $limit    = config('kpi.manado.thresholds.total_days.normal', 19);
-
-        $sailingDays = $items->map(function ($item) {
-            if (!$item->planned_etd || !$item->planned_eta) {
-                return null;
-            }
-
-            return $item->planned_etd->diffInDays($item->planned_eta);
-        })->filter();
-
-        $avgSailing = $sailingDays->avg() ?? 0;
-
-        $total = $dwelling + $avgSailing + $dooring;
-
-        return [
-            'dwelling'    => $dwelling,
-            'sailing_avg' => round($avgSailing, 2),
-            'dooring'     => $dooring,
-            'total'       => round($total, 2),
-            'limit'       => $limit,
-            'max_gap'     => $maxGap,
-            'ok'          => $total <= $limit,
-        ];
+        return app(VesselPlanAnalyzer::class)->analyze($this);
     }
 
     public function sopStatus(): array
     {
-        if (! $this->items()->exists()) {
+        $analysis = $this->analyze();
+
+        if (! ($analysis['total'] ?? null)) {
             return [
-                'label' => 'BELUM ADA JADWAL',
+                'label' => 'BELUM ADA DATA',
                 'color' => 'gray',
-                'ok'    => false,
             ];
         }
 
-        $analysis = $this->analyze();
-
-        return $analysis['ok']
-            ? [
-                'label' => 'SESUAI SOP',
-                'color' => 'success',
-                'ok'    => true,
-            ]
-            : [
+        if (! $analysis['ok']) {
+            return [
                 'label' => 'MELEBIHI SOP',
                 'color' => 'danger',
-                'ok'    => false,
             ];
+        }
+
+        return [
+            'label' => 'SESUAI SOP',
+            'color' => 'success',
+        ];
     }
 
     public function markAsSent(int $userId): void
     {
-        if (! $this->canSendToTam()) {
-            throw new DomainException('Jadwal belum memenuhi syarat untuk dikirim.');
+        if (! $this->isDraft()) {
+            throw new DomainException('Harus draft.');
+        }
+
+        $analysis = $this->analyze();
+
+        if (! $analysis['ok']) {
+            throw new DomainException('Belum sesuai SOP.');
         }
 
         $this->update([
-            'status'  => VesselPlanStatus::Sent,
-            'sent_at' => now(),
-            'sent_by' => $userId,
+            'status'           => VesselPlanStatus::Sent,
+            'sent_at'          => now(),
+            'sent_by'          => $userId,
+            'draft_kpi_total'  => $analysis['total'],
         ]);
-    }
 
-    public function markAsRevision(string $reason, int $userId): void
-    {
-        if (! $this->isSent()) {
-            throw new DomainException('Hanya yang sudah dikirim yang bisa direvisi.');
+        $phone = $this->whatsapp_phone;
+
+        if ($phone) {
+            $message = app(WhatsappMessageBuilder::class)
+                ->buildFullMessage($this);
+
+            app(WhatsappService::class)->send($phone, $message);
         }
-
-        $this->update([
-            'status'          => VesselPlanStatus::Revision,
-            'feedback_reason' => $reason,
-            'feedback_by'     => $userId,
-            'feedback_at'     => now(),
-        ]);
     }
 
     public function markAsFinal(int $userId): void
     {
         if (! $this->isSent()) {
-            throw new DomainException('Hanya yang sudah dikirim yang bisa difinalisasi.');
+            throw new DomainException('Harus sent.');
         }
 
-        DB::transaction(function () {
+        $analysis = $this->analyze();
+
+        DB::transaction(function () use ($analysis) {
 
             $this->update([
-                'status' => VesselPlanStatus::Final,
+                'status'           => VesselPlanStatus::Final,
+                'final_kpi_total'  => $analysis['total'],
             ]);
 
             foreach ($this->items as $item) {
 
-                $voyage = $item->voyage;
-
-                if (!$voyage) {
-                    continue;
-                }
-
-                $schedule = CreateShippingSchedule::run($voyage);
-
-                GenerateVesselChecks::run($schedule);
+                $item->voyage ?? $item->voyage()->create([
+                    'vessel_plan_id'    => $this->id,
+                    'shipping_line_id' => $item->shipping_line_id,
+                    'vessel_id'        => $item->vessel_id,
+                    'pol_id'           => $this->pol_id,
+                    'pod_id'           => $this->pod_id,
+                    'voyage_no'        => 'VY-' . $item->planned_etd->format('Ym') . '-' . $item->id,
+                    'etd'              => $item->planned_etd,
+                    'eta'              => $item->planned_eta,
+                    'period_month'     => $this->period_month,
+                ]);
             }
         });
     }
@@ -256,54 +174,20 @@ class VesselPlan extends Model
 
     public function reject(string $reason, int $userId): void
     {
-        $this->markAsRevision($reason, $userId);
+        $this->update([
+            'status'          => VesselPlanStatus::Revision,
+            'feedback_reason' => $reason,
+            'feedback_by'     => $userId,
+            'feedback_at'     => now(),
+        ]);
     }
 
-    public function waMessage(): string
+    public function kpiDeviation(): ?float
     {
-        $analysis = $this->analyze();
-
-        $lines = [
-            $this->waGreeting() . ' Pak,',
-            '',
-            "Berikut draft jadwal kapal periode {$this->period_month->format('M Y')} rute {$this->route_code}:",
-            '',
-        ];
-
-        foreach ($this->items()->with(['shippingLine', 'vessel'])->orderBy('planned_etd')->get() as $i => $item) {
-            $lines[] = ($i + 1) . '. ' . ($item->shippingLine->name ?? '-');
-            $lines[] = 'Kapal : ' . ($item->vessel->name ?? '-');
-            $lines[] = 'ETD   : ' . $item->planned_etd->format('d M Y');
-            $lines[] = 'ETA   : ' . $item->planned_eta->format('d M Y');
-            $lines[] = '';
+        if (!$this->draft_kpi_total || !$this->final_kpi_total) {
+            return null;
         }
 
-        $lines[] = 'Analisa KPI:';
-        $lines[] = '- Dwelling : ' . $analysis['dwelling'] . ' hari';
-        $lines[] = '- Sailing  : ' . $analysis['sailing_avg'] . ' hari';
-        $lines[] = '- Dooring  : ' . $analysis['dooring'] . ' hari';
-        $lines[] = '- Total    : ' . $analysis['total'] . ' hari';
-        $lines[] = '- Batas    : ' . $analysis['limit'] . ' hari';
-        $lines[] = '- Status   : ' . ($analysis['ok'] ? 'SESUAI SOP' : 'MELEBIHI SOP');
-        $lines[] = '';
-        $lines[] = 'Kualitas Jadwal:';
-        $lines[] = '- Max ETD Gap : ' . $analysis['max_gap'] . ' hari';
-        $lines[] = '';
-        $lines[] = 'Mohon konfirmasi / revisinya.';
-        $lines[] = 'Terima kasih.';
-
-        return implode("\n", $lines);
-    }
-
-    protected function waGreeting(): string
-    {
-        $hour = now()->hour;
-
-        return match (true) {
-            $hour < 11 => 'Selamat pagi',
-            $hour < 15 => 'Selamat siang',
-            $hour < 18 => 'Selamat sore',
-            default    => 'Selamat malam',
-        };
-    }
+        return $this->final_kpi_total - $this->draft_kpi_total;
+    } 
 }
