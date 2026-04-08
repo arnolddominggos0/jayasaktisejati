@@ -18,7 +18,7 @@ class VesselCheckResource extends Resource
     protected static ?string $pluralLabel     = 'Pemeriksaan Jadwal Kapal';
     protected static ?string $modelLabel      = 'Pemeriksaan Jadwal Kapal';
     protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
-    protected static ?string $navigationIcon  = 'heroicon-o-calendar-days';
+    protected static ?string $navigationIcon  = 'heroicon-o-clipboard-document-check';
     protected static ?int $navigationSort = 2;
 
     public static function table(Table $table): Table

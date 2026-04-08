@@ -44,8 +44,8 @@ class VesselPlanResource extends Resource
 
                 TextColumn::make('kpi_total')
                     ->label('Total KPI')
-                    ->getStateUsing(fn ($record) => $record->analyze()['total'] . ' hari')
-                    ->color(fn ($record) => $record->analyze()['ok'] ? 'success' : 'danger'),
+                    ->getStateUsing(fn($record) => $record->kpi_total ? $record->kpi_total . ' hari' : '-')
+                    ->color(fn($record) => $record->sopStatus()['color'] ?? 'gray'),
 
                 TextColumn::make('kpi_breakdown')
                     ->label('Dw/Sa/Dr')
@@ -53,6 +53,11 @@ class VesselPlanResource extends Resource
                         $a = $record->analyze();
                         return "{$a['dwelling']} / {$a['sailing_avg']} / {$a['dooring']}";
                     }),
+
+                TextColumn::make('max_gap')
+                    ->label('Max Gap')
+                    ->getStateUsing(fn($record) => ($record->analyze()['max_gap'] ?? 0) . ' hari')
+                    ->color(fn($record) => ($record->analyze()['max_gap'] ?? 0) > 6 ? 'danger' : 'success'),
 
                 TextColumn::make('status_sop')
                     ->label('Status SOP')
@@ -76,15 +81,15 @@ class VesselPlanResource extends Resource
                     ->label('Kirim')
                     ->icon('heroicon-o-paper-airplane')
                     ->color('primary')
-                    ->action(fn ($record) => $record->markAsSent(auth()->id()))
-                    ->visible(fn ($record) => $record?->isDraft()),
+                    ->action(fn($record) => $record->markAsSent(auth()->id()))
+                    ->visible(fn($record) => $record?->isDraft()),
 
                 Tables\Actions\Action::make('approve')
                     ->label('Finalisasi')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->action(fn ($record) => $record->approve(auth()->id()))
-                    ->visible(fn ($record) => $record?->isSent()),
+                    ->action(fn($record) => $record->approve(auth()->id()))
+                    ->visible(fn($record) => $record?->isSent()),
 
                 Tables\Actions\Action::make('feedback')
                     ->label('Kembalikan')
@@ -96,8 +101,8 @@ class VesselPlanResource extends Resource
                             ->required()
                             ->rows(4),
                     ])
-                    ->action(fn ($record, $data) => $record->reject($data['reason'], auth()->id()))
-                    ->visible(fn ($record) => $record?->isSent()),
+                    ->action(fn($record, $data) => $record->reject($data['reason'], auth()->id()))
+                    ->visible(fn($record) => $record?->isSent()),
             ])
             ->defaultSort('period_month', 'desc');
     }

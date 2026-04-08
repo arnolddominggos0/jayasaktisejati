@@ -16,7 +16,7 @@ class VesselCheckCaseResource extends Resource
 
     protected static ?string $navigationLabel = 'Tindak Lanjut Perubahan Jadwal';
     protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
-    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
+    protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
     protected static ?int $navigationSort = 3;
 
     public static function table(Table $table): Table

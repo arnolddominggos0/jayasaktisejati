@@ -25,7 +25,6 @@ class VesselPlanAnalyzer
         $total = $dwelling + $avgSailing + $dooring;
 
         $gapData = $this->calculateEtdGaps($items);
-
         $maxGap = $gapData['max_gap'];
 
         $ok = $total <= $limit && $maxGap <= 6;

@@ -16,6 +16,7 @@ class Voyage extends Model
 
     protected $fillable = [
         'vessel_plan_id',
+        'vessel_plan_item_id',
         'shipping_line_id',
         'vessel_id',
         'pol_id',
@@ -145,11 +146,9 @@ class Voyage extends Model
                             'voyage_id' => $voyage->id,
                             'code' => "d{$d}"
                         ],
-
                         [
                             'milestone_date' => $voyage->atd_at->copy()->addDays($d)
                         ]
-
                     );
                 }
             }
@@ -181,6 +180,16 @@ class Voyage extends Model
         return $this->belongsTo(Port::class, 'pod_id');
     }
 
+    public function vesselPlan()
+    {
+        return $this->belongsTo(VesselPlan::class);
+    }
+
+    public function vesselPlanItem()
+    {
+        return $this->belongsTo(VesselPlanItem::class);
+    }
+
     public function sailingSla()
     {
         return $this->hasOne(SlaResult::class)
@@ -207,32 +216,93 @@ class Voyage extends Model
         return $this->hasMany(VoyageCheckpoint::class);
     }
 
+    public function getPlannedSailingDaysAttribute(): ?float
+    {
+        return $this->vesselPlanItem?->planned_sailing_days;
+    }
+
+    public function getDepartureDelayDaysAttribute(): ?float
+    {
+        if (!$this->etd || !$this->atd_at) {
+            return null;
+        }
+
+        return round(
+            $this->etd->diffInSeconds($this->atd_at) / 86400,
+            2
+        );
+    }
+
+    public function getSailingDelayDaysAttribute(): ?float
+    {
+        if (!$this->planned_sailing_days || !$this->actual_sailing_days) {
+            return null;
+        }
+
+        return round(
+            $this->actual_sailing_days - $this->planned_sailing_days,
+            2
+        );
+    }
+
+    public function getSailingStatusAttribute(): string
+    {
+        if ($this->sailing_delay_days === null) {
+            return 'unknown';
+        }
+
+        return $this->sailing_delay_days <= 0 ? 'ontime' : 'delay';
+    }
+
+    public function getDelayRootCauseAttribute(): ?string
+    {
+        if ($this->departure_delay_days > 0 && $this->sailing_delay_days > 0) {
+            return 'MULTIPLE';
+        }
+
+        if ($this->departure_delay_days > 0) {
+            return 'PORT';
+        }
+
+        if ($this->sailing_delay_days > 0) {
+            return 'SAILING';
+        }
+
+        if (
+            $this->departure_delay_days === null &&
+            $this->sailing_delay_days === null
+        ) {
+            return null;
+        }
+
+        return 'ONTIME';
+    }
+
+    public function getDelayRootCauseLabelAttribute(): ?string
+    {
+        return match ($this->delay_root_cause) {
+            'PORT' => 'Delay Pelabuhan',
+            'SAILING' => 'Delay Pelayaran',
+            'MULTIPLE' => 'Multiple Delay',
+            'ONTIME' => 'On Time',
+            default => '-',
+        };
+    }
+
     public function getOperationalStatusEnumAttribute(): VoyageOperationalStatus
     {
-
-        if ($this->ata_at) {
-            return VoyageOperationalStatus::COMPLETED;
-        }
-
-        if ($this->atd_at) {
-            return VoyageOperationalStatus::SAILING;
-        }
-
-        if ($this->etd && $this->etd->isPast() && !$this->atd_at) {
-            return VoyageOperationalStatus::DELAYED;
-        }
-
+        if ($this->ata_at) return VoyageOperationalStatus::COMPLETED;
+        if ($this->atd_at) return VoyageOperationalStatus::SAILING;
+        if ($this->etd && $this->etd->isPast() && !$this->atd_at) return VoyageOperationalStatus::DELAYED;
         return VoyageOperationalStatus::SCHEDULED;
     }
 
     public function getOverdueDaysAttribute(): ?int
     {
-
         if (
             $this->operational_status_enum === VoyageOperationalStatus::DELAYED
             && $this->etd?->isPast()
         ) {
-
             return $this->etd->diffInDays(now());
         }
 
@@ -241,7 +311,6 @@ class Voyage extends Model
 
     public function getSailingRiskAttribute(): bool
     {
-
         if (
             $this->operational_status_enum !== VoyageOperationalStatus::SAILING
             || !$this->eta
@@ -256,7 +325,6 @@ class Voyage extends Model
 
     public function getEtaOverdueAttribute(): bool
     {
-
         return
             $this->operational_status_enum === VoyageOperationalStatus::SAILING
             && $this->eta
@@ -265,7 +333,6 @@ class Voyage extends Model
 
     public function getOtbStatusAttribute(): ?SlaStatus
     {
-
         if (!$this->etb || !$this->atb_at) {
             return null;
         }
@@ -277,7 +344,6 @@ class Voyage extends Model
 
     public function getOtdStatusAttribute(): ?SlaStatus
     {
-
         if (!$this->etd || !$this->atd_at) {
             return null;
         }
@@ -289,7 +355,6 @@ class Voyage extends Model
 
     public function getOtaStatusAttribute(): ?SlaStatus
     {
-
         if (!$this->eta || !$this->ata_at) {
             return null;
         }
@@ -301,7 +366,6 @@ class Voyage extends Model
 
     public function getDepartureDelayMinutesAttribute(): ?int
     {
-
         if (!$this->etd || !$this->atd_at) {
             return null;
         }
@@ -311,7 +375,6 @@ class Voyage extends Model
 
     public function getArrivalDelayMinutesAttribute(): ?int
     {
-
         if (!$this->eta || !$this->ata_at) {
             return null;
         }
@@ -321,7 +384,6 @@ class Voyage extends Model
 
     public function getDepartureDelaySeverityAttribute(): ?string
     {
-
         $minutes = $this->departure_delay_minutes;
 
         if (is_null($minutes) || $minutes <= 0) {
@@ -346,7 +408,6 @@ class Voyage extends Model
 
     public function getMilestoneSeverityAttribute(): string
     {
-
         $overdue = $this->milestones->where('is_overdue', true)->count();
         $dueToday = $this->milestones->where('is_due_today', true)->count();
 
@@ -363,7 +424,6 @@ class Voyage extends Model
 
     public function getDelayLabelAttribute(): ?string
     {
-
         $minutes = $this->departure_delay_minutes;
 
         if (!$minutes || $minutes <= 0) {

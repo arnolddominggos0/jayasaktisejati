@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Validation\ValidationException;
 
 class VesselPlanItem extends Model
 {
@@ -21,6 +22,25 @@ class VesselPlanItem extends Model
         'planned_etd' => 'datetime',
         'planned_eta' => 'datetime',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function ($item) {
+            if ($item->planned_eta && $item->planned_etd) {
+                if ($item->planned_eta <= $item->planned_etd) {
+                    throw ValidationException::withMessages([
+                        'planned_eta' => 'ETA harus lebih besar dari ETD'
+                    ]);
+                }
+            }
+        });
+
+        static::deleting(function (VesselPlanItem $item) {
+            if ($item->voyage) {
+                $item->voyage->delete();
+            }
+        });
+    }
 
     public function plan(): BelongsTo
     {
@@ -52,14 +72,5 @@ class VesselPlanItem extends Model
             $this->planned_etd->diffInSeconds($this->planned_eta) / 86400,
             2
         );
-    }
-
-    protected static function booted(): void
-    {
-        static::deleting(function (VesselPlanItem $item) {
-            if ($item->voyage) {
-                $item->voyage->delete();
-            }
-        });
     }
 }

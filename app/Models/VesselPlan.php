@@ -52,6 +52,20 @@ class VesselPlan extends Model
         return $this->customer?->pic_phone ?? $this->customer?->phone;
     }
 
+    public function getKpiTotalAttribute(): ?float
+    {
+        return match ($this->status) {
+            VesselPlanStatus::Final => $this->final_kpi_total,
+            VesselPlanStatus::Sent  => $this->draft_kpi_total,
+            default => $this->analyze()['total'] ?? null,
+        };
+    }
+
+    public function etdGaps(): array
+    {
+        return $this->analyze()['gaps'] ?? [];
+    }
+
     public function isDraft(): bool
     {
         return $this->status === VesselPlanStatus::Draft;
@@ -115,7 +129,7 @@ class VesselPlan extends Model
         $analysis = $this->analyze();
 
         if (! $analysis['ok']) {
-            throw new DomainException('Belum sesuai SOP.');
+            throw new DomainException('KPI atau gap tidak sesuai SOP.');
         }
 
         $this->update([
@@ -189,5 +203,5 @@ class VesselPlan extends Model
         }
 
         return $this->final_kpi_total - $this->draft_kpi_total;
-    } 
+    }
 }

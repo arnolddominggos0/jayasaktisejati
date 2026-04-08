@@ -12,6 +12,9 @@ use Illuminate\Database\Eloquent\Builder;
 class MonitoringKapalTam extends Page
 {
     protected static string $view = 'filament.pages.monitoring-kapal-tam';
+    protected static ?string $navigationIcon = 'heroicon-o-globe-alt';
+    protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
+    protected static ?int $navigationSort = 1;
 
     public string $period;
     public string $mode = 'control';
