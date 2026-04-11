@@ -185,71 +185,42 @@ class VoyageResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('shippingLine.name')
-                    ->label('Pelayaran')
-                    ->sortable()
-                    ->searchable(),
 
-                TextColumn::make('vessel.name')
-                    ->label('Kapal')
-                    ->sortable()
-                    ->searchable(),
+                TextColumn::make('shippingLine.name')->sortable()->searchable(),
 
-                TextColumn::make('voyage_no')
-                    ->label('Voyage')
-                    ->sortable()
-                    ->searchable()
-                    ->placeholder('-'),
+                TextColumn::make('vessel.name')->sortable()->searchable(),
 
-                TextColumn::make('pol.code')->label('POL'),
-                TextColumn::make('pod.code')->label('POD'),
+                TextColumn::make('voyage_no')->searchable(),
 
-                TextColumn::make('period_month')
-                    ->label('Periode')
-                    ->date('M Y'),
+                TextColumn::make('pol.code'),
+                TextColumn::make('pod.code'),
 
-                TextColumn::make('etd')
-                    ->label('ETD')
-                    ->dateTime(),
+                TextColumn::make('period_month')->date('M Y'),
 
-                TextColumn::make('eta')
-                    ->label('ETA')
-                    ->dateTime(),
+                TextColumn::make('etd')->dateTime(),
+                TextColumn::make('eta')->dateTime(),
 
-                TextColumn::make('operational_status')
-                    ->label('Status')
+                TextColumn::make('operational_status_enum')
                     ->badge()
-                    ->formatStateUsing(
-                        fn($state) =>
-                        VoyageOperationalStatus::from($state)->label()
-                    )
-                    ->color(
-                        fn($state) =>
-                        VoyageOperationalStatus::from($state)->color()
-                    ),
+                    ->formatStateUsing(fn($state) => $state->label())
+                    ->color(fn($state) => $state->color()),
 
                 TextColumn::make('is_delayed')
-                    ->label('Delay')
                     ->badge()
-                    ->formatStateUsing(fn($state) => $state ? 'Ya' : 'Tidak')
-                    ->color(fn($state) => $state ? 'danger' : 'gray'),
+                    ->formatStateUsing(fn($state) => $state ? 'Delay' : 'On Time')
+                    ->color(fn($state) => $state ? 'danger' : 'success'),
 
-                TextColumn::make('delay_logs_count')
-                    ->label('Revisi')
+                TextColumn::make('delay_root_cause')
+                    ->badge(),
+
+                TextColumn::make('cargo_achievement_ratio')
+                    ->label('Achievement')
+                    ->formatStateUsing(fn($state) => round($state * 100, 1) . '%'),
+
+                TextColumn::make('delayLogs_count')
                     ->counts('delayLogs')
-                    ->badge()
-                    ->color(fn($state) => $state > 0 ? 'warning' : 'gray')
-                    ->action(
-                        Tables\Actions\Action::make('history')
-                            ->modalHeading('Riwayat Perubahan Jadwal')
-                            ->modalSubmitAction(false)
-                            ->modalContent(
-                                fn($record) =>
-                                view('filament.voyage.delay-history', [
-                                    'logs' => $record->delayLogs()->latest()->get(),
-                                ])
-                            )
-                    ),
+                    ->badge(),
+
             ])
             ->defaultSort('etd', 'asc')
             ->actions([
@@ -260,9 +231,9 @@ class VoyageResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $ratioExpr = "CASE 
-        WHEN voyages.cargo_plan IS NULL OR voyages.cargo_plan = 0 
-        THEN NULL 
-        ELSE (voyages.cargo_actual * 1.0 / voyages.cargo_plan) 
+            WHEN voyages.cargo_plan IS NULL OR voyages.cargo_plan = 0 
+            THEN NULL 
+            ELSE (voyages.cargo_actual * 1.0 / voyages.cargo_plan) 
         END";
 
         return parent::getEloquentQuery()

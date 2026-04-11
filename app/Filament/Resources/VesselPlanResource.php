@@ -26,6 +26,7 @@ class VesselPlanResource extends Resource
     {
         return $table
             ->columns([
+
                 TextColumn::make('period_month')
                     ->label('Periode')
                     ->date('F Y')
@@ -44,32 +45,55 @@ class VesselPlanResource extends Resource
 
                 TextColumn::make('kpi_total')
                     ->label('Total KPI')
-                    ->getStateUsing(fn($record) => $record->kpi_total ? $record->kpi_total . ' hari' : '-')
-                    ->color(fn($record) => $record->sopStatus()['color'] ?? 'gray'),
+                    ->getStateUsing(fn($record) =>
+                        $record?->kpi_total ? $record->kpi_total . ' hari' : '-'
+                    )
+                    ->color(fn($record) => $record?->sopStatus()['color'] ?? 'gray'),
 
                 TextColumn::make('kpi_breakdown')
                     ->label('Dw/Sa/Dr')
                     ->getStateUsing(function ($record) {
+
+                        if (!$record) return '-';
+
                         $a = $record->analyze();
-                        return "{$a['dwelling']} / {$a['sailing_avg']} / {$a['dooring']}";
+
+                        $dw = $a['dwelling'] ?? 0;
+                        $sa = $a['sailing_avg'] ?? 0;
+                        $dr = $a['dooring'] ?? 0;
+
+                        return "{$dw} / {$sa} / {$dr}";
                     }),
 
                 TextColumn::make('max_gap')
                     ->label('Max Gap')
-                    ->getStateUsing(fn($record) => ($record->analyze()['max_gap'] ?? 0) . ' hari')
-                    ->color(fn($record) => ($record->analyze()['max_gap'] ?? 0) > 6 ? 'danger' : 'success'),
+                    ->getStateUsing(function ($record) {
+
+                        if (!$record) return '-';
+
+                        $gap = $record->analyze()['max_gap'] ?? 0;
+
+                        return $gap . ' hari';
+                    })
+                    ->color(fn($record) =>
+                        ($record?->analyze()['max_gap'] ?? 0) > 6 ? 'danger' : 'success'
+                    ),
 
                 TextColumn::make('status_sop')
                     ->label('Status SOP')
                     ->badge()
-                    ->getStateUsing(fn($record) => $record?->sopStatus()['label'] ?? '-')
-                    ->color(fn($record) => $record?->sopStatus()['color'] ?? 'gray'),
+                    ->getStateUsing(fn($record) =>
+                        $record?->sopStatus()['label'] ?? '-'
+                    )
+                    ->color(fn($record) =>
+                        $record?->sopStatus()['color'] ?? 'gray'
+                    ),
 
                 TextColumn::make('feedback_reason')
                     ->label('Alasan Revisi')
                     ->limit(40)
                     ->toggleable()
-                    ->visible(fn($record) => $record?->isRevision() ?? false),
+                    ->visible(fn($record) => $record?->isRevision()),
             ])
 
             ->actions([
@@ -81,14 +105,14 @@ class VesselPlanResource extends Resource
                     ->label('Kirim')
                     ->icon('heroicon-o-paper-airplane')
                     ->color('primary')
-                    ->action(fn($record) => $record->markAsSent(auth()->id()))
+                    ->action(fn($record) => $record?->markAsSent(auth()->id()))
                     ->visible(fn($record) => $record?->isDraft()),
 
                 Tables\Actions\Action::make('approve')
                     ->label('Finalisasi')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->action(fn($record) => $record->approve(auth()->id()))
+                    ->action(fn($record) => $record?->approve(auth()->id()))
                     ->visible(fn($record) => $record?->isSent()),
 
                 Tables\Actions\Action::make('feedback')
@@ -101,7 +125,9 @@ class VesselPlanResource extends Resource
                             ->required()
                             ->rows(4),
                     ])
-                    ->action(fn($record, $data) => $record->reject($data['reason'], auth()->id()))
+                    ->action(fn($record, $data) =>
+                        $record?->reject($data['reason'], auth()->id())
+                    )
                     ->visible(fn($record) => $record?->isSent()),
             ])
             ->defaultSort('period_month', 'desc');

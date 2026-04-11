@@ -149,6 +149,28 @@ class VesselPlan extends Model
         }
     }
 
+    public function canSendToTam(): bool
+    {
+        if (! $this->isDraft()) {
+            return false;
+        }
+
+        $analysis = $this->analyze();
+
+        return $analysis['ok'] ?? false;
+    }
+
+    public function maxEtdGap(): ?int
+    {
+        $gaps = $this->etdGaps();
+
+        if (empty($gaps)) {
+            return null;
+        }
+
+        return max($gaps);
+    }   
+
     public function markAsFinal(int $userId): void
     {
         if (! $this->isSent()) {

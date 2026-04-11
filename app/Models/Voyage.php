@@ -18,44 +18,49 @@ class Voyage extends Model
         'vessel_plan_id',
         'vessel_plan_item_id',
         'shipping_line_id',
+
         'vessel_id',
         'pol_id',
         'pod_id',
+
         'voyage_no',
+        'service',
         'etd',
         'eta',
         'etb',
+        'cargo_plan',
+
         'atb_at',
-        'period_month',
         'atd_at',
         'ata_at',
-        'actual_sailing_days',
-        'is_delayed',
-        'delay_reason',
-        'cargo_plan',
         'cargo_actual',
-        'cargo_actual_reported_at',
-        'cargo_actual_reported_by',
+
+        'period_month',
+        'actual_sailing_days',
+
+        'manual_delay_reason',
         'final_note',
+
         'closing_at',
-        'operational_status',
     ];
 
     protected $casts = [
         'etd' => 'datetime',
         'eta' => 'datetime',
         'etb' => 'datetime',
+
+        'atb_at' => 'datetime',
         'atd_at' => 'datetime',
         'ata_at' => 'datetime',
-        'atb_at' => 'datetime',
+
         'closing_at' => 'datetime',
         'period_month' => 'date',
+
         'actual_sailing_days' => 'decimal:2',
-        'is_delayed' => 'boolean',
-        'delay_reason' => VoyageDelayReason::class,
+        'manual_delay_reason' => VoyageDelayReason::class,
+
         'cargo_plan' => 'integer',
         'cargo_actual' => 'integer',
-        'cargo_actual_reported_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -67,7 +72,6 @@ class Voyage extends Model
                 $voyage->isDirty('eta') ||
                 $voyage->isDirty('etb')
             ) {
-
                 VoyageDelayLog::create([
                     'voyage_id'  => $voyage->id,
                     'old_etd'    => $voyage->getOriginal('etd'),
@@ -76,31 +80,22 @@ class Voyage extends Model
                     'new_eta'    => $voyage->eta,
                     'new_etb'    => $voyage->etb,
                     'new_atb_at' => $voyage->atb_at,
-                    'reason'     => $voyage->delay_reason?->value,
+                    'reason'     => $voyage->manual_delay_reason?->value,
                     'changed_by' => optional(auth_user())->name,
                 ]);
-
-                $voyage->is_delayed = true;
             }
 
-            if ($voyage->atd_at) {
-
-                $end = $voyage->ata_at ?? now();
-
-                if ($end->gt($voyage->atd_at)) {
-
-                    $voyage->actual_sailing_days = round(
-                        $voyage->atd_at->diffInSeconds($end) / 86400,
-                        2
-                    );
-                }
+            if ($voyage->atd_at && $voyage->ata_at) {
+                $voyage->actual_sailing_days = round(
+                    $voyage->atd_at->diffInSeconds($voyage->ata_at) / 86400,
+                    2
+                );
             }
 
             if (
                 $voyage->isDirty('cargo_actual') &&
-                is_null($voyage->cargo_actual_reported_at)
+                is_null($voyage->cargo_actual_reported_at ?? null)
             ) {
-
                 $voyage->cargo_actual_reported_at = now();
                 $voyage->cargo_actual_reported_by = optional(auth_user())->name;
             }
@@ -113,22 +108,18 @@ class Voyage extends Model
             }
 
             if ($voyage->eta) {
-
-                $voyage->checkpoints()->updateOrCreate(
-                    ['voyage_id' => $voyage->id, 'code' => 'eta_d2'],
-                    [
-                        'offset_days' => -2,
-                        'scheduled_at' => $voyage->eta->copy()->subDays(2),
-                    ]
-                );
-
-                $voyage->checkpoints()->updateOrCreate(
-                    ['voyage_id' => $voyage->id, 'code' => 'eta_d1'],
-                    [
-                        'offset_days' => -1,
-                        'scheduled_at' => $voyage->eta->copy()->subDay(),
-                    ]
-                );
+                foreach ([-2, -1] as $offset) {
+                    $voyage->checkpoints()->updateOrCreate(
+                        [
+                            'voyage_id' => $voyage->id,
+                            'code' => 'eta_d' . abs($offset)
+                        ],
+                        [
+                            'offset_days' => $offset,
+                            'scheduled_at' => $voyage->eta->copy()->addDays($offset),
+                        ]
+                    );
+                }
             }
         });
 
@@ -136,12 +127,9 @@ class Voyage extends Model
 
             if ($voyage->wasChanged('atd_at') && $voyage->atd_at) {
 
-                $days = [2, 4, 6, 8, 10, 12];
-
-                foreach ($days as $d) {
+                foreach ([2, 4, 6, 8, 10, 12] as $d) {
 
                     $voyage->milestones()->updateOrCreate(
-
                         [
                             'voyage_id' => $voyage->id,
                             'code' => "d{$d}"
@@ -153,11 +141,6 @@ class Voyage extends Model
                 }
             }
         });
-    }
-
-    public function delayLogs(): HasMany
-    {
-        return $this->hasMany(VoyageDelayLog::class);
     }
 
     public function shippingLine()
@@ -180,14 +163,24 @@ class Voyage extends Model
         return $this->belongsTo(Port::class, 'pod_id');
     }
 
-    public function vesselPlan()
-    {
-        return $this->belongsTo(VesselPlan::class);
-    }
-
     public function vesselPlanItem()
     {
         return $this->belongsTo(VesselPlanItem::class);
+    }
+
+    public function delayLogs(): HasMany
+    {
+        return $this->hasMany(VoyageDelayLog::class);
+    }
+
+    public function milestones(): HasMany
+    {
+        return $this->hasMany(VoyageMilestone::class);
+    }
+
+    public function checkpoints(): HasMany
+    {
+        return $this->hasMany(VoyageCheckpoint::class);
     }
 
     public function sailingSla()
@@ -206,16 +199,6 @@ class Voyage extends Model
         return $this->hasMany(VesselCheck::class);
     }
 
-    public function milestones(): HasMany
-    {
-        return $this->hasMany(VoyageMilestone::class);
-    }
-
-    public function checkpoints(): HasMany
-    {
-        return $this->hasMany(VoyageCheckpoint::class);
-    }
-
     public function getPlannedSailingDaysAttribute(): ?float
     {
         return $this->vesselPlanItem?->planned_sailing_days;
@@ -223,9 +206,7 @@ class Voyage extends Model
 
     public function getDepartureDelayDaysAttribute(): ?float
     {
-        if (!$this->etd || !$this->atd_at) {
-            return null;
-        }
+        if (!$this->etd || !$this->atd_at) return null;
 
         return round(
             $this->etd->diffInSeconds($this->atd_at) / 86400,
@@ -254,26 +235,22 @@ class Voyage extends Model
         return $this->sailing_delay_days <= 0 ? 'ontime' : 'delay';
     }
 
+    public function getIsDelayedAttribute(): bool
+    {
+        return ($this->departure_delay_days > 0)
+            || ($this->sailing_delay_days > 0);
+    }
+
     public function getDelayRootCauseAttribute(): ?string
     {
-        if ($this->departure_delay_days > 0 && $this->sailing_delay_days > 0) {
-            return 'MULTIPLE';
-        }
+        $dep = $this->departure_delay_days;
+        $sail = $this->sailing_delay_days;
 
-        if ($this->departure_delay_days > 0) {
-            return 'PORT';
-        }
+        if (is_null($dep) && is_null($sail)) return null;
 
-        if ($this->sailing_delay_days > 0) {
-            return 'SAILING';
-        }
-
-        if (
-            $this->departure_delay_days === null &&
-            $this->sailing_delay_days === null
-        ) {
-            return null;
-        }
+        if ($dep > 0 && $sail > 0) return 'MULTIPLE';
+        if ($dep > 0) return 'PORT';
+        if ($sail > 0) return 'SAILING';
 
         return 'ONTIME';
     }
@@ -390,13 +367,8 @@ class Voyage extends Model
             return null;
         }
 
-        if ($minutes <= 30) {
-            return 'minor';
-        }
-
-        if ($minutes <= 120) {
-            return 'moderate';
-        }
+        if ($minutes <= 30) return 'minor';
+        if ($minutes <= 120) return 'moderate';
 
         return 'major';
     }
@@ -411,13 +383,8 @@ class Voyage extends Model
         $overdue = $this->milestones->where('is_overdue', true)->count();
         $dueToday = $this->milestones->where('is_due_today', true)->count();
 
-        if ($overdue > 0) {
-            return 'critical';
-        }
-
-        if ($dueToday > 0) {
-            return 'warning';
-        }
+        if ($overdue > 0) return 'critical';
+        if ($dueToday > 0) return 'warning';
 
         return 'ontrack';
     }
@@ -426,9 +393,7 @@ class Voyage extends Model
     {
         $minutes = $this->departure_delay_minutes;
 
-        if (!$minutes || $minutes <= 0) {
-            return null;
-        }
+        if (!$minutes || $minutes <= 0) return null;
 
         if ($minutes >= 60) {
             return 'Terlambat ' . round($minutes / 60, 1) . ' jam';
