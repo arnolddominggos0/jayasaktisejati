@@ -6,6 +6,7 @@ use App\Enums\VesselPlanStatus;
 use App\Filament\Resources\VesselPlanResource;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanAnalysis;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanDashboard;
+use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanReviewHistory;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
@@ -18,10 +19,10 @@ class EditVesselPlan extends EditRecord
     protected function getHeaderWidgets(): array
     {
         if ($this->record->isFinal()) {
-            return [VesselPlanDashboard::class];
+            return [VesselPlanDashboard::class, VesselPlanReviewHistory::class];
         }
 
-        return [VesselPlanAnalysis::class];
+        return [VesselPlanAnalysis::class, VesselPlanReviewHistory::class];
     }
 
     public function getHeaderWidgetsColumns(): int
@@ -33,7 +34,7 @@ class EditVesselPlan extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('kirim_ke_tam')
+            Action::make('submitDraft')
                 ->label('Kirim ke TAM (WhatsApp)')
                 ->icon('heroicon-o-paper-airplane')
                 ->color('primary')
@@ -43,22 +44,28 @@ class EditVesselPlan extends EditRecord
                 )
                 ->disabled(
                     fn() =>
-                    ! $this->record->canSendToTam()
+                    ! $this->record->canSubmitDraft()
                 )
+                ->tooltip(fn() => $this->submitDraftDisabledReason())
                 ->requiresConfirmation()
                 ->action(function () {
 
-                    $this->record->markAsSent(auth()->id());
+                    $this->record->submitDraft(auth()->id());
 
                     Notification::make()
                         ->title('Draft Dikirim ke TAM')
+                        ->body('Snapshot draft dan KPI draft berhasil disimpan.')
                         ->success()
                         ->send();
 
-                    $this->redirect($this->record->waUrl());
+                    $waUrl = $this->record->waUrl();
+
+                    if ($waUrl) {
+                        $this->redirect($waUrl);
+                    }
                 }),
 
-            Action::make('approve')
+            Action::make('finalize')
                 ->label('Setujui & Finalisasi')
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
@@ -69,11 +76,11 @@ class EditVesselPlan extends EditRecord
                 ->requiresConfirmation()
                 ->action(function () {
 
-                    $count = $this->record->approve(auth()->id());
+                    $count = $this->record->finalizeSchedule(auth()->id());
 
                     Notification::make()
                         ->title('Vessel Plan Disetujui')
-                        ->body("{$count} voyage berhasil dibuat.")
+                        ->body("Snapshot final disimpan dan {$count} voyage disinkronkan.")
                         ->success()
                         ->send();
                 }),
@@ -119,10 +126,18 @@ class EditVesselPlan extends EditRecord
     }
 
 
-    protected function sendDisabledReason(): string
+    protected function submitDraftDisabledReason(): string
     {
         if ($this->record->items()->count() === 0) {
             return 'Tambahkan jadwal kapal terlebih dahulu.';
+        }
+
+        if (! $this->record->customer_id) {
+            return 'Customer TAM belum terhubung ke vessel plan.';
+        }
+
+        if (! $this->record->hasWhatsappRecipient()) {
+            return 'Nomor WhatsApp customer TAM belum tersedia.';
         }
 
         $analysis = $this->record->analyze();

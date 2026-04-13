@@ -36,6 +36,12 @@ class VesselPlanItem extends Model
         });
 
         static::deleting(function (VesselPlanItem $item) {
+            if ($item->plan && ! $item->plan->isEditable()) {
+                throw ValidationException::withMessages([
+                    'vessel_plan_id' => 'Item tidak bisa dihapus setelah vessel plan dikirim atau difinalkan.'
+                ]);
+            }
+
             if ($item->voyage) {
                 $item->voyage->delete();
             }
@@ -59,7 +65,7 @@ class VesselPlanItem extends Model
 
     public function voyage(): HasOne
     {
-        return $this->hasOne(Voyage::class);
+        return $this->hasOne(Voyage::class, 'vessel_plan_item_id');
     }
 
     public function getPlannedSailingDaysAttribute(): ?float
@@ -72,5 +78,26 @@ class VesselPlanItem extends Model
             $this->planned_etd->diffInSeconds($this->planned_eta) / 86400,
             2
         );
+    }
+
+    public function getDwellingDaysAttribute(): int
+    {
+        return 2;
+    }
+
+    public function getDooringDaysAttribute(): int
+    {
+        return 3;
+    }
+
+    public function getTotalKpiAttribute(): ?float
+    {
+        if (!$this->planned_sailing_days) {
+            return null;
+        }
+
+        return $this->dwelling_days
+            + $this->planned_sailing_days
+            + $this->dooring_days;
     }
 }

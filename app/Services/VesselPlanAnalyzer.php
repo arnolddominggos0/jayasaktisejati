@@ -11,12 +11,25 @@ class VesselPlanAnalyzer
         $items = $plan->items->sortBy('planned_etd')->values();
 
         if ($items->isEmpty()) {
-            return ['ok' => false];
+            return [
+                'dwelling' => 0,
+                'sailing_avg' => 0,
+                'dooring' => 0,
+                'total' => 0,
+                'limit' => 0,
+                'max_gap' => 0,
+                'gaps' => [],
+                'schedule_count' => 0,
+                'kpi_ok' => false,
+                'gap_ok' => false,
+                'violations' => ['Belum ada jadwal kapal.'],
+                'ok' => false,
+            ];
         }
 
-        $dwelling = config('kpi.manado.thresholds.dwelling_days', 6);
-        $dooring  = config('kpi.manado.thresholds.dooring_days', 3);
-        $limit    = config('kpi.manado.thresholds.total_days.normal', 19);
+        $dwelling = config('jss_kpi.manado.thresholds.dwelling_days', 6);
+        $dooring  = config('jss_kpi.manado.thresholds.dooring_days', 3);
+        $limit    = config('jss_kpi.manado.thresholds.total_days.normal', 19);
 
         $avgSailing = $items->map(fn($i) => $i->planned_sailing_days)
             ->filter()
@@ -27,7 +40,18 @@ class VesselPlanAnalyzer
         $gapData = $this->calculateEtdGaps($items);
         $maxGap = $gapData['max_gap'];
 
-        $ok = $total <= $limit && $maxGap <= 6;
+        $kpiOk = $total <= $limit;
+        $gapLimit = 6;
+        $gapOk = $maxGap <= $gapLimit;
+        $ok = $kpiOk && $gapOk;
+
+        $violations = [];
+        if (! $kpiOk) {
+            $violations[] = 'Total KPI ' . round($total, 2) . ' hari melebihi batas ' . $limit . ' hari.';
+        }
+        if (! $gapOk) {
+            $violations[] = 'Max ETD Gap ' . $maxGap . ' hari melebihi batas ' . $gapLimit . ' hari.';
+        }
 
         return [
             'dwelling'    => $dwelling,
@@ -37,6 +61,11 @@ class VesselPlanAnalyzer
             'limit'       => $limit,
             'max_gap'     => $maxGap,
             'gaps'        => $gapData['gaps'],
+            'schedule_count' => $items->count(),
+            'kpi_ok' => $kpiOk,
+            'gap_ok' => $gapOk,
+            'gap_limit' => $gapLimit,
+            'violations' => $violations,
             'ok'          => $ok,
         ];
     }

@@ -45,10 +45,31 @@ class VesselPlanResource extends Resource
 
                 TextColumn::make('kpi_total')
                     ->label('Total KPI')
-                    ->getStateUsing(fn($record) =>
+                    ->getStateUsing(
+                        fn($record) =>
                         $record?->kpi_total ? $record->kpi_total . ' hari' : '-'
                     )
                     ->color(fn($record) => $record?->sopStatus()['color'] ?? 'gray'),
+
+                TextColumn::make('draft_kpi_total')
+                    ->label('Draft KPI')
+                    ->suffix(' hari')
+                    ->toggleable(),
+
+                TextColumn::make('final_kpi_total')
+                    ->label('Final KPI')
+                    ->suffix(' hari')
+                    ->toggleable(),
+
+                TextColumn::make('kpi_deviation_label')
+                    ->label('Deviasi')
+                    ->badge()
+                    ->color(fn($record) => match (true) {
+                        is_null($record?->kpi_deviation) => 'gray',
+                        $record->kpi_deviation > 0 => 'danger',
+                        $record->kpi_deviation < 0 => 'success',
+                        default => 'warning',
+                    }),
 
                 TextColumn::make('kpi_breakdown')
                     ->label('Dw/Sa/Dr')
@@ -75,19 +96,36 @@ class VesselPlanResource extends Resource
 
                         return $gap . ' hari';
                     })
-                    ->color(fn($record) =>
-                        ($record?->analyze()['max_gap'] ?? 0) > 6 ? 'danger' : 'success'
+                    ->color(
+                        fn($record) => ($record?->analyze()['max_gap'] ?? 0) > 6 ? 'danger' : 'success'
                     ),
 
                 TextColumn::make('status_sop')
                     ->label('Status SOP')
                     ->badge()
-                    ->getStateUsing(fn($record) =>
+                    ->getStateUsing(
+                        fn($record) =>
                         $record?->sopStatus()['label'] ?? '-'
                     )
-                    ->color(fn($record) =>
+                    ->color(
+                        fn($record) =>
                         $record?->sopStatus()['color'] ?? 'gray'
-                    ),
+                    )
+                    ->tooltip(fn($record) => $record?->sopStatus()['reason'] ?? null),
+
+                TextColumn::make('status_kpi')
+                    ->label('Status KPI')
+                    ->badge()
+                    ->getStateUsing(fn($record) => ($record?->analyze()['kpi_ok'] ?? false) ? 'Sesuai' : 'Melebihi')
+                    ->color(fn($record) => ($record?->analyze()['kpi_ok'] ?? false) ? 'success' : 'danger')
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('status_gap')
+                    ->label('Status Gap')
+                    ->badge()
+                    ->getStateUsing(fn($record) => ($record?->analyze()['gap_ok'] ?? false) ? 'Sesuai' : 'Melebihi')
+                    ->color(fn($record) => ($record?->analyze()['gap_ok'] ?? false) ? 'success' : 'danger')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('feedback_reason')
                     ->label('Alasan Revisi')
@@ -101,18 +139,18 @@ class VesselPlanResource extends Resource
                 Tables\Actions\EditAction::make()
                     ->visible(fn($record) => $record?->isEditable()),
 
-                Tables\Actions\Action::make('send')
+                Tables\Actions\Action::make('submitDraft')
                     ->label('Kirim')
                     ->icon('heroicon-o-paper-airplane')
                     ->color('primary')
-                    ->action(fn($record) => $record?->markAsSent(auth()->id()))
+                    ->action(fn($record) => $record?->submitDraft(auth()->id()))
                     ->visible(fn($record) => $record?->isDraft()),
 
-                Tables\Actions\Action::make('approve')
+                Tables\Actions\Action::make('finalize')
                     ->label('Finalisasi')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
-                    ->action(fn($record) => $record?->approve(auth()->id()))
+                    ->action(fn($record) => $record?->finalizeSchedule(auth()->id()))
                     ->visible(fn($record) => $record?->isSent()),
 
                 Tables\Actions\Action::make('feedback')
@@ -125,7 +163,8 @@ class VesselPlanResource extends Resource
                             ->required()
                             ->rows(4),
                     ])
-                    ->action(fn($record, $data) =>
+                    ->action(
+                        fn($record, $data) =>
                         $record?->reject($data['reason'], auth()->id())
                     )
                     ->visible(fn($record) => $record?->isSent()),

@@ -20,16 +20,36 @@ class VesselPlanAnalysis extends Widget
             return [];
         }
 
-        $total = $this->record->items()->count();
-        $sop   = $this->record->sopStatus();
+        $analysis = $this->record->analyze();
+        $draftSnapshot = $this->record->draftSnapshot();
+        $finalSnapshot = $this->record->finalSnapshot();
+        $draftKpi = $draftSnapshot?->kpi_payload ?? null;
+        $finalKpi = $finalSnapshot?->kpi_payload ?? null;
+        $sop = $this->record->sopStatus();
+        $draftPanel = $this->getDraftPanelMeta();
+        $finalPanel = $this->getFinalPanelMeta();
 
         return [
-            'total'    => $total,
-            'maxGap'   => $total > 0 ? $this->record->maxEtdGap() : 0,
-            'idealGap' => 6,
+            'total'    => $analysis['schedule_count'] ?? 0,
+            'dwelling' => $analysis['dwelling'] ?? 0,
+            'sailingAvg' => $analysis['sailing_avg'] ?? 0,
+            'dooring' => $analysis['dooring'] ?? 0,
+            'totalKpi' => $analysis['total'] ?? 0,
+            'kpiLimit' => $analysis['limit'] ?? 0,
+            'maxGap'   => $analysis['max_gap'] ?? 0,
+            'idealGap' => $analysis['gap_limit'] ?? 6,
+            'kpiOk' => $analysis['kpi_ok'] ?? false,
+            'gapOk' => $analysis['gap_ok'] ?? false,
+            'violations' => $analysis['violations'] ?? [],
+            'draftKpi' => $draftKpi,
+            'finalKpi' => $finalKpi,
+            'draftPanelTitle' => $draftPanel['title'],
+            'draftPanelCaption' => $draftPanel['caption'],
+            'finalPanelTitle' => $finalPanel['title'],
+            'finalPanelCaption' => $finalPanel['caption'],
 
             'statusLabel' => $sop['label'],
-
+            'statusReason' => $sop['reason'] ?? '',
             'statusColor' => match ($sop['color']) {
                 'success' => 'text-green-600',
                 'danger'  => 'text-red-600',
@@ -41,6 +61,47 @@ class VesselPlanAnalysis extends Widget
                 'danger'  => 'bg-red-50',
                 default   => 'bg-gray-50',
             },
+        ];
+    }
+
+    protected function getDraftPanelMeta(): array
+    {
+        $snapshot = $this->record?->draftSnapshot();
+
+        if (! $snapshot) {
+            return [
+                'title' => 'Snapshot Draft',
+                'caption' => 'Belum ada snapshot draft yang pernah dikirim.',
+            ];
+        }
+
+        $title = match (true) {
+            $this->record?->isDraft() => 'Snapshot Draft Terakhir',
+            $this->record?->isSent() => 'Draft Terkirim',
+            $this->record?->isFinal() => 'Draft Yang Disetujui',
+            default => 'Snapshot Draft',
+        };
+
+        return [
+            'title' => $title,
+            'caption' => 'Tersimpan pada ' . $snapshot->created_at?->format('d M Y H:i'),
+        ];
+    }
+
+    protected function getFinalPanelMeta(): array
+    {
+        $snapshot = $this->record?->finalSnapshot();
+
+        if (! $snapshot) {
+            return [
+                'title' => 'Snapshot Final',
+                'caption' => 'Belum ada snapshot final.',
+            ];
+        }
+
+        return [
+            'title' => 'Snapshot Final',
+            'caption' => 'Disetujui pada ' . $snapshot->created_at?->format('d M Y H:i'),
         ];
     }
 }
