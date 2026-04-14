@@ -29,6 +29,12 @@ class EnsurePanelRole
             }
         }
 
+        if ($panel->getId() === 'customer') {
+            if (! (method_exists($user, 'hasRole') && $user->hasRole('customer'))) {
+                abort(403, 'Panel ini khusus untuk Customer.');
+            }
+        }
+
         return $next($request);
     }
 }

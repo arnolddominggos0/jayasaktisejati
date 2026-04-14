@@ -1,11 +1,22 @@
 <?php
 
+use App\Http\Controllers\Public\LandingController;
+use App\Http\Controllers\Public\TrackingController;
 use App\Http\Controllers\ShipmentPrintController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+/*
+|--------------------------------------------------------------------------
+| Public Routes (No Login Required)
+|--------------------------------------------------------------------------
+*/
+
+// Landing Page
+Route::get('/', [LandingController::class, 'index'])->name('landing');
+
+// Public Tracking
+Route::get('/tracking', [TrackingController::class, 'index'])->name('tracking');
+Route::post('/tracking/search', [TrackingController::class, 'search'])->name('tracking.search');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/shipments/{shipment}/waybill', [ShipmentPrintController::class, 'waybill'])

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 180" width="300" height="180">
+  <!-- White version for dark backgrounds -->
+  
+  <!-- Garis lengkung atas 1 -->
+  <path d="M 20,50 
+           C 70,25 130,35 170,45 
+           C 210,55 250,40 290,35" 
+        fill="none" 
+        stroke="rgba(255,255,255,0.85)" 
+        stroke-width="2.5" 
+        stroke-linecap="round"/>
+  
+  <!-- Garis lengkung atas 2 -->
+  <path d="M 15,70 
+           C 75,48 135,58 175,68 
+           C 215,78 255,58 295,55" 
+        fill="none" 
+        stroke="rgba(255,255,255,0.9)" 
+        stroke-width="3.5" 
+        stroke-linecap="round"/>
+  
+  <!-- Garis lengkung atas 3 -->
+  <path d="M 10,90 
+           C 80,68 140,78 180,88 
+           C 220,98 260,78 300,75" 
+        fill="none" 
+        stroke="rgba(255,255,255,0.95)" 
+        stroke-width="4" 
+        stroke-linecap="round"/>
+  
+  <!-- Garis bawah utama -->
+  <path d="M 5,145 
+           C 100,125 170,140 210,150
+           L 260,95 
+           L 305,70" 
+        fill="none" 
+        stroke="white" 
+        stroke-width="12" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+</svg>
