@@ -1,0 +1,4 @@
+ID,Code,Name,Email,Phone,Address,Type,Branch_ID,Branch_Name
+50,TAM-001,PT Toyota Astra Motor,logistik@toyota.astra.co.id,021-8195001,Jl Yos Sudarso Kav 8 Sunter II Jakarta 14330,company,1,Jakarta
+51,MITRA-001,PT Mitra Logistik,ops@mitralogistik.co.id,021-8765432,Jl Gatot Subroto Kav 35 Jakarta,company,1,Jakarta
+52,SUPER-001,Super Indo,scm@superindo.co.id,021-9876543,Jl Wolter Monginsidi No 89 Jakarta,company,1,Jakarta

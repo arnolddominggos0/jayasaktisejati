@@ -1,0 +1,3 @@
+ID,Loading_Session_ID,Unit_Plate_Number,Distance_Front_RH,Distance_Rear_RH,Distance_Back_Door,Distance_Rear_LH,Distance_Front_LH,Drop_Floor_Front_Height,Drop_Floor_Rear_Height,Container_Roof_Distance,Measurements_Valid,Unit_Safe_For_Loading,Checked_By,Checked_At
+1,3,B 1234 TAM,120,115,180,118,122,110,112,280,Yes,Yes,12,2026-04-14 10:30:00
+2,4,B 5678 TAM,118,117,182,119,120,111,113,278,Yes,Yes,12,2026-04-13 09:30:00

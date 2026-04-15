@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ShipmentController;
 use App\Http\Controllers\Api\CustomerController;
 use App\Http\Controllers\Api\VoyageController;
 use App\Http\Controllers\Api\DashboardController;
+use App\Http\Controllers\Api\AppSheetWebhookController;
 
 /*
 |--------------------------------------------------------------------------
@@ -18,6 +19,12 @@ use App\Http\Controllers\Api\DashboardController;
 | be assigned to the "api" middleware group. Make something great!
 |
 */
+
+// AppSheet Webhook Routes (Public - validated by signature)
+Route::prefix('appsheet')->group(function () {
+    Route::post('webhook', [AppSheetWebhookController::class, 'handle'])->name('appsheet.webhook');
+    Route::get('test', [AppSheetWebhookController::class, 'test'])->name('appsheet.test');
+});
 
 // Public routes
 Route::prefix('user')->group(function () {

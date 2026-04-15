@@ -13,8 +13,9 @@ class BriefingChecklist extends Model
     protected $fillable = [
         'session_id',
         'item',
+        'type',
         'status',
-        'remark'
+        'remark',
     ];
 
     protected $casts = [

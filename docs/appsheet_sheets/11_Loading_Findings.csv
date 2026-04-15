@@ -1,0 +1,3 @@
+ID,Loading_Session_ID,Category,Severity,Item_Name,Finding_Type,Description,Status,Created_At
+1,2,rack_pillar,warning,Pilar C,Pengecekan belum selesai,Pilar C dan D masih dalam pengecekan,in_progress,2026-04-15 13:30:00
+2,2,equipment,info,Katrol Atas,Menunggu pengecekan,Belum dilakukan pengecekan katrol,open,2026-04-15 13:30:00

@@ -6,12 +6,11 @@ use App\Enums\ShipmentStatus;
 use App\Events\ShipmentStatusUpdated;
 use App\Filament\Resources\ShipmentResource;
 use App\Filament\Resources\ShipmentResource\Widgets\RecentShipmentActivities;
-use App\Filament\Resources\ShipmentTrackingResource\Widgets\RecentTrackingActivities;
+use App\Services\ShipmentService;
 use Filament\Actions;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
-use App\Models\Shipment;
 
 class EditShipment extends EditRecord
 {
@@ -29,7 +28,6 @@ class EditShipment extends EditRecord
         ];
     }
 
-
     protected function getHeaderActions(): array
     {
         return [
@@ -37,7 +35,7 @@ class EditShipment extends EditRecord
                 ->label('Batalkan')
                 ->icon('heroicon-m-x-circle')
                 ->color('danger')
-                ->visible(fn() => ($this->record->status instanceof ShipmentStatus)
+                ->visible(fn () => ($this->record->status instanceof ShipmentStatus)
                     ? $this->record->status !== ShipmentStatus::Cancelled->value
                     : (string) $this->record->status !== ShipmentStatus::Cancelled->value)
                 ->requiresConfirmation()
@@ -47,7 +45,7 @@ class EditShipment extends EditRecord
                 ->label('Pulihkan')
                 ->icon('heroicon-m-arrow-path')
                 ->color('gray')
-                ->visible(fn() => ($this->record->status instanceof ShipmentStatus)
+                ->visible(fn () => ($this->record->status instanceof ShipmentStatus)
                     ? $this->record->status === ShipmentStatus::Cancelled
                     : (string) $this->record->status === ShipmentStatus::Cancelled->value)
                 ->requiresConfirmation()
@@ -108,32 +106,10 @@ class EditShipment extends EditRecord
     public function afterSave(): void
     {
         $shipment = $this->record;
+        $units = $this->form->getState()['units'] ?? [];
 
-        $this->syncUnits($shipment, $this->form->getState());
+        app(ShipmentService::class)->syncUnits($shipment, $units);
 
         event(new ShipmentStatusUpdated($shipment, 'fc'));
-    }
-
-    protected function syncUnits(Shipment $shipment, array $state): void
-    {
-        $units = $state['units'] ?? [];
-
-        $shipment->units()->delete();
-
-        if (is_array($units) && count($units) > 0) {
-            foreach ($units as $u) {
-                $shipment->units()->create([
-                    'model_no'          => $u['model_no'] ?? null,
-                    'reg_no'            => $u['reg_no'] ?? null,
-                    'chassis_no'        => $u['chassis_no'] ?? null,
-                    'engine_no'         => $u['engine_no'] ?? null,
-                    'color'             => $u['color'] ?? null,
-                    'do_number'         => $u['do_number'] ?? null,
-                    'qty'               => isset($u['qty']) ? (int)$u['qty'] : 1,
-                    'container_display' => $u['container_display'] ?? null,
-                    'notes'             => $u['notes'] ?? null,
-                ]);
-            }
-        }
     }
 }

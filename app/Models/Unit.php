@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Unit extends Model
 {
@@ -31,5 +32,10 @@ class Unit extends Model
     public function shipment()
     {
         return $this->belongsTo(Shipment::class, 'shipment_id', 'id');
+    }
+
+    public function unitChecks(): HasMany
+    {
+        return $this->hasMany(UnitCheck::class);
     }
 }

@@ -163,7 +163,7 @@
                     </div>
                     
                     <!-- Floating Stats Card -->
-                    <div class="absolute -bottom-6 -right-6 bg-white rounded-2xl p-5 shadow-2xl border border-slate-100">
+                    <div class="absolute top-1/2 right-[-20%] transform -translate-y-1/2 bg-white/90 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-white/30 w-64">
                         <div class="flex items-center gap-4">
                             <div class="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
                                 <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -171,7 +171,7 @@
                                 </svg>
                             </div>
                             <div>
-                                <p class="text-3xl font-bold text-slate-900">10,000+</p>
+                                <p class="text-3xl font-bold text-slate-900">100,000+</p>
                                 <p class="text-slate-500 text-sm font-medium">Pengiriman Sukses</p>
                             </div>
                         </div>
@@ -826,7 +826,6 @@
                     <div class="border-t border-slate-100 pt-4 mb-4">
                         <p class="text-xs text-slate-500 mb-1">Marketing</p>
                         <p class="font-semibold text-slate-800 text-sm">{{ $branch['contact_person'] }}</p>
-                        <p class="text-slate-600 text-sm">{{ $branch['phone'] }}</p>
                     </div>
                     <a href="https://wa.me/{{ $branch['whatsapp'] }}?text={{ urlencode('Selamat pagi/siang ' . $branch['contact_person'] . '. Saya ingin menanyakan informasi pengiriman dari ' . $branch['short_name'] . '. Mohon bantuannya, terima kasih.') }}" 
                        target="_blank"
@@ -864,7 +863,6 @@
                     <div class="border-t border-slate-100 pt-4 mb-4">
                         <p class="text-xs text-slate-500 mb-1">Marketing</p>
                         <p class="font-semibold text-slate-800 text-sm">{{ $branch['contact_person'] }}</p>
-                        <p class="text-slate-600 text-sm">{{ $branch['phone'] }}</p>
                     </div>
                     <a href="https://wa.me/{{ $branch['whatsapp'] }}?text={{ urlencode('Selamat pagi/siang ' . $branch['contact_person'] . '. Saya ingin menanyakan informasi pengiriman dari ' . $branch['short_name'] . '. Mohon bantuannya, terima kasih.') }}" 
                        target="_blank"
@@ -902,7 +900,6 @@
                     <div class="border-t border-slate-100 pt-4 mb-4">
                         <p class="text-xs text-slate-500 mb-1">Marketing</p>
                         <p class="font-semibold text-slate-800 text-sm">{{ $branch['contact_person'] }}</p>
-                        <p class="text-slate-600 text-sm">{{ $branch['phone'] }}</p>
                     </div>
                     <a href="https://wa.me/{{ $branch['whatsapp'] }}?text={{ urlencode('Selamat pagi/siang ' . $branch['contact_person'] . '. Saya ingin menanyakan informasi pengiriman dari ' . $branch['short_name'] . '. Mohon bantuannya, terima kasih.') }}" 
                        target="_blank"

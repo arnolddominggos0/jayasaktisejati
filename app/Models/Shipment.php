@@ -2,26 +2,24 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use App\Enums\{
-    ShipmentStatus,
-    ShipmentMode,
-    ServiceType,
-    CargoType,
-    DeliveryScope,
-    RequestType,
-    TrackStatus
-};
+use App\Enums\CargoType;
+use App\Enums\DeliveryScope;
+use App\Enums\RequestType;
+use App\Enums\ServiceType;
+use App\Enums\ShipmentMode;
+use App\Enums\ShipmentStatus;
+use App\Enums\TrackStatus;
 use App\Services\MpCheckGate;
+use App\Services\ShipmentKpiEvaluator;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 
 class Shipment extends Model
 {
@@ -94,31 +92,31 @@ class Shipment extends Model
     ];
 
     protected $casts = [
-        'status'              => ShipmentStatus::class,
-        'mode'                => ShipmentMode::class,
-        'service_type'        => ServiceType::class,
-        'cargo_type'          => CargoType::class,
-        'request_type'        => RequestType::class,
-        'delivery_scope'      => DeliveryScope::class,
-        'container_qty'       => 'integer',
-        'packages_total'      => 'integer',
-        'cbm_total'           => 'decimal:3',
-        'weight_total'        => 'decimal:2',
-        'requested_at'        => 'datetime',
-        'attachments'         => 'array',
-        'etd'                 => 'datetime',
-        'eta'                 => 'datetime',
-        'pickup_date'         => 'datetime',
-        'estimated_ready_at'  => 'datetime',
-        'confirm_is_true'     => 'boolean',
-        'delivered_at'        => 'datetime',
-        'cancelled_at'        => 'datetime',
-        'edited_fields'       => 'array',
-        'containers'          => 'array',
-        'lcl_items'           => 'array',
+        'status' => ShipmentStatus::class,
+        'mode' => ShipmentMode::class,
+        'service_type' => ServiceType::class,
+        'cargo_type' => CargoType::class,
+        'request_type' => RequestType::class,
+        'delivery_scope' => DeliveryScope::class,
+        'container_qty' => 'integer',
+        'packages_total' => 'integer',
+        'cbm_total' => 'decimal:3',
+        'weight_total' => 'decimal:2',
+        'requested_at' => 'datetime',
+        'attachments' => 'array',
+        'etd' => 'datetime',
+        'eta' => 'datetime',
+        'pickup_date' => 'datetime',
+        'estimated_ready_at' => 'datetime',
+        'confirm_is_true' => 'boolean',
+        'delivered_at' => 'datetime',
+        'cancelled_at' => 'datetime',
+        'edited_fields' => 'array',
+        'containers' => 'array',
+        'lcl_items' => 'array',
         // 'units'               => 'array',
-        'pol_id'              => 'integer',
-        'pod_id'              => 'integer',
+        'pol_id' => 'integer',
+        'pod_id' => 'integer',
     ];
 
     protected static array $colCache = [];
@@ -148,13 +146,13 @@ class Shipment extends Model
             $reqType = $m->request_type?->value ?? (string) $m->request_type;
             if (blank($m->doc_number)) {
                 $m->doc_number = $reqType === RequestType::SPPB_DO->value
-                    ? 'SPPB-' . now()->format('YmdHis')
-                    : 'AUTO-' . now()->format('Ymd-His');
+                    ? 'SPPB-'.now()->format('YmdHis')
+                    : 'AUTO-'.now()->format('Ymd-His');
             }
 
             if (blank($m->eta)) {
                 $modeCode = in_array(strtolower($mode), ['sea', 'sea_freight'], true) ? 'SH' : 'TC';
-                $m->eta   = self::computeEta($modeCode, (string) ($m->priority ?? 'normal'))->toDateTimeString();
+                $m->eta = self::computeEta($modeCode, (string) ($m->priority ?? 'normal'))->toDateTimeString();
             }
 
             if (blank($m->branch_id)) {
@@ -174,30 +172,38 @@ class Shipment extends Model
         });
 
         static::created(function (Shipment $m) {
-
             $m->ensureTrackSkeleton();
 
             $firstStatus = $m->mode === ShipmentMode::Sea
                 ? TrackStatus::Pickup
                 : TrackStatus::Pickup;
 
-            $m->tracks()->create([
-                'status'     => $firstStatus,
-                'tracked_at' => now(),
-                'note'       => 'Menunggu penjemputan',
-            ]);
+            $existingTrack = $m->tracks()->where('status', $firstStatus->value)->first();
+
+            if ($existingTrack && ! $existingTrack->tracked_at) {
+                $existingTrack->updateQuietly([
+                    'tracked_at' => now(),
+                    'note' => 'Menunggu penjemputan',
+                ]);
+            } elseif (! $existingTrack) {
+                $m->tracks()->create([
+                    'status' => $firstStatus->value,
+                    'tracked_at' => now(),
+                    'note' => 'Menunggu penjemputan',
+                ]);
+            }
         });
 
         static::saving(function (Shipment $m) {
             if ($m->mode === ShipmentMode::Sea) {
-                $m->service_type        = ServiceType::SeaFreight;
-                $m->pickup_date         = null;
-                $m->estimated_ready_at  = null;
+                $m->service_type = ServiceType::SeaFreight;
+                $m->pickup_date = null;
+                $m->estimated_ready_at = null;
 
                 if ($m->shipping_schedule_id && $m->shippingSchedule) {
                     $sch = $m->shippingSchedule;
 
-                    $m->voyage_id   = $sch->voyage_id ?? $m->voyage_id;
+                    $m->voyage_id = $sch->voyage_id ?? $m->voyage_id;
                     $m->vessel_name = $sch->vessel_name
                         ?? $sch->vessel?->name
                         ?? $m->vessel_name;
@@ -214,15 +220,15 @@ class Shipment extends Model
                     $m->eta = $sch->eta ?? $m->eta;
                 }
             } else {
-                $m->voyage_id      = null;
-                $m->vessel_name    = null;
-                $m->voyage         = null;
-                $m->pol            = null;
-                $m->pod            = null;
-                $m->etd            = null;
-                $m->eta            = $m->eta;
+                $m->voyage_id = null;
+                $m->vessel_name = null;
+                $m->voyage = null;
+                $m->pol = null;
+                $m->pod = null;
+                $m->etd = null;
+                $m->eta = $m->eta;
                 $m->container_size = null;
-                $m->container_qty  = null;
+                $m->container_qty = null;
 
                 $opt = (string) $m->service_option;
 
@@ -235,8 +241,8 @@ class Shipment extends Model
                 if (! $opt && $m->vehicle_type) {
                     $m->service_option = match ($m->vehicle_type) {
                         'car_carrier' => 'car_carrier',
-                        'towing'      => 'towing',
-                        default       => 'truck',
+                        'towing' => 'towing',
+                        default => 'truck',
                     };
                 }
 
@@ -266,10 +272,10 @@ class Shipment extends Model
                 $to ?: '—',
             );
 
-            $orig    = $m->getOriginal('status');
-            $prev    = $orig instanceof ShipmentStatus ? $orig : ShipmentStatus::tryFrom((string) $orig);
+            $orig = $m->getOriginal('status');
+            $prev = $orig instanceof ShipmentStatus ? $orig : ShipmentStatus::tryFrom((string) $orig);
             $currRaw = $m->status;
-            $curr    = $currRaw instanceof ShipmentStatus ? $currRaw : ShipmentStatus::tryFrom((string) $currRaw);
+            $curr = $currRaw instanceof ShipmentStatus ? $currRaw : ShipmentStatus::tryFrom((string) $currRaw);
 
             if ($curr !== $prev) {
                 if ($curr === ShipmentStatus::Delivered) {
@@ -315,12 +321,12 @@ class Shipment extends Model
             $m->ensureTrackSkeleton();
 
             $changed = array_keys($m->getChanges());
-            $ignore  = ['updated_at', 'created_at', 'edited_fields', 'last_edited_by'];
+            $ignore = ['updated_at', 'created_at', 'edited_fields', 'last_edited_by'];
             $changed = array_values(array_diff($changed, $ignore));
 
             if (! empty($changed)) {
                 $editorId = Auth::id();
-                $payload  = ['edited_fields' => $changed];
+                $payload = ['edited_fields' => $changed];
 
                 if ($editorId) {
                     $payload['last_edited_by'] = $editorId;
@@ -339,47 +345,63 @@ class Shipment extends Model
 
         $user = Auth::user();
 
-        $depot = \App\Models\Depot::where('coordinator_user_id', $user->id)->first();
+        $resolvedDepotId = $this->assigned_depot_id
+            ?? Depot::resolveIdFor(
+                $this->branch_id ?: $user?->branch_id,
+                $this->mode?->value ?? (string) $this->mode,
+                $this->voyage_id
+            );
 
-        if (! $depot) {
-            throw new \DomainException('Depot untuk FC ini tidak ditemukan.');
+        if (! $resolvedDepotId) {
+            $branchName = $this->branch?->name ?? ($user?->branch?->name ?? '-');
+            $modeLabel = $this->mode?->label() ?? (string) $this->mode;
+            throw new DomainException(
+                "Depot untuk cabang \"{$branchName}\" dengan moda \"{$modeLabel}\" tidak ditemukan. Pastikan depot sudah dikonfigurasi di menu Depo."
+            );
         }
 
         $this->forceFill([
-            'status'            => ShipmentStatus::Pending,
-            'assigned_depot_id' => $depot->id,
+            'status' => ShipmentStatus::Pending,
+            'assigned_depot_id' => $resolvedDepotId,
         ])->saveQuietly();
 
         $this->ensureTrackSkeleton();
-    }
 
+        $pickupTrack = $this->tracks()->where('status', TrackStatus::Pickup->value)->first();
+        if ($pickupTrack && ! $pickupTrack->tracked_at) {
+            $pickupTrack->updateQuietly([
+                'tracked_at' => now(),
+                'note' => 'Menunggu penjemputan',
+            ]);
+        }
+    }
 
     public static function generateCode(?string $mode = null, ?int $year = null, ?int $month = null): string
     {
-        $now   = now();
-        $year  = $year ?: $now->year;
+        $now = now();
+        $year = $year ?: $now->year;
         $month = $month ?: $now->month;
 
-        $prefix   = 'JSS' . str_pad($month, 2, '0', STR_PAD_LEFT) . substr($year, -2);
+        $prefix = 'JSS'.str_pad($month, 2, '0', STR_PAD_LEFT).substr($year, -2);
         $modeCode = match (strtolower((string) $mode)) {
-            'sea', 'sea_freight'                                      => 'SH',
+            'sea', 'sea_freight' => 'SH',
             'land', 'land_trucking', 'car_carrier', 'towing', 'truck' => 'TC',
-            default                                                   => 'XX',
+            default => 'XX',
         };
 
         $prefix .= $modeCode;
 
         $last = static::query()
-            ->where('code', 'like', $prefix . '%')
+            ->where('code', 'like', $prefix.'%')
             ->orderByDesc('code')
             ->value('code');
 
         $seq = 1;
-        if ($last && preg_match('/^' . $prefix . '(\d{4})$/', $last, $matches)) {
+        if ($last && preg_match('/^'.$prefix.'(\d{4})$/', $last, $matches)) {
             $seq = (int) $matches[1] + 1;
         }
 
-        return $prefix . str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
     }
 
     public static function computeEta(string $modeCode, string $priority, ?Carbon $base = null): Carbon
@@ -388,6 +410,7 @@ class Shipment extends Model
 
         if ($modeCode === 'SH') {
             $days = strtolower($priority) === 'urgent' ? 17 : 19;
+
             return $base->addDays($days)->endOfDay();
         }
 
@@ -404,7 +427,7 @@ class Shipment extends Model
     public function cancel(?int $userId = null): void
     {
         if (! $this->canCancel()) {
-            throw new \DomainException('Pesanan tidak dapat dibatalkan (sudah terkirim / sudah dibatalkan).');
+            throw new DomainException('Pesanan tidak dapat dibatalkan (sudah terkirim / sudah dibatalkan).');
         }
 
         $this->status = ShipmentStatus::Cancelled;
@@ -451,7 +474,7 @@ class Shipment extends Model
             return $order[0] ?? null;
         }
 
-        $values = array_map(fn(TrackStatus $s) => $s->value, $order);
+        $values = array_map(fn (TrackStatus $s) => $s->value, $order);
         $currValue = $current->value;
         $idx = array_search($currValue, $values, strict: true);
 
@@ -470,12 +493,10 @@ class Shipment extends Model
         ?array $override = null
     ): ShipmentTrack {
         if ($this->status === ShipmentStatus::Draft) {
-            throw new DomainException('Shipment masih draft.');
+            throw new DomainException('Shipment masih draft. Kirim ke FC terlebih dahulu.');
         }
 
-        if (! $this->tracks()->exists()) {
-            $this->ensureTrackSkeleton();
-        }
+        $this->ensureTrackSkeleton();
 
         if ($this->requiresMpCheck($status)) {
             $this->handleMpCheck($status, $override);
@@ -486,17 +507,20 @@ class Shipment extends Model
             ->first();
 
         if (! $track) {
-            throw new DomainException('Track skeleton tidak ditemukan.');
+            $track = $this->tracks()->create([
+                'status' => $status->value,
+                'tracked_at' => null,
+            ]);
         }
 
         if ($track->tracked_at) {
-            throw new DomainException('Status ini sudah pernah dicapai.');
+            throw new DomainException('Status "'.$status->label().'" sudah pernah dicapai pada '.$track->tracked_at->format('d M Y H:i').'.');
         }
 
         $track->updateQuietly([
-            'tracked_at'  => now(),
-            'note'        => $note,
-            'location'    => $location,
+            'tracked_at' => now(),
+            'note' => $note,
+            'location' => $location,
             'attachments' => $attachments,
         ]);
 
@@ -512,7 +536,6 @@ class Shipment extends Model
 
         return $track;
     }
-
 
     protected function requiresMpCheck(TrackStatus $status): bool
     {
@@ -537,24 +560,25 @@ class Shipment extends Model
             }
 
             DB::table('mp_check_overrides')->insert([
-                'shipment_id'  => $this->id,
-                'depot_id'     => $this->assigned_depot_id,
+                'shipment_id' => $this->id,
+                'depot_id' => $this->assigned_depot_id,
                 'track_status' => $status->value,
-                'override_by'  => Auth::id(),
-                'reason'       => $override['reason'],
-                'created_at'   => now(),
-                'updated_at'   => now(),
+                'override_by' => Auth::id(),
+                'reason' => $override['reason'],
+                'created_at' => now(),
+                'updated_at' => now(),
             ]);
         }
     }
 
     public function isWithinHMinus3Eta(): bool
     {
-        if (!$this->eta) {
+        if (! $this->eta) {
             return false;
         }
 
         $hMinus3 = Carbon::parse($this->eta)->subDays(3)->startOfDay();
+
         return now()->greaterThanOrEqualTo($hMinus3);
     }
 
@@ -564,26 +588,37 @@ class Shipment extends Model
             return;
         }
 
-        if ($this->tracks()->exists()) {
-            return;
-        }
+        $order = TrackStatus::orderForMode($this->mode);
+        $necessaryStatuses = array_merge($order, [
+            TrackStatus::Hold,
+            TrackStatus::Cancelled,
+        ]);
 
-        foreach (TrackStatus::orderForMode($this->mode) as $st) {
-            $this->tracks()->create([
-                'status' => $st->value,
-                'tracked_at' => null,
-            ]);
+        $existingStatuses = $this->tracks()
+            ->pluck('status')
+            ->map(fn ($s) => $s instanceof TrackStatus ? $s->value : (string) $s)
+            ->toArray();
+
+        foreach ($necessaryStatuses as $st) {
+            $value = $st instanceof TrackStatus ? $st->value : (string) $st;
+            if (! in_array($value, $existingStatuses, true)) {
+                $this->tracks()->create([
+                    'status' => $value,
+                    'tracked_at' => null,
+                ]);
+                $existingStatuses[] = $value;
+            }
         }
     }
 
     public function scopeActive($query)
     {
-        return $query->whereIn('status', array_map(fn($event) => $event->value, ShipmentStatus::active()));
+        return $query->whereIn('status', array_map(fn ($event) => $event->value, ShipmentStatus::active()));
     }
 
     public function scopeHistory($q)
     {
-        return $q->whereIn('status', array_map(fn($e) => $e->value, ShipmentStatus::completed()));
+        return $q->whereIn('status', array_map(fn ($e) => $e->value, ShipmentStatus::completed()));
     }
 
     public function getCompletedAtAttribute(): ?Carbon
@@ -670,7 +705,7 @@ class Shipment extends Model
         }
 
         foreach ($tracks as $t) {
-            $s  = $t->status instanceof TrackStatus ? $t->status : TrackStatus::tryFrom((string) $t->status);
+            $s = $t->status instanceof TrackStatus ? $t->status : TrackStatus::tryFrom((string) $t->status);
             $ts = $t->tracked_at ?? $t->created_at ?? now();
 
             if (self::hasCol('pickup_started_at') && ! $this->pickup_started_at && in_array($s, [
@@ -783,24 +818,24 @@ class Shipment extends Model
         return $this->latestTrack?->status;
     }
 
-    public function getLatestTrackedAtAttribute(): ?\Illuminate\Support\Carbon
+    public function getLatestTrackedAtAttribute(): ?Carbon
     {
         return $this->latestTrack?->tracked_at;
     }
 
     public function originCity()
     {
-        return $this->belongsTo(\App\Models\City::class, 'origin_city_id');
+        return $this->belongsTo(City::class, 'origin_city_id');
     }
 
     public function destinationCity()
     {
-        return $this->belongsTo(\App\Models\City::class, 'destination_city_id');
+        return $this->belongsTo(City::class, 'destination_city_id');
     }
 
     public function pol()
     {
-        return $this->belongsTo(\App\Models\Port::class, 'pol_id');
+        return $this->belongsTo(Port::class, 'pol_id');
     }
 
     public function pod()
@@ -810,7 +845,12 @@ class Shipment extends Model
 
     public function units()
     {
-        return $this->hasMany(\App\Models\Unit::class, 'shipment_id', 'id');
+        return $this->hasMany(Unit::class, 'shipment_id', 'id');
+    }
+
+    public function loadingSessions()
+    {
+        return $this->hasMany(LoadingSession::class, 'shipment_id');
     }
 
     public function getRouteLabelAttribute(): string
@@ -827,7 +867,7 @@ class Shipment extends Model
             ?? $this->pod_name
             ?? $this->to;
 
-        return trim(($origin ?: '—') . ' → ' . ($dest ?: '—'));
+        return trim(($origin ?: '—').' → '.($dest ?: '—'));
     }
 
     public function getAttachmentUrlsAttribute(): array
@@ -836,7 +876,7 @@ class Shipment extends Model
 
         return array_values(
             array_map(
-                fn($p) => Storage::disk('public')->url($p),
+                fn ($p) => Storage::disk('public')->url($p),
                 $paths
             )
         );
@@ -854,16 +894,16 @@ class Shipment extends Model
     public function getContainerMapAttribute(): array
     {
         $containers = collect($this->containers ?? [])
-            ->filter(fn($c) => ! empty($c['container_no']))
+            ->filter(fn ($c) => ! empty($c['container_no']))
             ->mapWithKeys(function ($c) {
                 $no = trim((string) $c['container_no']);
 
                 return [
                     $no => [
                         'container_no' => $no,
-                        'seal_no'      => $c['seal_no'] ?? null,
-                        'lcl_count'    => 0,
-                        'unit_count'   => 0,
+                        'seal_no' => $c['seal_no'] ?? null,
+                        'lcl_count' => 0,
+                        'unit_count' => 0,
                     ],
                 ];
             })->all();
@@ -904,7 +944,7 @@ class Shipment extends Model
         $parts = [];
 
         foreach ($map as $c) {
-            $seal   = $c['seal_no'] ? " / {$c['seal_no']}" : '';
+            $seal = $c['seal_no'] ? " / {$c['seal_no']}" : '';
             $detail = [];
 
             if ($c['lcl_count'] > 0) {
@@ -915,7 +955,7 @@ class Shipment extends Model
                 $detail[] = "{$c['unit_count']} unit";
             }
 
-            $det = $detail ? ' • ' . implode(', ', $detail) : '';
+            $det = $detail ? ' • '.implode(', ', $detail) : '';
             $parts[] = "{$c['container_no']}{$seal}{$det}";
         }
 
@@ -937,174 +977,37 @@ class Shipment extends Model
 
     public function isManadoKpiTarget(): bool
     {
-        $cfg         = config('jss_kpi.manado', []);
-        $customerIds = array_map('intval', $cfg['customer_ids'] ?? []);
-
-        if (empty($customerIds)) {
-            return false;
-        }
-
-        $customerId = (int) ($this->customer_id ?? 0);
-
-        return in_array($customerId, $customerIds, true);
+        return app(ShipmentKpiEvaluator::class)->isManadoKpiTarget($this);
     }
-
 
     public function kpiManadoThresholds(): array
     {
-        return config('jss_kpi.manado', [
-            'dwelling_days' => 5,
-            'sailing_days'  => 10,
-            'dooring_days'  => 2,
-            'total_days'    => ['normal' => 19, 'urgent' => 17],
-        ])['thresholds'] ?? [
-            'dwelling_days' => 5,
-            'sailing_days'  => 10,
-            'dooring_days'  => 2,
-            'total_days'    => ['normal' => 19, 'urgent' => 17],
-        ];
+        return app(ShipmentKpiEvaluator::class)->getManadoThresholds();
     }
 
     protected function diffDaysNullable($from, $to): ?int
     {
-        if (! $from || ! $to) {
-            return null;
-        }
-
-        $a = Carbon::parse($from)->startOfDay();
-        $b = Carbon::parse($to)->startOfDay();
-
-        return $a->diffInDays($b);
+        return app(ShipmentKpiEvaluator::class)->diffDaysNullable($from, $to);
     }
 
     public function evaluateKpiForManado(): array
     {
-        if (! $this->isManadoKpiTarget()) {
-            return ['applies' => false];
-        }
-
-        $priority = $this->priority === 'urgent' ? 'urgent' : 'normal';
-        $t        = $this->kpiManadoThresholds();
-
-        $ms = $this->milestoneTimes();
-
-        $dw = $this->diffDaysNullable($ms['pickup'],  $ms['onboard']);
-        $sa = $this->diffDaysNullable($ms['onboard'], $ms['arrived']);
-        $dr = $this->diffDaysNullable($ms['arrived'], $ms['deliv']);
-
-        $tt = ($dw !== null && $sa !== null && $dr !== null) ? ($dw + $sa + $dr) : null;
-
-        $okDw = is_null($dw) ? null : $dw <= ($t['dwelling_days'] ?? PHP_INT_MAX);
-        $okSa = is_null($sa) ? null : $sa <= ($t['sailing_days']  ?? PHP_INT_MAX);
-        $okDr = is_null($dr) ? null : $dr <= ($t['dooring_days']  ?? PHP_INT_MAX);
-        $okTt = is_null($tt) ? null : $tt <= (($t['total_days'][$priority] ?? null) ?? PHP_INT_MAX);
-
-        return [
-            'applies'  => true,
-            'priority' => $priority,
-            'summary'  => [
-                'dwelling' => [
-                    'actual' => $dw,
-                    'limit'  => $t['dwelling_days'],
-                    'status' => is_null($okDw) ? 'PENDING' : ($okDw ? 'OK' : 'LATE'),
-                ],
-                'sailing'  => [
-                    'actual' => $sa,
-                    'limit'  => $t['sailing_days'],
-                    'status' => is_null($okSa) ? 'PENDING' : ($okSa ? 'OK' : 'LATE'),
-                ],
-                'dooring'  => [
-                    'actual' => $dr,
-                    'limit'  => $t['dooring_days'],
-                    'status' => is_null($okDr) ? 'PENDING' : ($okDr ? 'OK' : 'LATE'),
-                ],
-                'total'    => [
-                    'actual' => $tt,
-                    'limit'  => $t['total_days'][$priority] ?? null,
-                    'status' => is_null($okTt) ? 'PENDING' : ($okTt ? 'OK' : 'LATE'),
-                ],
-            ],
-            'badge' => is_null($okTt) ? 'Pending' : ($okTt ? 'On Time' : 'Late'),
-        ];
+        return app(ShipmentKpiEvaluator::class)->evaluateManadoKpi($this);
     }
 
     public function kpiManadoSummaryText(): ?string
     {
-        $ev = $this->evaluateKpiForManado();
-        if (! ($ev['applies'] ?? false)) {
-            return null;
-        }
-
-        $s = $ev['summary'];
-        $p = $ev['priority'] ?? 'normal';
-
-        if ($p === 'urgent') {
-            return sprintf(
-                'Dw %s/%s | Dor %s/%s | Total %s/%s',
-                $s['dwelling']['actual'] ?? '-',
-                $s['dwelling']['limit'] ?? '-',
-                $s['dooring']['actual']  ?? '-',
-                $s['dooring']['limit'] ?? '-',
-                $s['total']['actual']    ?? '-',
-                $s['total']['limit']   ?? '-',
-            );
-        }
-
-        return sprintf(
-            'Total %s/%s | Dw %s/%s | Sai %s/%s | Dor %s/%s',
-            $s['total']['actual']    ?? '-',
-            $s['total']['limit']   ?? '-',
-            $s['dwelling']['actual'] ?? '-',
-            $s['dwelling']['limit'] ?? '-',
-            $s['sailing']['actual']  ?? '-',
-            $s['sailing']['limit'] ?? '-',
-            $s['dooring']['actual']  ?? '-',
-            $s['dooring']['limit'] ?? '-',
-        );
+        return app(ShipmentKpiEvaluator::class)->manadoSummaryText($this);
     }
 
     public function milestoneTimes(): array
     {
-        $tracks = ($this->relationLoaded('tracks') ? $this->tracks : $this->tracks()->get())
-            ->filter(fn($t) => ! empty($t->tracked_at))
-            ->sortBy('tracked_at')
-            ->values();
-
-        $toVal = fn($s) => $s instanceof TrackStatus ? $s->value : (string) $s;
-
-        $first = fn(array $set) => optional(
-            $tracks->first(fn($t) => in_array($toVal($t->status), $set, true))
-        )->tracked_at;
-
-        $last = fn(string $s) => optional(
-            $tracks->last(fn($t) => $toVal($t->status) === $s)
-        )->tracked_at;
-
-        return [
-            'pickup'  => $first([
-                TrackStatus::Pickup->value,
-                TrackStatus::Handover->value,
-                TrackStatus::Stuffing->value,
-                TrackStatus::DeliveryToPort->value,
-                TrackStatus::Stacking->value,
-            ]),
-            'onboard' => $first([
-                TrackStatus::UnitLoading->value,
-                TrackStatus::OnShip->value,
-                TrackStatus::VesselDepart->value,
-            ]),
-            'arrived' => $first([
-                TrackStatus::VesselArrival->value,
-                TrackStatus::Unloading->value,
-            ]),
-            'deliv'   => $last(TrackStatus::Delivered->value),
-        ];
+        return app(ShipmentKpiEvaluator::class)->getMilestoneTimes($this);
     }
-
 
     public function scopeTamKpi(Builder $q): Builder
     {
-        $cfg         = config('jss_kpi.manado', []);
+        $cfg = config('jss_kpi.manado', []);
         $customerIds = array_map('intval', $cfg['customer_ids'] ?? []);
 
         if (empty($customerIds)) {
@@ -1114,7 +1017,6 @@ class Shipment extends Model
         return $q->whereIn('customer_id', $customerIds);
     }
 
-
     public function scopeManadoKpiTarget(Builder $q): Builder
     {
         return $q->tamKpi();
@@ -1122,47 +1024,19 @@ class Shipment extends Model
 
     public function getPlannedKpiAttribute(): array
     {
-        return [
-            'dwelling' => config('kpi.manado.thresholds.dwelling_days', 6),
-            'sailing'  => config('kpi.manado.thresholds.sailing_days', 10),
-            'dooring'  => config('kpi.manado.thresholds.dooring_days', 3),
-            'total'    => config('kpi.manado.thresholds.total_days.normal', 19),
-        ];
+        return app(ShipmentKpiEvaluator::class)->getPlannedKpi();
     }
 
     public function getKpiEvaluationAttribute(): array
     {
+        $evaluator = app(ShipmentKpiEvaluator::class);
         $plan = $this->planned_kpi;
 
         return [
-            'dwelling' => $this->compare($this->dwelling_days, $plan['dwelling']),
-            'sailing'  => $this->compare($this->sailing_days, $plan['sailing']),
-            'dooring'  => $this->compare($this->dooring_days, $plan['dooring']),
-            'total'    => $this->compare($this->lead_time_days, $plan['total']),
-        ];
-    }
-
-    private function compare(?float $actual, ?float $target): array
-    {
-        if (is_null($actual) || is_null($target)) {
-            return [
-                'status' => 'unknown',
-                'diff'   => null,
-            ];
-        }
-
-        $diff = $actual - $target;
-
-        if ($diff <= 0) {
-            return [
-                'status' => 'ok',
-                'diff'   => round($diff, 2),
-            ];
-        }
-
-        return [
-            'status' => 'late',
-            'diff'   => round($diff, 2),
+            'dwelling' => $evaluator->compare($this->dwelling_days, $plan['dwelling']),
+            'sailing' => $evaluator->compare($this->sailing_days, $plan['sailing']),
+            'dooring' => $evaluator->compare($this->dooring_days, $plan['dooring']),
+            'total' => $evaluator->compare($this->lead_time_days, $plan['total']),
         ];
     }
 }
