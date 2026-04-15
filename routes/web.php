@@ -5,16 +5,10 @@ use App\Http\Controllers\Public\TrackingController;
 use App\Http\Controllers\ShipmentPrintController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Public Routes (No Login Required)
-|--------------------------------------------------------------------------
-*/
+Route::get('/ping', fn () => 'pong');
 
-// Landing Page
 Route::get('/', [LandingController::class, 'index'])->name('landing');
 
-// Public Tracking
 Route::get('/tracking', [TrackingController::class, 'index'])->name('tracking');
 Route::post('/tracking/search', [TrackingController::class, 'search'])->name('tracking.search');
 
@@ -32,13 +26,3 @@ Route::middleware(['auth'])->group(function () {
 Route::get('/tracking/{code}', function (string $code) {
     return "Tracking page for {$code}";
 })->name('tracking.show');
-
-Route::get('/_debug/fc-login-mw', function () {
-    $route = Route::getRoutes()->getByName('filament.fc.auth.login');
-
-    return response()->json([
-        'uri' => $route?->uri(),
-        'action' => $route?->getActionName(),
-        'middleware' => $route?->gatherMiddleware(),
-    ]);
-});
