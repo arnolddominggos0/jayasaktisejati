@@ -38,25 +38,30 @@ class AprilAudit2026 extends Page
 
     public $stats = [];
 
-    public $briefings = [];
+    public $manpowerList = [];
 
-    public $recentLoading = [];
+    public $dailyTotal = [];
+
+    public $healthStats = [];
+
+    public $apdStats = [];
+
+    public $loadingSessions = [];
 
     public function mount(): void
     {
         $this->loadStats();
-        $this->loadBriefings();
-        $this->loadRecentLoading();
+        $this->loadManpowerAttendance();
+        $this->loadDailyHealth();
+        $this->loadDailyAPD();
+        $this->loadLoadingSessions();
     }
 
     private function loadStats(): void
     {
-        $user = Filament::auth()->user();
-
         $this->stats = [
             'total_mp' => Manpower::count(),
             'briefing_sessions' => BriefingSession::count(),
-            'total_attendance' => BriefingAttendance::count(),
             'attendance_present' => BriefingAttendance::where('attendance_status', 'present')->count(),
             'ppe_checked' => BriefingAttendancePpeItem::count(),
             'ppe_ok' => BriefingAttendancePpeItem::where('condition', 'baik')->count(),
@@ -64,80 +69,156 @@ class AprilAudit2026 extends Page
             'loading_completed' => LoadingSession::where('status', 'completed')->count(),
         ];
 
-        // Health stats
         $healthStats = DB::select("
-            SELECT
-                AVG(temperature) as avg_temp,
-                MIN(temperature) as min_temp,
-                MAX(temperature) as max_temp,
-                AVG(bp_systolic) as avg_sys,
-                AVG(bp_diastolic) as avg_dia
+            SELECT AVG(temperature) as avg_temp
             FROM briefing_attendances
             WHERE attendance_status = 'present'
         ");
 
-        if ($healthStats) {
-            $this->stats['avg_temperature'] = round($healthStats[0]->avg_temp ?? 36.5, 1);
-            $this->stats['avg_bp'] = round($healthStats[0]->avg_sys ?? 120).'/'.round($healthStats[0]->avg_dia ?? 80);
-        } else {
-            $this->stats['avg_temperature'] = 36.5;
-            $this->stats['avg_bp'] = '120/80';
+        $this->stats['avg_temperature'] = round($healthStats[0]->avg_temp ?? 36.5, 1);
+    }
+
+    private function loadManpowerAttendance(): void
+    {
+        $dates = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16'];
+        $manpower = Manpower::orderBy('name')->get();
+
+        $this->manpowerList = [];
+        foreach ($manpower as $mp) {
+            $attendance = [];
+            $totalPresent = 0;
+            $totalDays = 16;
+
+            foreach ($dates as $day) {
+                $dateStr = '2026-04-'.$day;
+                $present = BriefingAttendance::where('manpower_id', $mp->id)
+                    ->whereHas('session', function ($q) use ($dateStr) {
+                        $q->where('date', $dateStr);
+                    })
+                    ->first();
+
+                if ($present) {
+                    if ($present->attendance_status === 'present') {
+                        $attendance[$day] = 'hadir';
+                        $totalPresent++;
+                    } elseif ($present->attendance_status === 'sick') {
+                        $attendance[$day] = 'sakit';
+                    } elseif ($present->attendance_status === 'absent') {
+                        $attendance[$day] = 'alpha';
+                    } else {
+                        $attendance[$day] = 'izin';
+                    }
+                } else {
+                    $attendance[$day] = 'alpha';
+                }
+            }
+
+            $this->manpowerList[] = [
+                'name' => $mp->name,
+                'attendance' => $attendance,
+                'total_present' => $totalPresent,
+                'total_days' => $totalDays,
+            ];
+        }
+
+        // Daily totals
+        $this->dailyTotal = [];
+        foreach ($dates as $day) {
+            $dateStr = '2026-04-'.$day;
+            $hadir = BriefingAttendance::whereHas('session', function ($q) use ($dateStr) {
+                $q->where('date', $dateStr);
+            })
+                ->where('attendance_status', 'present')
+                ->count();
+
+            $this->dailyTotal[$day] = ['hadir' => $hadir];
         }
     }
 
-    private function loadBriefings(): void
+    private function loadDailyHealth(): void
     {
-        $user = Filament::auth()->user();
+        $briefings = BriefingSession::orderBy('date')->get();
 
-        $this->briefings = BriefingSession::with(['attendances', 'depot'])
-            ->orderBy('date', 'desc')
-            ->limit(11)
-            ->get()
-            ->map(function ($session) {
-                $present = $session->attendances->where('attendance_status', 'present')->count();
-                $sick = $session->attendances->where('attendance_status', 'sick')->count();
-                $absent = $session->attendances->where('attendance_status', 'absent')->count();
-                $total = $session->attendances->count();
+        $this->healthStats = [];
+        foreach ($briefings as $briefing) {
+            $day = substr($briefing->date, 8, 2);
+            $present = $briefing->attendances->where('attendance_status', 'present');
 
-                return [
-                    'id' => $session->id,
-                    'date' => $session->date,
-                    'depot' => $session->depot?->name ?? '-',
-                    'total_mp' => $total,
-                    'present' => $present,
-                    'absent' => $absent,
-                    'sick' => $sick,
-                    'mp_check_status' => $session->mp_check_status?->value ?? 'pending',
-                ];
-            })
-            ->toArray();
+            $temps = $present->pluck('temperature')->filter()->toArray();
+            $sys = $present->pluck('bp_systolic')->filter()->toArray();
+            $dia = $present->pluck('bp_diastolic')->filter()->toArray();
+
+            $this->healthStats[] = [
+                'date' => $briefing->date,
+                'total_present' => $present->count(),
+                'avg_temp' => count($temps) ? round(array_sum($temps) / count($temps), 1) : '-',
+                'avg_sys' => count($sys) ? round(array_sum($sys) / count($sys)) : '-',
+                'avg_dia' => count($dia) ? round(array_sum($dia) / count($dia)) : '-',
+            ];
+        }
     }
 
-    private function loadRecentLoading(): void
+    private function loadDailyAPD(): void
     {
-        $this->recentLoading = LoadingSession::with(['shipment', 'depot', 'briefingSession'])
-            ->orderBy('code', 'desc')
-            ->limit(15)
-            ->get()
-            ->map(function ($session) {
-                $date = $session->briefingSession?->date ?? $session->created_at->format('Y-m-d');
+        $briefings = BriefingSession::orderBy('date')->get();
 
-                return [
-                    'code' => $session->code,
-                    'date' => $date,
-                    'depot' => $session->depot?->name ?? '-',
-                    'status' => $session->status?->value ?? 'draft',
-                    'mp_required' => $session->mp_required,
-                    'mp_present' => $session->mp_present,
-                    'mp_attendance' => $session->mp_attendance_completed ? '✅' : '❌',
-                    'health_check' => $session->health_check_completed ? '✅' : '❌',
-                    'apd_check' => $session->apd_check_completed ? '✅' : '❌',
-                    'rack_check' => $session->rack_container_check_completed ? '✅' : '❌',
-                    'equipment_check' => $session->equipment_check_completed ? '✅' : '❌',
-                    'unit_check' => $session->unit_check_completed ? '✅' : '❌',
-                    'final_decision' => $session->final_decision_status?->value ?? '-',
-                ];
-            })
-            ->toArray();
+        $this->apdStats = [];
+        foreach ($briefings as $briefing) {
+            $day = substr($briefing->date, 8, 2);
+            $present = $briefing->attendances->where('attendance_status', 'present');
+
+            $totalChecked = $present->count();
+            $helmOk = BriefingAttendancePpeItem::whereIn('attendance_id', $present->pluck('id'))
+                ->where('ppe_type', 'helm')
+                ->where('condition', 'baik')
+                ->count();
+            $rompiOk = BriefingAttendancePpeItem::whereIn('attendance_id', $present->pluck('id'))
+                ->where('ppe_type', 'rompi')
+                ->where('condition', 'baik')
+                ->count();
+            $sepatuOk = BriefingAttendancePpeItem::whereIn('attendance_id', $present->pluck('id'))
+                ->where('ppe_type', 'sepatu')
+                ->where('condition', 'baik')
+                ->count();
+            $sarungTanganOk = BriefingAttendancePpeItem::whereIn('attendance_id', $present->pluck('id'))
+                ->where('ppe_type', 'sarung_tangan')
+                ->where('condition', 'baik')
+                ->count();
+
+            $this->apdStats[] = [
+                'date' => $briefing->date,
+                'total_checked' => $totalChecked,
+                'helm_ok' => $helmOk,
+                'rompi_ok' => $rompiOk,
+                'sepatu_ok' => $sepatuOk,
+                'sarung_tangan_ok' => $sarungTanganOk,
+            ];
+        }
+    }
+
+    private function loadLoadingSessions(): void
+    {
+        $sessions = LoadingSession::with(['briefingSession'])
+            ->orderBy('code', 'desc')
+            ->limit(20)
+            ->get();
+
+        $this->loadingSessions = [];
+        foreach ($sessions as $session) {
+            $date = $session->briefingSession?->date ?? substr($session->created_at->format('Y-m-d'), 8, 2);
+
+            $this->loadingSessions[] = [
+                'code' => $session->code,
+                'date' => $date,
+                'mp' => $session->mp_present.'/'.$session->mp_required,
+                'attendance' => $session->mp_attendance_completed ? '✅' : '❌',
+                'health' => $session->health_check_completed ? '✅' : '❌',
+                'apd' => $session->apd_check_completed ? '✅' : '❌',
+                'rack' => $session->rack_container_check_completed ? '✅' : '❌',
+                'equipment' => $session->equipment_check_completed ? '✅' : '❌',
+                'unit' => $session->unit_check_completed ? '✅' : '❌',
+                'decision' => $session->final_decision_status?->value === 'go' ? 'GO' : ($session->final_decision_status?->value === 'stop' ? 'STOP' : 'PROGRESS'),
+            ];
+        }
     }
 }

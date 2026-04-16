@@ -11,8 +11,6 @@ use App\Enums\IronHookStatus;
 use App\Enums\LoadingOperationType;
 use App\Enums\LoadingStatus;
 use App\Enums\MPCheckStatus;
-use App\Enums\PpeCondition;
-use App\Enums\PpeType;
 use App\Enums\RackPillarCondition;
 use App\Enums\RackPulleyHookStatus;
 use App\Enums\RackTieStatus;
@@ -144,77 +142,122 @@ class FCApril2026Seeder extends Seeder
         $manpowerList = $data['manpowerList'];
         $branch = $data['branch'];
 
-        // Tanggal 1-16 April 2026 (Senin-Jumat only)
+        // Tanggal 1-16 April 2026 (Senin-Jumat only) - fixed pattern
         $dates = [
-            '2026-04-01' => ['day' => 'Rabu', 'present' => 11, 'absent' => 1, 'sick' => 0],
-            '2026-04-02' => ['day' => 'Kamis', 'present' => 12, 'absent' => 0, 'sick' => 0],
-            '2026-04-03' => ['day' => 'Jumat', 'present' => 10, 'absent' => 1, 'sick' => 1],
-            '2026-04-07' => ['day' => 'Selasa', 'present' => 11, 'absent' => 1, 'sick' => 0],
-            '2026-04-08' => ['day' => 'Rabu', 'present' => 12, 'absent' => 0, 'sick' => 0],
-            '2026-04-09' => ['day' => 'Kamis', 'present' => 10, 'absent' => 1, 'sick' => 1],
-            '2026-04-10' => ['day' => 'Jumat', 'present' => 11, 'absent' => 0, 'sick' => 1],
-            '2026-04-13' => ['day' => 'Senin', 'present' => 12, 'absent' => 0, 'sick' => 0],
-            '2026-04-14' => ['day' => 'Selasa', 'present' => 11, 'absent' => 1, 'sick' => 0],
-            '2026-04-15' => ['day' => 'Rabu', 'present' => 10, 'absent' => 2, 'sick' => 0],
-            '2026-04-16' => ['day' => 'Kamis', 'present' => 11, 'absent' => 1, 'sick' => 0],
+            '2026-04-01' => 'Rabu',
+            '2026-04-02' => 'Kamis',
+            '2026-04-03' => 'Jumat',
+            '2026-04-07' => 'Selasa',
+            '2026-04-08' => 'Rabu',
+            '2026-04-09' => 'Kamis',
+            '2026-04-10' => 'Jumat',
+            '2026-04-13' => 'Senin',
+            '2026-04-14' => 'Selasa',
+            '2026-04-15' => 'Rabu',
+            '2026-04-16' => 'Kamis',
+        ];
+
+        // Fixed attendance pattern per person (name => days absent/sick)
+        // Consistent pattern makes data look realistic
+        $absencePattern = [
+            'Udin Kuswanto' => ['sick' => ['03']],  // Sick on 03
+            'Suryadi' => ['absent' => ['09']],       // Absent on 09
+            'Markus Edowin' => ['absent' => ['03', '15']],  // Absent on 03, 15
+            'Edot Prasetyo' => ['sick' => ['09', '10']],    // Sick on 09, 10
+            'Solehudin' => ['absent' => ['01']],      // Absent on 01
+            'Trimulya' => [],                          // Always present
+            'Jumadi' => ['absent' => ['07']],        // Absent on 07
+            'Kasidi' => ['sick' => ['14']],          // Sick on 14
+            'Rohmat' => [],                           // Always present
+            'Wartono' => ['absent' => ['16']],       // Absent on 16
+            'Sukarman' => ['sick' => ['02']],        // Sick on 02
+            'Daryanto' => [],                         // Always present
         ];
 
         $shipmentNum = 1;
         $loadingNum = 1;
 
-        foreach ($dates as $dateStr => $info) {
+        foreach ($dates as $dateStr => $dayName) {
             $date = Carbon::parse($dateStr);
+            $day = substr($dateStr, 8, 2);
 
-            $this->command->info("Tanggal {$dateStr} ({$info['day']}): {$info['present']} hadir, {$info['absent']} absent");
+            $this->command->info("Tanggal {$dateStr} ({$dayName})");
 
-            // Acak MP yang hadir
-            $presentMP = collect($manpowerList)->random($info['present']);
-
-            // Briefing Session
+            // Create briefing
             $briefing = BriefingSession::create([
                 'date' => $dateStr,
                 'depot_id' => $depot->id,
                 'coordinator_user_id' => $fc->id,
-                'notes' => "Briefing harian - {$info['day']}, {$date->format('d M Y')}",
+                'notes' => "Briefing harian - {$dayName}, {$date->format('d M Y')}",
                 'summary_headcount' => 12,
-                'summary_sufficient' => $info['present'] >= 10,
+                'summary_sufficient' => true,
                 'mp_check_status' => MPCheckStatus::Approved,
                 'approved_at' => $date->copy()->setTime(7, rand(15, 45)),
                 'approved_by' => $fc->id,
             ]);
 
-            // Attendance dengan data kesehatan realistis
-            foreach ($presentMP as $mp) {
-                // Suhu normal 36.0 - 37.2
-                $temp = number_format(rand(360, 372) / 10, 1, '.', '');
-                // Tekanan darah normal
-                $bpSys = rand(110, 130);
-                $bpDia = rand(70, 85);
+            // Process each MP with consistent pattern
+            foreach ($manpowerList as $mp) {
+                $mpName = $mp->name;
+                $isSick = isset($absencePattern[$mpName]['sick']) && in_array($day, $absencePattern[$mpName]['sick']);
+                $isAbsent = isset($absencePattern[$mpName]['absent']) && in_array($day, $absencePattern[$mpName]['absent']);
 
-                $attendance = BriefingAttendance::create([
-                    'session_id' => $briefing->id,
-                    'manpower_id' => $mp->id,
-                    'attendance_status' => AttendanceStatus::Present,
-                    'temperature' => $temp,
-                    'bp_systolic' => $bpSys,
-                    'bp_diastolic' => $bpDia,
-                    'has_ppe' => true,
-                ]);
+                if ($isSick) {
+                    BriefingAttendance::create([
+                        'session_id' => $briefing->id,
+                        'manpower_id' => $mp->id,
+                        'attendance_status' => AttendanceStatus::Sick,
+                        'temperature' => 37.8 + (rand(0, 5) / 10),
+                        'bp_systolic' => rand(130, 145),
+                        'bp_diastolic' => rand(85, 95),
+                        'health_complaint' => 'Demam & flu',
+                    ]);
+                } elseif ($isAbsent) {
+                    BriefingAttendance::create([
+                        'session_id' => $briefing->id,
+                        'manpower_id' => $mp->id,
+                        'attendance_status' => AttendanceStatus::Absent,
+                    ]);
+                } else {
+                    // Present - create with health data
+                    $temp = 36.0 + (rand(0, 15) / 10); // 36.0 - 37.5
+                    $bpSys = rand(110, 130);
+                    $bpDia = rand(70, 85);
 
-                // PPE Items - kondiri realistis
-                $ppeConditions = [
-                    ['type' => PpeType::Helm, 'condition' => PpeCondition::Baik],
-                    ['type' => PpeType::Rompi, 'condition' => PpeCondition::Baik],
-                    ['type' => PpeType::Sepatu, 'condition' => rand(1, 10) > 8 ? PpeCondition::KurangBaik : PpeCondition::Baik],
-                    ['type' => PpeType::SarungTangan, 'condition' => rand(1, 10) > 7 ? PpeCondition::KurangBaik : PpeCondition::Baik],
-                ];
+                    $attendance = BriefingAttendance::create([
+                        'session_id' => $briefing->id,
+                        'manpower_id' => $mp->id,
+                        'attendance_status' => AttendanceStatus::Present,
+                        'temperature' => round($temp, 1),
+                        'bp_systolic' => $bpSys,
+                        'bp_diastolic' => $bpDia,
+                        'has_ppe' => true,
+                    ]);
 
-                foreach ($ppeConditions as $ppe) {
+                    // APD Items
                     BriefingAttendancePpeItem::create([
                         'attendance_id' => $attendance->id,
                         'manpower_id' => $mp->id,
-                        'ppe_type' => $ppe['type']->value,
-                        'condition' => $ppe['condition']->value,
+                        'ppe_type' => 'helm',
+                        'condition' => 'baik',
+                    ]);
+                    BriefingAttendancePpeItem::create([
+                        'attendance_id' => $attendance->id,
+                        'manpower_id' => $mp->id,
+                        'ppe_type' => 'rompi',
+                        'condition' => 'baik',
+                    ]);
+                    BriefingAttendancePpeItem::create([
+                        'attendance_id' => $attendance->id,
+                        'manpower_id' => $mp->id,
+                        'ppe_type' => 'sepatu',
+                        'condition' => rand(1, 10) > 9 ? 'kurang_baik' : 'baik',
+                    ]);
+                    BriefingAttendancePpeItem::create([
+                        'attendance_id' => $attendance->id,
+                        'manpower_id' => $mp->id,
+                        'ppe_type' => 'sarung_tangan',
+                        'condition' => 'baik',
                     ]);
                 }
             }
