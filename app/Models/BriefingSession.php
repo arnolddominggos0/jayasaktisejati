@@ -58,16 +58,25 @@ class BriefingSession extends Model
 
     public function getDisplayLabelAttribute(): string
     {
-        $date  = $this->date ? $this->date->format('Y-m-d') : (string) $this->date;
+        $date = $this->date ? $this->date->format('Y-m-d') : (string) $this->date;
         $depot = $this->depot->name ?? '-';
+
         return "{$date} · {$depot}";
+    }
+
+    public function refreshSufficientFlag(): void
+    {
+        $present = $this->presentAttendances()->count();
+        $target = (int) $this->summary_headcount;
+        $this->summary_sufficient = $target > 0 && $present >= $target;
+        $this->saveQuietly();
     }
 
     protected static function booted()
     {
         static::saving(function ($session) {
             $present = $session->presentAttendances()->count();
-            $target  = (int) $session->summary_headcount;
+            $target = (int) $session->summary_headcount;
             $session->summary_sufficient = $target > 0 && $present >= $target;
         });
     }

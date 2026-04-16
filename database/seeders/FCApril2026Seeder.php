@@ -95,20 +95,16 @@ class FCApril2026Seeder extends Seeder
             ['name' => 'PT Toyota Astra Motor', 'email' => 'logistik@toyota.astra.co.id', 'phone' => '021-8195001', 'type' => 'company', 'branch_id' => $branch->id]
         );
 
-        // 12 MP dengan data realistis Indonesia
+        // 8 MP aktif periode April 2026
         $mpData = [
-            ['name' => 'Udin Kuswanto', 'phone' => '081298765432', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift', 'K3']],
+            ['name' => 'Tri Mulya', 'phone' => '08129876001', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift', 'K3']],
             ['name' => 'Suryadi', 'phone' => '081212345678', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
-            ['name' => 'Markus Edowin', 'phone' => '081312345678', 'skills' => ['forklift'], 'certs' => ['SIO Forklift', 'K3']],
-            ['name' => 'Edot Prasetyo', 'phone' => '081412345678', 'skills' => ['loading'], 'certs' => ['K3']],
-            ['name' => 'Solehudin', 'phone' => '081512345678', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
-            ['name' => 'Trimulya', 'phone' => '081612345678', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift']],
-            ['name' => 'Jumadi', 'phone' => '081712345678', 'skills' => ['loading'], 'certs' => ['K3']],
-            ['name' => 'Kasidi', 'phone' => '081812345678', 'skills' => ['unloading'], 'certs' => ['K3']],
-            ['name' => 'Rohmat', 'phone' => '081912345678', 'skills' => ['forklift'], 'certs' => ['SIO Forklift', 'K3']],
-            ['name' => 'Wartono', 'phone' => '082098765432', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
-            ['name' => 'Sukarman', 'phone' => '082198765432', 'skills' => ['loading'], 'certs' => ['K3']],
-            ['name' => 'Daryanto', 'phone' => '082298765432', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift', 'K3']],
+            ['name' => 'Odih', 'phone' => '081312345678', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift', 'K3']],
+            ['name' => 'Rustam', 'phone' => '081412345678', 'skills' => ['loading'], 'certs' => ['K3']],
+            ['name' => 'Markus', 'phone' => '081512345678', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
+            ['name' => 'Soleh Wahidin', 'phone' => '081612345678', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift']],
+            ['name' => 'Habi', 'phone' => '081712345678', 'skills' => ['loading'], 'certs' => ['K3']],
+            ['name' => 'Cemen', 'phone' => '081812345678', 'skills' => ['unloading', 'loading'], 'certs' => ['K3']],
         ];
 
         $manpowerList = [];
@@ -158,20 +154,15 @@ class FCApril2026Seeder extends Seeder
         ];
 
         // Fixed attendance pattern per person (name => days absent/sick)
-        // Consistent pattern makes data look realistic
         $absencePattern = [
-            'Udin Kuswanto' => ['sick' => ['03']],  // Sick on 03
-            'Suryadi' => ['absent' => ['09']],       // Absent on 09
-            'Markus Edowin' => ['absent' => ['03', '15']],  // Absent on 03, 15
-            'Edot Prasetyo' => ['sick' => ['09', '10']],    // Sick on 09, 10
-            'Solehudin' => ['absent' => ['01']],      // Absent on 01
-            'Trimulya' => [],                          // Always present
-            'Jumadi' => ['absent' => ['07']],        // Absent on 07
-            'Kasidi' => ['sick' => ['14']],          // Sick on 14
-            'Rohmat' => [],                           // Always present
-            'Wartono' => ['absent' => ['16']],       // Absent on 16
-            'Sukarman' => ['sick' => ['02']],        // Sick on 02
-            'Daryanto' => [],                         // Always present
+            'Tri Mulya' => [],                           // Always present (PIC)
+            'Suryadi' => ['absent' => ['09']],           // Absent on 09
+            'Odih' => [],                                // Always present
+            'Rustam' => ['absent' => ['11']],            // Absent on 11
+            'Markus' => ['sick' => ['03']],               // Sick on 03
+            'Soleh Wahidin' => ['absent' => ['07']],     // Absent on 07
+            'Habi' => [],                                // Always present
+            'Cemen' => ['sick' => ['14']],               // Sick on 14
         ];
 
         $shipmentNum = 1;
@@ -189,7 +180,7 @@ class FCApril2026Seeder extends Seeder
                 'depot_id' => $depot->id,
                 'coordinator_user_id' => $fc->id,
                 'notes' => "Briefing harian - {$dayName}, {$date->format('d M Y')}",
-                'summary_headcount' => 12,
+                'summary_headcount' => 8,
                 'summary_sufficient' => true,
                 'mp_check_status' => MPCheckStatus::Approved,
                 'approved_at' => $date->copy()->setTime(7, rand(15, 45)),
@@ -284,8 +275,8 @@ class FCApril2026Seeder extends Seeder
             // Loading Sessions (2-3 per hari)
             $sessionsPerDay = rand(2, 3);
             for ($s = 0; $s < $sessionsPerDay; $s++) {
-                $mpRequired = rand(6, 8);
-                $mpPresent = min($mpRequired + rand(0, 2), 10);
+                $mpRequired = rand(5, 8);
+                $mpPresent = min($mpRequired + rand(0, 1), 8);
 
                 $shipment = Shipment::create([
                     'code' => 'JSS-'.substr($dateStr, 2, 2).substr($dateStr, 5, 2).substr($dateStr, 8, 2).'-'.str_pad($shipmentNum, 3, '0', STR_PAD_LEFT),

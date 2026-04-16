@@ -2,11 +2,14 @@
 
 namespace App\Filament\FC\Pages\Audit;
 
+use App\Enums\AttendanceStatus;
 use App\Models\BriefingAttendance;
 use App\Models\BriefingAttendancePpeItem;
 use App\Models\BriefingSession;
+use App\Models\Depot;
 use App\Models\LoadingSession;
 use App\Models\Manpower;
+use Carbon\Carbon;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
@@ -14,15 +17,15 @@ use Illuminate\Support\Facades\DB;
 
 class AprilAudit2026 extends Page
 {
-    protected static ?string $slug = 'audit-april-2026';
+    protected static ?string $slug = 'audit-dashboard';
 
-    protected static ?string $navigationIcon = 'heroicon-m-document-chart-bar';
+    protected static ?string $navigationIcon = 'heroicon-o-chart-bar-square';
 
-    protected static ?string $navigationLabel = 'Audit April 2026';
+    protected static ?string $navigationLabel = 'Dashboard';
 
-    protected static ?string $navigationGroup = 'Laporan Audit';
+    protected static ?string $navigationGroup = 'Laporan & Notifikasi';
 
-    protected static ?int $navigationSort = 100;
+    protected static ?int $navigationSort = 1;
 
     protected static string $view = 'filament.fc.pages.audit-april';
 
@@ -33,192 +36,249 @@ class AprilAudit2026 extends Page
 
     public function getTitle(): string|Htmlable
     {
-        return 'Laporan Audit April 2026';
+        return 'Dashboard Audit';
     }
 
     public $stats = [];
 
     public $manpowerList = [];
 
-    public $dailyTotal = [];
+    public $briefings = [];
 
-    public $healthStats = [];
+    public $healthSummary = [];
 
-    public $apdStats = [];
+    public $apdSummary = [];
 
-    public $loadingSessions = [];
+    public $loadingSummary = [];
+
+    public $depotName = '';
+
+    public $selectedDepotId = null;
+
+    public $selectedDate = '';
 
     public function mount(): void
     {
+        $user = Filament::auth()->user();
+        $this->selectedDate = now()->toDateString();
+
+        $depotId = app()->bound('scope.depot_id')
+            ? app('scope.depot_id')
+            : Depot::where('coordinator_user_id', $user?->id)->value('id');
+
+        $this->selectedDepotId = $depotId;
+        if ($depotId) {
+            $this->depotName = Depot::find($depotId)?->name ?? 'Depo Tanjung Priok';
+        }
+
+        $this->loadData();
+    }
+
+    public function loadData(): void
+    {
         $this->loadStats();
         $this->loadManpowerAttendance();
-        $this->loadDailyHealth();
-        $this->loadDailyAPD();
-        $this->loadLoadingSessions();
+        $this->loadBriefings();
+        $this->loadHealthSummary();
+        $this->loadApdSummary();
+        $this->loadLoadingSummary();
+    }
+
+    private function getBaseQuery()
+    {
+        $query = BriefingSession::query();
+
+        if ($this->selectedDepotId) {
+            $query->where('depot_id', $this->selectedDepotId);
+        }
+
+        if ($this->selectedDate) {
+            $startOfMonth = Carbon::parse($this->selectedDate)->startOfMonth()->toDateString();
+            $endOfMonth = Carbon::parse($this->selectedDate)->endOfMonth()->toDateString();
+            $query->whereBetween('date', [$startOfMonth, $endOfMonth]);
+        }
+
+        return $query;
+    }
+
+    private function getManpowerQuery()
+    {
+        $query = Manpower::where('active', true);
+
+        if ($this->selectedDepotId) {
+            $query->where('depot_id', $this->selectedDepotId);
+        }
+
+        return $query;
     }
 
     private function loadStats(): void
     {
-        $this->stats = [
-            'total_mp' => Manpower::count(),
-            'briefing_sessions' => BriefingSession::count(),
-            'attendance_present' => BriefingAttendance::where('attendance_status', 'present')->count(),
-            'ppe_checked' => BriefingAttendancePpeItem::count(),
-            'ppe_ok' => BriefingAttendancePpeItem::where('condition', 'baik')->count(),
-            'loading_sessions' => LoadingSession::count(),
-            'loading_completed' => LoadingSession::where('status', 'completed')->count(),
-        ];
+        $sessions = $this->getBaseQuery()->get();
+        $sessionIds = $sessions->pluck('id');
 
-        $healthStats = DB::select("
-            SELECT AVG(temperature) as avg_temp
+        $mpCount = $this->getManpowerQuery()->count();
+        $briefingCount = $sessions->count();
+
+        $attendancePresent = BriefingAttendance::whereIn('session_id', $sessionIds)
+            ->where('attendance_status', AttendanceStatus::Present->value)
+            ->count();
+
+        $ppeChecked = BriefingAttendancePpeItem::whereHas('attendance', fn ($q) => $q->whereIn('session_id', $sessionIds))
+            ->count();
+        $ppeOk = BriefingAttendancePpeItem::where('condition', 'baik')
+            ->whereHas('attendance', fn ($q) => $q->whereIn('session_id', $sessionIds))
+            ->count();
+
+        $loadingQuery = LoadingSession::query();
+        if ($this->selectedDepotId) {
+            $loadingQuery->where('depot_id', $this->selectedDepotId);
+        }
+        if ($this->selectedDate) {
+            $startOfMonth = Carbon::parse($this->selectedDate)->startOfMonth()->toDateString();
+            $endOfMonth = Carbon::parse($this->selectedDate)->endOfMonth()->toDateString();
+            $loadingQuery->whereBetween('created_at', [$startOfMonth, $endOfMonth.' 23:59:59']);
+        }
+        $loadingTotal = $loadingQuery->count();
+        $loadingCompleted = (clone $loadingQuery)->where('status', 'completed')->count();
+
+        $healthStats = DB::select('
+            SELECT AVG(temperature) as avg_temp, MIN(temperature) as min_temp, MAX(temperature) as max_temp,
+                   AVG(bp_systolic) as avg_sys, AVG(bp_diastolic) as avg_dia
             FROM briefing_attendances
-            WHERE attendance_status = 'present'
-        ");
+            WHERE attendance_status = ? AND session_id IN (?)
+        ', [AttendanceStatus::Present->value, $sessionIds->implode(',')]);
 
-        $this->stats['avg_temperature'] = round($healthStats[0]->avg_temp ?? 36.5, 1);
+        $this->stats = [
+            'total_mp' => $mpCount,
+            'briefing_sessions' => $briefingCount,
+            'attendance_present' => $attendancePresent,
+            'ppe_checked' => $ppeChecked,
+            'ppe_ok' => $ppeOk,
+            'loading_completed' => $loadingCompleted,
+            'loading_total' => $loadingTotal,
+            'avg_temperature' => round($healthStats[0]->avg_temp ?? 36.5, 1),
+            'min_temperature' => round($healthStats[0]->min_temp ?? 36.0, 1),
+            'max_temperature' => round($healthStats[0]->max_temp ?? 37.5, 1),
+            'avg_sys' => round($healthStats[0]->avg_sys ?? 120),
+            'avg_dia' => round($healthStats[0]->avg_dia ?? 80),
+        ];
     }
 
     private function loadManpowerAttendance(): void
     {
-        $dates = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15', '16'];
-        $manpower = Manpower::orderBy('name')->get();
+        $manpower = $this->getManpowerQuery()->orderBy('name')->get();
+        $sessions = $this->getBaseQuery()->pluck('id');
+        $totalDays = $sessions->count();
 
         $this->manpowerList = [];
         foreach ($manpower as $mp) {
-            $attendance = [];
-            $totalPresent = 0;
-            $totalDays = 16;
-
-            foreach ($dates as $day) {
-                $dateStr = '2026-04-'.$day;
-                $present = BriefingAttendance::where('manpower_id', $mp->id)
-                    ->whereHas('session', function ($q) use ($dateStr) {
-                        $q->where('date', $dateStr);
-                    })
-                    ->first();
-
-                if ($present) {
-                    if ($present->attendance_status === 'present') {
-                        $attendance[$day] = 'hadir';
-                        $totalPresent++;
-                    } elseif ($present->attendance_status === 'sick') {
-                        $attendance[$day] = 'sakit';
-                    } elseif ($present->attendance_status === 'absent') {
-                        $attendance[$day] = 'alpha';
-                    } else {
-                        $attendance[$day] = 'izin';
-                    }
-                } else {
-                    $attendance[$day] = 'alpha';
-                }
-            }
+            $present = BriefingAttendance::where('manpower_id', $mp->id)
+                ->whereIn('session_id', $sessions)
+                ->where('attendance_status', AttendanceStatus::Present->value)
+                ->count();
 
             $this->manpowerList[] = [
                 'name' => $mp->name,
-                'attendance' => $attendance,
-                'total_present' => $totalPresent,
+                'present' => $present,
                 'total_days' => $totalDays,
-            ];
-        }
-
-        // Daily totals
-        $this->dailyTotal = [];
-        foreach ($dates as $day) {
-            $dateStr = '2026-04-'.$day;
-            $hadir = BriefingAttendance::whereHas('session', function ($q) use ($dateStr) {
-                $q->where('date', $dateStr);
-            })
-                ->where('attendance_status', 'present')
-                ->count();
-
-            $this->dailyTotal[$day] = ['hadir' => $hadir];
-        }
-    }
-
-    private function loadDailyHealth(): void
-    {
-        $briefings = BriefingSession::orderBy('date')->get();
-
-        $this->healthStats = [];
-        foreach ($briefings as $briefing) {
-            $day = substr($briefing->date, 8, 2);
-            $present = $briefing->attendances->where('attendance_status', 'present');
-
-            $temps = $present->pluck('temperature')->filter()->toArray();
-            $sys = $present->pluck('bp_systolic')->filter()->toArray();
-            $dia = $present->pluck('bp_diastolic')->filter()->toArray();
-
-            $this->healthStats[] = [
-                'date' => $briefing->date,
-                'total_present' => $present->count(),
-                'avg_temp' => count($temps) ? round(array_sum($temps) / count($temps), 1) : '-',
-                'avg_sys' => count($sys) ? round(array_sum($sys) / count($sys)) : '-',
-                'avg_dia' => count($dia) ? round(array_sum($dia) / count($dia)) : '-',
+                'percentage' => $totalDays > 0 ? round(($present / $totalDays) * 100) : 0,
+                'status' => $totalDays > 0 ? ($present >= $totalDays - 2 ? 'Aktif' : ($present >= $totalDays - 4 ? 'Cukup' : 'Kurang')) : '-',
             ];
         }
     }
 
-    private function loadDailyAPD(): void
+    private function loadBriefings(): void
     {
-        $briefings = BriefingSession::orderBy('date')->get();
+        $sessions = $this->getBaseQuery()->with('coordinator')->orderBy('date')->get();
 
-        $this->apdStats = [];
-        foreach ($briefings as $briefing) {
-            $day = substr($briefing->date, 8, 2);
-            $present = $briefing->attendances->where('attendance_status', 'present');
-
-            $totalChecked = $present->count();
-            $helmOk = BriefingAttendancePpeItem::whereIn('attendance_id', $present->pluck('id'))
-                ->where('ppe_type', 'helm')
-                ->where('condition', 'baik')
-                ->count();
-            $rompiOk = BriefingAttendancePpeItem::whereIn('attendance_id', $present->pluck('id'))
-                ->where('ppe_type', 'rompi')
-                ->where('condition', 'baik')
-                ->count();
-            $sepatuOk = BriefingAttendancePpeItem::whereIn('attendance_id', $present->pluck('id'))
-                ->where('ppe_type', 'sepatu')
-                ->where('condition', 'baik')
-                ->count();
-            $sarungTanganOk = BriefingAttendancePpeItem::whereIn('attendance_id', $present->pluck('id'))
-                ->where('ppe_type', 'sarung_tangan')
-                ->where('condition', 'baik')
+        $this->briefings = [];
+        foreach ($sessions as $session) {
+            $attendees = $session->attendances()
+                ->where('attendance_status', AttendanceStatus::Present->value)
                 ->count();
 
-            $this->apdStats[] = [
-                'date' => $briefing->date,
-                'total_checked' => $totalChecked,
-                'helm_ok' => $helmOk,
-                'rompi_ok' => $rompiOk,
-                'sepatu_ok' => $sepatuOk,
-                'sarung_tangan_ok' => $sarungTanganOk,
+            $this->briefings[] = [
+                'date' => $session->date,
+                'notes' => $session->notes,
+                'attendees' => $attendees,
+                'coordinator' => $session->coordinator?->name ?? '-',
+                'mp_check_status' => $session->mp_check_status?->value ?? 'draft',
             ];
         }
     }
 
-    private function loadLoadingSessions(): void
+    private function loadHealthSummary(): void
     {
-        $sessions = LoadingSession::with(['briefingSession'])
-            ->orderBy('code', 'desc')
-            ->limit(20)
+        $sessions = $this->getBaseQuery()->pluck('id');
+
+        $attendances = BriefingAttendance::where('attendance_status', AttendanceStatus::Present->value)
+            ->whereIn('session_id', $sessions)
             ->get();
 
-        $this->loadingSessions = [];
-        foreach ($sessions as $session) {
-            $date = $session->briefingSession?->date ?? substr($session->created_at->format('Y-m-d'), 8, 2);
+        $temps = $attendances->pluck('temperature')->filter()->toArray();
+        $sys = $attendances->pluck('bp_systolic')->filter()->toArray();
+        $dia = $attendances->pluck('bp_diastolic')->filter()->toArray();
 
-            $this->loadingSessions[] = [
-                'code' => $session->code,
-                'date' => $date,
-                'mp' => $session->mp_present.'/'.$session->mp_required,
-                'attendance' => $session->mp_attendance_completed ? '✅' : '❌',
-                'health' => $session->health_check_completed ? '✅' : '❌',
-                'apd' => $session->apd_check_completed ? '✅' : '❌',
-                'rack' => $session->rack_container_check_completed ? '✅' : '❌',
-                'equipment' => $session->equipment_check_completed ? '✅' : '❌',
-                'unit' => $session->unit_check_completed ? '✅' : '❌',
-                'decision' => $session->final_decision_status?->value === 'go' ? 'GO' : ($session->final_decision_status?->value === 'stop' ? 'STOP' : 'PROGRESS'),
+        $this->healthSummary = [
+            'temp_min' => count($temps) ? round(min($temps), 1) : '-',
+            'temp_max' => count($temps) ? round(max($temps), 1) : '-',
+            'temp_avg' => count($temps) ? round(array_sum($temps) / count($temps), 1) : '-',
+            'sys_avg' => count($sys) ? round(array_sum($sys) / count($sys)) : '-',
+            'dia_avg' => count($dia) ? round(array_sum($dia) / count($dia)) : '-',
+            'total_checks' => $attendances->count(),
+        ];
+    }
+
+    private function loadApdSummary(): void
+    {
+        $sessions = $this->getBaseQuery()->pluck('id');
+        $types = ['helm', 'rompi', 'sepatu', 'sarung_tangan'];
+
+        $this->apdSummary = [];
+        foreach ($types as $type) {
+            $total = BriefingAttendancePpeItem::where('ppe_type', $type)
+                ->whereHas('attendance', fn ($q) => $q->whereIn('session_id', $sessions))
+                ->count();
+
+            $ok = BriefingAttendancePpeItem::where('ppe_type', $type)
+                ->where('condition', 'baik')
+                ->whereHas('attendance', fn ($q) => $q->whereIn('session_id', $sessions))
+                ->count();
+
+            $this->apdSummary[$type] = [
+                'total' => $total,
+                'ok' => $ok,
+                'percentage' => $total > 0 ? round(($ok / $total) * 100) : 0,
             ];
         }
+    }
+
+    private function loadLoadingSummary(): void
+    {
+        $query = LoadingSession::query();
+        if ($this->selectedDepotId) {
+            $query->where('depot_id', $this->selectedDepotId);
+        }
+        if ($this->selectedDate) {
+            $startOfMonth = Carbon::parse($this->selectedDate)->startOfMonth()->toDateString();
+            $endOfMonth = Carbon::parse($this->selectedDate)->endOfMonth()->toDateString();
+            $query->whereBetween('created_at', [$startOfMonth, $endOfMonth.' 23:59:59']);
+        }
+
+        $sessions = $query->get();
+        $completed = $sessions->where('status.value', 'completed')->count();
+        $go = $sessions->where('final_decision_status.value', 'go')->count();
+        $stop = $sessions->where('final_decision_status.value', 'stop')->count();
+        $progress = $sessions->whereNull('final_decision_status')->count();
+
+        $this->loadingSummary = [
+            'total' => $sessions->count(),
+            'completed' => $completed,
+            'go' => $go,
+            'stop' => $stop,
+            'progress' => $progress,
+            'percentage' => $sessions->count() > 0 ? round(($completed / $sessions->count()) * 100) : 0,
+        ];
     }
 }

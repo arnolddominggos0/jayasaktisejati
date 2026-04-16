@@ -1,0 +1,76 @@
+{
+  "periode_audit": "1-16 April 2026",
+  "pic": "Tri Mulya",
+  "manpower_aktif": [
+    {"id": 1, "nama": "Tri Mulya"},
+    {"id": 2, "nama": "Suryadi"},
+    {"id": 3, "nama": "Odih"},
+    {"id": 4, "nama": "Rustam"},
+    {"id": 5, "nama": "Markus"},
+    {"id": 6, "nama": "Soleh Wahidin"},
+    {"id": 7, "nama": "Habi"},
+    {"id": 8, "nama": "Cemen"}
+  ],
+  "dashboard_summary": {
+    "briefing_sessions": 12,
+    "kehadiran_mp": "7.5/8",
+    "total_mp_aktif": 8,
+    "apd_layak_pakai": "95/96",
+    "rata_rata_suhu": "36.6°C",
+    "rata_rata_td": "120/80",
+    "loading_selesai": 14,
+    "total_loading": 17,
+    "persentase_selesai": "82%"
+  },
+  "briefing_harian": [
+    {"tanggal": "2026-04-01", "pic": "Tri Mulya", "topik": "Keselamatan Kerja", "peserta": 7},
+    {"tanggal": "2026-04-02", "pic": "Tri Mulya", "topik": "Penggunaan APD", "peserta": 8},
+    {"tanggal": "2026-04-03", "pic": "Tri Mulya", "topik": "Prosedur Loading", "peserta": 7},
+    {"tanggal": "2026-04-07", "pic": "Tri Mulya", "topik": "Housekeeping Area", "peserta": 8},
+    {"tanggal": "2026-04-08", "pic": "Tri Mulya", "topik": "Emergency Response", "peserta": 8},
+    {"tanggal": "2026-04-09", "pic": "Tri Mulya", "topik": "Pencegahan Kecelakaan", "peserta": 7},
+    {"tanggal": "2026-04-10", "pic": "Tri Mulya", "topik": "Komunikasi Radio", "peserta": 8},
+    {"tanggal": "2026-04-11", "pic": "Tri Mulya", "topik": "Keselamatan Kerja", "peserta": 7},
+    {"tanggal": "2026-04-13", "pic": "Tri Mulya", "topik": "Pengecekan Kendaraan", "peserta": 8},
+    {"tanggal": "2026-04-14", "pic": "Tri Mulya", "topik": "Penggunaan APD", "peserta": 8},
+    {"tanggal": "2026-04-15", "pic": "Tri Mulya", "topik": "Prosedur Loading", "peserta": 8},
+    {"tanggal": "2026-04-16", "pic": "Tri Mulya", "topik": "Pengecekan Kendaraan", "peserta": 8}
+  ],
+  "statistik_kehadiran_per_mp": {
+    "Tri Mulya": {"kehadiran": 12, "status": "Aktif"},
+    "Suryadi": {"kehadiran": 11, "status": "Aktif"},
+    "Odih": {"kehadiran": 12, "status": "Aktif"},
+    "Rustam": {"kehadiran": 11, "status": "Aktif"},
+    "Markus": {"kehadiran": 11, "status": "Aktif"},
+    "Soleh Wahidin": {"kehadiran": 11, "status": "Aktif"},
+    "Habi": {"kehadiran": 12, "status": "Aktif"},
+    "Cemen": {"kehadiran": 11, "status": "Aktif"}
+  },
+  "statistik_kesehatan": {
+    "suhu_min": 36.4,
+    "suhu_max": 36.9,
+    "suhu_avg": 36.6,
+    "td_sistole_min": 115,
+    "td_sistole_max": 125,
+    "td_diastole_min": 75,
+    "td_diastole_max": 85,
+    "kategori": "Normal"
+  },
+  "statistik_apd": {
+    "total_pemeriksaan": 96,
+    "helm_layak": 44,
+    "sepatu_layak": 45,
+    "rompi_layak": 44,
+    "sarung_tangan_layak": 43,
+    "status_keseluruhan": "Layak Pakai"
+  },
+  "statistik_loading": {
+    "total_aktivitas": 17,
+    "selesai": 14,
+    "dalam_proses": 3,
+    "customer_utama": ["PT Semen Indonesia", "PT Indocement", "PT Holcim"],
+    "material_utama": ["Semen Portland", "Batu Split", "Pasir"]
+  },
+  "hari_kerja": 12,
+  "catatan_audit": "Data operasional normal, tidak ada kecelakaan kerja, APD dalam kondisi baik, kehadiran memenuhi standar."
+}

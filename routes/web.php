@@ -5,7 +5,11 @@ use App\Http\Controllers\Public\TrackingController;
 use App\Http\Controllers\ShipmentPrintController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/ping', fn () => 'pong');
+Route::get('/ping', fn() => 'pong');
+
+Route::get('/', function () {
+    return view('landing');
+});
 
 Route::get('/', [LandingController::class, 'index'])->name('landing');
 
