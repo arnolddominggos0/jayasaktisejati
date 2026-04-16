@@ -68,8 +68,8 @@ class FCApril2026Seeder extends Seeder
         $this->command->info('Membuat data master...');
 
         $fc = User::firstOrCreate(
-            ['email' => 'fc-jkt@jss.co.id'],
-            ['name' => 'Andi Wijaya', 'password' => Hash::make('password123'), 'email_verified_at' => now()]
+            ['email' => 'suryadi@jss.co.id'],
+            ['name' => 'Suryadi', 'password' => Hash::make('password123'), 'email_verified_at' => now()]
         );
         $fc->assignRole('field_coordinator');
 
@@ -97,20 +97,20 @@ class FCApril2026Seeder extends Seeder
             ['name' => 'PT Toyota Astra Motor', 'email' => 'logistik@toyota.astra.co.id', 'phone' => '021-8195001', 'type' => 'company', 'branch_id' => $branch->id]
         );
 
-        // 12 MP dengan data realistis
+        // 12 MP dengan data realistis Indonesia
         $mpData = [
-            ['name' => 'Budi Santoso', 'phone' => '081298765432', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift']],
-            ['name' => 'Dedi Kurniawan', 'phone' => '081212345678', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
-            ['name' => 'Eko Prasetyo', 'phone' => '081312345678', 'skills' => ['forklift'], 'certs' => ['SIO Forklift', 'K3']],
-            ['name' => 'Fajar Nugroho', 'phone' => '081412345678', 'skills' => ['loading'], 'certs' => ['K3']],
-            ['name' => 'Gunawan Wijaya', 'phone' => '081512345678', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
-            ['name' => 'Hadi Kusuma', 'phone' => '081612345678', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift']],
-            ['name' => 'Irfan Hakim', 'phone' => '081712345678', 'skills' => ['loading'], 'certs' => ['K3']],
-            ['name' => 'Joko Rahayu', 'phone' => '081812345678', 'skills' => ['unloading'], 'certs' => ['K3']],
-            ['name' => 'Karno Adi', 'phone' => '081912345678', 'skills' => ['forklift'], 'certs' => ['SIO Forklift']],
-            ['name' => 'Lukman Hakim', 'phone' => '082098765432', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
-            ['name' => 'Maman Suherman', 'phone' => '082198765432', 'skills' => ['loading'], 'certs' => ['K3']],
-            ['name' => 'Nana Suryana', 'phone' => '082298765432', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift', 'K3']],
+            ['name' => 'Udin Kuswanto', 'phone' => '081298765432', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift', 'K3']],
+            ['name' => 'Suryadi', 'phone' => '081212345678', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
+            ['name' => 'Markus Edowin', 'phone' => '081312345678', 'skills' => ['forklift'], 'certs' => ['SIO Forklift', 'K3']],
+            ['name' => 'Edot Prasetyo', 'phone' => '081412345678', 'skills' => ['loading'], 'certs' => ['K3']],
+            ['name' => 'Solehudin', 'phone' => '081512345678', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
+            ['name' => 'Trimulya', 'phone' => '081612345678', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift']],
+            ['name' => 'Jumadi', 'phone' => '081712345678', 'skills' => ['loading'], 'certs' => ['K3']],
+            ['name' => 'Kasidi', 'phone' => '081812345678', 'skills' => ['unloading'], 'certs' => ['K3']],
+            ['name' => 'Rohmat', 'phone' => '081912345678', 'skills' => ['forklift'], 'certs' => ['SIO Forklift', 'K3']],
+            ['name' => 'Wartono', 'phone' => '082098765432', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
+            ['name' => 'Sukarman', 'phone' => '082198765432', 'skills' => ['loading'], 'certs' => ['K3']],
+            ['name' => 'Daryanto', 'phone' => '082298765432', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift', 'K3']],
         ];
 
         $manpowerList = [];

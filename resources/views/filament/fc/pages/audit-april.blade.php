@@ -11,7 +11,7 @@
                     </div>
                     <div class="text-right">
                         <p class="text-sm text-gray-500">Field Coordinator</p>
-                        <p class="font-semibold">Andi Wijaya</p>
+                        <p class="font-semibold">{{ \Filament\Facades\Filament::auth()->user()->name ?? 'Suryadi' }}</p>
                     </div>
                 </div>
             </div>

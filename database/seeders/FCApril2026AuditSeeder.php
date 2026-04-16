@@ -80,7 +80,7 @@ class FCApril2026AuditSeeder extends Seeder
 
         $fcJkt = User::firstOrCreate(
             ['email' => 'fc-jkt@jss.co.id'],
-            ['name' => 'Andi Wijaya (FC Jakarta)', 'password' => Hash::make('password123'), 'email_verified_at' => now()]
+            ['name' => 'Trimulya(FC Jakarta)', 'password' => Hash::make('password123'), 'email_verified_at' => now()]
         );
         $fcJkt->assignRole('field_coordinator');
 
