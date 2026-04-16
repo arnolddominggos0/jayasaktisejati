@@ -95,6 +95,8 @@ class AprilAudit2026 extends Page
             ->get()
             ->map(function ($session) {
                 $present = $session->attendances->where('attendance_status', 'present')->count();
+                $sick = $session->attendances->where('attendance_status', 'sick')->count();
+                $absent = $session->attendances->where('attendance_status', 'absent')->count();
                 $total = $session->attendances->count();
 
                 return [
@@ -103,7 +105,8 @@ class AprilAudit2026 extends Page
                     'depot' => $session->depot?->name ?? '-',
                     'total_mp' => $total,
                     'present' => $present,
-                    'absent' => $total - $present,
+                    'absent' => $absent,
+                    'sick' => $sick,
                     'mp_check_status' => $session->mp_check_status?->value ?? 'pending',
                 ];
             })
@@ -112,14 +115,16 @@ class AprilAudit2026 extends Page
 
     private function loadRecentLoading(): void
     {
-        $this->recentLoading = LoadingSession::with(['shipment', 'depot'])
-            ->orderBy('created_at', 'desc')
-            ->limit(10)
+        $this->recentLoading = LoadingSession::with(['shipment', 'depot', 'briefingSession'])
+            ->orderBy('code', 'desc')
+            ->limit(15)
             ->get()
             ->map(function ($session) {
+                $date = $session->briefingSession?->date ?? $session->created_at->format('Y-m-d');
+
                 return [
                     'code' => $session->code,
-                    'date' => $session->created_at->format('Y-m-d'),
+                    'date' => $date,
                     'depot' => $session->depot?->name ?? '-',
                     'status' => $session->status?->value ?? 'draft',
                     'mp_required' => $session->mp_required,

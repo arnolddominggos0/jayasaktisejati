@@ -44,16 +44,16 @@ class FCApril2026Seeder extends Seeder
     public function run(): void
     {
         $this->command->info('========================================');
-        $this->command->info('FC APRIL 2026 - AUDIT DATA SEEDER');
+        $this->command->info('FC APRIL 2026 - DATA AUDIT HARIAN');
         $this->command->info('========================================');
 
         $this->createRoles();
         $data = $this->createMasterData();
-        $this->generateAprilData($data);
+        $this->generateDailyData($data);
 
         $this->command->info('');
         $this->command->info('========================================');
-        $this->command->info('AUDIT DATA APRIL 2026 - COMPLETED!');
+        $this->command->info('DATA AUDIT HARIAN APRIL 2026 - SELESAI!');
         $this->command->info('========================================');
     }
 
@@ -65,11 +65,11 @@ class FCApril2026Seeder extends Seeder
 
     private function createMasterData(): array
     {
-        $this->command->info('Creating master data...');
+        $this->command->info('Membuat data master...');
 
         $fc = User::firstOrCreate(
             ['email' => 'fc-jkt@jss.co.id'],
-            ['name' => 'Andi Wijaya (FC Jakarta)', 'password' => Hash::make('password123'), 'email_verified_at' => now()]
+            ['name' => 'Andi Wijaya', 'password' => Hash::make('password123'), 'email_verified_at' => now()]
         );
         $fc->assignRole('field_coordinator');
 
@@ -97,22 +97,31 @@ class FCApril2026Seeder extends Seeder
             ['name' => 'PT Toyota Astra Motor', 'email' => 'logistik@toyota.astra.co.id', 'phone' => '021-8195001', 'type' => 'company', 'branch_id' => $branch->id]
         );
 
-        // Create 12 MP
-        $mpNames = [
-            'Kurnia Adi Pratama', 'Dedi Setiawan', 'Eko Prasetyo', 'Fajar Nugroho',
-            'Gunawan Hidayat', 'Hadi Wijaya', 'Irfan Fachlevi', 'Joko Susilo',
-            'Karno Utomo', 'Lukman Hakim', 'Maman Surahman', 'Nana Sumarna',
+        // 12 MP dengan data realistis
+        $mpData = [
+            ['name' => 'Budi Santoso', 'phone' => '081298765432', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift']],
+            ['name' => 'Dedi Kurniawan', 'phone' => '081212345678', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
+            ['name' => 'Eko Prasetyo', 'phone' => '081312345678', 'skills' => ['forklift'], 'certs' => ['SIO Forklift', 'K3']],
+            ['name' => 'Fajar Nugroho', 'phone' => '081412345678', 'skills' => ['loading'], 'certs' => ['K3']],
+            ['name' => 'Gunawan Wijaya', 'phone' => '081512345678', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
+            ['name' => 'Hadi Kusuma', 'phone' => '081612345678', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift']],
+            ['name' => 'Irfan Hakim', 'phone' => '081712345678', 'skills' => ['loading'], 'certs' => ['K3']],
+            ['name' => 'Joko Rahayu', 'phone' => '081812345678', 'skills' => ['unloading'], 'certs' => ['K3']],
+            ['name' => 'Karno Adi', 'phone' => '081912345678', 'skills' => ['forklift'], 'certs' => ['SIO Forklift']],
+            ['name' => 'Lukman Hakim', 'phone' => '082098765432', 'skills' => ['loading', 'unloading'], 'certs' => ['K3']],
+            ['name' => 'Maman Suherman', 'phone' => '082198765432', 'skills' => ['loading'], 'certs' => ['K3']],
+            ['name' => 'Nana Suryana', 'phone' => '082298765432', 'skills' => ['forklift', 'loading'], 'certs' => ['SIO Forklift', 'K3']],
         ];
 
         $manpowerList = [];
-        foreach ($mpNames as $i => $name) {
+        foreach ($mpData as $i => $mp) {
             $manpowerList[] = Manpower::firstOrCreate(
-                ['name' => $name],
+                ['name' => $mp['name']],
                 [
                     'domain' => 'internal',
-                    'skills' => ['loading', 'forklift'],
-                    'certs' => ['SIO Forklift'],
-                    'phone' => '08123'.str_pad($i, 8, '0', STR_PAD_LEFT),
+                    'skills' => $mp['skills'],
+                    'certs' => $mp['certs'],
+                    'phone' => $mp['phone'],
                     'branch_id' => $branch->id,
                     'depot_id' => $depot->id,
                     'active' => true,
@@ -120,10 +129,10 @@ class FCApril2026Seeder extends Seeder
             );
         }
 
-        return compact('fc', 'branch', 'cityJkt', 'cityBtg', 'portTpri', 'portBtg', 'depot', 'customer', 'manpowerList');
+        return compact('fc', 'admin', 'branch', 'cityJkt', 'cityBtg', 'portTpri', 'portBtg', 'depot', 'customer', 'manpowerList');
     }
 
-    private function generateAprilData(array $data): void
+    private function generateDailyData(array $data): void
     {
         $fc = $data['fc'];
         $depot = $data['depot'];
@@ -133,43 +142,52 @@ class FCApril2026Seeder extends Seeder
         $portTpri = $data['portTpri'];
         $portBtg = $data['portBtg'];
         $manpowerList = $data['manpowerList'];
+        $branch = $data['branch'];
 
-        $this->command->info('Generating April 2026 data...');
-
+        // Tanggal 1-16 April 2026 (Senin-Jumat only)
         $dates = [
-            '2026-04-01', '2026-04-02', '2026-04-03',
-            '2026-04-07', '2026-04-08', '2026-04-09', '2026-04-10',
-            '2026-04-13', '2026-04-14', '2026-04-15', '2026-04-16',
+            '2026-04-01' => ['day' => 'Rabu', 'present' => 11, 'absent' => 1, 'sick' => 0],
+            '2026-04-02' => ['day' => 'Kamis', 'present' => 12, 'absent' => 0, 'sick' => 0],
+            '2026-04-03' => ['day' => 'Jumat', 'present' => 10, 'absent' => 1, 'sick' => 1],
+            '2026-04-07' => ['day' => 'Selasa', 'present' => 11, 'absent' => 1, 'sick' => 0],
+            '2026-04-08' => ['day' => 'Rabu', 'present' => 12, 'absent' => 0, 'sick' => 0],
+            '2026-04-09' => ['day' => 'Kamis', 'present' => 10, 'absent' => 1, 'sick' => 1],
+            '2026-04-10' => ['day' => 'Jumat', 'present' => 11, 'absent' => 0, 'sick' => 1],
+            '2026-04-13' => ['day' => 'Senin', 'present' => 12, 'absent' => 0, 'sick' => 0],
+            '2026-04-14' => ['day' => 'Selasa', 'present' => 11, 'absent' => 1, 'sick' => 0],
+            '2026-04-15' => ['day' => 'Rabu', 'present' => 10, 'absent' => 2, 'sick' => 0],
+            '2026-04-16' => ['day' => 'Kamis', 'present' => 11, 'absent' => 1, 'sick' => 0],
         ];
 
         $shipmentNum = 1;
         $loadingNum = 1;
 
-        foreach ($dates as $dateStr) {
+        foreach ($dates as $dateStr => $info) {
             $date = Carbon::parse($dateStr);
-            $dayName = $date->format('D');
 
-            $this->command->info("Processing: {$dateStr} ({$dayName})");
+            $this->command->info("Tanggal {$dateStr} ({$info['day']}): {$info['present']} hadir, {$info['absent']} absent");
 
-            // Create briefing session
-            $presentCount = rand(10, 12);
-            $presentMP = collect($manpowerList)->random(min($presentCount, count($manpowerList)));
+            // Acak MP yang hadir
+            $presentMP = collect($manpowerList)->random($info['present']);
 
+            // Briefing Session
             $briefing = BriefingSession::create([
                 'date' => $dateStr,
                 'depot_id' => $depot->id,
                 'coordinator_user_id' => $fc->id,
-                'notes' => 'Briefing harian April 2026',
+                'notes' => "Briefing harian - {$info['day']}, {$date->format('d M Y')}",
                 'summary_headcount' => 12,
-                'summary_sufficient' => true,
+                'summary_sufficient' => $info['present'] >= 10,
                 'mp_check_status' => MPCheckStatus::Approved,
-                'approved_at' => $date->copy()->setTime(7, 30),
+                'approved_at' => $date->copy()->setTime(7, rand(15, 45)),
                 'approved_by' => $fc->id,
             ]);
 
-            // Create attendance for each present MP
+            // Attendance dengan data kesehatan realistis
             foreach ($presentMP as $mp) {
-                $temp = rand(355, 370) / 10;
+                // Suhu normal 36.0 - 37.2
+                $temp = number_format(rand(360, 372) / 10, 1, '.', '');
+                // Tekanan darah normal
                 $bpSys = rand(110, 130);
                 $bpDia = rand(70, 85);
 
@@ -183,15 +201,15 @@ class FCApril2026Seeder extends Seeder
                     'has_ppe' => true,
                 ]);
 
-                // Create PPE items for attendance
-                $ppeItems = [
+                // PPE Items - kondiri realistis
+                $ppeConditions = [
                     ['type' => PpeType::Helm, 'condition' => PpeCondition::Baik],
                     ['type' => PpeType::Rompi, 'condition' => PpeCondition::Baik],
-                    ['type' => PpeType::Sepatu, 'condition' => rand(1, 10) > 2 ? PpeCondition::Baik : PpeCondition::KurangBaik],
-                    ['type' => PpeType::SarungTangan, 'condition' => PpeCondition::Baik],
+                    ['type' => PpeType::Sepatu, 'condition' => rand(1, 10) > 8 ? PpeCondition::KurangBaik : PpeCondition::Baik],
+                    ['type' => PpeType::SarungTangan, 'condition' => rand(1, 10) > 7 ? PpeCondition::KurangBaik : PpeCondition::Baik],
                 ];
 
-                foreach ($ppeItems as $ppe) {
+                foreach ($ppeConditions as $ppe) {
                     BriefingAttendancePpeItem::create([
                         'attendance_id' => $attendance->id,
                         'manpower_id' => $mp->id,
@@ -201,37 +219,38 @@ class FCApril2026Seeder extends Seeder
                 }
             }
 
-            // Create absent MPs
-            $absentMP = collect($manpowerList)->filter(fn ($mp) => ! $presentMP->contains($mp));
-            foreach ($absentMP->take(rand(1, 2)) as $mp) {
-                BriefingAttendance::create([
-                    'session_id' => $briefing->id,
-                    'manpower_id' => $mp->id,
-                    'attendance_status' => AttendanceStatus::Absent,
-                ]);
-            }
+            // Briefing Checklists
+            $checklists = [
+                ['item' => 'Helm Safety', 'type' => 'ppe'],
+                ['item' => 'Rompi Reflektif', 'type' => 'ppe'],
+                ['item' => 'Sepatu Safety', 'type' => 'ppe'],
+                ['item' => 'Sarung Tangan', 'type' => 'ppe'],
+                ['item' => 'Pemahaman Muatan', 'type' => 'safety'],
+                ['item' => 'Prosedur Darurat', 'type' => 'safety'],
+            ];
 
-            // Create checklists
-            $checklists = ['Helm Safety', 'Rompi Reflektif', 'Sepatu Safety', 'Sarung Tangan', 'Pemahaman Muatan', 'Prosedur Darurat'];
-            foreach ($checklists as $item) {
+            foreach ($checklists as $cl) {
                 BriefingChecklist::create([
                     'session_id' => $briefing->id,
-                    'item' => $item,
-                    'type' => 'safety',
+                    'item' => $cl['item'],
+                    'type' => $cl['type'],
                     'status' => 'done',
                 ]);
             }
 
-            // Create 2-3 loading sessions per day
+            // Loading Sessions (2-3 per hari)
             $sessionsPerDay = rand(2, 3);
             for ($s = 0; $s < $sessionsPerDay; $s++) {
+                $mpRequired = rand(6, 8);
+                $mpPresent = min($mpRequired + rand(0, 2), 10);
+
                 $shipment = Shipment::create([
-                    'code' => 'JSS-'.str_replace('-', '', $dateStr).'-'.str_pad($shipmentNum, 3, '0', STR_PAD_LEFT),
+                    'code' => 'JSS-'.substr($dateStr, 2, 2).substr($dateStr, 5, 2).substr($dateStr, 8, 2).'-'.str_pad($shipmentNum, 3, '0', STR_PAD_LEFT),
                     'customer_id' => $customer->id,
                     'receiver_id' => $customer->id,
                     'origin_city_id' => $cityJkt->id,
                     'destination_city_id' => $cityBtg->id,
-                    'branch_id' => $data['branch']->id,
+                    'branch_id' => $branch->id,
                     'assigned_depot_id' => $depot->id,
                     'mode' => ShipmentMode::Sea->value,
                     'status' => ShipmentStatus::Pending,
@@ -239,50 +258,55 @@ class FCApril2026Seeder extends Seeder
                     'cargo_type' => 'vehicle',
                     'container_size' => '40ft',
                     'container_qty' => rand(1, 2),
-                    'packages_total' => rand(5, 15),
-                    'cbm_total' => rand(50, 150),
-                    'weight_total' => rand(10000, 25000),
+                    'packages_total' => rand(8, 15),
+                    'cbm_total' => rand(60, 140),
+                    'weight_total' => rand(15000, 25000),
                     'pol_id' => $portTpri->id,
                     'pod_id' => $portBtg->id,
-                    'pic_name' => 'PIC TAM',
-                    'pic_phone' => '081234567890',
-                    'notes' => 'Audit April 2026',
+                    'pic_name' => 'PIC Toyota',
+                    'pic_phone' => '081298765432',
+                    'delivery_contact_name' => 'Warehouse Bontang',
+                    'delivery_contact_phone' => '081212345678',
+                    'notes' => "Shipment Toyota - {$date->format('d M Y')}",
                 ]);
 
-                $status = rand(1, 10) > 2 ? 'completed' : 'in_progress';
+                // 80% completed, 20% in progress
+                $isCompleted = rand(1, 10) <= 8;
 
                 $loading = LoadingSession::create([
-                    'code' => 'LD-'.str_replace('-', '', $dateStr).'-'.str_pad($loadingNum, 3, '0', STR_PAD_LEFT),
+                    'code' => 'LD-'.substr($dateStr, 2, 2).substr($dateStr, 5, 2).substr($dateStr, 8, 2).'-'.str_pad($loadingNum, 3, '0', STR_PAD_LEFT),
                     'shipment_id' => $shipment->id,
                     'depot_id' => $depot->id,
                     'coordinator_user_id' => $fc->id,
-                    'branch_id' => $data['branch']->id,
+                    'branch_id' => $branch->id,
                     'briefing_session_id' => $briefing->id,
                     'operation_type' => LoadingOperationType::Loading,
-                    'status' => $status === 'completed' ? LoadingStatus::Completed : LoadingStatus::MpAttendanceCheck,
-                    'mp_required' => rand(6, 10),
-                    'mp_present' => rand(6, 10),
-                    'mp_sufficient' => true,
-                    'mp_fit_count' => rand(6, 10),
-                    'apd_complete' => $status === 'completed',
-                    'apd_clean' => $status === 'completed',
-                    'equipment_safe' => $status === 'completed',
-                    'rack_container_safe' => $status === 'completed',
-                    'unit_measurements_ok' => $status === 'completed',
+                    'status' => $isCompleted ? LoadingStatus::Completed : LoadingStatus::MpAttendanceCheck,
+                    'mp_required' => $mpRequired,
+                    'mp_present' => $mpPresent,
+                    'mp_absent' => max(0, $mpRequired - $mpPresent),
+                    'mp_sufficient' => $mpPresent >= $mpRequired,
+                    'mp_fit_count' => $mpPresent - rand(0, 1),
+                    'apd_complete' => $isCompleted,
+                    'apd_clean' => $isCompleted,
+                    'equipment_safe' => $isCompleted,
+                    'rack_container_safe' => $isCompleted,
+                    'unit_measurements_ok' => $isCompleted,
                     'stock_apd_sufficient' => true,
                     'mp_attendance_completed' => true,
-                    'health_check_completed' => $status === 'completed',
-                    'apd_check_completed' => $status === 'completed',
-                    'equipment_check_completed' => $status === 'completed',
-                    'rack_container_check_completed' => $status === 'completed',
-                    'unit_check_completed' => $status === 'completed',
-                    'final_decision_completed' => $status === 'completed',
-                    'final_decision_status' => $status === 'completed' ? FinalDecisionStatus::Go : null,
-                    'started_at' => $date->copy()->setTime(8, rand(0, 59)),
-                    'completed_at' => $status === 'completed' ? $date->copy()->setTime(15, rand(0, 59)) : null,
+                    'health_check_completed' => $isCompleted,
+                    'apd_check_completed' => $isCompleted,
+                    'equipment_check_completed' => $isCompleted,
+                    'rack_container_check_completed' => $isCompleted,
+                    'unit_check_completed' => $isCompleted,
+                    'final_decision_completed' => $isCompleted,
+                    'final_decision_status' => $isCompleted ? FinalDecisionStatus::Go : null,
+                    'started_at' => $date->copy()->setTime(8, rand(0, 30)),
+                    'completed_at' => $isCompleted ? $date->copy()->setTime(15, rand(30, 59)) : null,
                 ]);
 
-                if ($status === 'completed') {
+                if ($isCompleted) {
+                    // Rack Container Check
                     RackContainerCheck::create([
                         'loading_session_id' => $loading->id,
                         'pillar_a_condition' => RackPillarCondition::StrongAndStraight,
@@ -313,6 +337,7 @@ class FCApril2026Seeder extends Seeder
                         'checked_by' => $fc->id,
                     ]);
 
+                    // Equipment Check
                     EquipmentCheck::create([
                         'loading_session_id' => $loading->id,
                         'pulley_top_status' => 'ok',
@@ -327,17 +352,18 @@ class FCApril2026Seeder extends Seeder
                         'checked_by' => $fc->id,
                     ]);
 
+                    // Unit Check
                     UnitCheck::create([
                         'loading_session_id' => $loading->id,
                         'unit_plate_number' => 'B '.rand(1000, 9999).' JKT',
-                        'distance_front_rh' => rand(110, 130),
-                        'distance_rear_rh' => rand(110, 130),
-                        'distance_back_door' => rand(170, 190),
-                        'distance_rear_lh' => rand(110, 130),
-                        'distance_front_lh' => rand(110, 130),
-                        'drop_floor_front_height' => rand(100, 120),
-                        'drop_floor_rear_height' => rand(100, 120),
-                        'container_roof_distance' => rand(270, 290),
+                        'distance_front_rh' => rand(115, 125),
+                        'distance_rear_rh' => rand(115, 125),
+                        'distance_back_door' => rand(175, 185),
+                        'distance_rear_lh' => rand(115, 125),
+                        'distance_front_lh' => rand(115, 125),
+                        'drop_floor_front_height' => rand(105, 115),
+                        'drop_floor_rear_height' => rand(105, 115),
+                        'container_roof_distance' => rand(275, 285),
                         'measurements_valid' => true,
                         'unit_safe_for_loading' => true,
                         'checked_by' => $fc->id,
@@ -347,15 +373,13 @@ class FCApril2026Seeder extends Seeder
                 $shipmentNum++;
                 $loadingNum++;
             }
-
-            $this->command->info("  ✓ {$dateStr}: 1 briefing + {$sessionsPerDay} loading sessions");
         }
 
         $this->command->info('');
-        $this->command->info('Summary:');
-        $this->command->info('- Briefing Sessions: '.count($dates));
-        $this->command->info('- Shipments: '.($shipmentNum - 1));
-        $this->command->info('- Loading Sessions: '.($loadingNum - 1));
-        $this->command->info('- Manpower: '.count($manpowerList));
+        $this->command->info('=== RINGKASAN DATA ===');
+        $this->command->info('Briefing Sessions: '.count($dates));
+        $this->command->info('Shipments: '.($shipmentNum - 1));
+        $this->command->info('Loading Sessions: '.($loadingNum - 1));
+        $this->command->info('Manpower: '.count($manpowerList));
     }
 }
