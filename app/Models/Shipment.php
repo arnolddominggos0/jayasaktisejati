@@ -86,7 +86,7 @@ class Shipment extends Model
         'estimated_ready_at',
         'containers',
         'lcl_items',
-        // 'units',
+        'units',
         'pol_id',
         'pod_id',
     ];
@@ -114,7 +114,7 @@ class Shipment extends Model
         'edited_fields' => 'array',
         'containers' => 'array',
         'lcl_items' => 'array',
-        // 'units'               => 'array',
+        'units'               => 'array',
         'pol_id' => 'integer',
         'pod_id' => 'integer',
     ];
@@ -146,8 +146,8 @@ class Shipment extends Model
             $reqType = $m->request_type?->value ?? (string) $m->request_type;
             if (blank($m->doc_number)) {
                 $m->doc_number = $reqType === RequestType::SPPB_DO->value
-                    ? 'SPPB-'.now()->format('YmdHis')
-                    : 'AUTO-'.now()->format('Ymd-His');
+                    ? 'SPPB-' . now()->format('YmdHis')
+                    : 'AUTO-' . now()->format('Ymd-His');
             }
 
             if (blank($m->eta)) {
@@ -382,7 +382,7 @@ class Shipment extends Model
         $year = $year ?: $now->year;
         $month = $month ?: $now->month;
 
-        $prefix = 'JSS'.str_pad($month, 2, '0', STR_PAD_LEFT).substr($year, -2);
+        $prefix = 'JSS' . str_pad($month, 2, '0', STR_PAD_LEFT) . substr($year, -2);
         $modeCode = match (strtolower((string) $mode)) {
             'sea', 'sea_freight' => 'SH',
             'land', 'land_trucking', 'car_carrier', 'towing', 'truck' => 'TC',
@@ -392,16 +392,16 @@ class Shipment extends Model
         $prefix .= $modeCode;
 
         $last = static::query()
-            ->where('code', 'like', $prefix.'%')
+            ->where('code', 'like', $prefix . '%')
             ->orderByDesc('code')
             ->value('code');
 
         $seq = 1;
-        if ($last && preg_match('/^'.$prefix.'(\d{4})$/', $last, $matches)) {
+        if ($last && preg_match('/^' . $prefix . '(\d{4})$/', $last, $matches)) {
             $seq = (int) $matches[1] + 1;
         }
 
-        return $prefix.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+        return $prefix . str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
     }
 
     public static function computeEta(string $modeCode, string $priority, ?Carbon $base = null): Carbon
@@ -474,7 +474,7 @@ class Shipment extends Model
             return $order[0] ?? null;
         }
 
-        $values = array_map(fn (TrackStatus $s) => $s->value, $order);
+        $values = array_map(fn(TrackStatus $s) => $s->value, $order);
         $currValue = $current->value;
         $idx = array_search($currValue, $values, strict: true);
 
@@ -514,7 +514,7 @@ class Shipment extends Model
         }
 
         if ($track->tracked_at) {
-            throw new DomainException('Status "'.$status->label().'" sudah pernah dicapai pada '.$track->tracked_at->format('d M Y H:i').'.');
+            throw new DomainException('Status "' . $status->label() . '" sudah pernah dicapai pada ' . $track->tracked_at->format('d M Y H:i') . '.');
         }
 
         $track->updateQuietly([
@@ -596,7 +596,7 @@ class Shipment extends Model
 
         $existingStatuses = $this->tracks()
             ->pluck('status')
-            ->map(fn ($s) => $s instanceof TrackStatus ? $s->value : (string) $s)
+            ->map(fn($s) => $s instanceof TrackStatus ? $s->value : (string) $s)
             ->toArray();
 
         foreach ($necessaryStatuses as $st) {
@@ -613,12 +613,12 @@ class Shipment extends Model
 
     public function scopeActive($query)
     {
-        return $query->whereIn('status', array_map(fn ($event) => $event->value, ShipmentStatus::active()));
+        return $query->whereIn('status', array_map(fn($event) => $event->value, ShipmentStatus::active()));
     }
 
     public function scopeHistory($q)
     {
-        return $q->whereIn('status', array_map(fn ($e) => $e->value, ShipmentStatus::completed()));
+        return $q->whereIn('status', array_map(fn($e) => $e->value, ShipmentStatus::completed()));
     }
 
     public function getCompletedAtAttribute(): ?Carbon
@@ -867,7 +867,7 @@ class Shipment extends Model
             ?? $this->pod_name
             ?? $this->to;
 
-        return trim(($origin ?: '—').' → '.($dest ?: '—'));
+        return trim(($origin ?: '—') . ' → ' . ($dest ?: '—'));
     }
 
     public function getAttachmentUrlsAttribute(): array
@@ -876,7 +876,7 @@ class Shipment extends Model
 
         return array_values(
             array_map(
-                fn ($p) => Storage::disk('public')->url($p),
+                fn($p) => Storage::disk('public')->url($p),
                 $paths
             )
         );
@@ -894,7 +894,7 @@ class Shipment extends Model
     public function getContainerMapAttribute(): array
     {
         $containers = collect($this->containers ?? [])
-            ->filter(fn ($c) => ! empty($c['container_no']))
+            ->filter(fn($c) => ! empty($c['container_no']))
             ->mapWithKeys(function ($c) {
                 $no = trim((string) $c['container_no']);
 
@@ -955,7 +955,7 @@ class Shipment extends Model
                 $detail[] = "{$c['unit_count']} unit";
             }
 
-            $det = $detail ? ' • '.implode(', ', $detail) : '';
+            $det = $detail ? ' • ' . implode(', ', $detail) : '';
             $parts[] = "{$c['container_no']}{$seal}{$det}";
         }
 
