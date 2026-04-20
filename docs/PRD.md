@@ -273,4 +273,4 @@ Sistem ini ditujukan untuk menyatukan proses operasional ke satu platform dengan
 - API user auth + branch/user management tersedia.
 - Route web untuk cetak dokumen shipment tersedia.
 - Resource Filament mencakup shipment, voyage, vessel plan, resource lapangan, serta dashboard/monitoring.
-- Service/action/command menunjukkan dukungan otomasi penjadwalan, sinkronisasi data voyage, evaluasi SLA, dan notifikasi.
+- Service/action/command menunjukkan dukungan otomasi penjadwalan, sinkronisasi data voyage, evaluasi SLA, dan notifikasi.-9
