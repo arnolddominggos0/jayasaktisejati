@@ -551,12 +551,34 @@ class Shipment extends Model
         try {
             MpCheckGate::ensureApproved($this->assignedDepot);
         } catch (DomainException $e) {
+            // Only allow override for sea shipments with proper authorization
+            $isSea = ($this->mode?->value ?? $this->mode) === 'sea';
+
             if (
-                ! is_array($override) ||
-                empty($override['reason']) ||
                 ! Auth::user()?->hasRole('super_admin')
             ) {
                 throw $e;
+            }
+
+            // For sea shipments, enforce override_reason validation
+            if ($isSea) {
+                if (! is_array($override) || empty($override['reason'])) {
+                    throw new DomainException(
+                        'MP Check belum diapprove. Super admin harus menyertakan alasan override (minimal 20 karakter).'
+                    );
+                }
+
+                $reason = trim((string) $override['reason']);
+                if (strlen($reason) < 20) {
+                    throw new DomainException(
+                        'Alasan override untuk sea shipment harus minimal 20 karakter.'
+                    );
+                }
+            } else {
+                // Land shipments: allow override with any reason
+                if (! is_array($override) || empty($override['reason'])) {
+                    throw $e;
+                }
             }
 
             DB::table('mp_check_overrides')->insert([

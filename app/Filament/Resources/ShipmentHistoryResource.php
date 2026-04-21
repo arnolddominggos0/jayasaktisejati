@@ -35,6 +35,52 @@ class ShipmentHistoryResource extends Resource
         return $u?->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']) === true;
     }
 
+    public static function canViewAny(): bool
+    {
+        $u = Filament::auth()->user();
+        return $u?->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']) ?? false;
+    }
+
+    public static function canView($record): bool
+    {
+        $user = Filament::auth()->user();
+
+        if (!$user) {
+            return false;
+        }
+
+        // Super admin bypass
+        if ($user->hasRole('super_admin')) {
+            return true;
+        }
+
+        // Check branch ownership
+        if ($user->branch_id && $record->branch_id !== null) {
+            return (int) $record->branch_id === (int) $user->branch_id;
+        }
+
+        // Field coordinator check
+        if ($user->hasRole('field_coordinator')) {
+            return $record->coordinator_id === $user->id || $record->coordinator_id === null;
+        }
+
+        return true;
+    }
+
+    public static function canEdit($record): bool
+    {
+        // Only super admin can edit historical shipments
+        $user = Filament::auth()->user();
+        return $user?->hasRole('super_admin') ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        // Only super admin can delete historical shipments
+        $user = Filament::auth()->user();
+        return $user?->hasRole('super_admin') ?? false;
+    }
+
     public static function getEloquentQuery(): Builder
     {
         $q = parent::getEloquentQuery()

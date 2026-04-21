@@ -134,6 +134,36 @@ class ViewShipmentHistory extends ViewRecord
                         ->suffix(fn($record) => $record->driver_phone ? " • {$record->driver_phone}" : null),
                 ]),
 
+            // Sea Timeline: Vessel milestones
+            Section::make('Timeline Kapal (Sea)')
+                ->visible(fn($record) => ($record->mode?->value ?? $record->mode) === 'sea')
+                ->columns(4)
+                ->schema([
+                    TextEntry::make('vessel_depart_at')
+                        ->label('ATD (Actual Departure)')
+                        ->state(fn($record) => $trackTime($record, ['vessel_depart'], 'asc'))
+                        ->dateTime('d M Y H:i')
+                        ->placeholder('—'),
+
+                    TextEntry::make('vessel_arrival_at')
+                        ->label('ATA (Actual Arrival)')
+                        ->state(fn($record) => $trackTime($record, ['vessel_arrival'], 'asc'))
+                        ->dateTime('d M Y H:i')
+                        ->placeholder('—'),
+
+                    TextEntry::make('loading_at')
+                        ->label('Unit Loading')
+                        ->state(fn($record) => $trackTime($record, ['unit_loading'], 'asc'))
+                        ->dateTime('d M Y H:i')
+                        ->placeholder('—'),
+
+                    TextEntry::make('unloading_at')
+                        ->label('Unloading')
+                        ->state(fn($record) => $trackTime($record, ['unloading'], 'asc'))
+                        ->dateTime('d M Y H:i')
+                        ->placeholder('—'),
+                ]),
+
             Section::make('Status & Tanggal')->columns(4)->schema([
                 TextEntry::make('status')->label('Status Akhir')->badge()
                     ->color(fn($state) => ($state?->label() ?? $state) === 'Terkirim' ? 'success' : 'danger')
@@ -154,7 +184,6 @@ class ViewShipmentHistory extends ViewRecord
                             return $trackTime($record, ['vessel_depart', 'onship'], 'asc') ?: ($record->etd ?? null);
                         }
 
-
                         return $trackTime($record, ['handover', 'delivery_to_customer', 'unit_loading'], 'asc')
                             ?: ($record->requested_at ?? null);
                     })
@@ -165,7 +194,7 @@ class ViewShipmentHistory extends ViewRecord
                     ->label('Dibatalkan')
                     ->dateTime('d M Y H:i')
                     ->placeholder('—'),
-    
+
                 TextEntry::make('cancelledBy.name')
                     ->label('Dibatalkan Oleh')
                     ->placeholder('—'),

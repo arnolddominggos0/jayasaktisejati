@@ -2,14 +2,129 @@
 // app/Http/Controllers/ShipmentPrintController.php
 namespace App\Http\Controllers;
 
+use App\Enums\ShipmentMode;
 use App\Models\Shipment;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Milon\Barcode\DNS1D;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 class ShipmentPrintController extends Controller
 {
+    /**
+     * Print Waybill for Sea Shipments (FR-06)
+     * Includes vessel, voyage, container, POL/POD details
+     */
+    public function waybill(Request $request, Shipment $shipment)
+    {
+        // Policy check: Ensure user can view this shipment
+        Gate::authorize('view', $shipment);
+
+        // Only for sea shipments
+        $isSea = ($shipment->mode instanceof ShipmentMode && $shipment->mode === ShipmentMode::Sea)
+            || (is_string($shipment->mode) && $shipment->mode === 'sea');
+
+        if (!$isSea) {
+            abort(404, 'Waybill hanya tersedia untuk shipment moda laut.');
+        }
+
+        // Load necessary relations for sea shipment
+        $shipment->load([
+            'branch',
+            'customer',
+            'receiver',
+            'originCity',
+            'destinationCity',
+            'pol',
+            'pod',
+            'shippingSchedule',
+            'tracks' => fn($q) => $q->orderBy('tracked_at', 'desc')->limit(5),
+        ]);
+
+        // Prepare branch info
+        $branchModel = $shipment->branch;
+        $branchInfo = [
+            'name'    => $branchModel?->name ?? 'PT Jaya Sakti Sejati',
+            'address' => $branchModel?->address ?? 'Komplek Lodan Center',
+            'phone'   => $branchModel?->phone ?? config('company.phone', '+6221 693 0565'),
+            'city'    => $branchModel?->city?->name ?? 'Jakarta',
+        ];
+
+        // Sea-specific data
+        $seaInfo = [
+            'vessel_name'    => $shipment->vessel_name ?? $shipment->shippingSchedule?->vessel_name ?? '—',
+            'voyage'         => $shipment->voyage ?? $shipment->shippingSchedule?->voyage ?? '—',
+            'container_no'   => $shipment->container_no ?? '—',
+            'seal_no'        => $shipment->seal_no ?? '—',
+            'pol'            => $shipment->pol?->name ?? $shipment->pol ?? '—',
+            'pod'            => $shipment->pod?->name ?? $shipment->pod ?? '—',
+            'etd'            => $shipment->etd?->format('d M Y H:i') ?? '—',
+            'eta'            => $shipment->eta?->format('d M Y H:i') ?? '—',
+            'service_option' => $shipment->service_option ?? 'FCL',
+            'container_size' => $shipment->container_size ?? '—',
+            'container_qty'  => $shipment->container_qty ?? 1,
+        ];
+
+        // Generate QR and Barcode
+        $trackUrl = route('tracking.show', $shipment->code);
+        $qrSvg = QrCode::format('svg')->size(100)->margin(1)->generate($trackUrl);
+
+        $barcode = new DNS1D();
+        $barcodeBase64 = $barcode->getBarcodePNG($shipment->code, 'C128', 2, 40);
+
+        // Brand info
+        $logoPath = public_path('images/logo.png');
+        if (!file_exists($logoPath)) $logoPath = public_path('favicon.ico');
+
+        $logoDataUri = null;
+        if (file_exists($logoPath)) {
+            $logoData = base64_encode(file_get_contents($logoPath));
+            $ext = strtolower(pathinfo($logoPath, PATHINFO_EXTENSION));
+            $logoMime = match ($ext) {
+                'png' => 'image/png',
+                'jpg', 'jpeg' => 'image/jpeg',
+                'ico' => 'image/x-icon',
+                'svg' => 'image/svg+xml',
+                default => mime_content_type($logoPath),
+            };
+            $logoDataUri = "data:{$logoMime};base64,{$logoData}";
+        }
+
+        $brand = [
+            'name'  => config('app.name', 'PT Jaya Sakti Sejati'),
+            'abbr'  => 'JSS',
+            'color' => '#0137A1',
+            'logo'  => $logoDataUri,
+            'site'  => env('APP_BRAND_SITE', 'https://jayasaktisejati.com'),
+            'phone' => env('COMPANY_PHONE', config('company.phone', '+6221 693 0565')),
+        ];
+
+        $data = [
+            'shipment'       => $shipment,
+            'branchInfo'     => $branchInfo,
+            'seaInfo'        => $seaInfo,
+            'qrSvg'          => $qrSvg,
+            'barcodeDataUri' => 'data:image/png;base64,' . $barcodeBase64,
+            'trackUrl'       => $trackUrl,
+            'printedAt'      => now()->timezone(config('app.timezone'))->format('d M Y H:i'),
+            'brand'          => $brand,
+        ];
+
+        $pdf = Pdf::loadView('shipments.waybill-sea', $data)
+            ->setPaper('A4', 'portrait')
+            ->setOptions([
+                'isRemoteEnabled'      => true,
+                'isHtml5ParserEnabled' => true,
+                'isPhpEnabled'         => false,
+                'dpi'                  => 110,
+                'defaultFont'          => 'DejaVu Sans',
+            ]);
+
+        $filename = 'WAYBILL-' . strtoupper($shipment->code) . '.pdf';
+        return $request->boolean('download') ? $pdf->download($filename) : $pdf->stream($filename);
+    }
+
     public function resi(Request $request, Shipment $shipment)
     {
         $rels = [];

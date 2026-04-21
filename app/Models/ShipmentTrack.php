@@ -78,6 +78,35 @@ class ShipmentTrack extends Model
         $this->attributes['status_normalized'] = true;
     }
 
+    /**
+     * Validate that note is provided for critical statuses on sea shipments.
+     * Critical statuses: Hold, Cancelled
+     */
+    protected function validateNoteForCriticalStatus(): void
+    {
+        $status = $this->status instanceof TrackStatus
+            ? $this->status
+            : TrackStatus::tryFrom((string) $this->status);
+
+        if (! $status?->requiresNote()) {
+            return;
+        }
+
+        // Only apply to sea shipments
+        $shipment = $this->shipment;
+        if (! $shipment || ($shipment->mode?->value ?? $shipment->mode) !== 'sea') {
+            return;
+        }
+
+        // Check if note is provided and not empty
+        $note = trim((string) $this->note);
+        if (strlen($note) < 10) {
+            throw ValidationException::withMessages([
+                'note' => "Status \"{$status->label()}\" memerlukan catatan minimal 10 karakter.",
+            ]);
+        }
+    }
+
     protected static function booted(): void
     {
         static::creating(function (ShipmentTrack $track) {
@@ -86,6 +115,14 @@ class ShipmentTrack extends Model
                 $track->created_by ??= $uid;
                 $track->updated_by ??= $uid;
             }
+
+            // Validate note requirement for critical statuses on sea shipments
+            $track->validateNoteForCriticalStatus();
+        });
+
+        static::updating(function (ShipmentTrack $track) {
+            // Validate note requirement when status changes to critical on sea shipments
+            $track->validateNoteForCriticalStatus();
         });
 
         static::saving(function (ShipmentTrack $track) {

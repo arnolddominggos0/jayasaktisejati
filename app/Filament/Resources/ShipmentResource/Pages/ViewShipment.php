@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ShipmentResource\Pages;
 
+use App\Enums\ShipmentMode;
 use App\Filament\Resources\ShipmentResource;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
@@ -59,11 +60,20 @@ class ViewShipment extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('print_waybill')
+                ->label('Cetak Waybill')
+                ->icon('heroicon-o-document-text')
+                ->color('success')
+                ->url(fn ($record) => route('shipments.print.waybill', ['shipment' => $record->id, 'download' => 1]))
+                ->openUrlInNewTab()
+                ->visible(fn ($record) => $record->mode === ShipmentMode::Sea),
+
             Action::make('create_loading')
                 ->label('Buat Loading Session')
                 ->icon('heroicon-o-plus')
                 ->url(fn ($record) => route('filament.fc.resources.loading-sessions.create', ['shipment_id' => $record->id]))
                 ->visible(fn () => auth()->user()?->hasRole('field_coordinator')),
+
             Action::make('edit')
                 ->label('Edit')
                 ->url(fn ($record) => $this->getResource()::getUrl('edit', ['record' => $record])),

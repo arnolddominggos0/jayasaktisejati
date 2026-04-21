@@ -1686,6 +1686,43 @@ class ShipmentResource extends Resource
         ];
     }
 
+    public static function canViewAny(): bool
+    {
+        $u = Filament::auth()->user();
+
+        return (bool) ($u
+            && method_exists($u, 'hasAnyRole')
+            && $u->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']));
+    }
+
+    public static function canView($record): bool
+    {
+        $user = Filament::auth()->user();
+
+        if (!$user) {
+            return false;
+        }
+
+        // Super admin bypass
+        if ($user->hasRole('super_admin')) {
+            return true;
+        }
+
+        // Check branch ownership
+        if ($user->branch_id && $record->branch_id !== null) {
+            if ((int) $record->branch_id !== (int) $user->branch_id) {
+                return false;
+            }
+        }
+
+        // Field coordinator can view assigned shipments
+        if ($user->hasRole('field_coordinator')) {
+            return $record->coordinator_id === $user->id || $record->coordinator_id === null;
+        }
+
+        return true;
+    }
+
     public static function canEdit($record): bool
     {
         $u = Filament::auth()->user();
@@ -1701,13 +1738,11 @@ class ShipmentResource extends Resource
             && (int) $record->branch_id === (int) $branchId;
     }
 
-    public static function canViewAny(): bool
+    public static function canDelete($record): bool
     {
-        $u = Filament::auth()->user();
-
-        return (bool) ($u
-            && method_exists($u, 'hasAnyRole')
-            && $u->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']));
+        // Only super admin can delete shipments
+        $user = Filament::auth()->user();
+        return $user?->hasRole('super_admin') ?? false;
     }
 
     public static function mutateFormDataBeforeCreate(array $data): array

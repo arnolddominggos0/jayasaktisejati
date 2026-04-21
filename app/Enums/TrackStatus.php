@@ -181,4 +181,44 @@ enum TrackStatus: string
     {
         return array_values(array_diff(self::orderLand(), [self::Delivered, self::Cancelled]));
     }
+
+    /**
+     * Determine if this status is a sea-specific milestone.
+     * Used to conditionally display sea-only tracking columns.
+     */
+    public function isSeaMilestone(): bool
+    {
+        return in_array($this, [
+            self::OnShip,
+            self::VesselDepart,
+            self::VesselArrival,
+            self::UnitLoading,
+            self::Stacking,
+            self::DeliveryToPort,
+        ], true);
+    }
+
+    /**
+     * Determine if this status requires a note to be provided.
+     * Critical statuses like Hold and Cancelled always require notes.
+     */
+    public function requiresNote(): bool
+    {
+        return in_array($this, [
+            self::Hold,
+            self::Cancelled,
+        ], true);
+    }
+
+    /**
+     * Check if this is a critical status that affects shipment flow.
+     */
+    public function isCriticalStatus(): bool
+    {
+        return in_array($this, [
+            self::Hold,
+            self::Cancelled,
+            self::Delivered,
+        ], true);
+    }
 }
