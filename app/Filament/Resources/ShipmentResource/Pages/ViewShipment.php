@@ -68,6 +68,14 @@ class ViewShipment extends ViewRecord
                 ->openUrlInNewTab()
                 ->visible(fn ($record) => $record->mode === ShipmentMode::Sea),
 
+            Action::make('print_packing_list')
+                ->label('Cetak Packing List')
+                ->icon('heroicon-o-clipboard-document-list')
+                ->color('warning')
+                ->url(fn ($record) => route('shipments.print.packing', ['shipment' => $record->id, 'download' => 1]))
+                ->openUrlInNewTab()
+                ->visible(fn ($record) => $record->mode === ShipmentMode::Sea),
+
             Action::make('create_loading')
                 ->label('Buat Loading Session')
                 ->icon('heroicon-o-plus')

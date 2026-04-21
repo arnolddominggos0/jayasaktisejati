@@ -4,17 +4,103 @@ namespace App\Filament\Resources\ShipmentResource\RelationManagers;
 
 use App\Enums\ShipmentMode;
 use App\Enums\TrackStatus;
+use App\Models\ShipmentTrack;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
+use Illuminate\Database\Eloquent\Model;
 
 class ShipmentTracksRelationManager extends RelationManager
 {
     protected static string $relationship = 'tracks';
     protected static ?string $title = 'Timeline';
     protected static ?string $recordTitleAttribute = 'status';
+
+    /**
+     * Authorization: Only allow viewing tracks if user can view the parent shipment.
+     * Super admin bypass is handled by policy before() method.
+     */
+    public static function canViewAny(): bool
+    {
+        $user = \Filament\Facades\Filament::auth()->user();
+        return $user?->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']) ?? false;
+    }
+
+    /**
+     * Authorization: Check individual track record access via parent shipment policy.
+     */
+    public static function canView(Model $record): bool
+    {
+        $user = \Filament\Facades\Filament::auth()->user();
+
+        // Super admin bypass
+        if ($user?->hasRole('super_admin')) {
+            return true;
+        }
+
+        // Check parent shipment access via policy
+        $shipment = $record->shipment;
+        if (!$shipment) {
+            return false;
+        }
+
+        // Delegate to shipment policy for branch/coordinator scoping
+        return $user?->can('view', $shipment) ?? false;
+    }
+
+    /**
+     * Authorization: Only office_admin and super_admin can create tracks.
+     */
+    public static function canCreate(): bool
+    {
+        $user = \Filament\Facades\Filament::auth()->user();
+        return $user?->hasAnyRole(['super_admin', 'office_admin']) ?? false;
+    }
+
+    /**
+     * Authorization: Only super_admin can edit tracks.
+     * Field coordinators update tracks via action buttons, not direct edit.
+     */
+    public static function canEdit(Model $record): bool
+    {
+        $user = \Filament\Facades\Filament::auth()->user();
+
+        // Only super admin can edit
+        if (!$user?->hasRole('super_admin')) {
+            return false;
+        }
+
+        // Check parent shipment access for defense-in-depth
+        $shipment = $record->shipment;
+        if (!$shipment) {
+            return false;
+        }
+
+        return $user->can('view', $shipment);
+    }
+
+    /**
+     * Authorization: Only super_admin can delete tracks.
+     */
+    public static function canDelete(Model $record): bool
+    {
+        $user = \Filament\Facades\Filament::auth()->user();
+
+        // Only super admin can delete
+        if (!$user?->hasRole('super_admin')) {
+            return false;
+        }
+
+        // Check parent shipment access for defense-in-depth
+        $shipment = $record->shipment;
+        if (!$shipment) {
+            return false;
+        }
+
+        return $user->can('view', $shipment);
+    }
 
     public function form(Form $form): Form
     {
