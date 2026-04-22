@@ -104,3 +104,9 @@ Task dianggap selesai jika:
 - Tracking update tidak loncat status tidak valid.
 - Dokumen hanya bisa dicetak oleh user berhak.
 - Test minimum dijalankan dan hasil tercatat.
+
+
+## E. FC Task Breakdown
+
+Untuk eksekusi role field coordinator satu per satu:
+- `docs/FC_OPERATIONAL_TASKS.md`

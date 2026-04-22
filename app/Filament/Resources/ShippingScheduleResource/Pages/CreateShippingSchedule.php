@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Actions;
+namespace App\Filament\Resources\ShippingScheduleResource\Pages;
 
 use App\Models\Voyage;
 use App\Models\ShippingSchedule;

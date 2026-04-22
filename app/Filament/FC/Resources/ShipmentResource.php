@@ -78,23 +78,21 @@ class ShipmentResource extends Resource
 
         $branchId = app()->bound('scope.branch_id')
             ? app('scope.branch_id')
-            : ($u->branch_id ?? null);
-
-        if ($branchId) {
-            $q->where('branch_id', $branchId);
-        }
+            : null;
 
         $depotId = app()->bound('scope.depot_id')
             ? app('scope.depot_id')
-            : Depot::where('coordinator_user_id', $u->id)->value('id');
+            : null;
+
+        if (! $branchId || ! $depotId) {
+            return $q->whereRaw('1=0');
+        }
+
+        $q->where('branch_id', $branchId);
 
         $q->where(function ($w) use ($depotId, $u) {
-            if ($depotId) {
-                $w->where('assigned_depot_id', $depotId)
-                    ->orWhere('coordinator_id', $u->id);
-            } else {
-                $w->where('coordinator_id', $u->id);
-            }
+            $w->where('assigned_depot_id', $depotId)
+                ->orWhere('coordinator_id', $u->id);
         });
 
         return $q->with([

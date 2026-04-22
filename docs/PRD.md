@@ -265,6 +265,7 @@ Sistem ini ditujukan untuk menyatukan proses operasional ke satu platform dengan
 3. Notifikasi WhatsApp: trigger event mana yang wajib vs opsional?
 4. Batasan edit historis shipment setelah status tertentu (lock policy)?
 5. Kebutuhan akses pelanggan eksternal ke tracking publik (scope & keamanan)?
+6. Integrasi AppSheet untuk input lapangan FC (briefing/APD/checkpoint/checksheet) pada fase berapa?
 
 ---
 

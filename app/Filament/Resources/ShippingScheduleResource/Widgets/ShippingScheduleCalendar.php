@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Widgets;
+namespace App\Filament\Resources\ShippingScheduleResource\Widgets;
 
 use App\Models\ShippingSchedule;
 use App\Supports\MonthParam; 

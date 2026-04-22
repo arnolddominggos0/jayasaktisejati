@@ -9,7 +9,7 @@ use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\Grid;
 
-class ViewVesselCheckCase extends ViewRecord
+class ViewVesselCheckCases extends ViewRecord
 {
     protected static string $resource = VesselCheckCaseResource::class;
 

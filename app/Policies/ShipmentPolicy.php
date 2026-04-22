@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Models\Depot;
 use App\Models\Shipment;
 use App\Models\User;
 
@@ -38,7 +39,24 @@ class ShipmentPolicy
         }
 
         if ($user->hasRole('field_coordinator')) {
-            return $shipment->coordinator_id === $user->id || is_null($shipment->coordinator_id);
+            $mode = $shipment->mode?->value ?? (string) $shipment->mode;
+            if ($mode !== 'sea') {
+                return false;
+            }
+
+            if ($shipment->branch_id !== $user->branch_id) {
+                return false;
+            }
+
+            $depotId = app()->bound('scope.depot_id')
+                ? app('scope.depot_id')
+                : Depot::where('coordinator_user_id', $user->id)->value('id');
+
+            if ($depotId && $shipment->assigned_depot_id === $depotId) {
+                return true;
+            }
+
+            return $shipment->coordinator_id === $user->id;
         }
 
         return false;

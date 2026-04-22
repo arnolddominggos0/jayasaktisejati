@@ -25,3 +25,5 @@ Untuk memastikan implementasi tetap sinkron dengan PRD + playbook:
 - `docs/ALIGNMENT_MATRIX.md`
 - `docs/PRD.md`
 - `docs/OPENCODE_SHIPMENT_PLAYBOOK.md`
+- `docs/OPERATIONAL_SPRINT_PACKAGE.md`
+- `prd.md`

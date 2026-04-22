@@ -31,7 +31,7 @@ class ShipmentTracksRelationManager extends RelationManager
     /**
      * Authorization: Check individual track record access via parent shipment policy.
      */
-    public static function canView(Model $record): bool
+    public function canView(Model $record): bool
     {
         $user = \Filament\Facades\Filament::auth()->user();
 
@@ -53,7 +53,7 @@ class ShipmentTracksRelationManager extends RelationManager
     /**
      * Authorization: Only office_admin and super_admin can create tracks.
      */
-    public static function canCreate(): bool
+    public function canCreate(): bool
     {
         $user = \Filament\Facades\Filament::auth()->user();
         return $user?->hasAnyRole(['super_admin', 'office_admin']) ?? false;
@@ -63,7 +63,7 @@ class ShipmentTracksRelationManager extends RelationManager
      * Authorization: Only super_admin can edit tracks.
      * Field coordinators update tracks via action buttons, not direct edit.
      */
-    public static function canEdit(Model $record): bool
+    public function canEdit(Model $record): bool
     {
         $user = \Filament\Facades\Filament::auth()->user();
 
@@ -84,7 +84,7 @@ class ShipmentTracksRelationManager extends RelationManager
     /**
      * Authorization: Only super_admin can delete tracks.
      */
-    public static function canDelete(Model $record): bool
+    public function canDelete(Model $record): bool
     {
         $user = \Filament\Facades\Filament::auth()->user();
 
