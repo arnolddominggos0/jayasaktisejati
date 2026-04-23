@@ -209,6 +209,13 @@ class ShipmentResource extends Resource
                     TrackStatus::Unloading->value,
                     TrackStatus::DeliveryToCustomer->value,
                 ], true))
+                ->required(fn (Forms\Get $get) => in_array($get('track_status'), [
+                    TrackStatus::Handover->value,
+                    TrackStatus::Stuffing->value,
+                    TrackStatus::Unloading->value,
+                    TrackStatus::DeliveryToCustomer->value,
+                ], true))
+                ->minItems(1)
                 ->default([])
                 ->schema([
                     Radio::make('checkseet_status')
@@ -221,14 +228,20 @@ class ShipmentResource extends Resource
                     FileUpload::make('attachments')
                         ->disk('public')
                         ->directory('shipment-tracks/checkseet')
-                        ->multiple(),
+                        ->multiple()
+                        ->required(fn (Forms\Get $get) => $get('checkseet_status') === 'ng'),
                 ])
                 ->columnSpan(12),
 
             Textarea::make('note')
                 ->label('Catatan Lapangan')
                 ->rows(4)
-                ->columnSpan(12),
+                ->columnSpan(12)
+                ->required(fn (Forms\Get $get) => in_array($get('track_status'), [
+                    TrackStatus::Hold->value,
+                    TrackStatus::Cancelled->value,
+                ], true))
+                ->minLength(10),
 
             Textarea::make('override_reason')
                 ->label('Alasan Override MP Check')
@@ -249,7 +262,8 @@ class ShipmentResource extends Resource
                             TrackStatus::Unloading->value,
                         ], true)
                 )
-                ->helperText('Wajib diisi. Dicatat untuk audit.')
+                ->minLength(20)
+                ->helperText('Wajib diisi minimal 20 karakter. Dicatat untuk audit.')
                 ->columnSpan(12),
         ];
     }
@@ -477,8 +491,11 @@ class ShipmentResource extends Resource
                                 $status,
                                 $data['note'] ?? null,
                                 null,
-                                $data['attachments'] ?? null,
-                                $override
+                                null,
+                                $override,
+                                $data['checkseet'] ?? null,
+                                $data['plan_loading_time_at'] ?? null,
+                                $data['plan_closing_time_at'] ?? null,
                             );
 
                             Notification::make()
@@ -682,7 +699,8 @@ class ShipmentResource extends Resource
                         ->label('Tahan')
                         ->icon('heroicon-m-pause-circle')
                         ->color('warning')
-                        ->visible(fn (Shipment $record) => ! in_array($record->latest_track_status, [TrackStatus::Delivered, TrackStatus::Cancelled], true)
+                        ->visible(fn (Shipment $record) => $record->latest_track_status !== TrackStatus::Hold
+                            && ! in_array($record->latest_track_status, [TrackStatus::Delivered, TrackStatus::Cancelled], true)
                             && $record->latest_track_status !== null)
                         ->form([Textarea::make('note')->label('Alasan')->rows(3)->required()])
                         ->action(fn (Shipment $record, array $data) => $record->appendTrack(TrackStatus::Hold, $data['note'])),

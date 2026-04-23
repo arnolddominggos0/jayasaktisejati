@@ -20,6 +20,10 @@ class ShipmentPrintController extends Controller
      */
     protected function logPrintAction(Shipment $shipment, string $docType): void
     {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('document_print_logs')) {
+            return;
+        }
+
         DB::table('document_print_logs')->insert([
             'user_id'      => Auth::id(),
             'shipment_id'  => $shipment->id,
@@ -39,6 +43,24 @@ class ShipmentPrintController extends Controller
     {
         if ($shipment->status === ShipmentStatus::Draft) {
             abort(403, 'Dokumen tidak dapat dicetak untuk shipment dengan status Draft.');
+        }
+    }
+
+    /**
+     * Authorize print access with role policy and sea-mode guard for FC.
+     */
+    protected function authorizePrint(Shipment $shipment): void
+    {
+        Gate::authorize('print', $shipment);
+
+        $user = Auth::user();
+        if ($user && $user->hasRole('field_coordinator')) {
+            $isSea = ($shipment->mode instanceof ShipmentMode && $shipment->mode === ShipmentMode::Sea)
+                || (is_string($shipment->mode) && $shipment->mode === 'sea');
+
+            if (! $isSea) {
+                abort(403, 'Koordinator Lapangan hanya dapat mencetak dokumen untuk shipment moda laut.');
+            }
         }
     }
 
@@ -87,8 +109,8 @@ class ShipmentPrintController extends Controller
      */
     public function waybill(Request $request, Shipment $shipment)
     {
-        // Policy check: Ensure user can view this shipment
-        Gate::authorize('view', $shipment);
+        // Policy check: Ensure user is authorized to print this shipment
+        $this->authorizePrint($shipment);
 
         // Validate shipment status
         $this->validatePrintStatus($shipment);
@@ -209,8 +231,8 @@ class ShipmentPrintController extends Controller
      */
     public function packingList(Request $request, Shipment $shipment)
     {
-        // Policy check: Ensure user can view this shipment
-        Gate::authorize('view', $shipment);
+        // Policy check: Ensure user is authorized to print this shipment
+        $this->authorizePrint($shipment);
 
         // Validate shipment status
         $this->validatePrintStatus($shipment);
@@ -327,8 +349,8 @@ class ShipmentPrintController extends Controller
 
     public function resi(Request $request, Shipment $shipment)
     {
-        // Policy check: Ensure user can view this shipment
-        Gate::authorize('view', $shipment);
+        // Policy check: Ensure user is authorized to print this shipment
+        $this->authorizePrint($shipment);
 
         // Validate shipment status
         $this->validatePrintStatus($shipment);

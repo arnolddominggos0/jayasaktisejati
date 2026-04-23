@@ -11,8 +11,8 @@ class DatabaseSeeder extends Seeder
         $this->call(RolesAndUsersSeeder::class);
         $this->call(SlaRuleSeeder::class);
         $this->call(InitialSetupSeeder::class);
-        $this->call(ProductionSeeder::class);
-        $this->call(FCApril2026Seeder::class);
-        $this->call(FCProductionE2ESeeder::class);
+        // $this->call(ProductionSeeder::class);
+        // $this->call(FCApril2026Seeder::class);
+        // $this->call(FCProductionE2ESeeder::class);
     }
 }

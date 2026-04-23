@@ -3,20 +3,22 @@
 namespace Database\Seeders;
 
 use App\Enums\CustomerType;
-use App\Models\{
-    Branch,
-    City,
-    Customer,
-    Port,
-    Depot,
-    Manpower,
-    ShippingLine,
-    Vessel,
-    Voyage
-};
+use App\Enums\MPDomain;
+use App\Models\Branch;
+use App\Models\City;
+use App\Models\Customer;
+use App\Models\Depot;
+use App\Models\Manpower;
+use App\Models\Port;
+use App\Models\ShippingLine;
+use App\Models\User;
+use App\Models\Vessel;
+use App\Models\Voyage;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Faker\Factory as Faker;
+use Spatie\Permission\Models\Role;
 
 class InitialSetupSeeder extends Seeder
 {
@@ -24,8 +26,30 @@ class InitialSetupSeeder extends Seeder
     {
         $faker = Faker::create('id_ID');
 
+        Role::findOrCreate('field_coordinator', 'web');
+
         $jkt = Branch::firstOrCreate(['code' => 'JKT'], ['name' => 'Jakarta']);
         $mdn = Branch::firstOrCreate(['code' => 'MDO'], ['name' => 'Manado']);
+
+        $fcJkt = User::firstOrCreate(
+            ['email' => 'fc.jkt@demo.local'],
+            [
+                'name' => 'FC Jakarta',
+                'password' => Hash::make('password'),
+                'branch_id' => $jkt->id,
+            ]
+        );
+        $fcJkt->syncRoles(['field_coordinator']);
+
+        $fcMdo = User::firstOrCreate(
+            ['email' => 'fc.mdo@demo.local'],
+            [
+                'name' => 'FC Manado',
+                'password' => Hash::make('password'),
+                'branch_id' => $mdn->id,
+            ]
+        );
+        $fcMdo->syncRoles(['field_coordinator']);
 
         $cityNames = ['Jakarta', 'Manado', 'Surabaya', 'Makassar'];
         foreach ($cityNames as $name) {
@@ -44,28 +68,30 @@ class InitialSetupSeeder extends Seeder
         ];
 
         foreach ($ports as $p) {
-            Port::firstOrCreate(['code' => $p['code']], $p);
+            Port::updateOrCreate(['code' => $p['code']], $p);
         }
 
         $portIds = Port::pluck('id')->toArray();
 
         $depots = [
             [
-                'code' => 'DPT-JKT-SEA',
-                'name' => 'Jakarta Sea Depot',
+                'code' => 'DEPOTJKT',
+                'name' => 'Depo PDI Jakarta',
                 'mode' => 'sea',
                 'branch_id' => $jkt->id,
+                'coordinator_user_id' => $fcJkt->id,
             ],
             [
-                'code' => 'DPT-MDO-LAND',
-                'name' => 'Manado Land Depot',
-                'mode' => 'land',
+                'code' => 'DEPOTBTG',
+                'name' => 'Depo Bitung',
+                'mode' => 'sea',
                 'branch_id' => $mdn->id,
+                'coordinator_user_id' => $fcMdo->id,
             ],
         ];
 
         foreach ($depots as $d) {
-            Depot::firstOrCreate(
+            Depot::updateOrCreate(
                 ['code' => $d['code']],
                 [
                     'name' => $d['name'],
@@ -74,7 +100,7 @@ class InitialSetupSeeder extends Seeder
                     'port_id' => $faker->randomElement($portIds),
                     'service_types' => ['stevedoring', 'trucking'],
                     'address' => $faker->address(),
-                    'coordinator_user_id' => null,
+                    'coordinator_user_id' => $d['coordinator_user_id'],
                 ]
             );
         }
@@ -104,7 +130,7 @@ class InitialSetupSeeder extends Seeder
         foreach (range(1, 15) as $i) {
             Manpower::create([
                 'name' => $faker->name(),
-                'domain' => collect(\App\Enums\MPDomain::cases())->random(),
+                'domain' => MPDomain::SeaFreight,
                 'skills' => ['lashing', 'loading'],
                 'certs' => ['BOSIET'],
                 'phone' => $faker->phoneNumber(),
@@ -116,12 +142,12 @@ class InitialSetupSeeder extends Seeder
         }
 
         $line = ShippingLine::firstOrCreate(
-            ['code' => 'SML'],
-            ['name' => 'Samudera Line']
+            ['code' => 'TANTO'],
+            ['name' => 'Tanto Intim Line']
         );
 
         $vessel = Vessel::firstOrCreate(
-            ['name' => 'MV Nusantara'],
+            ['name' => 'Tanto Sejahtera'],
             [
                 'shipping_line_id' => $line->id,
                 'imo' => 'IMO' . $faker->numerify('#######'),
@@ -129,17 +155,19 @@ class InitialSetupSeeder extends Seeder
             ]
         );
 
-        Voyage::create([
-            'shipping_line_id' => $line->id,
-            'vessel_id'        => $vessel->id,
-            'pol_id'           => $faker->randomElement($portIds),
-            'pod_id'           => $faker->randomElement($portIds),
-            'voyage_no'        => 'VY-' . strtoupper(Str::random(5)),
-            'etd'              => now()->addDays(2),
-            'eta'              => now()->addDays(7),
-            'etb'              => now()->addDays(6),
-            'period_month'     => now()->startOfMonth(),
-            'cargo_plan'       => 1000,
-        ]);
+        Voyage::firstOrCreate(
+            ['voyage_no' => 'VY-DEFAULT'],
+            [
+                'shipping_line_id' => $line->id,
+                'vessel_id' => $vessel->id,
+                'pol_id' => $faker->randomElement($portIds),
+                'pod_id' => $faker->randomElement($portIds),
+                'etd' => now()->addDays(2),
+                'eta' => now()->addDays(7),
+                'etb' => now()->addDays(6),
+                'period_month' => now()->startOfMonth(),
+                'cargo_plan' => 1000,
+            ]
+        );
     }
 }

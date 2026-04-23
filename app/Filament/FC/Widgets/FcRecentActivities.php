@@ -18,36 +18,37 @@ class FcRecentActivities extends BaseWidget
     public function table(Table $table): Table
     {
         $u = Filament::auth()->user();
-        $fcCol = (string) config('fc.shipment_fc_column', 'coordinator_id');
+        $branchId = app()->bound('scope.branch_id') ? app('scope.branch_id') : ($u?->branch_id ?? null);
+        $depotId = app()->bound('scope.depot_id') ? app('scope.depot_id') : null;
 
         return $table
-            ->query(function (): Builder {
-                $u = Filament::auth()->user();
-                $fcCol = (string) config('fc.shipment_fc_column', 'coordinator_id');
-
+            ->query(function () use ($u, $branchId, $depotId): Builder {
                 $q = ShipmentTrack::query()
                     ->with([
-                        'shipment:id,code,origin_city_id,destination_city_id,' . $fcCol,
+                        'shipment:id,code,origin_city_id,destination_city_id,mode,assigned_depot_id,coordinator_id,branch_id',
                         'shipment.originCity:id,name',
                         'shipment.destinationCity:id,name',
+                        'user:id,name',
                     ])
+                    ->whereNotNull('tracked_at')
                     ->latest('tracked_at');
 
-                if ($u?->branch_id) {
-                    $q->whereHas('shipment', fn($s) => $s->where(function ($w) use ($u) {
-                        $w->where('branch_id', $u->branch_id)->orWhereNull('branch_id');
-                    }));
-                }
+                $q->whereHas('shipment', function (Builder $s) use ($u, $branchId, $depotId) {
+                    $s->where('mode', 'sea');
 
-                if ($u?->office_id) {
-                    $q->whereHas('shipment', fn($s) => $s->where(function ($w) use ($u) {
-                        $w->where('origin_office_id', $u->office_id)
-                            ->orWhere('destination_office_id', $u->office_id)
-                            ->orWhereNull('origin_office_id');
-                    }));
-                }
+                    if ($branchId) {
+                        $s->where('branch_id', $branchId);
+                    }
 
-                $q->whereHas('shipment', fn($s) => $s->where($fcCol, Filament::auth()->id()));
+                    if ($depotId) {
+                        $s->where(function ($w) use ($depotId, $u) {
+                            $w->where('assigned_depot_id', $depotId)
+                                ->orWhere('coordinator_id', $u?->id);
+                        });
+                    } else {
+                        $s->where('coordinator_id', $u?->id);
+                    }
+                });
 
                 return $q;
             })
@@ -66,28 +67,34 @@ class FcRecentActivities extends BaseWidget
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->colors([
-                        'info'    => ['pickup', 'loading', 'on_transit'],
-                        'success' => ['delivered'],
-                        'warning' => ['on_hold'],
-                        'danger'  => ['problem', 'cancelled'],
-                        'gray'    => ['waiting', 'draft'],
-                    ])
+                    ->formatStateUsing(fn ($state) => $state?->label() ?? (string) $state)
+                    ->color(fn ($state) => match ($state?->value ?? (string) $state) {
+                        'delivered' => 'success',
+                        'cancelled' => 'danger',
+                        'hold' => 'warning',
+                        'pickup', 'handover', 'stuffing', 'delivery_to_port', 'stacking', 'unit_loading' => 'info',
+                        default => 'gray',
+                    })
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('location_text')
-                    ->label('Lokasi')
+                Tables\Columns\TextColumn::make('route_text')
+                    ->label('Rute')
                     ->getStateUsing(function ($record) {
                         $o = $record->shipment->originCity->name ?? null;
                         $d = $record->shipment->destinationCity->name ?? null;
-                        return $record->location_name ?: ($o && $d ? "{$o} → {$d}" : '—');
+                        return $o && $d ? "{$o} → {$d}" : '—';
                     })
                     ->wrap(),
 
-                Tables\Columns\TextColumn::make('remark')
+                Tables\Columns\TextColumn::make('note')
                     ->label('Catatan')
                     ->limit(60)
+                    ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
+
+                Tables\Columns\TextColumn::make('user.name')
+                    ->label('Oleh')
+                    ->placeholder('—'),
             ])
             ->defaultPaginationPageOption(10)
             ->paginated([10, 25, 50]);

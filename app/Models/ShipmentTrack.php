@@ -79,11 +79,25 @@ class ShipmentTrack extends Model
     }
 
     /**
+     * Run all tracking validations explicitly (used when model events are bypassed).
+     */
+    public function validateTrackingState(): void
+    {
+        $this->validateNoteForCriticalStatus();
+        $this->validateChecksheetConsistency();
+    }
+
+    /**
      * Validate that note is provided for critical statuses on sea shipments.
      * Critical statuses: Hold, Cancelled
      */
     protected function validateNoteForCriticalStatus(): void
     {
+        // Only validate when track is actually being recorded (not skeleton creation)
+        if (empty($this->tracked_at)) {
+            return;
+        }
+
         $status = $this->status instanceof TrackStatus
             ? $this->status
             : TrackStatus::tryFrom((string) $this->status);
@@ -107,6 +121,47 @@ class ShipmentTrack extends Model
         }
     }
 
+    /**
+     * Validate checksheet consistency for sea shipments.
+     * If any checksheet item has status NG, note must be provided (min 10 chars).
+     */
+    protected function validateChecksheetConsistency(): void
+    {
+        // Only validate when track is actually being recorded (not skeleton creation)
+        if (empty($this->tracked_at)) {
+            return;
+        }
+
+        $shipment = $this->shipment;
+        if (! $shipment || ($shipment->mode?->value ?? $shipment->mode) !== 'sea') {
+            return;
+        }
+
+        $checkseet = $this->checkseet;
+        if (! is_array($checkseet) || empty($checkseet)) {
+            return;
+        }
+
+        $hasNg = false;
+        foreach ($checkseet as $item) {
+            if (is_array($item) && ($item['checkseet_status'] ?? null) === 'ng') {
+                $hasNg = true;
+                break;
+            }
+        }
+
+        if (! $hasNg) {
+            return;
+        }
+
+        $note = trim((string) $this->note);
+        if (strlen($note) < 10) {
+            throw ValidationException::withMessages([
+                'note' => 'Checksheet memiliki status NG. Catatan minimal 10 karakter wajib diisi.',
+            ]);
+        }
+    }
+
     protected static function booted(): void
     {
         static::creating(function (ShipmentTrack $track) {
@@ -118,11 +173,13 @@ class ShipmentTrack extends Model
 
             // Validate note requirement for critical statuses on sea shipments
             $track->validateNoteForCriticalStatus();
+            $track->validateChecksheetConsistency();
         });
 
         static::updating(function (ShipmentTrack $track) {
             // Validate note requirement when status changes to critical on sea shipments
             $track->validateNoteForCriticalStatus();
+            $track->validateChecksheetConsistency();
         });
 
         static::saving(function (ShipmentTrack $track) {

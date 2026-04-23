@@ -1,5 +1,6 @@
 @php
 use App\Enums\TrackStatus;
+use Illuminate\Support\Facades\Storage;
 
 if ($items instanceof \Closure) {
 $items = $items();
@@ -10,6 +11,13 @@ $latestVal = optional($tracks->last())->status?->value;
 
 /** @var \BackedEnum[] $order */
 $order = TrackStatus::orderSea();
+
+// For progress calculation, use last non-terminal track when current is Hold/Cancelled
+$progressVal = $latestVal;
+if (in_array($progressVal, ['hold', 'cancelled'], true)) {
+    $prev = $tracks->reverse()->first(fn($t) => ! in_array($t->status?->value, ['hold', 'cancelled'], true));
+    $progressVal = $prev?->status?->value;
+}
 
 $fmt = function ($dt) {
 if (! $dt) {
@@ -94,7 +102,7 @@ return ['text' => 'Menunggu proses ini.', 'class' => 'text-gray-500'];
 };
 
 $totalSteps = count($order);
-$currentIndex = collect($order)->search(fn($s) => $s->value === $latestVal);
+$currentIndex = collect($order)->search(fn($s) => $s->value === $progressVal);
 $doneCount = $currentIndex === false ? 0 : $currentIndex + 1;
 $progressPct = $totalSteps > 0 ? intval(round(($doneCount / $totalSteps) * 100)) : 0;
 @endphp
@@ -187,6 +195,45 @@ $progressPct = $totalSteps > 0 ? intval(round(($doneCount / $totalSteps) * 100))
                                     <p class="mt-1 text-[13px] leading-6 {{ $d['class'] }} line-clamp-2">
                                         {{ $d['text'] }}
                                     </p>
+
+                                    @if ($hit && !empty($hit->checkseet) && is_array($hit->checkseet))
+                                    <div class="mt-2 space-y-1.5">
+                                        @foreach ($hit->checkseet as $item)
+                                        @php
+                                            $csStatus = $item['checkseet_status'] ?? '-';
+                                            $csBadge = match ($csStatus) {
+                                                'ok' => 'bg-green-100 text-green-800 ring-green-200',
+                                                'ng' => 'bg-red-100 text-red-800 ring-red-200',
+                                                default => 'bg-gray-100 text-gray-700 ring-gray-200',
+                                            };
+                                        @endphp
+                                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                                            <span class="inline-flex items-center rounded px-1.5 py-0.5 ring-1 {{ $csBadge }}">
+                                                {{ strtoupper($csStatus) }}
+                                            </span>
+                                            <span class="text-gray-700">
+                                                {{ $item['model'] ?? '—' }}
+                                                @if (!empty($item['no_rangka']))
+                                                <span class="text-gray-400">· {{ $item['no_rangka'] }}</span>
+                                                @endif
+                                            </span>
+                                        </div>
+                                        @endforeach
+                                    </div>
+                                    @endif
+
+                                    @if ($hit && !empty($hit->attachments) && is_array($hit->attachments))
+                                    <div class="mt-2 flex flex-wrap gap-2">
+                                        @foreach ($hit->attachments as $att)
+                                        @if (is_string($att) && $att)
+                                        <a href="{{ Storage::url($att) }}" target="_blank" class="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-[11px] text-gray-600 ring-1 ring-gray-200 hover:bg-gray-100">
+                                            <x-filament::icon icon="heroicon-m-paper-clip" class="h-3.5 w-3.5 text-gray-400" />
+                                            Lampiran
+                                        </a>
+                                        @endif
+                                        @endforeach
+                                    </div>
+                                    @endif
 
                                     <div class="mt-0.5 text-xs text-gray-500 sm:hidden">
                                         {{ $hit?->tracked_at ? $fmt($hit->tracked_at) : '' }}

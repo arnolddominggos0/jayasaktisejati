@@ -2,6 +2,7 @@
 
 namespace App\Filament\FC\Widgets;
 
+use App\Enums\ShipmentStatus;
 use App\Models\Shipment;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget as Widget;
@@ -10,39 +11,68 @@ use Illuminate\Database\Eloquent\Builder;
 
 class FcKpiStats extends Widget
 {
-    protected ?string $heading = 'Ringkasan Tugas';
+    protected ?string $heading = 'Ringkasan Harian';
     protected static ?string $pollingInterval = '60s';
+
+    protected function getSeaBaseQuery(): Builder
+    {
+        $u = Filament::auth()->user();
+        $branchId = app()->bound('scope.branch_id') ? app('scope.branch_id') : ($u?->branch_id ?? null);
+        $depotId = app()->bound('scope.depot_id') ? app('scope.depot_id') : null;
+
+        return Shipment::query()
+            ->where('mode', 'sea')
+            ->when($branchId, fn (Builder $query) => $query->where('branch_id', $branchId))
+            ->when($depotId, fn (Builder $query) => $query->where(function ($w) use ($depotId, $u) {
+                $w->where('assigned_depot_id', $depotId)
+                    ->orWhere('coordinator_id', $u?->id);
+            }), fn (Builder $query) => $query->where('coordinator_id', $u?->id));
+    }
+
     protected function getStats(): array
     {
-        $u     = Filament::auth()->user();
-        $fcCol = (string) config('fc.shipment_fc_column', 'coordinator_id');
+        $base = $this->getSeaBaseQuery();
 
-        $base = Shipment::query()
-            ->when($u?->branch_id, fn(Builder $query) => $query->where(function ($w) use ($u) {
-                $w->where('branch_id', $u->branch_id)->orWhereNull('branch_id');
-            }))
-            ->when($u?->office_id ?? null, fn(Builder $query) => $query->where(function ($w) use ($u) {
-                $w->where('origin_office_id', $u->office_id)->orWhere('destination_office_id', $u->office_id)
-                    ->orWhereNull('origin_office_id');
-            }))
-            ->where($fcCol, $u->id);
-
-        $assigned   = (clone $base)->count();
-        $inProgress = (clone $base)->whereIn('status', ['pickup', 'loading', 'on_transit'])->count();
-        $delivered  = (clone $base)->where('status', 'delivered')->count();
+        $assigned = (clone $base)->count();
+        $inProgress = (clone $base)->where('status', ShipmentStatus::Transit->value)->count();
+        $onHold = (clone $base)->where('status', ShipmentStatus::Hold->value)->count();
+        $urgent = (clone $base)
+            ->where('priority', 'urgent')
+            ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value])
+            ->count();
+        $nearEta = (clone $base)
+            ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value])
+            ->where(function (Builder $q) {
+                $q->whereNull('eta')
+                    ->orWhere('eta', '<=', now()->addDay());
+            })
+            ->count();
 
         return [
             Stat::make('Ditugaskan', $assigned)
-                ->description('Total pekerjaan')
-                ->descriptionIcon('heroicon-m-clipboard-document-check'),
+                ->description('Total shipment laut')
+                ->descriptionIcon('heroicon-m-clipboard-document-check')
+                ->color('gray'),
 
             Stat::make('Berjalan', $inProgress)
-                ->description('Pickup / loading / on transit')
-                ->descriptionIcon('heroicon-m-truck'),
+                ->description('Dalam perjalanan')
+                ->descriptionIcon('heroicon-m-truck')
+                ->color('info'),
 
-            Stat::make('Selesai', $delivered)
-                ->description('Sudah terkirim')
-                ->descriptionIcon('heroicon-m-check-badge'),
+            Stat::make('On Hold', $onHold)
+                ->description('Butuh tindak lanjut')
+                ->descriptionIcon('heroicon-m-pause-circle')
+                ->color('warning'),
+
+            Stat::make('Urgent', $urgent)
+                ->description('Prioritas tinggi')
+                ->descriptionIcon('heroicon-m-exclamation-triangle')
+                ->color('danger'),
+
+            Stat::make('ETA Dekat', $nearEta)
+                ->description('ETA ≤ 24 jam')
+                ->descriptionIcon('heroicon-m-clock')
+                ->color($nearEta > 0 ? 'warning' : 'success'),
         ];
     }
 

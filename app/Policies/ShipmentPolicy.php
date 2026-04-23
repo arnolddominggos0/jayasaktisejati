@@ -27,6 +27,22 @@ class ShipmentPolicy
         return $this->update($user, $shipment);
     }
 
+    /**
+     * Print policy: FC may only print sea shipment documents.
+     * Other roles follow view/update scoping.
+     */
+    public function print(User $user, Shipment $shipment): bool
+    {
+        if ($user->hasRole('field_coordinator')) {
+            $mode = $shipment->mode?->value ?? (string) $shipment->mode;
+            if ($mode !== 'sea') {
+                return false;
+            }
+        }
+
+        return $this->view($user, $shipment);
+    }
+
     public function create(User $user): bool
     {
         return $user->hasAnyRole(['super_admin', 'office_admin']);

@@ -490,11 +490,16 @@ class Shipment extends Model
         ?string $note = null,
         ?string $location = null,
         ?array $attachments = null,
-        ?array $override = null
+        ?array $override = null,
+        ?array $checkseet = null,
+        ?string $planLoadingTimeAt = null,
+        ?string $planClosingTimeAt = null,
     ): ShipmentTrack {
         if ($this->status === ShipmentStatus::Draft) {
             throw new DomainException('Shipment masih draft. Kirim ke FC terlebih dahulu.');
         }
+
+        $this->guardInvalidStatusTransition($status);
 
         $this->ensureTrackSkeleton();
 
@@ -517,11 +522,20 @@ class Shipment extends Model
             throw new DomainException('Status "' . $status->label() . '" sudah pernah dicapai pada ' . $track->tracked_at->format('d M Y H:i') . '.');
         }
 
+        $track->tracked_at = now();
+        $track->note = $note;
+        $track->checkseet = $checkseet;
+        $track->validateTrackingState();
+
         $track->updateQuietly([
             'tracked_at' => now(),
             'note' => $note,
             'location' => $location,
             'attachments' => $attachments,
+            'checkseet' => $checkseet,
+            'plan_loading_time_at' => $planLoadingTimeAt,
+            'plan_closing_time_at' => $planClosingTimeAt,
+            'updated_by' => Auth::id(),
         ]);
 
         if ($to = $status->toShipmentStatus()) {
@@ -535,6 +549,68 @@ class Shipment extends Model
         }
 
         return $track;
+    }
+
+    protected function guardInvalidStatusTransition(TrackStatus $status): void
+    {
+        $isSea = ($this->mode?->value ?? $this->mode) === 'sea';
+
+        if (! $isSea) {
+            return;
+        }
+
+        if (in_array($status, [TrackStatus::Hold, TrackStatus::Cancelled], true)) {
+            return;
+        }
+
+        $order = TrackStatus::orderSea();
+        $orderValues = array_map(fn (TrackStatus $s) => $s->value, $order);
+
+        // Query fresh to avoid stale relation cache on the model instance
+        $latest = $this->latestTrack()->first();
+        $current = $latest?->status instanceof TrackStatus
+            ? $latest->status
+            : TrackStatus::tryFrom((string) ($latest?->status ?? ''));
+
+        // If currently on Hold, look back to the last non-terminal tracked status
+        if ($current === TrackStatus::Hold) {
+            $previousTrack = $this->tracks()
+                ->whereNotNull('tracked_at')
+                ->whereIn('status', $orderValues)
+                ->orderBy('tracked_at', 'desc')
+                ->first();
+
+            $current = $previousTrack?->status instanceof TrackStatus
+                ? $previousTrack->status
+                : TrackStatus::tryFrom((string) ($previousTrack?->status ?? ''));
+        }
+
+        $currentIndex = $current ? array_search($current->value, $orderValues, true) : -1;
+        $targetIndex = array_search($status->value, $orderValues, true);
+
+        if ($targetIndex === false) {
+            throw new DomainException('Status "' . $status->label() . '" tidak valid untuk shipment laut.');
+        }
+
+        if ($targetIndex <= $currentIndex) {
+            throw new DomainException('Tidak dapat mengubah status ke tahap sebelumnya atau yang sudah pernah dicapai.');
+        }
+
+        $isImmediateNext = $targetIndex === $currentIndex + 1;
+
+        // Allow rack shipment to skip Stuffing and go Handover -> DeliveryToPort
+        $isValidSkip = $current?->value === TrackStatus::Handover->value
+            && $status === TrackStatus::DeliveryToPort
+            && \App\Services\LoadingSessionAutoCreate::isRackShipment($this);
+
+        if (! $isImmediateNext && ! $isValidSkip) {
+            $expected = $order[$currentIndex + 1] ?? null;
+            $expectedLabel = $expected?->label() ?? 'tidak ada';
+
+            throw new DomainException(
+                'Status hanya dapat dilanjutkan ke tahap berikutnya secara berurutan. Status berikutnya yang diharapkan: ' . $expectedLabel . '.'
+            );
+        }
     }
 
     protected function requiresMpCheck(TrackStatus $status): bool
