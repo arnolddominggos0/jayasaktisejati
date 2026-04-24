@@ -2,16 +2,21 @@
 
 namespace App\Services;
 
+use App\Enums\ShipmentStatus;
 use App\Models\AppSheetSyncLog;
 use App\Models\BriefingAttendance;
 use App\Models\BriefingAttendancePpeItem;
 use App\Models\BriefingChecklist;
 use App\Models\BriefingSession;
+use App\Models\Depot;
 use App\Models\EquipmentCheck;
 use App\Models\LoadingFinding;
 use App\Models\LoadingSession;
 use App\Models\RackContainerCheck;
+use App\Models\Shipment;
 use App\Models\UnitCheck;
+use App\Models\User;
+use DomainException;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
@@ -36,20 +41,29 @@ class AppSheetService
         $this->loggingEnabled = config('appsheet.logging_enabled', true);
     }
 
-    public function syncFromWebhook(string $tableName, array $data, string $operation = 'create')
+    public function syncFromWebhook(string $tableName, array $data, string $operation = 'create', ?int $submittedByUserId = null)
     {
-        $log = $this->createSyncLog('webhook', $tableName, $data['id'] ?? null, $operation, $data);
+        $log = $this->createSyncLog('webhook', $tableName, $data['id'] ?? null, $operation, $data, $submittedByUserId);
 
         try {
+            $mappedData = $this->mapFields($tableName, $data, $submittedByUserId);
+
+            if ($submittedByUserId !== null) {
+                $this->validateFcScope($tableName, $mappedData, $submittedByUserId);
+            }
+
+            $this->validateShipmentStatusGuard($tableName, $mappedData);
+
             $result = match ($tableName) {
-                'briefing_attendances' => $this->syncBriefingAttendance($data, $operation),
-                'briefing_attendance_ppe_items' => $this->syncBriefingPpeItem($data, $operation),
-                'briefing_checklists' => $this->syncBriefingChecklist($data, $operation),
-                'loading_sessions' => $this->syncLoadingSession($data, $operation),
-                'rack_container_checks' => $this->syncRackContainerCheck($data, $operation),
-                'equipment_checks' => $this->syncEquipmentCheck($data, $operation),
-                'unit_checks' => $this->syncUnitCheck($data, $operation),
-                'loading_findings' => $this->syncLoadingFinding($data, $operation),
+                'briefing_sessions' => $this->syncBriefingSession($data, $operation, $submittedByUserId),
+                'briefing_attendances' => $this->syncBriefingAttendance($data, $operation, $submittedByUserId),
+                'briefing_attendance_ppe_items' => $this->syncBriefingPpeItem($data, $operation, $submittedByUserId),
+                'briefing_checklists' => $this->syncBriefingChecklist($data, $operation, $submittedByUserId),
+                'loading_sessions' => $this->syncLoadingSession($data, $operation, $submittedByUserId),
+                'rack_container_checks' => $this->syncRackContainerCheck($data, $operation, $submittedByUserId),
+                'equipment_checks' => $this->syncEquipmentCheck($data, $operation, $submittedByUserId),
+                'unit_checks' => $this->syncUnitCheck($data, $operation, $submittedByUserId),
+                'loading_findings' => $this->syncLoadingFinding($data, $operation, $submittedByUserId),
                 default => throw new Exception("Unknown table: {$tableName}"),
             };
 
@@ -58,7 +72,7 @@ class AppSheetService
                 $this->recalculateBriefingSession($tableName, $result);
             }
 
-            $log->markAsSuccess(['result' => $result]);
+            $log->markAsSuccess(['result' => $result->toArray() ?? $result]);
 
             if ($this->loggingEnabled) {
                 Log::channel('appsheet')->info("Sync successful: {$tableName}", ['record_id' => $data['id'] ?? null]);
@@ -80,9 +94,37 @@ class AppSheetService
         }
     }
 
-    protected function syncBriefingAttendance(array $data, string $operation)
+    protected function syncBriefingSession(array $data, string $operation, ?int $submittedByUserId = null)
     {
-        $mappedData = $this->mapFields('briefing_attendances', $data);
+        $mappedData = $this->mapFields('briefing_sessions', $data, $submittedByUserId);
+        $date = $mappedData['date'] ?? null;
+        $depotId = $mappedData['depot_id'] ?? null;
+
+        if (! $date || ! $depotId) {
+            throw new Exception('Tanggal dan Depot ID wajib diisi untuk Briefing Session');
+        }
+
+        Depot::where('id', $depotId)->exists()
+            || throw new Exception("Depot ID {$depotId} tidak ditemukan");
+
+        return match ($operation) {
+            'create' => BriefingSession::firstOrCreate(
+                ['date' => $date, 'depot_id' => $depotId],
+                $mappedData
+            ),
+            'update' => BriefingSession::updateOrCreate(
+                ['date' => $date, 'depot_id' => $depotId],
+                $mappedData
+            ),
+            'delete' => BriefingSession::where('date', $date)
+                ->where('depot_id', $depotId)->delete(),
+            default => throw new Exception("Unknown operation: {$operation}"),
+        };
+    }
+
+    protected function syncBriefingAttendance(array $data, string $operation, ?int $submittedByUserId = null)
+    {
+        $mappedData = $this->mapFields('briefing_attendances', $data, $submittedByUserId);
         $sessionId = $mappedData['session_id'] ?? null;
         $manpowerId = $mappedData['manpower_id'] ?? null;
 
@@ -108,9 +150,9 @@ class AppSheetService
         };
     }
 
-    protected function syncBriefingPpeItem(array $data, string $operation)
+    protected function syncBriefingPpeItem(array $data, string $operation, ?int $submittedByUserId = null)
     {
-        $mappedData = $this->mapFields('briefing_attendance_ppe_items', $data);
+        $mappedData = $this->mapFields('briefing_attendance_ppe_items', $data, $submittedByUserId);
         $attendanceId = $mappedData['attendance_id'] ?? null;
         $ppeType = $mappedData['ppe_type'] ?? null;
 
@@ -135,9 +177,9 @@ class AppSheetService
         };
     }
 
-    protected function syncBriefingChecklist(array $data, string $operation)
+    protected function syncBriefingChecklist(array $data, string $operation, ?int $submittedByUserId = null)
     {
-        $mappedData = $this->mapFields('briefing_checklists', $data);
+        $mappedData = $this->mapFields('briefing_checklists', $data, $submittedByUserId);
         $sessionId = $mappedData['session_id'] ?? null;
         $item = $mappedData['item'] ?? null;
 
@@ -163,9 +205,9 @@ class AppSheetService
         };
     }
 
-    protected function syncLoadingSession(array $data, string $operation)
+    protected function syncLoadingSession(array $data, string $operation, ?int $submittedByUserId = null)
     {
-        $mappedData = $this->mapFields('loading_sessions', $data);
+        $mappedData = $this->mapFields('loading_sessions', $data, $submittedByUserId);
 
         return match ($operation) {
             'create' => LoadingSession::firstOrCreate(
@@ -178,9 +220,9 @@ class AppSheetService
         };
     }
 
-    protected function syncRackContainerCheck(array $data, string $operation)
+    protected function syncRackContainerCheck(array $data, string $operation, ?int $submittedByUserId = null)
     {
-        $mappedData = $this->mapFields('rack_container_checks', $data);
+        $mappedData = $this->mapFields('rack_container_checks', $data, $submittedByUserId);
         $loadingSessionId = $mappedData['loading_session_id'] ?? null;
 
         if (! $loadingSessionId) {
@@ -195,9 +237,9 @@ class AppSheetService
         };
     }
 
-    protected function syncEquipmentCheck(array $data, string $operation)
+    protected function syncEquipmentCheck(array $data, string $operation, ?int $submittedByUserId = null)
     {
-        $mappedData = $this->mapFields('equipment_checks', $data);
+        $mappedData = $this->mapFields('equipment_checks', $data, $submittedByUserId);
         $loadingSessionId = $mappedData['loading_session_id'] ?? null;
 
         if (! $loadingSessionId) {
@@ -212,9 +254,9 @@ class AppSheetService
         };
     }
 
-    protected function syncUnitCheck(array $data, string $operation)
+    protected function syncUnitCheck(array $data, string $operation, ?int $submittedByUserId = null)
     {
-        $mappedData = $this->mapFields('unit_checks', $data);
+        $mappedData = $this->mapFields('unit_checks', $data, $submittedByUserId);
         $loadingSessionId = $mappedData['loading_session_id'] ?? null;
 
         if (! $loadingSessionId) {
@@ -229,9 +271,9 @@ class AppSheetService
         };
     }
 
-    protected function syncLoadingFinding(array $data, string $operation)
+    protected function syncLoadingFinding(array $data, string $operation, ?int $submittedByUserId = null)
     {
-        $mappedData = $this->mapFields('loading_findings', $data);
+        $mappedData = $this->mapFields('loading_findings', $data, $submittedByUserId);
 
         return match ($operation) {
             'create' => LoadingFinding::create($mappedData),
@@ -241,7 +283,7 @@ class AppSheetService
         };
     }
 
-    protected function mapFields(string $table, array $data): array
+    protected function mapFields(string $table, array $data, ?int $submittedByUserId = null): array
     {
         $config = config("appsheet.tables.{$table}");
 
@@ -251,18 +293,127 @@ class AppSheetService
 
         $mapped = [];
         foreach ($config['fields'] as $laravelField => $appSheetField) {
-            if (isset($data[$appSheetField])) {
+            if (array_key_exists($appSheetField, $data)) {
                 $mapped[$laravelField] = $data[$appSheetField];
             }
         }
 
-        $user = auth()->id() ?? 1;
+        $user = auth()->id() ?? $submittedByUserId ?? 1;
         $mapped['created_by'] = $user;
         if (! in_array($table, ['briefing_attendances', 'briefing_attendance_ppe_items', 'briefing_checklists'])) {
             $mapped['checked_by'] = $user;
         }
 
         return $mapped;
+    }
+
+    protected function validateFcScope(string $tableName, array $mappedData, int $submittedByUserId): void
+    {
+        $user = User::find($submittedByUserId);
+
+        if (! $user || ! $user->hasRole('field_coordinator')) {
+            throw new DomainException('Pengguna tidak memiliki role Field Coordinator.');
+        }
+
+        $branchId = null;
+        $depotId = null;
+
+        match ($tableName) {
+            'briefing_sessions' => (function () use ($mappedData, &$branchId, &$depotId) {
+                $depotId = $mappedData['depot_id'] ?? null;
+                if ($depotId) {
+                    $depot = Depot::find($depotId);
+                    $branchId = $depot?->branch_id;
+                }
+            })(),
+
+            'briefing_attendances', 'briefing_checklists' => (function () use ($mappedData, &$branchId, &$depotId) {
+                $sessionId = $mappedData['session_id'] ?? null;
+                if ($sessionId) {
+                    $session = BriefingSession::with('depot')->find($sessionId);
+                    $depotId = $session?->depot_id;
+                    $branchId = $session?->depot?->branch_id;
+                }
+            })(),
+
+            'briefing_attendance_ppe_items' => (function () use ($mappedData, &$branchId, &$depotId) {
+                $attendanceId = $mappedData['attendance_id'] ?? null;
+                if ($attendanceId) {
+                    $attendance = BriefingAttendance::with('session.depot')->find($attendanceId);
+                    $depotId = $attendance?->session?->depot_id;
+                    $branchId = $attendance?->session?->depot?->branch_id;
+                }
+            })(),
+
+            'loading_sessions', 'loading_findings' => (function () use ($mappedData, &$branchId, &$depotId) {
+                $branchId = $mappedData['branch_id'] ?? null;
+                $depotId = $mappedData['depot_id'] ?? null;
+            })(),
+
+            'rack_container_checks', 'equipment_checks', 'unit_checks' => (function () use ($mappedData, &$branchId, &$depotId) {
+                $loadingSessionId = $mappedData['loading_session_id'] ?? null;
+                if ($loadingSessionId) {
+                    $session = LoadingSession::find($loadingSessionId);
+                    $branchId = $session?->branch_id;
+                    $depotId = $session?->depot_id;
+                }
+            })(),
+
+            default => null,
+        };
+
+        if ($branchId && $user->branch_id !== $branchId) {
+            throw new DomainException('FC tidak memiliki akses ke branch ini.');
+        }
+
+        if ($depotId) {
+            $hasDepotAccess = Depot::where('id', $depotId)
+                ->where(function ($q) use ($user) {
+                    $q->where('coordinator_user_id', $user->id)
+                        ->orWhere('branch_id', $user->branch_id);
+                })
+                ->exists();
+
+            if (! $hasDepotAccess) {
+                throw new DomainException('FC tidak memiliki akses ke depot ini.');
+            }
+        }
+    }
+
+    protected function validateShipmentStatusGuard(string $tableName, array $mappedData): void
+    {
+        $shipmentId = null;
+
+        match ($tableName) {
+            'loading_sessions', 'loading_findings' => (function () use ($mappedData, &$shipmentId) {
+                $shipmentId = $mappedData['shipment_id'] ?? null;
+            })(),
+
+            'rack_container_checks', 'equipment_checks', 'unit_checks' => (function () use ($mappedData, &$shipmentId) {
+                $loadingSessionId = $mappedData['loading_session_id'] ?? null;
+                if ($loadingSessionId) {
+                    $shipmentId = LoadingSession::where('id', $loadingSessionId)->value('shipment_id');
+                }
+            })(),
+
+            default => null,
+        };
+
+        if (! $shipmentId) {
+            return;
+        }
+
+        $shipment = Shipment::find($shipmentId);
+
+        if (! $shipment) {
+            throw new DomainException('Shipment tidak ditemukan.');
+        }
+
+        if (! in_array($shipment->status, ShipmentStatus::inProgress(), true)) {
+            throw new DomainException(
+                'Form tidak dapat disubmit untuk shipment dengan status "' . $shipment->status->label() . '".')
+            ;
+        }
     }
 
     protected function recalculateBriefingSession(string $tableName, $result): void
@@ -303,8 +454,15 @@ class AppSheetService
         }
     }
 
-    protected function createSyncLog(string $type, string $table, $recordId, string $operation, array $payload): AppSheetSyncLog
+    protected function createSyncLog(string $type, string $table, $recordId, string $operation, array $payload, ?int $submittedByUserId = null): AppSheetSyncLog
     {
+        $syncedBy = 'system';
+        if ($submittedByUserId) {
+            $syncedBy = User::where('id', $submittedByUserId)->value('name') ?? "user:{$submittedByUserId}";
+        } elseif (auth()->check()) {
+            $syncedBy = auth()->user()->name;
+        }
+
         return AppSheetSyncLog::create([
             'sync_type' => $type,
             'table_name' => $table,
@@ -313,7 +471,7 @@ class AppSheetService
             'payload' => $payload,
             'status' => 'pending',
             'source' => 'appsheet',
-            'synced_by' => auth()->user()?->name ?? 'system',
+            'synced_by' => $syncedBy,
         ]);
     }
 

@@ -15,10 +15,8 @@ use App\Models\User;
 use App\Models\Vessel;
 use App\Models\Voyage;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Faker\Factory as Faker;
-use Spatie\Permission\Models\Role;
 
 class InitialSetupSeeder extends Seeder
 {
@@ -26,30 +24,11 @@ class InitialSetupSeeder extends Seeder
     {
         $faker = Faker::create('id_ID');
 
-        Role::findOrCreate('field_coordinator', 'web');
-
         $jkt = Branch::firstOrCreate(['code' => 'JKT'], ['name' => 'Jakarta']);
         $mdn = Branch::firstOrCreate(['code' => 'MDO'], ['name' => 'Manado']);
 
-        $fcJkt = User::firstOrCreate(
-            ['email' => 'fc.jkt@demo.local'],
-            [
-                'name' => 'FC Jakarta',
-                'password' => Hash::make('password'),
-                'branch_id' => $jkt->id,
-            ]
-        );
-        $fcJkt->syncRoles(['field_coordinator']);
-
-        $fcMdo = User::firstOrCreate(
-            ['email' => 'fc.mdo@demo.local'],
-            [
-                'name' => 'FC Manado',
-                'password' => Hash::make('password'),
-                'branch_id' => $mdn->id,
-            ]
-        );
-        $fcMdo->syncRoles(['field_coordinator']);
+        $fcJkt = User::where('email', 'koor.jkt@jss.local')->firstOrFail();
+        $fcMdo = User::where('email', 'koor.mdo@jss.local')->firstOrFail();
 
         $cityNames = ['Jakarta', 'Manado', 'Surabaya', 'Makassar'];
         foreach ($cityNames as $name) {
@@ -142,12 +121,12 @@ class InitialSetupSeeder extends Seeder
         }
 
         $line = ShippingLine::firstOrCreate(
-            ['code' => 'TANTO'],
-            ['name' => 'Tanto Intim Line']
+            ['code' => 'SML'],
+            ['name' => 'Samudera Line']
         );
 
         $vessel = Vessel::firstOrCreate(
-            ['name' => 'Tanto Sejahtera'],
+            ['name' => 'MV Nusantara'],
             [
                 'shipping_line_id' => $line->id,
                 'imo' => 'IMO' . $faker->numerify('#######'),

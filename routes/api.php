@@ -26,7 +26,7 @@ Route::prefix('appsheet')->group(function () {
     Route::get('test', [AppSheetWebhookController::class, 'test'])->name('appsheet.test');
 });
 
-// Public routes
+// Public routesap
 Route::prefix('user')->group(function () {
     Route::post('register', [AuthController::class, 'register'])->name('user.register');
     Route::post('login', [AuthController::class, 'login'])

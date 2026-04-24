@@ -58,6 +58,7 @@ enum TrackStatus: string
             self::VesselDepart,
             self::VesselArrival,
             self::Unloading,
+            self::HandoverTrucking,
             self::DeliveryToCustomer,
             self::Delivered,
         ];
@@ -96,6 +97,7 @@ enum TrackStatus: string
             self::VesselDepart,
             self::VesselArrival,
             self::Unloading,
+            self::HandoverTrucking,
             self::DeliveryToCustomer => ShipmentStatus::Transit,
         };
     }
@@ -129,6 +131,7 @@ enum TrackStatus: string
             'vessel_ata'        => self::VesselArrival,
             'stripping_start'   => self::Unloading,
             'stacking_start'    => self::Stacking,
+            'handover_self_drive' => self::HandoverTrucking,
         ];
 
         return $map[$key] ?? null;

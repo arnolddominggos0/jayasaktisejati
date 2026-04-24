@@ -4,7 +4,8 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
-use App\Models\{User, Branch};
+use App\Models\User;
+use App\Models\Branch;
 use Illuminate\Support\Facades\Hash;
 
 class RolesAndUsersSeeder extends Seeder
@@ -20,31 +21,51 @@ class RolesAndUsersSeeder extends Seeder
 
         $admin = User::firstOrCreate(
             ['email' => 'admin@jss.local'],
-            ['name' => 'Super Admin', 'password' => Hash::make('Admin#12345'), 'branch_id' => $jkt->id]
+            [
+                'name' => 'Super Admin',
+                'password' => Hash::make('Admin#12345'),
+                'branch_id' => $jkt->id
+            ]
         );
         $admin->syncRoles(['super_admin']);
 
         $oa = User::firstOrCreate(
             ['email' => 'office.jkt@jss.local'],
-            ['name' => 'Office Admin JKT', 'password' => Hash::make('Admin#12345'), 'branch_id' => $jkt->id]
+            [
+                'name' => 'Office Admin JKT',
+                'password' => Hash::make('Admin#12345'),
+                'branch_id' => $jkt->id
+            ]
         );
         $oa->syncRoles(['office_admin']);
 
-        $fc = User::firstOrCreate(
+        $fcMdo = User::firstOrCreate(
             ['email' => 'koor.mdo@jss.local'],
-            ['name' => 'Koordinator MDO', 'password' => Hash::make('Admin#12345'), 'branch_id' => $mdo->id]
+            [
+                'name' => 'Koordinator MDO',
+                'password' => Hash::make('Admin#12345'),
+                'branch_id' => $mdo->id
+            ]
         );
-        $fc->syncRoles(['field_coordinator']);
+        $fcMdo->syncRoles(['field_coordinator']);
 
-        $fc = User::firstOrCreate(
+        $fcJkt = User::firstOrCreate(
             ['email' => 'koor.jkt@jss.local'],
-            ['name' => 'Koordinator JKT', 'password' => Hash::make('Admin#12345'), 'branch_id' => $jkt->id]
+            [
+                'name' => 'Koordinator JKT',
+                'password' => Hash::make('Admin#12345'),
+                'branch_id' => $jkt->id
+            ]
         );
-        $fc->syncRoles(['field_coordinator']);
+        $fcJkt->syncRoles(['field_coordinator']);
 
         $cust = User::firstOrCreate(
             ['email' => 'customer@jss.local'],
-            ['name' => 'Customer Demo', 'password' => Hash::make('Admin#12345'), 'branch_id' => $mdo->id]
+            [
+                'name' => 'Customer Demo',
+                'password' => Hash::make('Admin#12345'),
+                'branch_id' => $mdo->id
+            ]
         );
         $cust->syncRoles(['customer']);
     }

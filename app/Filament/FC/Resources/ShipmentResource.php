@@ -121,21 +121,21 @@ class ShipmentResource extends Resource
             }
 
             if ($isCurrentOrPast) {
-                $label = $status->label().' ✓';
+                $label = $status->label() . ' ✓';
                 $options[$status->value] = $label;
 
                 continue;
             }
 
             if ($isNext) {
-                $options[$status->value] = '➡ '.$status->label();
+                $options[$status->value] = '➡ ' . $status->label();
 
                 continue;
             }
 
             $track = $record->tracks()->where('status', $status->value)->whereNotNull('tracked_at')->exists();
             if ($track) {
-                $options[$status->value] = $status->label().' ✓';
+                $options[$status->value] = $status->label() . ' ✓';
                 $reached = true;
 
                 continue;
@@ -146,8 +146,8 @@ class ShipmentResource extends Resource
 
         $finished = TrackStatus::finished();
         if ($current && ! in_array($current, $finished, true)) {
-            $options[TrackStatus::Hold->value] = '⚠ '.TrackStatus::Hold->label();
-            $options[TrackStatus::Cancelled->value] = '✕ '.TrackStatus::Cancelled->label();
+            $options[TrackStatus::Hold->value] = '⚠ ' . TrackStatus::Hold->label();
+            $options[TrackStatus::Cancelled->value] = '✕ ' . TrackStatus::Cancelled->label();
         }
 
         return $options;
@@ -160,12 +160,12 @@ class ShipmentResource extends Resource
                 ->label('Status Lapangan')
                 ->options(function (?Shipment $record) {
                     if (! $record) {
-                        return collect(TrackStatus::orderSea())->mapWithKeys(fn ($e) => [$e->value => $e->label()]);
+                        return collect(TrackStatus::orderSea())->mapWithKeys(fn($e) => [$e->value => $e->label()]);
                     }
 
                     return static::getNextTrackStatusOptions($record);
                 })
-                ->default(fn (?Shipment $record) => $record?->nextTrackStatus()?->value)
+                ->default(fn(?Shipment $record) => $record?->nextTrackStatus()?->value)
                 ->required()
                 ->native(false)
                 ->columnSpan(12)
@@ -174,28 +174,29 @@ class ShipmentResource extends Resource
             Forms\Components\Placeholder::make('loading_gate_warning')
                 ->label('')
                 ->content('⚠ Shipment ber-rak: Status "Dimuat di Kapal" diupdate otomatis setelah loading checkpoint selesai di AppSheet.')
-                ->visible(fn (Forms\Get $get, ?Shipment $record) => $get('track_status') === TrackStatus::UnitLoading->value
-                    && $record
-                    && LoadingSessionAutoCreate::isRackShipment($record)
+                ->visible(
+                    fn(Forms\Get $get, ?Shipment $record) => $get('track_status') === TrackStatus::UnitLoading->value
+                        && $record
+                        && LoadingSessionAutoCreate::isRackShipment($record)
                 ),
 
             Checkbox::make('complete_current_step')
                 ->label('Step ini sudah selesai & lanjut ke status berikutnya')
-                ->visible(fn (Forms\Get $get, ?Shipment $record) => $record?->nextTrackStatus() !== null)
+                ->visible(fn(Forms\Get $get, ?Shipment $record) => $record?->nextTrackStatus() !== null)
                 ->default(true)
                 ->columnSpan(12),
 
             DateTimePicker::make('plan_loading_time_at')
                 ->label('Plan Loading Time')
                 ->seconds(false)
-                ->visible(fn (Forms\Get $get) => $get('track_status') === TrackStatus::Handover->value)
+                ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::Handover->value)
                 ->required()
                 ->columnSpan(6),
 
             DateTimePicker::make('plan_closing_time_at')
                 ->label('Plan Closing Time')
                 ->seconds(false)
-                ->visible(fn (Forms\Get $get) => $get('track_status') === TrackStatus::Handover->value)
+                ->visible(fn(Forms\Get $get) => $get('track_status') === TrackStatus::Handover->value)
                 ->required()
                 ->columnSpan(6),
 
@@ -203,16 +204,18 @@ class ShipmentResource extends Resource
                 ->label('Checksheet Unit')
                 ->collapsible()
                 ->orderColumn(false)
-                ->visible(fn (Forms\Get $get) => in_array($get('track_status'), [
+                ->visible(fn(Forms\Get $get) => in_array($get('track_status'), [
                     TrackStatus::Handover->value,
                     TrackStatus::Stuffing->value,
                     TrackStatus::Unloading->value,
+                    TrackStatus::HandoverTrucking->value,
                     TrackStatus::DeliveryToCustomer->value,
                 ], true))
-                ->required(fn (Forms\Get $get) => in_array($get('track_status'), [
+                ->required(fn(Forms\Get $get) => in_array($get('track_status'), [
                     TrackStatus::Handover->value,
                     TrackStatus::Stuffing->value,
                     TrackStatus::Unloading->value,
+                    TrackStatus::HandoverTrucking->value,
                     TrackStatus::DeliveryToCustomer->value,
                 ], true))
                 ->minItems(1)
@@ -229,7 +232,7 @@ class ShipmentResource extends Resource
                         ->disk('public')
                         ->directory('shipment-tracks/checkseet')
                         ->multiple()
-                        ->required(fn (Forms\Get $get) => $get('checkseet_status') === 'ng'),
+                        ->required(fn(Forms\Get $get) => $get('checkseet_status') === 'ng'),
                 ])
                 ->columnSpan(12),
 
@@ -237,7 +240,7 @@ class ShipmentResource extends Resource
                 ->label('Catatan Lapangan')
                 ->rows(4)
                 ->columnSpan(12)
-                ->required(fn (Forms\Get $get) => in_array($get('track_status'), [
+                ->required(fn(Forms\Get $get) => in_array($get('track_status'), [
                     TrackStatus::Hold->value,
                     TrackStatus::Cancelled->value,
                 ], true))
@@ -247,7 +250,7 @@ class ShipmentResource extends Resource
                 ->label('Alasan Override MP Check')
                 ->rows(3)
                 ->visible(
-                    fn (Forms\Get $get) => auth_user()?->hasRole('super_admin') &&
+                    fn(Forms\Get $get) => auth_user()?->hasRole('super_admin') &&
                         in_array($get('track_status'), [
                             TrackStatus::Stuffing->value,
                             TrackStatus::UnitLoading->value,
@@ -255,7 +258,7 @@ class ShipmentResource extends Resource
                         ], true)
                 )
                 ->required(
-                    fn (Forms\Get $get) => auth_user()?->hasRole('super_admin') &&
+                    fn(Forms\Get $get) => auth_user()?->hasRole('super_admin') &&
                         in_array($get('track_status'), [
                             TrackStatus::Stuffing->value,
                             TrackStatus::UnitLoading->value,
@@ -276,17 +279,17 @@ class ShipmentResource extends Resource
                 ->schema([
                     Forms\Components\Placeholder::make('code')
                         ->label('Kode')
-                        ->content(fn (Shipment $record) => $record->code)
+                        ->content(fn(Shipment $record) => $record->code)
                         ->columnSpan(4),
 
                     Forms\Components\Placeholder::make('status')
                         ->label('Status')
-                        ->content(fn (Shipment $record) => $record->status?->label() ?? '-')
+                        ->content(fn(Shipment $record) => $record->status?->label() ?? '-')
                         ->columnSpan(4),
 
                     Forms\Components\Placeholder::make('route')
                         ->label('Rute')
-                        ->content(fn (Shipment $record) => ($record->originCity->name ?? '-').' → '.($record->destinationCity->name ?? '-'))
+                        ->content(fn(Shipment $record) => ($record->originCity->name ?? '-') . ' → ' . ($record->destinationCity->name ?? '-'))
                         ->columnSpan(12),
                 ]),
         ]);
@@ -299,7 +302,7 @@ class ShipmentResource extends Resource
                 TextColumn::make('code')
                     ->label('Kode')
                     ->badge()
-                    ->color(fn (Shipment $record) => $record->mode === ShipmentMode::Sea ? 'primary' : 'warning')
+                    ->color(fn(Shipment $record) => $record->mode === ShipmentMode::Sea ? 'primary' : 'warning')
                     ->extraAttributes(['class' => 'font-mono'])
                     ->copyable()
                     ->searchable()
@@ -307,11 +310,11 @@ class ShipmentResource extends Resource
 
                 IconColumn::make('mode')
                     ->label('Moda')
-                    ->icon(fn ($state) => ($state instanceof ShipmentMode ? $state->value : (string) $state) === ShipmentMode::Sea->value
+                    ->icon(fn($state) => ($state instanceof ShipmentMode ? $state->value : (string) $state) === ShipmentMode::Sea->value
                         ? 'heroicon-m-cog-8-tooth' : 'heroicon-m-truck')
-                    ->color(fn ($state) => ($state instanceof ShipmentMode ? $state->value : (string) $state) === ShipmentMode::Sea->value
+                    ->color(fn($state) => ($state instanceof ShipmentMode ? $state->value : (string) $state) === ShipmentMode::Sea->value
                         ? 'primary' : 'warning')
-                    ->tooltip(fn ($state) => ($state instanceof ShipmentMode ? $state->value : (string) $state) === ShipmentMode::Sea->value
+                    ->tooltip(fn($state) => ($state instanceof ShipmentMode ? $state->value : (string) $state) === ShipmentMode::Sea->value
                         ? 'Laut' : 'Darat'),
 
                 TextColumn::make('customer.name')->label('Pengirim')->badge()->searchable()->toggleable(),
@@ -330,7 +333,7 @@ class ShipmentResource extends Resource
 
                 TextColumn::make('service_type')
                     ->label('Layanan')
-                    ->getStateUsing(fn (Shipment $record) => $record->service_type?->label() ?? (string) $record->service_type ?: '-')
+                    ->getStateUsing(fn(Shipment $record) => $record->service_type?->label() ?? (string) $record->service_type ?: '-')
                     ->badge()
                     ->colors([
                         'info' => [ServiceType::SeaFreight->label()],
@@ -358,8 +361,8 @@ class ShipmentResource extends Resource
                 TextColumn::make('latest_track_status')
                     ->label('Track Status')
                     ->badge()
-                    ->formatStateUsing(fn (Shipment $record) => $record->latest_track_status?->label() ?? '-')
-                    ->color(fn (Shipment $record) => match ($record->latest_track_status) {
+                    ->formatStateUsing(fn(Shipment $record) => $record->latest_track_status?->label() ?? '-')
+                    ->color(fn(Shipment $record) => match ($record->latest_track_status) {
                         TrackStatus::Delivered => 'success',
                         TrackStatus::Cancelled => 'danger',
                         TrackStatus::Hold => 'warning',
@@ -426,7 +429,7 @@ class ShipmentResource extends Resource
                             default => 'gray',
                         };
                     })
-                    ->visible(fn () => true)
+                    ->visible(fn() => true)
                     ->toggleable(),
 
                 TextColumn::make('eta')->label('ETA')->badge()->dateTime('d M Y, H:i')->toggleable(),
@@ -435,21 +438,21 @@ class ShipmentResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Status')
-                    ->options(collect(ShipmentStatus::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])),
+                    ->options(collect(ShipmentStatus::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()])),
                 Tables\Filters\SelectFilter::make('origin_city_id')
                     ->label('Asal')
-                    ->options(fn () => City::query()->orderBy('name')->pluck('name', 'id')->toArray())
+                    ->options(fn() => City::query()->orderBy('name')->pluck('name', 'id')->toArray())
                     ->searchable(),
                 Tables\Filters\SelectFilter::make('destination_city_id')
                     ->label('Tujuan')
-                    ->options(fn () => City::query()->orderBy('name')->pluck('name', 'id')->toArray())
+                    ->options(fn() => City::query()->orderBy('name')->pluck('name', 'id')->toArray())
                     ->searchable(),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
 
                 Tables\Actions\Action::make('updateTrack')
-                    ->label('Update Status')
+                    ->label('Update Lapangan')
                     ->icon('heroicon-m-pencil-square')
                     ->color('info')
                     ->form(static::trackUpdateForm())
@@ -464,7 +467,7 @@ class ShipmentResource extends Resource
                         if ($existingTrack) {
                             Notification::make()
                                 ->title('Status sudah pernah dicapai')
-                                ->body("'{$status->label()}' sudah diupdate pada ".$existingTrack->tracked_at->format('d M Y H:i').'.')
+                                ->body("'{$status->label()}' sudah diupdate pada " . $existingTrack->tracked_at->format('d M Y H:i') . '.')
                                 ->warning()
                                 ->send();
 
@@ -516,7 +519,7 @@ class ShipmentResource extends Resource
                         ->label('Set Menunggu')
                         ->icon('heroicon-m-clock')
                         ->color('gray')
-                        ->visible(fn (Shipment $record) => in_array($record->status?->value ?? (string) $record->status, ['draft', 'hold'], true))
+                        ->visible(fn(Shipment $record) => in_array($record->status?->value ?? (string) $record->status, ['draft', 'hold'], true))
                         ->requiresConfirmation()
                         ->action(function (Shipment $record) {
                             $record->update(['status' => ShipmentStatus::Pending->value]);
@@ -527,7 +530,7 @@ class ShipmentResource extends Resource
                         ->label('Mulai Penjemputan')
                         ->icon('heroicon-m-truck')
                         ->color('info')
-                        ->visible(fn (Shipment $record) => ($record->status?->value ?? (string) $record->status) === 'pending')
+                        ->visible(fn(Shipment $record) => ($record->status?->value ?? (string) $record->status) === 'pending')
                         ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             $record->appendTrack(TrackStatus::Pickup, $data['note'] ?? null);
@@ -538,9 +541,9 @@ class ShipmentResource extends Resource
                         ->label('Handover Depo')
                         ->icon('heroicon-m-building-office')
                         ->color('info')
-                        ->visible(fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::Pickup->value)
+                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::Pickup->value)
                         ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn (Shipment $record, array $data) => $record->appendTrack(TrackStatus::Handover, $data['note'] ?? null)),
+                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::Handover, $data['note'] ?? null)),
 
                     Tables\Actions\Action::make('stuffing')
                         ->label('Stuffing & Segel')
@@ -554,7 +557,7 @@ class ShipmentResource extends Resource
                             return ! LoadingSessionAutoCreate::isRackShipment($record);
                         })
                         ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn (Shipment $record, array $data) => $record->appendTrack(TrackStatus::Stuffing, $data['note'] ?? null)),
+                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::Stuffing, $data['note'] ?? null)),
 
                     Tables\Actions\Action::make('stuffingViaAppSheet')
                         ->label('Loading via AppSheet')
@@ -572,7 +575,7 @@ class ShipmentResource extends Resource
 
                             return LoadingSessionAutoCreate::isRackShipment($record);
                         })
-                        ->action(fn () => null),
+                        ->action(fn() => null),
 
                     Tables\Actions\Action::make('deliveryToPort')
                         ->label('Antar ke Pelabuhan')
@@ -599,7 +602,7 @@ class ShipmentResource extends Resource
                         ->label('Stacking (Terminal)')
                         ->icon('heroicon-m-rectangle-group')
                         ->color('info')
-                        ->visible(fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::DeliveryToPort->value)
+                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::DeliveryToPort->value)
                         ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             $record->appendTrack(TrackStatus::Stacking, $data['note'] ?? null);
@@ -642,53 +645,61 @@ class ShipmentResource extends Resource
 
                             return LoadingSessionAutoCreate::isRackShipment($record);
                         })
-                        ->action(fn () => null),
+                        ->action(fn() => null),
 
                     Tables\Actions\Action::make('onShip')
                         ->label('On Ship')
                         ->icon('heroicon-m-rocket-launch')
                         ->color('info')
-                        ->visible(fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::UnitLoading->value)
+                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::UnitLoading->value)
                         ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn (Shipment $record, array $data) => $record->appendTrack(TrackStatus::OnShip, $data['note'] ?? null)),
+                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::OnShip, $data['note'] ?? null)),
 
                     Tables\Actions\Action::make('vesselDepart')
                         ->label('Kapal Berangkat')
                         ->icon('heroicon-m-paper-airplane')
                         ->color('info')
-                        ->visible(fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::OnShip->value)
+                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::OnShip->value)
                         ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn (Shipment $record, array $data) => $record->appendTrack(TrackStatus::VesselDepart, $data['note'] ?? null)),
+                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::VesselDepart, $data['note'] ?? null)),
 
                     Tables\Actions\Action::make('vesselArrival')
                         ->label('Kapal Tiba')
                         ->icon('heroicon-m-flag')
                         ->color('info')
-                        ->visible(fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::VesselDepart->value)
+                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::VesselDepart->value)
                         ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn (Shipment $record, array $data) => $record->appendTrack(TrackStatus::VesselArrival, $data['note'] ?? null)),
+                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::VesselArrival, $data['note'] ?? null)),
 
                     Tables\Actions\Action::make('unloading')
                         ->label('Pembongkaran')
                         ->icon('heroicon-m-arrow-down-tray')
                         ->color('info')
-                        ->visible(fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::VesselArrival->value)
+                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::VesselArrival->value)
                         ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn (Shipment $record, array $data) => $record->appendTrack(TrackStatus::Unloading, $data['note'] ?? null)),
+                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::Unloading, $data['note'] ?? null)),
+
+                    Tables\Actions\Action::make('handoverTrucking')
+                        ->label('Handover Self-Drive')
+                        ->icon('heroicon-m-arrow-trending-up')
+                        ->color('info')
+                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::Unloading->value)
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::HandoverTrucking, $data['note'] ?? null)),
 
                     Tables\Actions\Action::make('deliveryToCustomer')
                         ->label('Antar ke Customer')
                         ->icon('heroicon-m-user')
                         ->color('info')
-                        ->visible(fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::Unloading->value)
+                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::Unloading->value)
                         ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn (Shipment $record, array $data) => $record->appendTrack(TrackStatus::DeliveryToCustomer, $data['note'] ?? null)),
+                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::DeliveryToCustomer, $data['note'] ?? null)),
 
                     Tables\Actions\Action::make('markDelivered')
                         ->label('Tandai Terkirim')
                         ->icon('heroicon-m-check-badge')
                         ->color('success')
-                        ->visible(fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::DeliveryToCustomer->value)
+                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::DeliveryToCustomer->value)
                         ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             $record->appendTrack(TrackStatus::Delivered, $data['note'] ?? 'Terkirim');
@@ -699,17 +710,17 @@ class ShipmentResource extends Resource
                         ->label('Tahan')
                         ->icon('heroicon-m-pause-circle')
                         ->color('warning')
-                        ->visible(fn (Shipment $record) => $record->latest_track_status !== TrackStatus::Hold
+                        ->visible(fn(Shipment $record) => $record->latest_track_status !== TrackStatus::Hold
                             && ! in_array($record->latest_track_status, [TrackStatus::Delivered, TrackStatus::Cancelled], true)
                             && $record->latest_track_status !== null)
                         ->form([Textarea::make('note')->label('Alasan')->rows(3)->required()])
-                        ->action(fn (Shipment $record, array $data) => $record->appendTrack(TrackStatus::Hold, $data['note'])),
+                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::Hold, $data['note'])),
 
                     Tables\Actions\Action::make('cancel')
                         ->label('Batalkan')
                         ->icon('heroicon-m-x-circle')
                         ->color('danger')
-                        ->visible(fn (Shipment $record) => $record->canCancel())
+                        ->visible(fn(Shipment $record) => $record->canCancel())
                         ->form([Textarea::make('note')->label('Alasan')->rows(3)->required()])
                         ->requiresConfirmation()
                         ->action(function (Shipment $record, array $data) {

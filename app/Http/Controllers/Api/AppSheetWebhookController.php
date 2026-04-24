@@ -36,11 +36,13 @@ class AppSheetWebhookController extends Controller
                 'table' => 'required|string',
                 'operation' => 'required|string|in:create,update,delete',
                 'data' => 'required|array',
+                'submitted_by_user_id' => 'nullable|integer|exists:users,id',
             ]);
 
             $table = $data['table'];
             $operation = $data['operation'];
             $recordData = $data['data'];
+            $submittedByUserId = $data['submitted_by_user_id'] ?? null;
 
             $allowedTables = array_keys(config('appsheet.tables', []));
             if (! in_array($table, $allowedTables, true)) {
@@ -51,7 +53,7 @@ class AppSheetWebhookController extends Controller
                 ], 422);
             }
 
-            $result = $this->appSheetService->syncFromWebhook($table, $recordData, $operation);
+            $result = $this->appSheetService->syncFromWebhook($table, $recordData, $operation, $submittedByUserId);
 
             return response()->json([
                 'success' => true,
@@ -67,6 +69,15 @@ class AppSheetWebhookController extends Controller
                 'message' => 'Validation failed',
                 'errors' => $e->errors(),
             ], 422);
+        } catch (\DomainException $e) {
+            Log::warning('AppSheet webhook domain error: '.$e->getMessage(), [
+                'request' => $request->all(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 403);
         } catch (\Exception $e) {
             Log::error('AppSheet webhook error: '.$e->getMessage(), [
                 'request' => $request->all(),

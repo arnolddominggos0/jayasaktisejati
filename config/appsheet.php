@@ -38,6 +38,20 @@ return [
     'tables' => [
 
         // ── Briefing (sebelum loading) ──────────────────────────
+        'briefing_sessions' => [
+            'appsheet_table' => 'Briefing Sessions',
+            'model' => \App\Models\BriefingSession::class,
+            'primary_key' => ['date', 'depot_id'],
+            'fields' => [
+                'date' => 'Tanggal',
+                'depot_id' => 'Depot ID',
+                'coordinator_user_id' => 'Koordinator ID',
+                'notes' => 'Catatan',
+                'summary_headcount' => 'Jumlah MP Dibutuhkan',
+                'summary_solution' => 'Solusi Kekurangan',
+            ],
+        ],
+
         'briefing_attendances' => [
             'appsheet_table' => 'Briefing Attendances',
             'model' => BriefingAttendance::class,

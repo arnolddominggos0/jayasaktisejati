@@ -9,6 +9,8 @@ class AppSheetSyncLog extends Model
 {
     use HasFactory;
 
+    protected $table = 'appsheet_sync_logs';
+
     protected $fillable = [
         'sync_type',
         'table_name',
