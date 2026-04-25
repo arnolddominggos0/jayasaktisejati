@@ -64,7 +64,7 @@ class AprilAudit2026 extends Page
 
         $depotId = app()->bound('scope.depot_id')
             ? app('scope.depot_id')
-            : Depot::where('coordinator_user_id', $user?->id)->value('id');
+            : ($user?->scope_unit_type === 'depot' ? $user->scope_unit_id : Depot::where('coordinator_user_id', $user?->id)->value('id'));
 
         $this->selectedDepotId = $depotId;
         if ($depotId) {

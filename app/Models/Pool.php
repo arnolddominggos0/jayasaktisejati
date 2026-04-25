@@ -17,6 +17,31 @@ class Pool extends Model
         'coordinator_user_id',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (Pool $m) {
+            // Guard: reject assigning a coordinator already assigned to another depot or pool.
+            if ($m->isDirty('coordinator_user_id') && $m->coordinator_user_id !== null) {
+                $existingPool = static::query()
+                    ->where('coordinator_user_id', $m->coordinator_user_id)
+                    ->whereKeyNot($m->getKey() ?? 0)
+                    ->exists();
+
+                if ($existingPool) {
+                    throw new \InvalidArgumentException('Coordinator is already assigned to another pool.');
+                }
+
+                $existingDepot = \App\Models\Depot::query()
+                    ->where('coordinator_user_id', $m->coordinator_user_id)
+                    ->exists();
+
+                if ($existingDepot) {
+                    throw new \InvalidArgumentException('Coordinator is already assigned to a depot.');
+                }
+            }
+        });
+    }
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);

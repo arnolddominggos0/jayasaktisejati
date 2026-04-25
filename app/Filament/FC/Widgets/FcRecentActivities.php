@@ -18,7 +18,7 @@ class FcRecentActivities extends BaseWidget
     public function table(Table $table): Table
     {
         $u = Filament::auth()->user();
-        $branchId = app()->bound('scope.branch_id') ? app('scope.branch_id') : ($u?->branch_id ?? null);
+        $branchId = app()->bound('scope.branch_id') ? app('scope.branch_id') : ($u?->effectiveBranchId() ?? null);
         $depotId = app()->bound('scope.depot_id') ? app('scope.depot_id') : null;
 
         return $table

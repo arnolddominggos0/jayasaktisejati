@@ -51,7 +51,7 @@ class ShipmentPolicy
     public function update(User $user, Shipment $shipment): bool
     {
         if ($user->hasRole('office_admin')) {
-            return is_null($shipment->branch_id) || $shipment->branch_id === $user->branch_id;
+            return is_null($shipment->branch_id) || $shipment->branch_id === $user->effectiveBranchId();
         }
 
         if ($user->hasRole('field_coordinator')) {
@@ -60,10 +60,16 @@ class ShipmentPolicy
                 return false;
             }
 
-            if ($shipment->branch_id !== $user->branch_id) {
+            if ($shipment->branch_id !== $user->effectiveBranchId()) {
                 return false;
             }
 
+            // Canonical scope check first
+            if ($user->scope_unit_type === 'depot' && $user->scope_unit_id && $shipment->assigned_depot_id === $user->scope_unit_id) {
+                return true;
+            }
+
+            // Fallback to legacy depot lookup or direct coordinator_id
             $depotId = app()->bound('scope.depot_id')
                 ? app('scope.depot_id')
                 : Depot::where('coordinator_user_id', $user->id)->value('id');

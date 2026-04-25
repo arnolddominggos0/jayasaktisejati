@@ -23,13 +23,13 @@ class DashboardController extends Controller
      */
     public function stats(Request $request): JsonResponse
     {
-        $cacheKey = 'dashboard_stats_' . ($request->user()->branch_id ?? 'all');
+        $cacheKey = 'dashboard_stats_' . ($request->user()->effectiveBranchId() ?? 'all');
         
         $stats = Cache::remember($cacheKey, 300, function () use ($request) {
             $shipmentQuery = Shipment::query();
             
             if (!$request->user()->hasRole('super_admin')) {
-                $shipmentQuery->where('branch_id', $request->user()->branch_id);
+                $shipmentQuery->where('branch_id', $request->user()->effectiveBranchId());
             }
 
             return [
@@ -58,7 +58,7 @@ class DashboardController extends Controller
         $query = Shipment::query();
         
         if (!$request->user()->hasRole('super_admin')) {
-            $query->where('branch_id', $request->user()->branch_id);
+            $query->where('branch_id', $request->user()->effectiveBranchId());
         }
 
         $stats = $query->select('status', DB::raw('count(*) as count'))
@@ -76,7 +76,7 @@ class DashboardController extends Controller
         $query = Shipment::query()->with(['customer', 'receiver']);
         
         if (!$request->user()->hasRole('super_admin')) {
-            $query->where('branch_id', $request->user()->branch_id);
+            $query->where('branch_id', $request->user()->effectiveBranchId());
         }
 
         $shipments = $query->latest()->limit(10)->get();

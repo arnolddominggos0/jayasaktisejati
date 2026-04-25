@@ -29,12 +29,16 @@ class ShipmentTrackPolicy
         }
 
         // Check branch ownership
-        if ($user->hasRole('office_admin') && $user->branch_id) {
-            return $shipment->branch_id === null || $shipment->branch_id === $user->branch_id;
+        if ($user->hasRole('office_admin') && $user->effectiveBranchId()) {
+            return $shipment->branch_id === null || $shipment->branch_id === $user->effectiveBranchId();
         }
 
-        // Field coordinator can view if assigned
+        // Field coordinator can view if assigned (canonical scope or legacy coordinator_id)
         if ($user->hasRole('field_coordinator')) {
+            if ($user->scope_unit_type === 'depot' && $user->scope_unit_id && $shipment->assigned_depot_id === $user->scope_unit_id) {
+                return true;
+            }
+
             return $shipment->coordinator_id === $user->id || $shipment->coordinator_id === null;
         }
 
@@ -57,8 +61,8 @@ class ShipmentTrackPolicy
         // Only super admin can update (enforced by before())
         // This method should not be reached by non-super-admin due to before()
         // But we add branch check for defense-in-depth
-        if ($user->branch_id && $shipment->branch_id !== null) {
-            return $shipment->branch_id === $user->branch_id;
+        if ($user->effectiveBranchId() && $shipment->branch_id !== null) {
+            return $shipment->branch_id === $user->effectiveBranchId();
         }
 
         return true;
@@ -74,8 +78,8 @@ class ShipmentTrackPolicy
         }
 
         // Defense-in-depth branch check
-        if ($user->branch_id && $shipment->branch_id !== null) {
-            return $shipment->branch_id === $user->branch_id;
+        if ($user->effectiveBranchId() && $shipment->branch_id !== null) {
+            return $shipment->branch_id === $user->effectiveBranchId();
         }
 
         return true;

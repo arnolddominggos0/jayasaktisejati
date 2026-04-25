@@ -72,20 +72,25 @@ class AppSheetWebhookController extends Controller
         } catch (\DomainException $e) {
             Log::warning('AppSheet webhook domain error: '.$e->getMessage(), [
                 'request' => $request->all(),
+                'submitted_by_user_id' => $submittedByUserId ?? null,
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+                'error_code' => 'SCOPE_VIOLATION',
             ], 403);
         } catch (\Exception $e) {
             Log::error('AppSheet webhook error: '.$e->getMessage(), [
                 'request' => $request->all(),
+                'submitted_by_user_id' => $submittedByUserId ?? null,
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
+                'error_code' => 'INTERNAL_ERROR',
             ], 500);
         }
     }

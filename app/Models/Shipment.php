@@ -156,8 +156,8 @@ class Shipment extends Model
             }
 
             if (blank($m->branch_id)) {
-                if (Auth::check() && Auth::user()->branch_id) {
-                    $m->branch_id = Auth::user()->branch_id;
+                if (Auth::check() && Auth::user()->effectiveBranchId()) {
+                    $m->branch_id = Auth::user()->effectiveBranchId();
                 } elseif ($m->origin_office_id) {
                     $m->branch_id = Office::whereKey($m->origin_office_id)->value('branch_id');
                 }
@@ -253,8 +253,8 @@ class Shipment extends Model
             }
 
             if (blank($m->branch_id)) {
-                if (Auth::check() && Auth::user()->branch_id) {
-                    $m->branch_id = Auth::user()->branch_id;
+                if (Auth::check() && Auth::user()->effectiveBranchId()) {
+                    $m->branch_id = Auth::user()->effectiveBranchId();
                 } elseif ($m->origin_office_id) {
                     $m->branch_id = Office::whereKey($m->origin_office_id)->value('branch_id');
                 }

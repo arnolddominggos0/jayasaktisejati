@@ -87,6 +87,7 @@ class AppSheetService
                 Log::channel('appsheet')->error("Sync failed: {$tableName}", [
                     'error' => $e->getMessage(),
                     'data' => $data,
+                    'submitted_by_user_id' => $submittedByUserId,
                 ]);
             }
 
@@ -362,21 +363,106 @@ class AppSheetService
             default => null,
         };
 
-        if ($branchId && $user->branch_id !== $branchId) {
-            throw new DomainException('FC tidak memiliki akses ke branch ini.');
+        // Reject impersonation: mapped coordinator must match the submitting user.
+        $mappedCoordinatorId = $mappedData['coordinator_user_id'] ?? null;
+        if ($mappedCoordinatorId !== null && (int) $mappedCoordinatorId !== (int) $user->id) {
+            throw new DomainException(
+                sprintf(
+                    '[IMPERSONATION_REJECTED] submitted_by_user_id=%d (%s) but payload coordinator_user_id=%d. Table=%s. Koordinator di payload harus sama dengan pengguna yang mengirim.',
+                    $user->id,
+                    $user->name,
+                    $mappedCoordinatorId,
+                    $tableName
+                )
+            );
+        }
+
+        $hasCanonicalScope = $user->scope_branch_id !== null
+            && $user->scope_unit_id !== null
+            && $user->scope_unit_type !== null;
+
+        if ($hasCanonicalScope) {
+            // STRICT MODE: payload must align exactly with canonical scope.
+            // No fallback to legacy depot/pool lookups or branch-wide access.
+
+            if ($branchId !== null && (int) $branchId !== (int) $user->scope_branch_id) {
+                throw new DomainException(
+                    sprintf(
+                        '[SCOPE_MISMATCH] FC user:%d (%s) canonical branch=%d, but payload targets branch=%d. Table=%s. Harap periksa penugasan FC di Master Depo/Pool.',
+                        $user->id,
+                        $user->name,
+                        $user->scope_branch_id,
+                        $branchId,
+                        $tableName
+                    )
+                );
+            }
+
+            if ($depotId !== null) {
+                if ($user->scope_unit_type !== 'depot' || (int) $depotId !== (int) $user->scope_unit_id) {
+                    throw new DomainException(
+                        sprintf(
+                            '[SCOPE_MISMATCH] FC user:%d (%s) canonical unit=%s:%d, but payload targets depot=%d. Table=%s. Harap periksa penugasan FC di Master Depo/Pool.',
+                            $user->id,
+                            $user->name,
+                            $user->scope_unit_type,
+                            $user->scope_unit_id,
+                            $depotId,
+                            $tableName
+                        )
+                    );
+                }
+            }
+
+            return;
+        }
+
+        // LEGACY MODE: user has not been backfilled with canonical scope.
+        // Allow existing fallback behavior but log deprecation for ops visibility.
+        $effectiveBranchId = $user->effectiveBranchId();
+
+        if ($branchId && $effectiveBranchId !== $branchId) {
+            throw new DomainException(
+                sprintf(
+                    '[LEGACY_SCOPE_DENIED] FC user:%d (%s) legacy branch=%d, but payload targets branch=%d. Table=%s. Mohon jalankan backfill scope agar validasi lebih ketat.',
+                    $user->id,
+                    $user->name,
+                    $effectiveBranchId ?? 'null',
+                    $branchId,
+                    $tableName
+                )
+            );
         }
 
         if ($depotId) {
             $hasDepotAccess = Depot::where('id', $depotId)
-                ->where(function ($q) use ($user) {
+                ->where(function ($q) use ($user, $effectiveBranchId) {
                     $q->where('coordinator_user_id', $user->id)
-                        ->orWhere('branch_id', $user->branch_id);
+                        ->orWhere('branch_id', $effectiveBranchId);
                 })
                 ->exists();
 
             if (! $hasDepotAccess) {
-                throw new DomainException('FC tidak memiliki akses ke depot ini.');
+                throw new DomainException(
+                    sprintf(
+                        '[LEGACY_SCOPE_DENIED] FC user:%d (%s) tidak memiliki akses ke depot=%d. Table=%s. Mohon jalankan backfill scope agar validasi lebih ketat.',
+                        $user->id,
+                        $user->name,
+                        $depotId,
+                        $tableName
+                    )
+                );
             }
+        }
+
+        if ($this->loggingEnabled) {
+            Log::channel('appsheet')->warning("[DEPRECATED] AppSheet payload accepted using legacy scope fallback", [
+                'user_id' => $user->id,
+                'table' => $tableName,
+                'branch_id' => $branchId,
+                'depot_id' => $depotId,
+                'note' => 'User belum memiliki canonical scope. Jalankan backfill segera.',
+            ]);
         }
     }
 

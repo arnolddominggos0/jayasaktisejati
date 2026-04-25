@@ -48,6 +48,8 @@ class ListBriefingSessions extends ListRecords
     {
         $user = Filament::auth()->user();
 
-        return Depot::where('coordinator_user_id', $user?->id)->value('id');
+        return $user?->scope_unit_type === 'depot'
+            ? $user->scope_unit_id
+            : Depot::where('coordinator_user_id', $user?->id)->value('id');
     }
 }

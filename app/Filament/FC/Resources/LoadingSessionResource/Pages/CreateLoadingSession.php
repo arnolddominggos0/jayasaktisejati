@@ -25,13 +25,13 @@ class CreateLoadingSession extends CreateRecord
         if (empty($data['depot_id'])) {
             $depotId = app()->bound('scope.depot_id')
                 ? app('scope.depot_id')
-                : Depot::where('coordinator_user_id', $user->id)->value('id');
+                : ($user->scope_unit_type === 'depot' ? $user->scope_unit_id : Depot::where('coordinator_user_id', $user->id)->value('id'));
             $data['depot_id'] = $depotId;
         }
 
         // Set branch
         if (empty($data['branch_id'])) {
-            $data['branch_id'] = $user->branch_id ?? app('scope.branch_id') ?? null;
+            $data['branch_id'] = $user->effectiveBranchId() ?? app('scope.branch_id') ?? null;
         }
 
         // Set initial status

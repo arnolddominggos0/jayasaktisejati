@@ -33,6 +33,26 @@ class Depot extends Model
             if (! in_array($m->mode, ['sea', 'land'], true)) {
                 $m->mode = 'land';
             }
+
+            // Guard: reject assigning a coordinator already assigned to another depot or pool.
+            if ($m->isDirty('coordinator_user_id') && $m->coordinator_user_id !== null) {
+                $existingDepot = static::query()
+                    ->where('coordinator_user_id', $m->coordinator_user_id)
+                    ->whereKeyNot($m->getKey() ?? 0)
+                    ->exists();
+
+                if ($existingDepot) {
+                    throw new \InvalidArgumentException('Coordinator is already assigned to another depot.');
+                }
+
+                $existingPool = \App\Models\Pool::query()
+                    ->where('coordinator_user_id', $m->coordinator_user_id)
+                    ->exists();
+
+                if ($existingPool) {
+                    throw new \InvalidArgumentException('Coordinator is already assigned to a pool.');
+                }
+            }
         });
     }
 

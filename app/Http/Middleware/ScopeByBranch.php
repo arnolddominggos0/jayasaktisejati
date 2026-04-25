@@ -14,7 +14,7 @@ class ScopeByBranch
         if ($user) {
             $currentBranchId = $user->hasRole('super_admin')
                 ? null
-                : $user->branch_id;
+                : $user->effectiveBranchId();
 
             app()->instance('currentBranchId', $currentBranchId);
 

@@ -32,7 +32,7 @@ class ShipmentController extends Controller
 
         // Apply branch scoping for non-super-admins
         if (!$request->user()->hasRole('super_admin')) {
-            $query->where('branch_id', $request->user()->branch_id);
+            $query->where('branch_id', $request->user()->effectiveBranchId());
         }
 
         // Apply filters
@@ -96,7 +96,7 @@ class ShipmentController extends Controller
         try {
             $shipment = DB::transaction(function () use ($validated, $request) {
                 if (!$request->user()->hasRole('super_admin')) {
-                    $validated['branch_id'] = $request->user()->branch_id;
+                    $validated['branch_id'] = $request->user()->effectiveBranchId();
                 }
                 $validated['status'] = 'Draft';
                 return Shipment::create($validated);

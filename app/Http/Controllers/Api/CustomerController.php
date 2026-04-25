@@ -36,7 +36,7 @@ class CustomerController extends Controller
 
         // Apply branch filter for non-super-admins
         if (!$request->user()->hasRole('super_admin')) {
-            $query->where('branch_id', $request->user()->branch_id);
+            $query->where('branch_id', $request->user()->effectiveBranchId());
         }
 
         $perPage = $request->get('per_page', 15);

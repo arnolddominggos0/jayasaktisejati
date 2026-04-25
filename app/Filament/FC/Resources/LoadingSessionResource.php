@@ -52,7 +52,7 @@ class LoadingSessionResource extends Resource
 
         $branchId = app()->bound('scope.branch_id')
             ? app('scope.branch_id')
-            : ($u->branch_id ?? null);
+            : ($u->effectiveBranchId() ?? null);
 
         if ($branchId) {
             $q->where('branch_id', $branchId);
@@ -60,7 +60,7 @@ class LoadingSessionResource extends Resource
 
         $depotId = app()->bound('scope.depot_id')
             ? app('scope.depot_id')
-            : Depot::where('coordinator_user_id', $u->id)->value('id');
+            : ($u->scope_unit_type === 'depot' ? $u->scope_unit_id : Depot::where('coordinator_user_id', $u->id)->value('id'));
 
         if ($depotId) {
             $q->where('depot_id', $depotId);

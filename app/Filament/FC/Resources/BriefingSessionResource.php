@@ -58,7 +58,7 @@ class BriefingSessionResource extends Resource
 
         $branchId = app()->bound('scope.branch_id')
             ? app('scope.branch_id')
-            : ($user->branch_id ?? null);
+            : ($user->effectiveBranchId() ?? null);
 
         if ($branchId) {
             $query->whereHas('depot', fn ($q) => $q->where('branch_id', $branchId));
@@ -66,7 +66,7 @@ class BriefingSessionResource extends Resource
 
         $depotId = app()->bound('scope.depot_id')
             ? app('scope.depot_id')
-            : Depot::where('coordinator_user_id', $user->id)->value('id');
+            : ($user->scope_unit_type === 'depot' ? $user->scope_unit_id : Depot::where('coordinator_user_id', $user->id)->value('id'));
 
         if ($depotId) {
             $query->where('depot_id', $depotId);
@@ -98,7 +98,9 @@ class BriefingSessionResource extends Resource
                         ->default(function () {
                             $user = Filament::auth()->user();
 
-                            return Depot::where('coordinator_user_id', $user?->id)->value('id');
+                            return $user?->scope_unit_type === 'depot'
+                                ? $user->scope_unit_id
+                                : Depot::where('coordinator_user_id', $user?->id)->value('id');
                         })
                         ->live(),
 

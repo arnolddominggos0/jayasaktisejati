@@ -66,8 +66,8 @@ class BriefingSessionResource extends Resource
                             ->exists();
                     }
 
-                    if ($u && $isFc && isset($u->branch_id)) {
-                        $query->where('branch_id', $u->branch_id);
+                    if ($u && $isFc && $u->effectiveBranchId()) {
+                        $query->where('branch_id', $u->effectiveBranchId());
                     }
 
                     $query->orderBy('name');
@@ -235,8 +235,8 @@ class BriefingSessionResource extends Resource
 
                         $depotId = Depot::query()
                             ->when(
-                                $u && $isFc && isset($u->branch_id),
-                                fn($query) => $query->where('branch_id', $u->branch_id)
+                                $u && $isFc && $u->effectiveBranchId(),
+                                fn($query) => $query->where('branch_id', $u->effectiveBranchId())
                             )
                             ->orderBy('name')
                             ->value('id');
