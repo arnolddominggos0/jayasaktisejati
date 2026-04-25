@@ -66,9 +66,12 @@ class User extends Authenticatable implements FilamentUser
     protected static function booted(): void
     {
         static::saving(function (User $user) {
-            // Guard: if scope_unit_type/scope_unit_id are being set, they must be consistent
-            // with the target depot/pool coordinator assignment.
-            if ($user->isDirty(['scope_unit_type', 'scope_unit_id'])) {
+            // Guard: if any canonical scope field changes, validate consistency.
+            // scope_unit_type/scope_unit_id must point to a unit that lists this user
+            // as coordinator, and scope_branch_id must match that unit's branch.
+            $scopeDirty = $user->isDirty(['scope_branch_id', 'scope_unit_type', 'scope_unit_id']);
+
+            if ($scopeDirty) {
                 $type = $user->scope_unit_type;
                 $unitId = $user->scope_unit_id;
 
@@ -89,11 +92,11 @@ class User extends Authenticatable implements FilamentUser
                     }
                 }
 
-                // If clearing scope fields, ensure we are not leaving an orphaned assignment
-                // (Depot/Pool still pointing to this user). This is allowed intentionally
-                // because the canonical source of truth for WHO is coordinator is the
-                // depot/pool table; the user scope fields are derived. Clearing them here
-                // is only a soft desync that Slice 2 will resolve with a full refactor.
+                // If scope_unit_id/type are cleared but scope_branch_id remains,
+                // that is acceptable because the canonical source of truth for WHO
+                // is coordinator is the depot/pool table. The user scope fields are
+                // derived. Clearing them here is only a soft desync resolved by
+                // the backfill / Slice-2 middleware canonical-scope guard.
             }
         });
     }

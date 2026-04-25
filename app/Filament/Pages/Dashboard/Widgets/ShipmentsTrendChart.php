@@ -21,8 +21,8 @@ class ShipmentsTrendChart extends ChartWidget
         $scope = function ($q) {
             $u = auth_user();
             if (! $u || (method_exists($u, 'hasRole') && $u->hasRole('super_admin'))) return;
-            if (Schema::hasColumn('shipments', 'branch_id') && $u->branch_id) {
-                $q->where('branch_id', $u->branch_id);
+            if (Schema::hasColumn('shipments', 'branch_id') && $u->effectiveBranchId()) {
+                $q->where('branch_id', $u->effectiveBranchId());
             } elseif (Schema::hasColumn('shipments', 'depot_id') && $u->depot_id) {
                 $q->where('depot_id', $u->depot_id);
             }

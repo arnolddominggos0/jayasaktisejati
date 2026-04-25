@@ -59,6 +59,8 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'branch_id' => $user->branch_id,
+                'scope_branch_id' => $user->scope_branch_id,
+                'effective_branch_id' => $user->effectiveBranchId(),
             ],
             'branch' => $user->branch ? [
                 'id' => $user->branch->id,
@@ -100,6 +102,8 @@ class AuthController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'branch_id' => $user->branch_id,
+                'scope_branch_id' => $user->scope_branch_id,
+                'effective_branch_id' => $user->effectiveBranchId(),
             ],
             'branch' => $user->branch ? [
                 'id' => $user->branch->id,
@@ -126,6 +130,8 @@ class AuthController extends Controller
                 'name' => $u->name,
                 'email' => $u->email,
                 'branch_id' => $u->branch_id,
+                'scope_branch_id' => $u->scope_branch_id,
+                'effective_branch_id' => $u->effectiveBranchId(),
             ],
             'branch' => $u->branch ? [
                 'id' => $u->branch->id,

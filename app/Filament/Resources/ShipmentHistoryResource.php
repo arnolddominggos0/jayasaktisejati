@@ -55,8 +55,8 @@ class ShipmentHistoryResource extends Resource
         }
 
         // Check branch ownership
-        if ($user->branch_id && $record->branch_id !== null) {
-            return (int) $record->branch_id === (int) $user->branch_id;
+        if ($user->effectiveBranchId() && $record->branch_id !== null) {
+            return (int) $record->branch_id === (int) $user->effectiveBranchId();
         }
 
         // Field coordinator check
@@ -90,9 +90,9 @@ class ShipmentHistoryResource extends Resource
         $user = Filament::auth()->user();
 
         if (!$user?->hasRole('super_admin')) {
-            if ($user?->branch_id) {
+            if ($user?->effectiveBranchId()) {
                 $q->where(function ($w) use ($user) {
-                    $w->where('branch_id', $user->branch_id)->orWhereNull('branch_id');
+                    $w->where('branch_id', $user->effectiveBranchId())->orWhereNull('branch_id');
                 });
             }
 

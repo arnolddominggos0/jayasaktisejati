@@ -85,7 +85,7 @@ class ShipmentResource extends Resource
             return app('currentBranchId');
         }
 
-        return Filament::auth()->user()?->branch_id;
+        return Filament::auth()->user()?->effectiveBranchId();
     }
 
     public static function getEloquentQuery(): Builder
@@ -1085,9 +1085,9 @@ class ShipmentResource extends Resource
 
                 if (! ($user && method_exists($user, 'hasRole') && $user->hasRole('super_admin'))) {
 
-                    if ($user?->branch_id) {
+                    if ($user?->effectiveBranchId()) {
                         $query->where(function ($w) use ($user) {
-                            $w->where('branch_id', $user->branch_id)
+                            $w->where('branch_id', $user->effectiveBranchId())
                                 ->orWhereNull('branch_id');
                         });
                     }
@@ -1709,8 +1709,8 @@ class ShipmentResource extends Resource
         }
 
         // Check branch ownership
-        if ($user->branch_id && $record->branch_id !== null) {
-            if ((int) $record->branch_id !== (int) $user->branch_id) {
+        if ($user->effectiveBranchId() && $record->branch_id !== null) {
+            if ((int) $record->branch_id !== (int) $user->effectiveBranchId()) {
                 return false;
             }
         }

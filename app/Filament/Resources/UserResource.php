@@ -46,8 +46,8 @@ class UserResource extends Resource
 
         if ($u?->hasRole('super_admin')) return $q;
 
-        if ($u?->hasRole('office_admin') && $u->branch_id) {
-            return $q->where('branch_id', $u->branch_id);
+        if ($u?->hasRole('office_admin') && $u->effectiveBranchId()) {
+            return $q->where('branch_id', $u->effectiveBranchId());
         }
 
         return $q->whereRaw('1=0');
@@ -204,8 +204,8 @@ class UserResource extends Resource
         $q = User::query();
         $u = auth_user();
 
-        if ($u?->hasRole('office_admin') && $u->branch_id) {
-            $q->where('branch_id', $u->branch_id);
+        if ($u?->hasRole('office_admin') && $u->effectiveBranchId()) {
+            $q->where('branch_id', $u->effectiveBranchId());
         }
 
         return (string) $q->count();
