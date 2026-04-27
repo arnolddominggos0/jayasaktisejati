@@ -29,7 +29,7 @@ class DashboardController extends Controller
             $shipmentQuery = Shipment::query();
             
             if (!$request->user()->hasRole('super_admin')) {
-                $shipmentQuery->where('branch_id', $request->user()->effectiveBranchId());
+                $shipmentQuery->where(fn ($w) => $w->where('branch_id', $request->user()->effectiveBranchId())->orWhereNull('branch_id'));
             }
 
             return [
@@ -58,7 +58,7 @@ class DashboardController extends Controller
         $query = Shipment::query();
         
         if (!$request->user()->hasRole('super_admin')) {
-            $query->where('branch_id', $request->user()->effectiveBranchId());
+            $query->where(fn ($w) => $w->where('branch_id', $request->user()->effectiveBranchId())->orWhereNull('branch_id'));
         }
 
         $stats = $query->select('status', DB::raw('count(*) as count'))
@@ -76,7 +76,7 @@ class DashboardController extends Controller
         $query = Shipment::query()->with(['customer', 'receiver']);
         
         if (!$request->user()->hasRole('super_admin')) {
-            $query->where('branch_id', $request->user()->effectiveBranchId());
+            $query->where(fn ($w) => $w->where('branch_id', $request->user()->effectiveBranchId())->orWhereNull('branch_id'));
         }
 
         $shipments = $query->latest()->limit(10)->get();

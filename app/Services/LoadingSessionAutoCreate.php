@@ -135,7 +135,7 @@ class LoadingSessionAutoCreate
         }
 
         return $shipment->branch_id
-            ? User::where('branch_id', $shipment->branch_id)
+            ? User::where(fn ($q) => $q->where('scope_branch_id', $shipment->branch_id)->orWhere(fn ($q2) => $q2->whereNull('scope_branch_id')->where('branch_id', $shipment->branch_id)))
                 ->whereHas('roles', fn ($q) => $q->where('name', 'field_coordinator'))
                 ->value('id')
             : null;

@@ -173,7 +173,7 @@ class CanonicalScopeModelTest extends TestCase
 
         $fc = User::factory()->create([
             'branch_id' => $branch->id,
-            'scope_branch_id' => $branch->id,
+            'scope_branch_id' => null,
             'scope_unit_id' => null,
             'scope_unit_type' => null,
         ]);
@@ -189,7 +189,8 @@ class CanonicalScopeModelTest extends TestCase
 
         $this->actingAs($fc);
 
-        // Should pass because scope_* are null (not yet backfilled), so guard is skipped.
+        // All scope_* are null (not yet backfilled), so the canonical guard is skipped
+        // and the middleware falls through to the live depot/pool assignment.
         $response = $this->get(route('filament.fc.pages.dashboard'));
         $response->assertSuccessful();
     }

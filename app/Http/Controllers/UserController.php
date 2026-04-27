@@ -28,7 +28,7 @@ class UserController extends Controller
             if (empty($currentBranchId)) {
                 return response()->json(['message' => 'Branch scope not set'], 422);
             }
-            $q->where('branch_id', $currentBranchId);
+            $q->where(fn ($w) => $w->where('scope_branch_id', $currentBranchId)->orWhere(fn ($w2) => $w2->whereNull('scope_branch_id')->where('branch_id', $currentBranchId)));
         } else {
             if ($request->filled('branch_id')) {
                 $q->where('branch_id', $request->integer('branch_id'));
@@ -37,10 +37,10 @@ class UserController extends Controller
 
         $search = $request->input('search', $request->input('q'));
         if (! empty($search)) {
-            $term = '%' . str_replace('%', '\\%', $search) . '%';
+            $term = '%'.str_replace('%', '\\%', $search).'%';
             $q->where(function ($w) use ($term) {
                 $w->where(DB::raw('LOWER(name)'), 'LIKE', strtolower($term))
-                  ->orWhere(DB::raw('LOWER(email)'), 'LIKE', strtolower($term));
+                    ->orWhere(DB::raw('LOWER(email)'), 'LIKE', strtolower($term));
             });
         }
 
@@ -48,21 +48,21 @@ class UserController extends Controller
             $q->role($role);
         }
 
-        $sortBy  = $request->sortBy();
+        $sortBy = $request->sortBy();
         $sortDir = $request->sortDir();
         $q->orderBy($sortBy, $sortDir)
-          ->orderBy('id', 'asc');
+            ->orderBy('id', 'asc');
 
-        $perPage   = $request->perPage();
+        $perPage = $request->perPage();
         $paginator = $q->paginate($perPage)->appends($request->validated());
 
         return UserApiResource::collection($paginator)->additional([
             'context' => [
-                'sort_by'  => $sortBy,
+                'sort_by' => $sortBy,
                 'sort_dir' => $sortDir,
-                'filters'  => [
-                    'search'    => $search,
-                    'role'      => $request->input('role'),
+                'filters' => [
+                    'search' => $search,
+                    'role' => $request->input('role'),
                     'branch_id' => $request->input('branch_id'),
                 ],
             ],

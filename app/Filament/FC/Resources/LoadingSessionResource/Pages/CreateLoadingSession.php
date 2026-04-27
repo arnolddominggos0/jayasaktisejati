@@ -31,7 +31,7 @@ class CreateLoadingSession extends CreateRecord
 
         // Set branch
         if (empty($data['branch_id'])) {
-            $data['branch_id'] = $user->effectiveBranchId() ?? app('scope.branch_id') ?? null;
+            $data['branch_id'] = $user->effectiveBranchId() ?? (app()->bound('scope.branch_id') ? app('scope.branch_id') : null);
         }
 
         // Set initial status

@@ -15,7 +15,7 @@ class NotifyAdminOnShipmentUpdate
         $shipment = $event->shipment;
 
         $recipients = User::role(['super_admin', 'office_admin'])
-            ->when($shipment->branch_id, fn($q) => $q->where('branch_id', $shipment->branch_id))
+            ->when($shipment->branch_id, fn($q) => $q->where(fn ($w) => $w->where('scope_branch_id', $shipment->branch_id)->orWhere(fn ($w2) => $w2->whereNull('scope_branch_id')->where('branch_id', $shipment->branch_id))))
             ->get();
 
         if ($recipients->isEmpty()) {

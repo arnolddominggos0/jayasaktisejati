@@ -181,7 +181,7 @@ class SendShipmentEtaNotifications extends Command
 
         if ($shipment->branch_id) {
             $branchUsers = User::query()
-                ->where('port_id', $shipment->branch_id)
+                ->where('branch_id', $shipment->branch_id)
                 ->whereNotNull('email')
                 ->where('email', '!=', '')
                 ->whereNull('customer_id')

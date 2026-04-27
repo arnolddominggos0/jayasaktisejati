@@ -22,7 +22,7 @@ class FcKpiStats extends Widget
 
         return Shipment::query()
             ->where('mode', 'sea')
-            ->when($branchId, fn (Builder $query) => $query->where('branch_id', $branchId))
+            ->when($branchId, fn (Builder $query) => $query->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id')))
             ->when($depotId, fn (Builder $query) => $query->where(function ($w) use ($depotId, $u) {
                 $w->where('assigned_depot_id', $depotId)
                     ->orWhere('coordinator_id', $u?->id);

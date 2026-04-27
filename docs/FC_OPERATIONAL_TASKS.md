@@ -1,6 +1,12 @@
+@@ -52,57 +52,92 @@ ### Task FC-03 — Detail shipment FC
+
+-0
+
 # FC Operational Tasks — Step by Step
 
 Dokumen ini memecah pekerjaan role **Field Coordinator (FC)** menjadi task kecil berurutan agar bisa dieksekusi satu per satu.
+
+> Dokumen PRD khusus FC untuk validasi ekspektasi tugas tersedia di `docs/PRD_FC.md`.
 
 ## 1) Scope FC
 
@@ -23,31 +29,6 @@ Refer to @docs/PRD.md and @docs/ALIGNMENT_MATRIX.md.
 Implement FC-01 hardening for field coordinator data access scope.
 Do not modify land shipment logic.
 Return patch + test commands.
-```
-
-### Task FC-02 — Hardening form update tracking
-Target:
-- Validasi note/checksheet/attachment/override_reason konsisten.
-- Mencegah transisi status yang tidak valid.
-
-Prompt:
-```txt
-Implement FC-02 tracking workflow hardening in FC shipment tracking form.
-Focus on note/checksheet/attachment/override_reason validations.
-Do not touch unrelated modules.
-Return patch + risk notes + test commands.
-```
-
-### Task FC-03 — Detail shipment FC
-Target:
-- Halaman detail menampilkan data penting lapangan (route, service, ETD/ETA, timeline).
-- Data tampil stabil meski ada field null.
-
-Prompt:
-```txt
-Implement FC-03 detail shipment improvements for field coordinator usability.
-Keep scope only FC ViewShipment page/components.
-Return patch + manual verification checklist.
 ```
 
 ### Task FC-04 — Dashboard FC minimal actionable
@@ -74,12 +55,47 @@ Enforce role policy and mode sea guard.
 Return patch + auth test commands.
 ```
 
+
+### Setelah FC-05: apakah ganti tujuan?
+
+Tidak ganti tujuan besar. Setelah FC-05, jalankan **stabilisasi + transisi scope** dulu sebelum loncat ke inisiatif baru.
+
+Urutan yang disarankan:
+
+1. **FC-05A — Stabilization gate (wajib)**
+   - Tutup bug blocker dari FC-01 s/d FC-05.
+   - Jalankan lint + test gate.
+   - Verifikasi policy/scope pada data existing.
+
+2. **FC-05B — Client migration gate (wajib)**
+   - Client read path pindah ke `effective_branch_id`.
+   - `branch_id` tetap dikirim sebagai fallback sementara (legacy).
+   - Monitor error 4xx/5xx dan mismatch scope selama masa transisi.
+
+3. **FC-06 — AppSheet hardening lanjutan (opsional setelah gate hijau)**
+   - Fokus reliability ingest + idempotency + observability.
+   - Tidak menambah fitur besar sebelum gate FC-05A/05B hijau.
+
+4. **FC-07 — UX/performance polish (opsional)**
+   - Perbaikan UX FC briefing/tracking berdasarkan feedback lapangan.
+   - Query/index tuning jika ada bottleneck nyata.
+
+Rule sederhana sebelum lanjut jauh:
+- Jika FC-05A/05B belum hijau, **jangan** mulai FC-06/FC-07.
+- Jika ada 500 di flow FC, rollback ke stabilization checklist dulu.
+
 ## 3) Definition of Done per Task
 
 - Scope tidak melebar dari task aktif.
 - Test minimal dijalankan.
 - Tidak mengubah logic shipment land.
 - Ringkasan perubahan + risiko tercatat.
+
+## 3.1) Prompt siap pakai dari hasil terakhir
+
+Kalau mau lanjut **prompting-only** dari status implementasi terakhir (Fixes 6–9), pakai:
+- `docs/FC_NEXT_PROMPT.md`
+- Eksekusi dilakukan di **OpenCode CLI** (plan + build di CLI), bukan patch langsung di chat.
 
 ## 4) Suggested Commands
 
@@ -106,61 +122,3 @@ Tugas FC yang harus tertangkap di sistem:
 
 3. **Checkpoint unit saat loading/unloading**
    - Catat checkpoint di fase loading.
-   - Catat checkpoint di fase unloading.
-   - Simpan jam, lokasi, petugas, dan catatan anomali.
-
-4. **Checksheet kendaraan lintas titik**
-   - PDC.
-   - Depo Asal (saat status handover).
-   - Depo Tujuan.
-   - Supir (saat handover ke supir/self-drive).
-
-## 6) Mapping Proses ke Status Shipment
-
-- **Handover** → checksheet awal unit + validasi APD + kesiapan MP.
-- **Loading** → checkpoint unit loading + update catatan kondisi.
-- **Vessel/Transit** → monitoring event & exception.
-- **Unloading** → checkpoint unit unloading + checksheet tujuan.
-- **Delivery/Handover Supir** → checksheet serah-terima ke supir + bukti final.
-
-## 7) Integrasi ke AppSheet (Rencana Implementasi)
-
-Tujuan integrasi: memudahkan input lapangan via mobile dengan form terstruktur, offline-friendly, dan sinkron ke sistem inti.
-
-### 7.1 Modul Form AppSheet
-
-1. **Form Briefing Harian**
-   - Tanggal, lokasi, tim, jumlah hadir, jumlah fit to work, kecukupan MP, catatan.
-
-2. **Form Cek APD**
-   - Personel, checklist item APD, status, bukti foto, catatan.
-
-3. **Form Checkpoint Unit**
-   - Shipment code, status (loading/unloading), timestamp, lokasi, kondisi, foto.
-
-4. **Form Checksheet Kendaraan**
-   - Data kendaraan (model/no rangka/no mesin/warna/registrasi/cabang).
-   - Checklist kondisi per area (eksterior, interior, perlengkapan, dokumen, aksesori).
-   - Sign-off pihak terkait (PDC, Depo Asal, Depo Tujuan, Supir, Terima Cabang).
-
-### 7.2 Integrasi Data ke Backend
-
-- AppSheet menyimpan record ke tabel staging/endpoint API.
-- Backend melakukan validasi role/scope + validasi status shipment.
-- Data tervalidasi di-attach ke `ShipmentTrack` / entity checksheet terkait.
-- Audit log disimpan untuk setiap submit/update.
-
-### 7.3 Guardrails Integrasi
-
-- Scope user tetap branch/depot-based.
-- Form hanya aktif untuk status shipment yang relevan.
-- Perubahan checksheet setelah status final dibatasi (lock policy).
-
-## 8) Tambahan Definition of Done untuk FC
-
-Task FC dianggap selesai jika:
-
-- Briefing, APD, checkpoint, dan checksheet kendaraan sudah tercatat di flow status terkait.
-- Bukti lapangan (foto/catatan/sign-off) tersimpan dan bisa diaudit.
-- Integrasi AppSheet tidak melanggar role + branch/depot scope.
-- Tim FC dapat submit data lapangan dengan effort minimal (mobile-first).

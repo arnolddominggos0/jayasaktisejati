@@ -32,7 +32,7 @@ class FcAttentionList extends BaseWidget
                     ])
                     ->where('mode', 'sea')
                     ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value])
-                    ->when($branchId, fn (Builder $q) => $q->where('branch_id', $branchId))
+                    ->when($branchId, fn (Builder $q) => $q->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id')))
                     ->when($depotId, fn (Builder $q) => $q->where(function ($w) use ($depotId, $u) {
                         $w->where('assigned_depot_id', $depotId)
                             ->orWhere('coordinator_id', $u?->id);

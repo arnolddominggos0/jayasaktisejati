@@ -37,7 +37,7 @@ class FcRecentActivities extends BaseWidget
                     $s->where('mode', 'sea');
 
                     if ($branchId) {
-                        $s->where('branch_id', $branchId);
+                        $s->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id'));
                     }
 
                     if ($depotId) {
