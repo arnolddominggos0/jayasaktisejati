@@ -79,7 +79,6 @@ class AppSheetService
             }
 
             return ['success' => true, 'data' => $result];
-
         } catch (Exception $e) {
             $log->markAsFailed($e->getMessage());
 
@@ -154,28 +153,66 @@ class AppSheetService
     protected function syncBriefingPpeItem(array $data, string $operation, ?int $submittedByUserId = null)
     {
         $mappedData = $this->mapFields('briefing_attendance_ppe_items', $data, $submittedByUserId);
-        $attendanceId = $mappedData['attendance_id'] ?? null;
-        $ppeType = $mappedData['ppe_type'] ?? null;
 
-        if (! $attendanceId) {
-            throw new Exception('Attendance ID wajib diisi untuk PPE Item');
+        $attendanceId = $mappedData['attendance_id']
+            ?? $data['attendance_id']
+            ?? null;
+
+        if (!$attendanceId) {
+            throw new \Exception('Attendance ID wajib diisi untuk PPE Item');
         }
 
-        BriefingAttendance::where('id', $attendanceId)->exists()
-            || throw new Exception("Briefing Attendance ID {$attendanceId} tidak ditemukan");
+        $attendance = BriefingAttendance::find($attendanceId);
+
+        if (!$attendance) {
+            throw new \Exception("Attendance ID {$attendanceId} tidak ditemukan");
+        }
+
+        $ppeType = $mappedData['ppe_type'] ?? $data['ppe_type'] ?? null;
+        $status  = $mappedData['status'] ?? $data['status'] ?? null;
+        $catatan = $mappedData['catatan'] ?? $data['catatan'] ?? null;
+
+        if (!$ppeType) {
+            throw new \Exception('PPE Type wajib diisi');
+        }
+
+        if (!$status) {
+            throw new \Exception('Status wajib diisi');
+        }
+
+        $finalData = [
+            'attendance_id' => $attendanceId,
+            'ppe_type'      => $ppeType,
+            'status'        => $status,
+            'catatan'       => $catatan,
+        ];
 
         return match ($operation) {
-            'create' => BriefingAttendancePpeItem::firstOrCreate(
-                array_filter(['attendance_id' => $attendanceId, 'ppe_type' => $ppeType]),
-                $mappedData
-            ),
+            'create' => BriefingAttendancePpeItem::create($finalData),
+
             'update' => BriefingAttendancePpeItem::updateOrCreate(
-                array_filter(['attendance_id' => $attendanceId, 'ppe_type' => $ppeType]),
-                $mappedData
+                [
+                    'attendance_id' => $attendanceId,
+                    'ppe_type'      => $ppeType,
+                ],
+                $finalData
             ),
-            'delete' => BriefingAttendancePpeItem::where('id', $mappedData['id'] ?? 0)->delete(),
-            default => throw new Exception("Unknown operation: {$operation}"),
+
+            'delete' => $this->deletePpeItem($mappedData, $data),
+
+            default => throw new \Exception("Unknown operation: {$operation}"),
         };
+    }
+
+    protected function deletePpeItem(array $mappedData, array $data)
+    {
+        $id = $mappedData['id'] ?? $data['id'] ?? null;
+
+        if (!$id) {
+            throw new \Exception('ID wajib diisi untuk delete PPE item');
+        }
+
+        return BriefingAttendancePpeItem::where('id', $id)->delete();
     }
 
     protected function syncBriefingChecklist(array $data, string $operation, ?int $submittedByUserId = null)
@@ -497,8 +534,8 @@ class AppSheetService
 
         if (! in_array($shipment->status, ShipmentStatus::inProgress(), true)) {
             throw new DomainException(
-                'Form tidak dapat disubmit untuk shipment dengan status "' . $shipment->status->label() . '".')
-            ;
+                'Form tidak dapat disubmit untuk shipment dengan status "' . $shipment->status->label() . '".'
+            );
         }
     }
 
