@@ -37,29 +37,40 @@ class AppSheetService
     }
 
    public function syncFromWebhook(string $tableName, array $data, string $operation = 'create', ?int $submittedByUserId = null)
-   {
+{
+    $root = $data;
+
     while (isset($data['data']) && is_array($data['data'])) {
         $data = $data['data'];
     }
 
-    $handler = $this->registry->get($tableName);
+    $data = array_merge($data, [
+        'attendance_id' => $root['attendance_id'] ?? $data['attendance_id'] ?? null
+    ]);
 
-    $prepared = method_exists($handler, 'preNormalize')
-        ? $handler->preNormalize($data)
-        : $data;
-
-    $mappedData = array_merge(
-        $prepared,
-        $this->normalizer->mapFields($tableName, $prepared, $submittedByUserId)
-    );
-
-    $result = $handler->sync($mappedData, $prepared, $operation, $submittedByUserId);
-
-    if (method_exists($handler, 'afterSync')) {
-        $handler->afterSync($result);
+    if ($tableName === 'briefing_attendance_ppe_items') {
+        return $this->syncBriefingPpeItem($data, $operation, $submittedByUserId);
     }
 
-    return ['success' => true, 'data' => $result];
+    $mappedData = $this->mapFields($tableName, $data, $submittedByUserId);
+
+    if ($submittedByUserId !== null) {
+        $this->validateFcScope($tableName, $mappedData, $submittedByUserId);
+    }
+
+    $this->validateShipmentStatusGuard($tableName, $mappedData);
+
+    return match ($tableName) {
+        'briefing_sessions' => $this->syncBriefingSession($data, $operation, $submittedByUserId),
+        'briefing_attendances' => $this->syncBriefingAttendance($data, $operation, $submittedByUserId),
+        'briefing_checklists' => $this->syncBriefingChecklist($data, $operation, $submittedByUserId),
+        'loading_sessions' => $this->syncLoadingSession($data, $operation, $submittedByUserId),
+        'rack_container_checks' => $this->syncRackContainerCheck($data, $operation, $submittedByUserId),
+        'equipment_checks' => $this->syncEquipmentCheck($data, $operation, $submittedByUserId),
+        'unit_checks' => $this->syncUnitCheck($data, $operation, $submittedByUserId),
+        'loading_findings' => $this->syncLoadingFinding($data, $operation, $submittedByUserId),
+        default => throw new Exception("Unknown table: {$tableName}"),
+    };
 }
 
     protected function syncBriefingAttendance(array $data, string $operation)
@@ -91,81 +102,72 @@ class AppSheetService
     }
 
     protected function syncBriefingPpeItem(array $data, string $operation, ?int $submittedByUserId = null)
-   {
-	Log::info('MASUK PPE FUNCTION', $data);
+{
+    Log::info('MASUK PPE FUNCTION', $data);
 
     while (isset($data['data']) && is_array($data['data'])) {
         $data = $data['data'];
     }
 
-    // 🔥 AMBIL LANGSUNG TANPA MAPFIELDS
     $attendanceId = $data['attendance_id'] ?? null;
-    $ppeType = $data['ppe_type'] ?? null;
-    $status = $data['status'] ?? null;
-    $catatan = $data['catatan'] ?? null;
+$ppeType = $data['ppe_type'] ?? null;
+$conditionRaw = $data['condition'] ?? $data['status'] ?? null;
 
-    if (!$attendanceId) {
-        throw new \Exception('DEBUG: attendance_id NULL');
-    }
+$condition = match ($conditionRaw) {
+    'OK' => 'baik',
+    'NG' => 'rusak',
+    default => null
+};
 
-    $attendance = \App\Models\BriefingAttendance::find($attendanceId);
+$remark = $data['remark'] ?? null;
 
-    if (!$attendance) {
-        throw new \Exception("DEBUG: attendance {$attendanceId} NOT FOUND");
-    }
+if (!$attendanceId) {
+    throw new \Exception('DEBUG: attendance_id NULL');
+}
 
-    if (!$ppeType) {
-        throw new \Exception('DEBUG: ppe_type NULL');
-    }
+$attendance = \App\Models\BriefingAttendance::find($attendanceId);
 
-    if (!$status) {
-        throw new \Exception('DEBUG: status NULL');
-    }
+if (!$attendance) {
+    throw new \Exception("DEBUG: attendance {$attendanceId} NOT FOUND");
+}
 
-    return match ($operation) {
-        'create' => \App\Models\BriefingAttendancePpeItem::create([
+if (!$ppeType) {
+    throw new \Exception('DEBUG: ppe_type NULL');
+}
+
+if (!$condition) {
+    throw new \Exception('Invalid condition: ' . $conditionRaw);
+}
+
+    if ($operation === 'create') {
+        return \App\Models\BriefingAttendancePpeItem::create([
             'attendance_id' => $attendanceId,
             'ppe_type' => $ppeType,
-            'status' => $status,
-            'catatan' => $catatan,
-        ]),
+            'condition' => $condition,
+            'remark' => $remark,
+        ]);
+    }
 
-        'update' => \App\Models\BriefingAttendancePpeItem::updateOrCreate(
+    if ($operation === 'update') {
+        return \App\Models\BriefingAttendancePpeItem::updateOrCreate(
             [
                 'attendance_id' => $attendanceId,
                 'ppe_type' => $ppeType,
             ],
             [
-                'status' => $status,
-                'catatan' => $catatan,
+                'condition' => $condition,
+                'remark' => $remark,
             ]
-        ),
+        );
+    }
 
-        'delete' => \App\Models\BriefingAttendancePpeItem::where('id', $data['id'] ?? 0)->delete(),
+    if ($operation === 'delete') {
+        return \App\Models\BriefingAttendancePpeItem::where('id', $data['id'] ?? 0)->delete();
+    }
 
-        default => throw new \Exception("Unknown operation: {$operation}"),
-    };
+    throw new \Exception("Unknown operation: {$operation}");
 }
 
-
-
-        $mappedData = $this->mapFields('briefing_attendance_ppe_items', $data);
-        $attendanceId = $mappedData['attendance_id'] ?? null;
-        $ppeType = $mappedData['ppe_type'] ?? null;
-
-        BriefingAttendance::where('id', $attendanceId)->exists()
-            || throw new Exception("Briefing Attendance ID {$attendanceId} tidak ditemukan");
-
-        return match ($operation) {
-            'create' => BriefingAttendancePpeItem::firstOrCreate(
-                array_filter(['attendance_id' => $attendanceId, 'ppe_type' => $ppeType]),
-                $mappedData
-            ),
-            'update' => BriefingAttendancePpeItem::updateOrCreate(
-                array_filter(['attendance_id' => $attendanceId, 'ppe_type' => $ppeType]),
-                $mappedData
-            ),
-            'delete' => BriefingAttendancePpeItem::where('id', $
 
     protected function syncBriefingChecklist(array $data, string $operation)
     {
