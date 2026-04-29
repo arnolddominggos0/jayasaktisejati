@@ -57,7 +57,6 @@ class VesselCheckCaseResource extends Resource
     {
         return [
             'index' => Pages\ListVesselCheckCases::route('/'),
-            'view'  => Pages\ViewVesselCheckCase::route('/{record}'),
         ];
     }
 }
