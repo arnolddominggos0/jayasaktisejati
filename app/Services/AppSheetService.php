@@ -36,49 +36,31 @@ class AppSheetService
         $this->loggingEnabled = config('appsheet.logging_enabled', true);
     }
 
-    public function syncFromWebhook(string $tableName, array $data, string $operation = 'create')
-    {
-        $log = $this->createSyncLog('webhook', $tableName, $data['id'] ?? null, $operation, $data);
-
-        try {
-            $result = match ($tableName) {
-                'briefing_attendances' => $this->syncBriefingAttendance($data, $operation),
-                'briefing_attendance_ppe_items' => $this->syncBriefingPpeItem($data, $operation),
-                'briefing_checklists' => $this->syncBriefingChecklist($data, $operation),
-                'loading_sessions' => $this->syncLoadingSession($data, $operation),
-                'rack_container_checks' => $this->syncRackContainerCheck($data, $operation),
-                'equipment_checks' => $this->syncEquipmentCheck($data, $operation),
-                'unit_checks' => $this->syncUnitCheck($data, $operation),
-                'loading_findings' => $this->syncLoadingFinding($data, $operation),
-                default => throw new Exception("Unknown table: {$tableName}"),
-            };
-
-            $afterSync = config("appsheet.tables.{$tableName}.after_sync");
-            if ($afterSync === 'recalculate_briefing_session') {
-                $this->recalculateBriefingSession($tableName, $result);
-            }
-
-            $log->markAsSuccess(['result' => $result]);
-
-            if ($this->loggingEnabled) {
-                Log::channel('appsheet')->info("Sync successful: {$tableName}", ['record_id' => $data['id'] ?? null]);
-            }
-
-            return ['success' => true, 'data' => $result];
-
-        } catch (Exception $e) {
-            $log->markAsFailed($e->getMessage());
-
-            if ($this->loggingEnabled) {
-                Log::channel('appsheet')->error("Sync failed: {$tableName}", [
-                    'error' => $e->getMessage(),
-                    'data' => $data,
-                ]);
-            }
-
-            throw $e;
-        }
+   public function syncFromWebhook(string $tableName, array $data, string $operation = 'create', ?int $submittedByUserId = null)
+{
+    while (isset($data['data']) && is_array($data['data'])) {
+        $data = $data['data'];
     }
+
+    $handler = $this->registry->get($tableName);
+
+    $prepared = method_exists($handler, 'preNormalize')
+        ? $handler->preNormalize($data)
+        : $data;
+
+    $mappedData = array_merge(
+        $prepared,
+        $this->normalizer->mapFields($tableName, $prepared, $submittedByUserId)
+    );
+
+    $result = $handler->sync($mappedData, $prepared, $operation, $submittedByUserId);
+
+    if (method_exists($handler, 'afterSync')) {
+        $handler->afterSync($result);
+    }
+
+    return ['success' => true, 'data' => $result];
+}
 
     protected function syncBriefingAttendance(array $data, string $operation)
     {
@@ -113,10 +95,6 @@ class AppSheetService
         $mappedData = $this->mapFields('briefing_attendance_ppe_items', $data);
         $attendanceId = $mappedData['attendance_id'] ?? null;
         $ppeType = $mappedData['ppe_type'] ?? null;
-
-        if (! $attendanceId) {
-            throw new Exception('Attendance ID wajib diisi untuk PPE Item');
-        }
 
         BriefingAttendance::where('id', $attendanceId)->exists()
             || throw new Exception("Briefing Attendance ID {$attendanceId} tidak ditemukan");
