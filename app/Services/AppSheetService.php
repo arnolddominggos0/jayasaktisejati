@@ -37,7 +37,7 @@ class AppSheetService
     }
 
    public function syncFromWebhook(string $tableName, array $data, string $operation = 'create', ?int $submittedByUserId = null)
-{
+   {
     while (isset($data['data']) && is_array($data['data'])) {
         $data = $data['data'];
     }
@@ -90,8 +90,65 @@ class AppSheetService
         };
     }
 
-    protected function syncBriefingPpeItem(array $data, string $operation)
-    {
+    protected function syncBriefingPpeItem(array $data, string $operation, ?int $submittedByUserId = null)
+   {
+	Log::info('MASUK PPE FUNCTION', $data);
+
+    while (isset($data['data']) && is_array($data['data'])) {
+        $data = $data['data'];
+    }
+
+    // 🔥 AMBIL LANGSUNG TANPA MAPFIELDS
+    $attendanceId = $data['attendance_id'] ?? null;
+    $ppeType = $data['ppe_type'] ?? null;
+    $status = $data['status'] ?? null;
+    $catatan = $data['catatan'] ?? null;
+
+    if (!$attendanceId) {
+        throw new \Exception('DEBUG: attendance_id NULL');
+    }
+
+    $attendance = \App\Models\BriefingAttendance::find($attendanceId);
+
+    if (!$attendance) {
+        throw new \Exception("DEBUG: attendance {$attendanceId} NOT FOUND");
+    }
+
+    if (!$ppeType) {
+        throw new \Exception('DEBUG: ppe_type NULL');
+    }
+
+    if (!$status) {
+        throw new \Exception('DEBUG: status NULL');
+    }
+
+    return match ($operation) {
+        'create' => \App\Models\BriefingAttendancePpeItem::create([
+            'attendance_id' => $attendanceId,
+            'ppe_type' => $ppeType,
+            'status' => $status,
+            'catatan' => $catatan,
+        ]),
+
+        'update' => \App\Models\BriefingAttendancePpeItem::updateOrCreate(
+            [
+                'attendance_id' => $attendanceId,
+                'ppe_type' => $ppeType,
+            ],
+            [
+                'status' => $status,
+                'catatan' => $catatan,
+            ]
+        ),
+
+        'delete' => \App\Models\BriefingAttendancePpeItem::where('id', $data['id'] ?? 0)->delete(),
+
+        default => throw new \Exception("Unknown operation: {$operation}"),
+    };
+}
+
+
+
         $mappedData = $this->mapFields('briefing_attendance_ppe_items', $data);
         $attendanceId = $mappedData['attendance_id'] ?? null;
         $ppeType = $mappedData['ppe_type'] ?? null;
@@ -108,10 +165,7 @@ class AppSheetService
                 array_filter(['attendance_id' => $attendanceId, 'ppe_type' => $ppeType]),
                 $mappedData
             ),
-            'delete' => BriefingAttendancePpeItem::where('id', $mappedData['id'] ?? 0)->delete(),
-            default => throw new Exception("Unknown operation: {$operation}"),
-        };
-    }
+            'delete' => BriefingAttendancePpeItem::where('id', $
 
     protected function syncBriefingChecklist(array $data, string $operation)
     {
