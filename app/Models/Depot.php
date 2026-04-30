@@ -26,6 +26,11 @@ class Depot extends Model
     protected static function booted(): void
     {
         static::saving(function (Depot $m) {
+
+            //skip validation if seeding
+            if (app()->runningInConsole()) {
+                return;
+            }
             if ($m->mode === 'sea_freight') {
                 $m->mode = 'sea';
             }
