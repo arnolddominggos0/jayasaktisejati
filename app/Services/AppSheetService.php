@@ -97,6 +97,7 @@ class AppSheetService
             throw $e;
         }
     }
+
     protected function syncBriefingSession(array $data, string $operation, ?int $submittedByUserId = null)
     {
         $mappedData = $this->mapFields('briefing_sessions', $data, $submittedByUserId);
@@ -157,45 +158,38 @@ class AppSheetService
     {
         Log::info('MASUK PPE FUNCTION', $data);
 
-        // Extract nested data if needed
         while (isset($data['data']) && is_array($data['data'])) {
             $data = $data['data'];
         }
-
-        // Map AppSheet field names to Laravel field names
-        $mappedData = $this->mapFields('briefing_attendance_ppe_items', $data, $submittedByUserId);
-
-        $attendanceId = $mappedData['attendance_id'] ?? null;
+        $attendanceId = $data['attendance_id'] ?? null;
+        $ppeType = $data['ppe_type'] ?? null;
+        $status = $data['status'] ?? null;
+        $catatan = $data['catatan'] ?? null;
 
         if (!$attendanceId) {
-            throw new \Exception('Attendance ID wajib diisi untuk PPE Item');
+            throw new \Exception('DEBUG: attendance_id NULL');
         }
 
         $attendance = \App\Models\BriefingAttendance::find($attendanceId);
 
         if (!$attendance) {
-            throw new \Exception("Attendance ID {$attendanceId} tidak ditemukan");
+            throw new \Exception("DEBUG: attendance {$attendanceId} NOT FOUND");
         }
-
-        // Use mapped data (converts AppSheet field names to Laravel field names)
-        $ppeType = $mappedData['ppe_type'] ?? null;
-        $condition = $mappedData['condition'] ?? null;
-        $remark = $mappedData['remark'] ?? null;
 
         if (!$ppeType) {
-            throw new \Exception('PPE Type wajib diisi');
+            throw new \Exception('DEBUG: ppe_type NULL');
         }
 
-        if (!$condition) {
-            throw new \Exception('Kondisi wajib diisi');
+        if (!$status) {
+            throw new \Exception('DEBUG: status NULL');
         }
 
         return match ($operation) {
             'create' => \App\Models\BriefingAttendancePpeItem::create([
                 'attendance_id' => $attendanceId,
                 'ppe_type' => $ppeType,
-                'condition' => $condition,
-                'remark' => $remark,
+                'status' => $status,
+                'catatan' => $catatan,
             ]),
 
             'update' => \App\Models\BriefingAttendancePpeItem::updateOrCreate(
@@ -204,8 +198,8 @@ class AppSheetService
                     'ppe_type' => $ppeType,
                 ],
                 [
-                    'condition' => $condition,
-                    'remark' => $remark,
+                    'status' => $status,
+                    'catatan' => $catatan,
                 ]
             ),
 
@@ -411,7 +405,6 @@ class AppSheetService
             default => null,
         };
 
-        // Reject impersonation: mapped coordinator must match the submitting user.
         $mappedCoordinatorId = $mappedData['coordinator_user_id'] ?? null;
         if ($mappedCoordinatorId !== null && (int) $mappedCoordinatorId !== (int) $user->id) {
             throw new DomainException(
@@ -430,8 +423,6 @@ class AppSheetService
             && $user->scope_unit_type !== null;
 
         if ($hasCanonicalScope) {
-            // STRICT MODE: payload must align exactly with canonical scope.
-            // No fallback to legacy depot/pool lookups or branch-wide access.
 
             if ($branchId !== null && (int) $branchId !== (int) $user->scope_branch_id) {
                 throw new DomainException(
@@ -464,9 +455,6 @@ class AppSheetService
 
             return;
         }
-
-        // LEGACY MODE: user has not been backfilled with canonical scope.
-        // Allow existing fallback behavior but log deprecation for ops visibility.
         $effectiveBranchId = $user->effectiveBranchId();
 
         if ($branchId && $effectiveBranchId !== $branchId) {
