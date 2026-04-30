@@ -2,7 +2,6 @@
 
 namespace App\Enums;
 
-// App\Enums\PpeCondition.php
 enum PpeCondition: string
 {
     case Baik = 'baik';

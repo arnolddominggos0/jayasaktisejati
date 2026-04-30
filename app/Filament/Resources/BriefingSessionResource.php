@@ -7,6 +7,7 @@ use App\Filament\Resources\BriefingSessionResource\RelationManagers\AttendanceRe
 use App\Models\BriefingSession;
 use App\Models\Depot;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
@@ -17,10 +18,9 @@ use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
-use Filament\Facades\Filament;
-use Filament\Tables\Columns\ViewColumn;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -30,11 +30,16 @@ class BriefingSessionResource extends Resource
     protected static ?string $model = BriefingSession::class;
 
     protected static ?string $navigationGroup = 'Transaksi';
+
     protected static ?string $navigationLabel = 'Briefing MP';
-    protected static ?string $pluralLabel     = 'Briefing MP';
-    protected static ?string $modelLabel      = 'Sesi Briefing';
-    protected static ?string $navigationIcon  = 'heroicon-m-clipboard-document-check';
-    protected static ?int    $navigationSort  = 20;
+
+    protected static ?string $pluralLabel = 'Briefing MP';
+
+    protected static ?string $modelLabel = 'Sesi Briefing';
+
+    protected static ?string $navigationIcon = 'heroicon-m-clipboard-document-check';
+
+    protected static ?int $navigationSort = 20;
 
     public static function form(Forms\Form $form): Forms\Form
     {
@@ -46,9 +51,12 @@ class BriefingSessionResource extends Resource
                 ->required()
                 ->rule(function (Get $get, ?BriefingSession $record) {
                     $depotId = (int) $get('depot_id');
-                    if (! $depotId) return null;
+                    if (! $depotId) {
+                        return null;
+                    }
+
                     return Rule::unique('briefing_sessions', 'date')
-                        ->where(fn($query) => $query->where('depot_id', $depotId))
+                        ->where(fn ($query) => $query->where('depot_id', $depotId))
                         ->ignore($record?->id);
                 }),
 
@@ -81,10 +89,11 @@ class BriefingSessionResource extends Resource
             Select::make('coordinator_user_id')
                 ->label('PIC')
                 ->options(function (Get $get) {
-                    $depotId  = $get('depot_id');
+                    $depotId = $get('depot_id');
                     $branchId = $depotId ? Depot::query()->whereKey($depotId)->value('branch_id') : null;
+
                     return User::role('field_coordinator')
-                        ->when($branchId, fn($query) => $query->where('branch_id', $branchId))
+                        ->when($branchId, fn ($query) => $query->where(fn ($q) => $q->where('scope_branch_id', $branchId)->orWhere(fn ($q2) => $q2->whereNull('scope_branch_id')->where('branch_id', $branchId))))
                         ->orderBy('name')
                         ->pluck('name', 'id');
                 })
@@ -93,14 +102,18 @@ class BriefingSessionResource extends Resource
                 ->required()
                 ->rule(function (Get $get) {
                     return function (string $attribute, $value, \Closure $fail) use ($get) {
-                        if (! $value) return;
-                        $depotId  = (int) $get('depot_id');
+                        if (! $value) {
+                            return;
+                        }
+                        $depotId = (int) $get('depot_id');
                         $branchId = $depotId ? Depot::query()->whereKey($depotId)->value('branch_id') : null;
                         $ok = User::role('field_coordinator')
-                            ->when($branchId, fn($query) => $query->where('branch_id', $branchId))
+                            ->when($branchId, fn ($query) => $query->where(fn ($q) => $q->where('scope_branch_id', $branchId)->orWhere(fn ($q2) => $q2->whereNull('scope_branch_id')->where('branch_id', $branchId))))
                             ->whereKey($value)
                             ->exists();
-                        if (! $ok) $fail('PIC harus koordinator lapangan di cabang yang sama.');
+                        if (! $ok) {
+                            $fail('PIC harus koordinator lapangan di cabang yang sama.');
+                        }
                     };
                 }),
 
@@ -113,18 +126,26 @@ class BriefingSessionResource extends Resource
             Placeholder::make('computed_sufficient')
                 ->label('Kecukupan')
                 ->content(function (?BriefingSession $record) {
-                    if (! $record?->id) return '—';
+                    if (! $record?->id) {
+                        return '—';
+                    }
                     $present = $record->presentAttendances()->count();
-                    $target  = (int) $record->summary_headcount;
-                    if ($target <= 0) return 'Target belum diisi';
+                    $target = (int) $record->summary_headcount;
+                    if ($target <= 0) {
+                        return 'Target belum diisi';
+                    }
+
                     return $present >= $target
                         ? "Cukup ({$present}/{$target})"
                         : "Tidak Cukup ({$present}/{$target})";
                 })
                 ->extraAttributes(function (?BriefingSession $record) {
-                    if (! $record?->id || ! $record->summary_headcount) return ['class' => 'text-gray-500'];
+                    if (! $record?->id || ! $record->summary_headcount) {
+                        return ['class' => 'text-gray-500'];
+                    }
                     $present = $record->presentAttendances()->count();
-                    $target  = (int) $record->summary_headcount;
+                    $target = (int) $record->summary_headcount;
+
                     return ['class' => $present >= $target ? 'text-green-600 font-medium' : 'text-rose-600 font-medium'];
                 }),
 
@@ -132,9 +153,12 @@ class BriefingSessionResource extends Resource
                 ->label('Solusi/Keterangan')
                 ->columnSpanFull()
                 ->required(function (Get $get, ?BriefingSession $record) {
-                    $target  = (int) $get('summary_headcount');
-                    if (! $record?->id || $target <= 0) return false;
+                    $target = (int) $get('summary_headcount');
+                    if (! $record?->id || $target <= 0) {
+                        return false;
+                    }
                     $present = $record->presentAttendances()->count();
+
                     return $present < $target;
                 }),
 
@@ -161,7 +185,7 @@ class BriefingSessionResource extends Resource
                     ->label('Hadir')
                     ->state(function ($record) {
                         $present = (int) ($record->present_attendances_count ?? $record->presentAttendances()->count());
-                        $target  = max(0, (int) $record->summary_headcount);
+                        $target = max(0, (int) $record->summary_headcount);
 
                         $percent = $target > 0 ? (int) round(min(100, ($present / $target) * 100)) : 0;
 
@@ -173,9 +197,9 @@ class BriefingSessionResource extends Resource
 
                         return [
                             'present' => $present,
-                            'target'  => $target,
+                            'target' => $target,
                             'percent' => $percent,
-                            'tone'    => $tone,
+                            'tone' => $tone,
                         ];
                     })
                     ->view('tables.columns.attendance-progress')
@@ -184,7 +208,7 @@ class BriefingSessionResource extends Resource
 
                 TextColumn::make('present_attendances_count')
                     ->label('Hadir (x/y)')
-                    ->getStateUsing(fn($record) => $record->summary_headcount
+                    ->getStateUsing(fn ($record) => $record->summary_headcount
                         ? "{$record->present_attendances_count}/{$record->summary_headcount}"
                         : (string) $record->present_attendances_count)
                     ->sortable()
@@ -194,24 +218,31 @@ class BriefingSessionResource extends Resource
                 TextColumn::make('summary_sufficient')->label('Kecukupan')
                     ->state(function ($record) {
                         $present = $record->present_attendances_count ?? $record->presentAttendances()->count();
-                        $target  = (int) $record->summary_headcount;
-                        if ($target <= 0) return 'Belum Ditentukan';
+                        $target = (int) $record->summary_headcount;
+                        if ($target <= 0) {
+                            return 'Belum Ditentukan';
+                        }
+
                         return $present >= $target ? 'Cukup' : 'Tidak Cukup';
                     })
                     ->badge()
-                    ->color(fn($record) => ($record->summary_headcount > 0 && ($record->present_attendances_count ?? 0) < $record->summary_headcount) ? 'danger' : 'success')
-                    ->tooltip(fn($record) => "Hadir " . ($record->present_attendances_count ?? 0) . " / Target " . (int) $record->summary_headcount),
+                    ->color(fn ($record) => ($record->summary_headcount > 0 && ($record->present_attendances_count ?? 0) < $record->summary_headcount) ? 'danger' : 'success')
+                    ->tooltip(fn ($record) => 'Hadir '.($record->present_attendances_count ?? 0).' / Target '.(int) $record->summary_headcount),
             ])
             ->filters([
                 Filter::make('today')->label('Hari ini')
-                    ->query(fn(EloquentBuilder $query) => $query->whereDate('date', now()->toDateString())),
+                    ->query(fn (EloquentBuilder $query) => $query->whereDate('date', now()->toDateString())),
                 Filter::make('bulan_ini')->label('Bulan ini')
-                    ->query(fn(EloquentBuilder $query) => $query->whereBetween('date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])),
+                    ->query(fn (EloquentBuilder $query) => $query->whereBetween('date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])),
                 Filter::make('rentang')
                     ->form([DatePicker::make('from')->label('Dari'), DatePicker::make('until')->label('Sampai')])
                     ->query(function (EloquentBuilder $query, array $data) {
-                        if ($data['from'] ?? null)  $query->whereDate('date', '>=', $data['from']);
-                        if ($data['until'] ?? null) $query->whereDate('date', '<=', $data['until']);
+                        if ($data['from'] ?? null) {
+                            $query->whereDate('date', '>=', $data['from']);
+                        }
+                        if ($data['until'] ?? null) {
+                            $query->whereDate('date', '<=', $data['until']);
+                        }
                     }),
                 SelectFilter::make('depot_id')->label('Depot')->relationship('depot', 'name'),
                 SelectFilter::make('coordinator_user_id')->label('Koordinator')->relationship('coordinator', 'name'),
@@ -236,7 +267,7 @@ class BriefingSessionResource extends Resource
                         $depotId = Depot::query()
                             ->when(
                                 $u && $isFc && $u->effectiveBranchId(),
-                                fn($query) => $query->where('branch_id', $u->effectiveBranchId())
+                                fn ($query) => $query->where('branch_id', $u->effectiveBranchId())
                             )
                             ->orderBy('name')
                             ->value('id');
@@ -254,7 +285,7 @@ class BriefingSessionResource extends Resource
                 Tables\Actions\Action::make('kelola')
                     ->label('Kelola')
                     ->icon('heroicon-m-clipboard-document-list')
-                    ->url(fn($record) => static::getUrl('edit', ['record' => $record])),
+                    ->url(fn ($record) => static::getUrl('edit', ['record' => $record])),
                 Tables\Actions\EditAction::make()->label('Ubah'),
                 Tables\Actions\DeleteAction::make()->label('Hapus'),
             ])
@@ -263,9 +294,16 @@ class BriefingSessionResource extends Resource
 
     public static function getEloquentQuery(): EloquentBuilder
     {
-        return static::getModel()::query()
+        $query = static::getModel()::query()
             ->with(['depot:id,name', 'coordinator:id,name'])
             ->withCount(['attendances', 'presentAttendances']);
+
+        $branchId = app()->bound('currentBranchId') ? app('currentBranchId') : null;
+        if ($branchId) {
+            $query->whereHas('depot', fn ($q) => $q->where('branch_id', $branchId));
+        }
+
+        return $query;
     }
 
     public static function getRelations(): array

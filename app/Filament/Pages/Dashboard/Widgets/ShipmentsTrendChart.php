@@ -22,7 +22,7 @@ class ShipmentsTrendChart extends ChartWidget
             $u = auth_user();
             if (! $u || (method_exists($u, 'hasRole') && $u->hasRole('super_admin'))) return;
             if (Schema::hasColumn('shipments', 'branch_id') && $u->effectiveBranchId()) {
-                $q->where('branch_id', $u->effectiveBranchId());
+                $q->where(fn ($w) => $w->where('branch_id', $u->effectiveBranchId())->orWhereNull('branch_id'));
             } elseif (Schema::hasColumn('shipments', 'depot_id') && $u->depot_id) {
                 $q->where('depot_id', $u->depot_id);
             }

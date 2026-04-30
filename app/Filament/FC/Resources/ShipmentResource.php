@@ -88,7 +88,7 @@ class ShipmentResource extends Resource
             return $q->whereRaw('1=0');
         }
 
-        $q->where('branch_id', $branchId);
+        $q->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id'));
 
         $q->where(function ($w) use ($depotId, $u) {
             $w->where('assigned_depot_id', $depotId)

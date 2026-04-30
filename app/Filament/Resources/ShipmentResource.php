@@ -95,7 +95,7 @@ class ShipmentResource extends Resource
         $branchId = self::currentBranchId();
 
         if ($branchId) {
-            $q->where('branch_id', $branchId);
+            $q->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id'));
         }
 
         return $q;
@@ -163,7 +163,7 @@ class ShipmentResource extends Resource
                     ->schema([
                         Grid::make(12)->schema([
                             Hidden::make('branch_id')
-                                ->default(fn () => Filament::auth()->user()?->branch_id)
+                                ->default(fn () => Filament::auth()->user()?->effectiveBranchId())
                                 ->dehydrated(),
                             Group::make([
                                 Select::make('customer_id')
@@ -462,7 +462,7 @@ class ShipmentResource extends Resource
                                     $set($f, null);
                                 }
 
-                                $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->branch_id);
+                                $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->effectiveBranchId());
                                 $depotId = self::resolveDepotId($branchId, $state, $get('voyage_id'));
 
                                 $set('assigned_depot_id', $depotId);
@@ -917,7 +917,7 @@ class ShipmentResource extends Resource
                                             }
                                         }
 
-                                        $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->branch_id);
+                                        $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->effectiveBranchId());
                                         $depotId = self::resolveDepotId($branchId, $get('mode'), $state);
                                         $set('assigned_depot_id', $depotId);
                                     })
@@ -935,7 +935,7 @@ class ShipmentResource extends Resource
                                 Placeholder::make('auto_depot_display')
                                     ->label('Depo Penugasan (otomatis)')
                                     ->content(function (Get $get) {
-                                        $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->branch_id);
+                                        $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->effectiveBranchId());
                                         $depotId = $get('assigned_depot_id') ?: self::resolveDepotId($branchId, $get('mode'), $get('voyage_id'));
 
                                         if ($depotId) {
@@ -1065,21 +1065,6 @@ class ShipmentResource extends Resource
                             ShipmentStatus::Cancelled->value,
                         ]);
                 });
-
-                $branchId = app()->bound('currentBranchId')
-                    ? app('currentBranchId')
-                    : null;
-
-                if ($branchId) {
-                    $query->where('branch_id', $branchId);
-                }
-
-                $query->with([
-                    'originCity:id,name',
-                    'destinationCity:id,name',
-                    'destinationOffice:id,branch_id',
-                    'tracks:id,shipment_id,status,actual_at,tracked_at',
-                ]);
 
                 $user = Filament::auth()->user();
 
@@ -1562,7 +1547,7 @@ class ShipmentResource extends Resource
                         $branchId = self::currentBranchId();
 
                         if ($branchId) {
-                            $records = $records->where('branch_id', $branchId);
+                            $records = $records->filter(fn ($r) => $r->branch_id === null || $r->branch_id == $branchId);
                         }
 
                         if ($records->isEmpty()) {

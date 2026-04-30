@@ -55,7 +55,7 @@ class LoadingSessionResource extends Resource
             : ($u->effectiveBranchId() ?? null);
 
         if ($branchId) {
-            $q->where('branch_id', $branchId);
+            $q->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id'));
         }
 
         $depotId = app()->bound('scope.depot_id')

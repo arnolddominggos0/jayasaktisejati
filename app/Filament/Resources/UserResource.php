@@ -6,18 +6,17 @@ use App\Filament\Resources\UserResource\Pages;
 use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\User;
-use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Forms\Components\Group;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
-use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
@@ -26,12 +25,17 @@ class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static ?string $navigationIcon   = 'heroicon-o-users';
-    protected static ?string $navigationLabel  = 'Pengguna';
+    protected static ?string $navigationIcon = 'heroicon-o-users';
+
+    protected static ?string $navigationLabel = 'Pengguna';
+
     protected static ?string $pluralModelLabel = 'Pengguna';
-    protected static ?string $modelLabel       = 'Pengguna';
-    protected static ?string $navigationGroup  = 'Master Data';
-    protected static ?int    $navigationSort   = 10;
+
+    protected static ?string $modelLabel = 'Pengguna';
+
+    protected static ?string $navigationGroup = 'Master Data';
+
+    protected static ?int $navigationSort = 10;
 
     public static function canViewAny(): bool
     {
@@ -44,10 +48,14 @@ class UserResource extends Resource
         $q = parent::getEloquentQuery();
         $u = auth_user();
 
-        if ($u?->hasRole('super_admin')) return $q;
+        if ($u?->hasRole('super_admin')) {
+            return $q;
+        }
 
         if ($u?->hasRole('office_admin') && $u->effectiveBranchId()) {
-            return $q->where('branch_id', $u->effectiveBranchId());
+            $bid = $u->effectiveBranchId();
+
+            return $q->where(fn ($w) => $w->where('scope_branch_id', $bid)->orWhere(fn ($w2) => $w2->whereNull('scope_branch_id')->where('branch_id', $bid)));
         }
 
         return $q->whereRaw('1=0');
@@ -77,18 +85,18 @@ class UserResource extends Resource
                                     ->placeholder('user@example.com'),
 
                                 TextInput::make('password')
-                                    ->label(fn(?User $record) => $record
+                                    ->label(fn (?User $record) => $record
                                         ? 'Password (kosongkan jika tidak diubah)'
                                         : 'Password')
-                                    ->helperText(fn(?User $record) => $record
+                                    ->helperText(fn (?User $record) => $record
                                         ? 'Biarkan kosong jika tidak mengganti password.'
                                         : 'Minimal 8 karakter.')
                                     ->password()
                                     ->revealable()
-                                    ->required(fn(?User $record) => $record === null)
-                                    ->rule(fn(?User $record) => $record === null ? 'required|min:8' : 'nullable|min:8')
-                                    ->dehydrateStateUsing(fn(?string $state) => filled($state) ? Hash::make(trim($state)) : null)
-                                    ->dehydrated(fn(?string $state) => filled($state))
+                                    ->required(fn (?User $record) => $record === null)
+                                    ->rule(fn (?User $record) => $record === null ? 'required|min:8' : 'nullable|min:8')
+                                    ->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make(trim($state)) : null)
+                                    ->dehydrated(fn (?string $state) => filled($state))
                                     ->maxLength(100),
                             ])
                             ->columns(2),
@@ -99,12 +107,11 @@ class UserResource extends Resource
                                     ->label('Cabang')
                                     ->placeholder('Pilih cabang')
                                     ->options(
-                                        fn() =>
-                                        $isSuper
+                                        fn () => $isSuper
                                             ? Branch::query()->orderBy('name')->pluck('name', 'id')
                                             : Branch::query()->whereKey(auth_user()?->branch_id)->pluck('name', 'id')
                                     )
-                                    ->default(fn() => auth_user()?->branch_id)
+                                    ->default(fn () => auth_user()?->branch_id)
                                     ->searchable()
                                     ->required(),
 
@@ -118,8 +125,8 @@ class UserResource extends Resource
                                     )
                                     ->searchable()
                                     ->nullable()
-                                    ->visible(fn(Get $get) => $get('role_name') === 'customer')
-                                    ->required(fn(Get $get) => $get('role_name') === 'customer')
+                                    ->visible(fn (Get $get) => $get('role_name') === 'customer')
+                                    ->required(fn (Get $get) => $get('role_name') === 'customer')
                                     ->helperText('Wajib jika role = customer.'),
                             ])
                             ->columns(2),
@@ -129,12 +136,11 @@ class UserResource extends Resource
                                 Select::make('role_name')
                                     ->label('Role')
                                     ->options(
-                                        fn() =>
-                                        $isSuper
+                                        fn () => $isSuper
                                             ? Role::query()->orderBy('name')->pluck('name', 'name')
                                             : Role::query()
-                                            ->whereIn('name', ['office_admin', 'field_coordinator', 'customer'])
-                                            ->orderBy('name')->pluck('name', 'name')
+                                                ->whereIn('name', ['office_admin', 'field_coordinator', 'customer'])
+                                                ->orderBy('name')->pluck('name', 'name')
                                     )
                                     ->searchable()
                                     ->required()
@@ -164,7 +170,7 @@ class UserResource extends Resource
                     ->badge()
                     ->separator(', ')
                     ->sortable(false)
-                    ->formatStateUsing(fn($state) => is_array($state) ? implode(', ', $state) : (string) $state),
+                    ->formatStateUsing(fn ($state) => is_array($state) ? implode(', ', $state) : (string) $state),
                 TextColumn::make('updated_at')->label('Diubah')->since()->sortable(),
             ])
             ->filters([
@@ -177,7 +183,7 @@ class UserResource extends Resource
                 Tables\Actions\EditAction::make()->label('Ubah'),
                 Tables\Actions\DeleteAction::make()
                     ->label('Hapus')
-                    ->visible(fn($record) => (auth_user()?->hasRole('super_admin') ?? false)
+                    ->visible(fn ($record) => (auth_user()?->hasRole('super_admin') ?? false)
                         && ! $record->hasRole('super_admin')
                         && ($record->id !== auth_user()?->id)),
             ])
@@ -192,9 +198,9 @@ class UserResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListUsers::route('/'),
+            'index' => Pages\ListUsers::route('/'),
             'create' => Pages\CreateUser::route('/create'),
-            'edit'   => Pages\EditUser::route('/{record}/edit'),
+            'edit' => Pages\EditUser::route('/{record}/edit'),
         ];
     }
 
@@ -205,7 +211,8 @@ class UserResource extends Resource
         $u = auth_user();
 
         if ($u?->hasRole('office_admin') && $u->effectiveBranchId()) {
-            $q->where('branch_id', $u->effectiveBranchId());
+            $bid = $u->effectiveBranchId();
+            $q->where(fn ($w) => $w->where('scope_branch_id', $bid)->orWhere(fn ($w2) => $w2->whereNull('scope_branch_id')->where('branch_id', $bid)));
         }
 
         return (string) $q->count();

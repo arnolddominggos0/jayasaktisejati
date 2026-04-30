@@ -3,6 +3,7 @@
 namespace App\Filament\FC\Widgets;
 
 use App\Enums\ShipmentStatus;
+use App\Models\Branch;
 use App\Models\Shipment;
 use Filament\Facades\Filament;
 use Filament\Tables;
@@ -15,6 +16,23 @@ class FcAttentionList extends BaseWidget
     protected static ?string $heading = 'Butuh Perhatian Hari Ini';
     protected static ?string $pollingInterval = '60s';
     protected int|string|array $columnSpan = 'full';
+
+    /**
+     * Get current branch name for context-aware messaging.
+     */
+    private function getBranchName(): string
+    {
+        $u = Filament::auth()->user();
+        $branchId = app()->bound('scope.branch_id') ? app('scope.branch_id') : ($u?->effectiveBranchId() ?? null);
+
+        if (! $branchId) {
+            return 'branch ini';
+        }
+
+        $branch = Branch::find($branchId);
+
+        return $branch?->name ?? 'branch ini';
+    }
 
     public function table(Table $table): Table
     {
@@ -32,7 +50,7 @@ class FcAttentionList extends BaseWidget
                     ])
                     ->where('mode', 'sea')
                     ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value])
-                    ->when($branchId, fn (Builder $q) => $q->where('branch_id', $branchId))
+                    ->when($branchId, fn (Builder $q) => $q->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id')))
                     ->when($depotId, fn (Builder $q) => $q->where(function ($w) use ($depotId, $u) {
                         $w->where('assigned_depot_id', $depotId)
                             ->orWhere('coordinator_id', $u?->id);
@@ -52,13 +70,18 @@ class FcAttentionList extends BaseWidget
                 Tables\Columns\TextColumn::make('code')
                     ->label('Kode')
                     ->badge()
+                    ->color('gray')
                     ->extraAttributes(['class' => 'font-mono'])
                     ->searchable(),
 
                 Tables\Columns\TextColumn::make('priority')
                     ->label('Prioritas')
                     ->badge()
-                    ->color(fn (?string $state) => $state === 'urgent' ? 'danger' : 'gray')
+                    ->color(fn (?string $state) => match ($state) {
+                        'urgent' => 'danger',
+                        'normal' => 'gray',
+                        default => 'gray',
+                    })
                     ->formatStateUsing(fn (?string $state) => match ($state) {
                         'urgent' => 'Urgent',
                         'normal' => 'Normal',
@@ -73,6 +96,8 @@ class FcAttentionList extends BaseWidget
                         'hold' => 'warning',
                         'transit' => 'info',
                         'pending' => 'gray',
+                        'delivered' => 'success',
+                        'cancelled' => 'danger',
                         default => 'gray',
                     }),
 
@@ -84,6 +109,7 @@ class FcAttentionList extends BaseWidget
                         'delivered' => 'success',
                         'cancelled' => 'danger',
                         'hold' => 'warning',
+                        'urgent' => 'danger',
                         default => 'info',
                     }),
 
@@ -110,6 +136,6 @@ class FcAttentionList extends BaseWidget
             ->defaultPaginationPageOption(10)
             ->paginated([10, 25, 50])
             ->emptyStateHeading('Tidak ada shipment yang butuh perhatian')
-            ->emptyStateDescription('Semua shipment dalam kondisi normal.');
+            ->emptyStateDescription(fn () => 'Semua shipment dalam kondisi normal di '.$this->getBranchName().'.');
     }
 }

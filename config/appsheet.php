@@ -56,6 +56,7 @@ return [
             'appsheet_table' => 'Briefing Attendances',
             'model' => BriefingAttendance::class,
             'primary_key' => ['session_id', 'manpower_id'],
+            'add_checked_by' => false,
             'fields' => [
                 'session_id' => 'Sesi ID',
                 'manpower_id' => 'MP ID',
@@ -75,6 +76,7 @@ return [
             'appsheet_table' => 'Briefing Attendance PPE Items',
             'model' => BriefingAttendancePpeItem::class,
             'primary_key' => ['attendance_id', 'ppe_type'],
+            'add_checked_by' => false,
             'fields' => [
                 'attendance_id' => 'Attendance ID',
                 'ppe_type' => 'Jenis APD',
@@ -87,6 +89,7 @@ return [
             'appsheet_table' => 'Briefing Checklists',
             'model' => BriefingChecklist::class,
             'primary_key' => ['session_id', 'item'],
+            'add_checked_by' => false,
             'fields' => [
                 'session_id' => 'Sesi ID',
                 'item' => 'Item',

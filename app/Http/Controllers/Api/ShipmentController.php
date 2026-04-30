@@ -32,7 +32,7 @@ class ShipmentController extends Controller
 
         // Apply branch scoping for non-super-admins
         if (!$request->user()->hasRole('super_admin')) {
-            $query->where('branch_id', $request->user()->effectiveBranchId());
+            $query->where(fn ($w) => $w->where('branch_id', $request->user()->effectiveBranchId())->orWhereNull('branch_id'));
         }
 
         // Apply filters
