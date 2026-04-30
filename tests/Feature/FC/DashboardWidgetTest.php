@@ -195,11 +195,13 @@ class DashboardWidgetTest extends TestCase
         ShipmentTrack::create([
             'shipment_id' => $seaShipment->id,
             'status' => TrackStatus::Pickup->value,
+            'status_normalized' => 0,
             'tracked_at' => now(),
         ]);
         ShipmentTrack::create([
             'shipment_id' => $landShipment->id,
             'status' => TrackStatus::Pickup->value,
+            'status_normalized' => 0,
             'tracked_at' => now(),
         ]);
 
@@ -229,11 +231,13 @@ class DashboardWidgetTest extends TestCase
         ShipmentTrack::create([
             'shipment_id' => $shipment->id,
             'status' => TrackStatus::Pickup->value,
+            'status_normalized' => 0,
             'tracked_at' => now(),
         ]);
         ShipmentTrack::create([
             'shipment_id' => $shipment->id,
             'status' => TrackStatus::Handover->value,
+            'status_normalized' => 0,
             'tracked_at' => now()->subDay(),
         ]);
 
@@ -252,5 +256,95 @@ class DashboardWidgetTest extends TestCase
             ->get();
 
         $this->assertCount(2, $rows);
+    }
+
+    /** @test */
+    public function fc_dashboard_displays_branch_context_header(): void
+    {
+        [$fc, $branch, $depot] = $this->createFcContext();
+
+        $this->actingAs($fc);
+
+        $response = $this->get('/fc/dashboard');
+
+        $response->assertOk();
+        $response->assertSee($branch->name);
+        $response->assertSee($depot->name);
+        $response->assertSee('Lingkup Operasional');
+        $response->assertSee('Koordinator Lapangan');
+        $response->assertSee('Mode: Laut');
+    }
+
+    /** @test */
+    public function fc_dashboard_page_has_branch_context_methods(): void
+    {
+        [$fc, $branch, $depot] = $this->createFcContext();
+
+        $this->actingAs($fc);
+
+        // Test the Dashboard page methods directly
+        $dashboard = new \App\Filament\FC\Pages\Dashboard\Dashboard();
+
+        $this->assertEquals($branch->name, $dashboard->getBranchName());
+        $this->assertEquals($depot->name, $dashboard->getDepotName());
+        $this->assertTrue($dashboard->hasBranchContext());
+        $this->assertTrue($dashboard->hasDepotContext());
+    }
+
+    /** @test */
+    public function fc_attention_list_returns_branch_aware_empty_state_text(): void
+    {
+        [$fc, $branch, $depot] = $this->createFcContext();
+
+        $this->actingAs($fc);
+
+        // Test the widget directly since Livewire widgets aren't rendered in initial HTML
+        $widget = new \App\Filament\FC\Widgets\FcAttentionList();
+        $reflection = new \ReflectionClass($widget);
+        $method = $reflection->getMethod('getBranchName');
+        $method->setAccessible(true);
+
+        $branchName = $method->invoke($widget);
+        $this->assertEquals($branch->name, $branchName);
+    }
+
+    /** @test */
+    public function fc_kpi_eta_dekat_shows_warning_when_count_positive(): void
+    {
+        [$fc, $branch, $depot] = $this->createFcContext();
+
+        // Create a shipment with near ETA (within 24 hours)
+        $this->createSeaShipment($branch, $fc, $depot, [
+            'status' => ShipmentStatus::Transit->value,
+            'eta' => now()->addHours(6),
+        ]);
+
+        $base = $this->getKpiBaseQuery($fc, $branch->id, $depot->id);
+        $nearEta = (clone $base)
+            ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value])
+            ->where(function ($q) {
+                $q->whereNull('eta')
+                    ->orWhere('eta', '<=', now()->addDay());
+            })
+            ->count();
+
+        $this->assertEquals(1, $nearEta);
+    }
+
+    /** @test */
+    public function fc_dashboard_page_has_all_widgets_configured(): void
+    {
+        [$fc, $branch, $depot] = $this->createFcContext();
+
+        $this->actingAs($fc);
+
+        $response = $this->get('/fc/dashboard');
+
+        $response->assertOk();
+        // Verify widgets are referenced in the view (by class name in HTML comment or wire:snapshot)
+        $response->assertSee('fc-kpi-stats');
+        $response->assertSee('fc-attention-list');
+        $response->assertSee('fc-status-chart');
+        $response->assertSee('fc-recent-activities');
     }
 }

@@ -57,10 +57,7 @@ class VesselCheckCaseResource extends Resource
     {
         return [
             'index' => Pages\ListVesselCheckCases::route('/'),
-<<<<<<< HEAD
             'view'  => Pages\ViewVesselCheckCases::route('/{record}'),
-=======
->>>>>>> eebaf8e1b6240b8c3cc76728ca0f0e504241f688
         ];
     }
 }
