@@ -9,14 +9,14 @@ use App\Models\Depot;
 use App\Models\Shipment;
 use App\Models\User;
 use App\Policies\ShipmentPolicy;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class ShipmentPolicyScopeTest extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     protected function setUp(): void
     {
