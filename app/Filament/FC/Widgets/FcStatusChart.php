@@ -94,12 +94,12 @@ class FcStatusChart extends ChartWidget
 
         $datasets = [];
         $colors = [
-            'pickup' => ['bg' => 'rgba(59, 130, 246, 0.5)', 'border' => 'rgb(59, 130, 246)'],
-            'handover_stuffing' => ['bg' => 'rgba(16, 185, 129, 0.5)', 'border' => 'rgb(16, 185, 129)'],
-            'port_terminal' => ['bg' => 'rgba(245, 158, 11, 0.5)', 'border' => 'rgb(245, 158, 11)'],
-            'voyage' => ['bg' => 'rgba(99, 102, 241, 0.5)', 'border' => 'rgb(99, 102, 241)'],
-            'unloading_delivery' => ['bg' => 'rgba(20, 184, 166, 0.5)', 'border' => 'rgb(20, 184, 166)'],
-            'hold_cancel' => ['bg' => 'rgba(239, 68, 68, 0.5)', 'border' => 'rgb(239, 68, 68)'],
+            'pickup' => ['bg' => 'rgba(59, 130, 246, 0.6)', 'border' => 'rgb(37, 99, 235)'],
+            'handover_stuffing' => ['bg' => 'rgba(16, 185, 129, 0.6)', 'border' => 'rgb(5, 150, 105)'],
+            'port_terminal' => ['bg' => 'rgba(245, 158, 11, 0.6)', 'border' => 'rgb(217, 119, 6)'],
+            'voyage' => ['bg' => 'rgba(99, 102, 241, 0.6)', 'border' => 'rgb(79, 70, 229)'],
+            'unloading_delivery' => ['bg' => 'rgba(20, 184, 166, 0.6)', 'border' => 'rgb(13, 148, 136)'],
+            'hold_cancel' => ['bg' => 'rgba(239, 68, 68, 0.6)', 'border' => 'rgb(220, 38, 38)'],
         ];
 
         foreach ($categories as $cat => $_) {

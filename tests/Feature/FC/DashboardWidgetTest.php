@@ -341,10 +341,115 @@ class DashboardWidgetTest extends TestCase
         $response = $this->get('/fc/dashboard');
 
         $response->assertOk();
-        // Verify widgets are referenced in the view (by class name in HTML comment or wire:snapshot)
         $response->assertSee('fc-kpi-stats');
         $response->assertSee('fc-attention-list');
         $response->assertSee('fc-status-chart');
         $response->assertSee('fc-recent-activities');
+    }
+
+    /** @test */
+    public function fc_kpi_stats_priority_order_urgent_first(): void
+    {
+        $widget = new \App\Filament\FC\Widgets\FcKpiStats();
+        $reflection = new \ReflectionClass($widget);
+        $method = $reflection->getMethod('getStats');
+        $method->setAccessible(true);
+
+        $stats = $method->invoke($widget);
+
+        $labels = array_map(fn ($stat) => $stat->getLabel(), $stats);
+
+        $this->assertEquals('Urgent', $labels[0], 'Urgent should be the first KPI card');
+        $this->assertEquals('On Hold', $labels[1], 'On Hold should be the second KPI card');
+        $this->assertEquals('ETA Dekat', $labels[2], 'ETA Dekat should be the third KPI card');
+    }
+
+    /** @test */
+    public function fc_dashboard_urgency_count_returns_zero_when_no_attention_items(): void
+    {
+        [$fc, $branch, $depot] = $this->createFcContext();
+
+        $this->actingAs($fc);
+
+        $this->createSeaShipment($branch, $fc, $depot, [
+            'status' => ShipmentStatus::Transit->value,
+            'priority' => 'normal',
+            'eta' => now()->addDays(5),
+        ]);
+
+        $dashboard = new \App\Filament\FC\Pages\Dashboard\Dashboard();
+        $count = $dashboard->getUrgencyCount();
+
+        $this->assertEquals(0, $count);
+    }
+
+    /** @test */
+    public function fc_dashboard_urgency_count_includes_urgent_shipments(): void
+    {
+        [$fc, $branch, $depot] = $this->createFcContext();
+
+        $this->actingAs($fc);
+
+        $this->createSeaShipment($branch, $fc, $depot, [
+            'status' => ShipmentStatus::Transit->value,
+            'priority' => 'urgent',
+        ]);
+
+        $dashboard = new \App\Filament\FC\Pages\Dashboard\Dashboard();
+        $count = $dashboard->getUrgencyCount();
+
+        $this->assertEquals(1, $count);
+    }
+
+    /** @test */
+    public function fc_dashboard_urgency_count_includes_hold_and_near_eta(): void
+    {
+        [$fc, $branch, $depot] = $this->createFcContext();
+
+        $this->actingAs($fc);
+
+        $this->createSeaShipment($branch, $fc, $depot, [
+            'status' => ShipmentStatus::Hold->value,
+        ]);
+        $this->createSeaShipment($branch, $fc, $depot, [
+            'status' => ShipmentStatus::Transit->value,
+            'eta' => now()->addHours(6),
+        ]);
+
+        $dashboard = new \App\Filament\FC\Pages\Dashboard\Dashboard();
+        $count = $dashboard->getUrgencyCount();
+
+        $this->assertEquals(2, $count);
+    }
+
+    /** @test */
+    public function fc_dashboard_shows_urgency_indicator_when_attention_items_exist(): void
+    {
+        [$fc, $branch, $depot] = $this->createFcContext();
+
+        $this->actingAs($fc);
+
+        $this->createSeaShipment($branch, $fc, $depot, [
+            'status' => ShipmentStatus::Transit->value,
+            'priority' => 'urgent',
+        ]);
+
+        $response = $this->get('/fc/dashboard');
+
+        $response->assertOk();
+        $response->assertSee('butuh perhatian');
+    }
+
+    /** @test */
+    public function fc_dashboard_shows_normal_indicator_when_no_attention_items(): void
+    {
+        [$fc, $branch, $depot] = $this->createFcContext();
+
+        $this->actingAs($fc);
+
+        $response = $this->get('/fc/dashboard');
+
+        $response->assertOk();
+        $response->assertSee('Semua normal');
     }
 }

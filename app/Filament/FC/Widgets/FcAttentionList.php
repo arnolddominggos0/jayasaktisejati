@@ -17,9 +17,6 @@ class FcAttentionList extends BaseWidget
     protected static ?string $pollingInterval = '60s';
     protected int|string|array $columnSpan = 'full';
 
-    /**
-     * Get current branch name for context-aware messaging.
-     */
     private function getBranchName(): string
     {
         $u = Filament::auth()->user();
@@ -32,6 +29,32 @@ class FcAttentionList extends BaseWidget
         $branch = Branch::find($branchId);
 
         return $branch?->name ?? 'branch ini';
+    }
+
+    private function formatEtaCountdown(?\Illuminate\Support\Carbon $eta): ?string
+    {
+        if (! $eta) {
+            return null;
+        }
+
+        $diff = now()->diffInMinutes($eta, false);
+
+        if ($diff <= 0) {
+            $ago = now()->diffForHumans($eta, true);
+            return "Lewat {$ago}";
+        }
+
+        if ($diff < 60) {
+            return (int) $diff . ' menit lagi';
+        }
+
+        if ($diff < 1440) {
+            $hours = (int) ($diff / 60);
+            return "{$hours} jam lagi";
+        }
+
+        $days = (int) ($diff / 1440);
+        return "{$days} hari lagi";
     }
 
     public function table(Table $table): Table
@@ -74,18 +97,29 @@ class FcAttentionList extends BaseWidget
                     ->extraAttributes(['class' => 'font-mono'])
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('priority')
-                    ->label('Prioritas')
+                Tables\Columns\TextColumn::make('severity')
+                    ->label('Keparahan')
                     ->badge()
-                    ->color(fn (?string $state) => match ($state) {
-                        'urgent' => 'danger',
-                        'normal' => 'gray',
+                    ->getStateUsing(function ($record) {
+                        if ($record->priority === 'urgent') {
+                            return 'Urgent';
+                        }
+                        if ($record->status?->value === ShipmentStatus::Hold->value) {
+                            return 'Ditahan';
+                        }
+                        return 'ETA Dekat';
+                    })
+                    ->color(fn (string $state) => match ($state) {
+                        'Urgent' => 'danger',
+                        'Ditahan' => 'warning',
+                        'ETA Dekat' => 'warning',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn (?string $state) => match ($state) {
-                        'urgent' => 'Urgent',
-                        'normal' => 'Normal',
-                        default => $state ?: '—',
+                    ->icon(fn (string $state) => match ($state) {
+                        'Urgent' => 'heroicon-m-exclamation-triangle',
+                        'Ditahan' => 'heroicon-m-pause-circle',
+                        'ETA Dekat' => 'heroicon-m-clock',
+                        default => null,
                     }),
 
                 Tables\Columns\TextColumn::make('status')
@@ -126,6 +160,7 @@ class FcAttentionList extends BaseWidget
                     ->label('ETA')
                     ->dateTime('d M Y H:i')
                     ->placeholder('—')
+                    ->description(fn ($record) => $this->formatEtaCountdown($record->eta))
                     ->color(function ($state) {
                         if (! $state) {
                             return 'gray';
@@ -136,6 +171,7 @@ class FcAttentionList extends BaseWidget
             ->defaultPaginationPageOption(10)
             ->paginated([10, 25, 50])
             ->emptyStateHeading('Tidak ada shipment yang butuh perhatian')
-            ->emptyStateDescription(fn () => 'Semua shipment dalam kondisi normal di '.$this->getBranchName().'.');
+            ->emptyStateDescription(fn () => 'Semua shipment dalam kondisi normal di '.$this->getBranchName().'.')
+            ->emptyStateIcon('heroicon-o-check-circle');
     }
 }

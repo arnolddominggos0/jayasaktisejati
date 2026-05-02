@@ -49,30 +49,30 @@ class FcKpiStats extends Widget
             ->count();
 
         return [
-            Stat::make('Ditugaskan', $assigned)
-                ->description('Total shipment laut')
-                ->descriptionIcon('heroicon-m-clipboard-document-check')
-                ->color('gray'),
+            Stat::make('Urgent', $urgent)
+                ->description('Prioritas tinggi')
+                ->descriptionIcon('heroicon-m-exclamation-triangle')
+                ->color($urgent > 0 ? 'danger' : 'gray'),
+
+            Stat::make('On Hold', $onHold)
+                ->description('Butuh tindak lanjut')
+                ->descriptionIcon('heroicon-m-pause-circle')
+                ->color($onHold > 0 ? 'warning' : 'gray'),
+
+            Stat::make('ETA Dekat', $nearEta)
+                ->description('ETA ≤ 24 jam')
+                ->descriptionIcon('heroicon-m-clock')
+                ->color($nearEta > 0 ? 'warning' : 'success'),
 
             Stat::make('Berjalan', $inProgress)
                 ->description('Dalam perjalanan')
                 ->descriptionIcon('heroicon-m-truck')
                 ->color('info'),
 
-            Stat::make('On Hold', $onHold)
-                ->description('Butuh tindak lanjut')
-                ->descriptionIcon('heroicon-m-pause-circle')
-                ->color('warning'),
-
-            Stat::make('Urgent', $urgent)
-                ->description('Prioritas tinggi')
-                ->descriptionIcon('heroicon-m-exclamation-triangle')
-                ->color('danger'),
-
-            Stat::make('ETA Dekat', $nearEta)
-                ->description('ETA ≤ 24 jam')
-                ->descriptionIcon('heroicon-m-clock')
-                ->color($nearEta > 0 ? 'warning' : 'success'),
+            Stat::make('Ditugaskan', $assigned)
+                ->description('Total shipment laut')
+                ->descriptionIcon('heroicon-m-clipboard-document-check')
+                ->color('gray'),
         ];
     }
 

@@ -2,11 +2,14 @@
 
 namespace App\Filament\FC\Pages\Dashboard;
 
+use App\Enums\ShipmentStatus;
 use App\Models\Branch;
 use App\Models\Depot;
+use App\Models\Shipment;
 use Filament\Pages\Page;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Builder;
 
 class Dashboard extends Page
 {
@@ -31,9 +34,6 @@ class Dashboard extends Page
         return static::$title ?? 'Dashboard';
     }
 
-    /**
-     * Get the current branch context for the FC user.
-     */
     public function getBranchContext(): ?Branch
     {
         $user = Filament::auth()->user();
@@ -52,9 +52,6 @@ class Dashboard extends Page
         return Branch::find($branchId);
     }
 
-    /**
-     * Get the current depot context for the FC user.
-     */
     public function getDepotContext(): ?Depot
     {
         $user = Filament::auth()->user();
@@ -67,7 +64,6 @@ class Dashboard extends Page
             : ($user->scope_unit_type === 'depot' ? $user->scope_unit_id : null);
 
         if (! $depotId) {
-            // Fallback: try to find depot by coordinator_user_id
             $depotId = Depot::where('coordinator_user_id', $user->id)->value('id');
         }
 
@@ -78,35 +74,56 @@ class Dashboard extends Page
         return Depot::find($depotId);
     }
 
-    /**
-     * Get branch name with safe fallback.
-     */
     public function getBranchName(): string
     {
         return $this->getBranchContext()?->name ?? 'Branch tidak diketahui';
     }
 
-    /**
-     * Get depot name with safe fallback.
-     */
     public function getDepotName(): string
     {
         return $this->getDepotContext()?->name ?? 'Depot tidak diketahui';
     }
 
-    /**
-     * Check if user has valid branch context.
-     */
     public function hasBranchContext(): bool
     {
         return $this->getBranchContext() !== null;
     }
 
-    /**
-     * Check if user has valid depot context.
-     */
     public function hasDepotContext(): bool
     {
         return $this->getDepotContext() !== null;
+    }
+
+    public function getUrgencyCount(): int
+    {
+        $user = Filament::auth()->user();
+        if (! $user) {
+            return 0;
+        }
+
+        $branchId = app()->bound('scope.branch_id')
+            ? app('scope.branch_id')
+            : ($user->effectiveBranchId() ?? null);
+        $depotId = app()->bound('scope.depot_id')
+            ? app('scope.depot_id')
+            : null;
+
+        return Shipment::query()
+            ->where('mode', 'sea')
+            ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value])
+            ->when($branchId, fn (Builder $q) => $q->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id')))
+            ->when($depotId, fn (Builder $q) => $q->where(function ($w) use ($depotId, $user) {
+                $w->where('assigned_depot_id', $depotId)
+                    ->orWhere('coordinator_id', $user->id);
+            }), fn (Builder $q) => $q->where('coordinator_id', $user->id))
+            ->where(function (Builder $q) {
+                $q->where('priority', 'urgent')
+                    ->orWhere('status', ShipmentStatus::Hold->value)
+                    ->orWhere(function (Builder $q2) {
+                        $q2->whereNotNull('eta')
+                            ->where('eta', '<=', now()->addDay());
+                    });
+            })
+            ->count();
     }
 }

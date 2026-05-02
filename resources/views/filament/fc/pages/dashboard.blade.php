@@ -1,5 +1,5 @@
 <x-filament-panels::page>
-    {{-- Branch/Depot Context Header --}}
+    {{-- Branch/Depot Context Header with Urgency Indicator --}}
     <div class="fi-page-header-context mb-6">
         <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -23,6 +23,18 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
+                    @php
+                        $urgencyCount = $this->getUrgencyCount();
+                    @endphp
+                    @if($urgencyCount > 0)
+                        <x-filament::badge color="danger" size="sm" icon="heroicon-m-exclamation-triangle">
+                            {{ $urgencyCount }} butuh perhatian
+                        </x-filament::badge>
+                    @else
+                        <x-filament::badge color="success" size="sm" icon="heroicon-m-check-circle">
+                            Semua normal
+                        </x-filament::badge>
+                    @endif
                     <x-filament::badge color="info" size="sm" icon="heroicon-m-shield-check">
                         Koordinator Lapangan
                     </x-filament::badge>

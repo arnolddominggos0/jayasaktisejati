@@ -73,6 +73,10 @@ class FcRecentActivities extends BaseWidget
                         'cancelled' => 'danger',
                         'hold' => 'warning',
                         'pickup', 'handover', 'stuffing', 'delivery_to_port', 'stacking', 'unit_loading' => 'info',
+                        'onship', 'vessel_depart', 'vessel_arrival' => 'info',
+                        'unloading', 'delivery_to_customer', 'handover_trucking' => 'info',
+                        'pending' => 'gray',
+                        'draft' => 'gray',
                         default => 'gray',
                     })
                     ->sortable(),
