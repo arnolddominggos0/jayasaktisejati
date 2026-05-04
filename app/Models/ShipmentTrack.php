@@ -18,7 +18,7 @@ class ShipmentTrack extends Model
         'status_normalized',
         'tracked_at',
         'location',
-        'note', 
+        'note',
         'attachments',
         'check_result',
         'checkseet',
@@ -198,13 +198,18 @@ class ShipmentTrack extends Model
                 'vessel_depart'        => 80,
                 'vessel_arrival'       => 90,
                 'unloading'            => 100,
+                'handover_trucking'    => 105,
                 'delivery_to_customer' => 110,
                 'delivered'            => 120,
                 'hold'                 => 900,
                 'cancelled'            => 999,
             ];
 
-            $track->status_normalized = $map[$status] ?? 0;
+            if (!isset($map[$status])) {
+                throw new \InvalidArgumentException("Unknown track status: {$status}");
+            }
+
+            $track->status_normalized = $map[$status];
         });
 
         static::updating(function (ShipmentTrack $track) {
@@ -219,8 +224,8 @@ class ShipmentTrack extends Model
             if (!$shipment) return;
 
             $hasRealTracking = $shipment->tracks
-            ->filter(fn($t) => !empty($t->tracked_at))
-            ->isNotEmpty();
+                ->filter(fn($t) => !empty($t->tracked_at))
+                ->isNotEmpty();
 
             if (!$hasRealTracking) {
                 if ($shipment->status !== ShipmentStatus::Draft->value) {

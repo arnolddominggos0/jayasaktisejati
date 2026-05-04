@@ -83,7 +83,7 @@ Dokumen ini fokus pada **planning** (belum implementasi) untuk penyempurnaan UI 
 - Aktivitas terbaru menampilkan informasi ringkas: waktu, kode shipment, status, route, pelaku.
 - Status badge menggunakan skema warna seragam lintas widget.
 
-### UI-FR-05: Shipment List Readability   
+### UI-FR-05: Shipment List Readability
 - Kolom inti (kode, status, prioritas, ETA, route) lebih mudah dipindai cepat.
 - Empty state branch-specific (mis. “Tidak ada shipment dalam scope branch ini”).
 

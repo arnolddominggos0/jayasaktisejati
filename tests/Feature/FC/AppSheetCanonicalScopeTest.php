@@ -111,11 +111,7 @@ class AppSheetCanonicalScopeTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJsonFragment(['success' => false, 'error_code' => 'SCOPE_VIOLATION']);
-<<<<<<< HEAD
-        $this->assertStringStartsWith('[SCOPE_MISMATCH]', $response->json('message'));
-=======
         $this->assertStringContainsString('[SCOPE_MISMATCH]', $response->json('message'));
->>>>>>> e433085b6f469c495465fdc0d5893050aef28eb9
 
         $this->assertDatabaseHas('appsheet_sync_logs', [
             'table_name' => 'briefing_sessions',
@@ -145,11 +141,7 @@ class AppSheetCanonicalScopeTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJsonFragment(['success' => false, 'error_code' => 'SCOPE_VIOLATION']);
-<<<<<<< HEAD
         $this->assertStringStartsWith('[SCOPE_MISMATCH]', $response->json('message'));
-=======
-        $this->assertStringContainsString('[SCOPE_MISMATCH]', $response->json('message'));
->>>>>>> e433085b6f469c495465fdc0d5893050aef28eb9
     }
 
     /** @test */
@@ -176,11 +168,7 @@ class AppSheetCanonicalScopeTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJsonFragment(['success' => false, 'error_code' => 'SCOPE_VIOLATION']);
-<<<<<<< HEAD
         $this->assertStringStartsWith('[IMPERSONATION_REJECTED]', $response->json('message'));
-=======
-        $this->assertStringContainsString('[IMPERSONATION_REJECTED]', $response->json('message'));
->>>>>>> e433085b6f469c495465fdc0d5893050aef28eb9
     }
 
     /** @test */
@@ -230,11 +218,7 @@ class AppSheetCanonicalScopeTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJsonFragment(['success' => false, 'error_code' => 'SCOPE_VIOLATION']);
-<<<<<<< HEAD
         $this->assertStringStartsWith('[SCOPE_MISMATCH]', $response->json('message'));
-=======
-        $this->assertStringContainsString('[SCOPE_MISMATCH]', $response->json('message'));
->>>>>>> e433085b6f469c495465fdc0d5893050aef28eb9
     }
 
     /** @test */
@@ -294,11 +278,7 @@ class AppSheetCanonicalScopeTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJsonFragment(['success' => false, 'error_code' => 'SCOPE_VIOLATION']);
-<<<<<<< HEAD
         $this->assertStringStartsWith('[LEGACY_SCOPE_DENIED]', $response->json('message'));
-=======
-        $this->assertStringContainsString('[LEGACY_SCOPE_DENIED]', $response->json('message'));
->>>>>>> e433085b6f469c495465fdc0d5893050aef28eb9
     }
 
     private function createLegacyFc(string $code = 'JKT', string $name = 'Jakarta'): array

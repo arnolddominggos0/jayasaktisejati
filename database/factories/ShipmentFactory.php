@@ -134,8 +134,7 @@ class ShipmentFactory extends Factory
                 'vehicle_type'   => null,
                 'vehicle_plate'  => null,
                 'pickup_date'    => null,
-                'driver_name'    => null,
-                'driver_phone'   => null,
+                'driver_id'      => null,
             ];
         }
 
@@ -157,8 +156,7 @@ class ShipmentFactory extends Factory
             'vehicle_type'   => $vehicleType,
             'vehicle_plate'  => strtoupper(fake()->bothify('B #### ??')),
             'pickup_date'    => fake()->dateTimeBetween('now', '+5 days'),
-            'driver_name'    => fake()->name(),
-            'driver_phone'   => '08' . fake()->numerify('##########'),
+            'driver_id'      => null,
 
             'vessel_name'    => null,
             'voyage'         => null,

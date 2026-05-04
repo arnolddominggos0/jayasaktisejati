@@ -52,8 +52,10 @@ class BriefingAttendanceHandler extends BaseSyncHandler
 
     public function afterSync($result): void
     {
-        if ($result instanceof BriefingAttendance) {
-            $this->recalculateBriefingSession($result->session_id);
+        $sessionId = $result->session_id ?? null;
+
+        if ($sessionId) {
+            $this->recalculateBriefingSession($sessionId);
         }
     }
 }

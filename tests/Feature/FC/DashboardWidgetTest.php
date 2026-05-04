@@ -71,13 +71,13 @@ class DashboardWidgetTest extends TestCase
     {
         return Shipment::query()
             ->where('mode', 'sea')
-            ->when($branchId, fn ($query) => $query->where(function ($w) use ($branchId) {
+            ->when($branchId, fn($query) => $query->where(function ($w) use ($branchId) {
                 $w->where('branch_id', $branchId)->orWhereNull('branch_id');
             }))
-            ->when($depotId, fn ($query) => $query->where(function ($w) use ($depotId, $fc) {
+            ->when($depotId, fn($query) => $query->where(function ($w) use ($depotId, $fc) {
                 $w->where('assigned_depot_id', $depotId)
                     ->orWhere('coordinator_id', $fc->id);
-            }), fn ($query) => $query->where('coordinator_id', $fc->id));
+            }), fn($query) => $query->where('coordinator_id', $fc->id));
     }
 
     /** @test */
@@ -195,14 +195,13 @@ class DashboardWidgetTest extends TestCase
         ShipmentTrack::create([
             'shipment_id' => $seaShipment->id,
             'status' => TrackStatus::Pickup->value,
-            'status_normalized' => 0,
             'tracked_at' => now(),
         ]);
+
         ShipmentTrack::create([
             'shipment_id' => $landShipment->id,
             'status' => TrackStatus::Pickup->value,
-            'status_normalized' => 0,
-            'tracked_at' => now(),
+            'tracked_at' => now()->addSecond(), 
         ]);
 
         $results = ShipmentTrack::query()
@@ -214,6 +213,7 @@ class DashboardWidgetTest extends TestCase
                             ->orWhere('coordinator_id', $fc->id);
                     });
             })
+            ->latest('tracked_at')
             ->pluck('shipment_id')
             ->toArray();
 
@@ -231,13 +231,13 @@ class DashboardWidgetTest extends TestCase
         ShipmentTrack::create([
             'shipment_id' => $shipment->id,
             'status' => TrackStatus::Pickup->value,
-            'status_normalized' => 0,
+            'status_normalized' => 10, // pickup = 10 per migration
             'tracked_at' => now(),
         ]);
         ShipmentTrack::create([
             'shipment_id' => $shipment->id,
             'status' => TrackStatus::Handover->value,
-            'status_normalized' => 0,
+            'status_normalized' => 20, // handover = 20 per migration
             'tracked_at' => now()->subDay(),
         ]);
 
@@ -357,7 +357,7 @@ class DashboardWidgetTest extends TestCase
 
         $stats = $method->invoke($widget);
 
-        $labels = array_map(fn ($stat) => $stat->getLabel(), $stats);
+        $labels = array_map(fn($stat) => $stat->getLabel(), $stats);
 
         $this->assertEquals('Urgent', $labels[0], 'Urgent should be the first KPI card');
         $this->assertEquals('On Hold', $labels[1], 'On Hold should be the second KPI card');

@@ -137,6 +137,27 @@ enum TrackStatus: string
         return $map[$key] ?? null;
     }
 
+    public function toNormalizedValue(): int
+    {
+        return match ($this) {
+            self::Pickup              => 10,
+            self::Handover            => 20,
+            self::Stuffing            => 30,
+            self::DeliveryToPort      => 40,
+            self::Stacking            => 50,
+            self::UnitLoading         => 60,
+            self::OnShip              => 70,
+            self::VesselDepart        => 80,
+            self::VesselArrival       => 90,
+            self::Unloading           => 100,
+            self::HandoverTrucking    => 105,
+            self::DeliveryToCustomer  => 110,
+            self::Delivered           => 120,
+            self::Hold                => 900,
+            self::Cancelled           => 999,
+        };
+    }
+
     public static function simplifiedForMode($mode, ?array $mask = null): array
     {
         $mask = array_merge([

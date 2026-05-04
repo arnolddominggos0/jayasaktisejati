@@ -77,4 +77,22 @@ class BriefingAttendance extends Model
             $this->bp_diastolic = (int) $m[2];
         }
     }
+
+    protected static function booted()
+    {
+        static::saved(function ($attendance) {
+            $session = $attendance->session;
+
+            if (!$session) return;
+
+            $presentCount = $session->attendances()
+                ->where('attendance_status', 'present')
+                ->count();
+
+            $session->summary_sufficient =
+                $presentCount >= $session->summary_headcount;
+
+            $session->saveQuietly();
+        });
+    }
 }

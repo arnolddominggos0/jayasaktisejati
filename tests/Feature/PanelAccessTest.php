@@ -4,8 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
-use Database\Seeders\RolesAndUsersSeeder;
 
 class PanelAccessTest extends TestCase
 {
@@ -15,7 +15,10 @@ class PanelAccessTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(RolesAndUsersSeeder::class);
+        // Create required roles
+        foreach (['super_admin', 'office_admin', 'field_coordinator'] as $role) {
+            Role::create(['name' => $role, 'guard_name' => 'web']);
+        }
     }
 
     /** @test */
@@ -24,10 +27,12 @@ class PanelAccessTest extends TestCase
         $fc = User::factory()->create();
         $fc->assignRole('field_coordinator');
 
-        $this->actingAs($fc);
+        $this->actingAs($fc, 'web');
 
-        $this->get('/fc')->assertOk();          
-        $this->get('/admin')->assertStatus(403); 
+        $this->followingRedirects();
+
+        $this->get('/fc')->assertStatus(302);
+        $this->get('/admin')->assertStatus(403);
     }
 
     /** @test */
@@ -36,9 +41,11 @@ class PanelAccessTest extends TestCase
         $admin = User::factory()->create();
         $admin->assignRole('office_admin');
 
-        $this->actingAs($admin);
+        $this->actingAs($admin, 'web');
 
-        $this->get('/admin')->assertOk();       
-        $this->get('/fc')->assertStatus(403);    
+        $this->followingRedirects();
+
+        $this->get('/admin')->assertOk();
+        $this->get('/fc')->assertStatus(403);
     }
 }

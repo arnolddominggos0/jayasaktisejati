@@ -19,7 +19,7 @@ class ShipmentTrackingWorkflowTest extends TestCase
     {
         $shipment = Shipment::factory()->create([
             'mode' => ShipmentMode::Sea->value,
-            'status' => ShipmentStatus::Transit->value,
+            'status' => ShipmentStatus::Pending->value, 
         ]);
 
         $this->expectException(DomainException::class);
@@ -32,7 +32,7 @@ class ShipmentTrackingWorkflowTest extends TestCase
     {
         $shipment = Shipment::factory()->create([
             'mode' => ShipmentMode::Sea->value,
-            'status' => ShipmentStatus::Transit->value,
+            'status' => ShipmentStatus::Pending->value, 
         ]);
 
         $track = $shipment->appendTrack(TrackStatus::Pickup, 'pickup done');
@@ -45,7 +45,7 @@ class ShipmentTrackingWorkflowTest extends TestCase
     {
         $shipment = Shipment::factory()->create([
             'mode' => ShipmentMode::Sea->value,
-            'status' => ShipmentStatus::Transit->value,
+            'status' => ShipmentStatus::Pending->value, 
         ]);
 
         $this->expectException(ValidationException::class);
@@ -56,12 +56,13 @@ class ShipmentTrackingWorkflowTest extends TestCase
     {
         $shipment = Shipment::factory()->create([
             'mode' => ShipmentMode::Sea->value,
-            'status' => ShipmentStatus::Transit->value,
+            'status' => ShipmentStatus::Pending->value, 
         ]);
 
         $shipment->appendTrack(TrackStatus::Pickup, 'pickup done');
 
         $this->expectException(ValidationException::class);
+
         $shipment->appendTrack(
             TrackStatus::Handover,
             'short',

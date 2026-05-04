@@ -130,6 +130,14 @@ class AppSheetBriefingIngestionTest extends TestCase
         ]);
 
         $session->refresh();
+
+        $presentCount = $session->attendances()
+            ->where('attendance_status', 'present')
+            ->count();
+
+        $this->assertEquals(1, $presentCount);
+        $this->assertTrue($presentCount >= $session->summary_headcount);
+
         $this->assertTrue($session->summary_sufficient);
 
         $this->assertDatabaseHas('appsheet_sync_logs', [
