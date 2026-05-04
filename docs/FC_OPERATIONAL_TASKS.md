@@ -2,6 +2,9 @@
 
 Dokumen ini memecah pekerjaan role **Field Coordinator (FC)** menjadi task kecil berurutan agar bisa dieksekusi satu per satu.
 
+> Dokumen PRD khusus FC untuk validasi ekspektasi tugas tersedia di `docs/PRD_FC.md`.
+> Draft planning perbaikan UI FC berbasis branch tersedia di `docs/PRD_FC_UI_BRANCH_PLAN.md`.
+
 ## 1) Scope FC
 
 Fokus role FC di project ini:
