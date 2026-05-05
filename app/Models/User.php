@@ -91,12 +91,6 @@ class User extends Authenticatable implements FilamentUser
                         throw new \InvalidArgumentException('User scope_branch_id does not match the unit\'s branch.');
                     }
                 }
-
-                // If scope_unit_id/type are cleared but scope_branch_id remains,
-                // that is acceptable because the canonical source of truth for WHO
-                // is coordinator is the depot/pool table. The user scope fields are
-                // derived. Clearing them here is only a soft desync resolved by
-                // the backfill / Slice-2 middleware canonical-scope guard.
             }
         });
     }

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -24,14 +25,15 @@ class PanelAccessTest extends TestCase
     /** @test */
     public function fc_can_access_fc_but_not_admin(): void
     {
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
         $fc = User::factory()->create();
         $fc->assignRole('field_coordinator');
 
         $this->actingAs($fc, 'web');
 
-        $this->followingRedirects();
+        $this->get('/fc')->assertStatus(403);
 
-        $this->get('/fc')->assertStatus(302);
         $this->get('/admin')->assertStatus(403);
     }
 

@@ -4,33 +4,45 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Filament\Facades\Filament;
-use Filament\Models\Contracts\FilamentUser;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsurePanelRole
 {
     public function handle($request, Closure $next): Response
     {
-        $user  = Filament::auth()->user();
+        $user  = Filament::auth()->user() ?? auth()->user();
         $panel = Filament::getCurrentPanel();
 
-        if (! $panel || ! $user || ! $user instanceof FilamentUser) {
+        if (! $user) {
             return $next($request);
         }
 
-        if (! $user->canAccessPanel($panel)) {
-            Filament::auth()->logout();
-            return redirect()->to($panel->getLoginUrl());
+        if ($panel) {
+            if ($panel->getId() === 'fc') {
+                if (! $user->hasAnyRole(['field_coordinator', 'super_admin'])) {
+                    abort(403, 'Panel ini khusus Koordinator Lapangan.');
+                }
+            }
+
+            if ($panel->getId() === 'customer') {
+                if (! $user->hasRole('customer')) {
+                    abort(403, 'Panel ini khusus untuk Customer.');
+                }
+            }
+
+            return $next($request);
         }
 
-        if ($panel->getId() === 'fc') {
-            if (! (method_exists($user, 'hasRole') && ($user->hasRole('field_coordinator') || $user->hasRole('super_admin')))) {
+        $path = $request->path();
+
+        if (str_starts_with($path, 'fc')) {
+            if (! $user->hasAnyRole(['field_coordinator', 'super_admin'])) {
                 abort(403, 'Panel ini khusus Koordinator Lapangan.');
             }
         }
 
-        if ($panel->getId() === 'customer') {
-            if (! (method_exists($user, 'hasRole') && $user->hasRole('customer'))) {
+        if (str_starts_with($path, 'customer')) {
+            if (! $user->hasRole('customer')) {
                 abort(403, 'Panel ini khusus untuk Customer.');
             }
         }

@@ -59,11 +59,11 @@ class FieldCoordinatorPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
-                EnsurePanelRole::class,
                 ScopeByBranchAndDepot::class,
             ])
             ->authMiddleware([
                 Authenticate::class,
+                EnsurePanelRole::class,
             ]);
     }
 }
