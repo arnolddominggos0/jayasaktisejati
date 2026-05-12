@@ -31,7 +31,7 @@
                 'short_name' => 'Surabaya',
                 'whatsapp' => '6281265559397',
                 'contact_person' => 'Admin Surabaya',
-                'address' => 'Jl. Kalianget No. 110, Surabaya, Jawa Timur 60165',
+                'address' => 'Jl. Kalianget No. 110, Perak Utara, Kec. Pabean Cantian, Surabaya, Jawa Timur 60165'
             ],
             'jakarta' => [
                 'name' => 'Jakarta (Kantor Cabang)',
@@ -45,7 +45,7 @@
                 'short_name' => 'Manado',
                 'whatsapp' => '624318142227',
                 'contact_person' => 'Admin Manado',
-                'address' => 'Jl. Arie Lasut Kombos Atas No. 84, Manado, Sulawesi Utara',
+                'address' => 'Jl. Kombos Atas No.84Kairagi Satu, Kec. Mapanget, Kota Manado, Sulawesi Utara',
             ],
         ],
 

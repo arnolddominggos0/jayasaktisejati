@@ -158,19 +158,21 @@ class AppSheetService
     {
         Log::info('MASUK PPE FUNCTION', $data);
 
-        while (isset($data['data']) && is_array($data['data'])) {
-            $data = $data['data'];
-        }
-        $attendanceId = $data['attendance_id'] ?? null;
-        $ppeType = $data['ppe_type'] ?? null;
-        $status = $data['status'] ?? null;
-        $catatan = $data['catatan'] ?? null;
+        $mappedData = $this->mapFields(
+            'briefing_attendance_ppe_items',
+            $data,
+            $submittedByUserId
+        );
+
+        $attendanceId = $mappedData['attendance_id'] ?? null;
+        $ppeType = $mappedData['ppe_type'] ?? null;
+        $condition = $mappedData['condition'] ?? null;
 
         if (!$attendanceId) {
-            throw new \Exception('DEBUG: attendance_id NULL');
+            throw new Exception('DEBUG: attendance_id NULL');
         }
 
-        $attendance = \App\Models\BriefingAttendance::find($attendanceId);
+        $attendance = BriefingAttendance::find($attendanceId);
 
         if (!$attendance) {
             throw new \Exception("DEBUG: attendance {$attendanceId} NOT FOUND");
@@ -180,31 +182,25 @@ class AppSheetService
             throw new \Exception('DEBUG: ppe_type NULL');
         }
 
-        if (!$status) {
-            throw new \Exception('DEBUG: status NULL');
+        if (!$condition) {
+            throw new \Exception('DEBUG: condition NULL');
         }
 
         return match ($operation) {
-            'create' => \App\Models\BriefingAttendancePpeItem::create([
-                'attendance_id' => $attendanceId,
-                'ppe_type' => $ppeType,
-                'status' => $status,
-                'catatan' => $catatan,
-            ]),
+            'create' => BriefingAttendancePpeItem::create($mappedData),
 
-            'update' => \App\Models\BriefingAttendancePpeItem::updateOrCreate(
-                [
-                    'attendance_id' => $attendanceId,
-                    'ppe_type' => $ppeType,
-                ],
-                [
-                    'status' => $status,
-                    'catatan' => $catatan,
-                ]
+            'update' => BriefingAttendancePpeItem::updateOrCreate(
+                ['attendance_id' => $attendanceId, 'ppe_type' => $ppeType],
+                $mappedData
             ),
 
-            'delete' => \App\Models\BriefingAttendancePpeItem::where('id', $data['id'] ?? 0)->delete(),
-
+            'delete' => BriefingAttendancePpeItem::where(
+                'attendance_id',
+                $attendanceId
+            )->where(
+                'ppe_type',
+                $ppeType
+            )->delete(),
             default => throw new \Exception("Unknown operation: {$operation}"),
         };
     }

@@ -26,6 +26,7 @@ class BriefingSession extends Model
         'backup_required',
         'backup_type',     // internal/external
         'backup_notes',
+        'briefing_evidence_path',
     ];
 
     protected $casts = [

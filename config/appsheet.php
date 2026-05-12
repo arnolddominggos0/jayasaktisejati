@@ -49,6 +49,7 @@ return [
                 'notes' => 'Catatan',
                 'summary_headcount' => 'Jumlah MP Dibutuhkan',
                 'summary_solution' => 'Solusi Kekurangan',
+                'briefing_evidence_path' => 'Foto Briefing',
             ],
         ],
 
