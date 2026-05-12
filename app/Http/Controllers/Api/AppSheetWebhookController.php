@@ -95,6 +95,58 @@ class AppSheetWebhookController extends Controller
         }
     }
 
+
+    /**
+     * Ringkasan briefing beserta attendance, PPE items, checklist, dan loading session untuk AppSheet.
+     */
+    public function briefingSummary(Request $request): JsonResponse
+    {
+        try {
+            $signature = $request->header('X-AppSheet-Signature');
+            if ($signature && ! $this->appSheetService->validateWebhookSignature($signature, $request->all())) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid signature',
+                ], 401);
+            }
+
+            $filters = $request->validate([
+                'session_id' => 'nullable|integer|exists:briefing_sessions,id',
+                'date' => 'nullable|date',
+                'date_from' => 'nullable|date',
+                'date_to' => 'nullable|date|after_or_equal:date_from',
+                'depot_id' => 'nullable|integer|exists:depots,id',
+                'limit' => 'nullable|integer|min:1|max:200',
+                'submitted_by_user_id' => 'nullable|integer|exists:users,id',
+            ]);
+
+            $submittedByUserId = $filters['submitted_by_user_id'] ?? null;
+            unset($filters['submitted_by_user_id']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Briefing summary generated successfully',
+                'data' => $this->appSheetService->getBriefingSummary($filters, $submittedByUserId),
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\DomainException $e) {
+            Log::warning('AppSheet briefing summary scope error: '.$e->getMessage(), [
+                'request' => $request->all(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'error_code' => 'SCOPE_VIOLATION',
+            ], 403);
+        }
+    }
+
     /**
      * Test endpoint untuk cek koneksi
      */

@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\AppSheetWebhookController;
 // AppSheet Webhook Routes (Public - validated by signature)
 Route::prefix('appsheet')->group(function () {
     Route::post('webhook', [AppSheetWebhookController::class, 'handle'])->name('appsheet.webhook');
+    Route::match(['get', 'post'], 'briefing-summary', [AppSheetWebhookController::class, 'briefingSummary'])->name('appsheet.briefing-summary');
     Route::get('test', [AppSheetWebhookController::class, 'test'])->name('appsheet.test');
 });
 
