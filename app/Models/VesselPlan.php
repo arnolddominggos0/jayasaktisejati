@@ -93,11 +93,6 @@ class VesselPlan extends Model
             ->first();
     }
 
-    public static function resolveTamCustomerId(): ?int
-    {
-        return static::resolveTamCustomer()?->id;
-    }
-
     public static function generateForMonth(Carbon $periodMonth): self
     {
         return app(VesselPlanGenerator::class)->generateForMonth($periodMonth);

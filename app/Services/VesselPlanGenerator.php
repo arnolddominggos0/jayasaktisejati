@@ -5,51 +5,72 @@ namespace App\Services;
 use App\Enums\VesselPlanStatus;
 use App\Models\VesselPlan;
 use Illuminate\Support\Carbon;
-use DomainException;
 
 class VesselPlanGenerator
 {
     public function generateNextMonth(): ?VesselPlan
     {
-        $latest = VesselPlan::orderByDesc('period_month')->first();
+        $latest = VesselPlan::query()
+            ->orderByDesc('period_month')
+            ->first();
 
         $nextMonth = $latest
-            ? Carbon::parse($latest->period_month)->addMonth()->startOfMonth()
+            ? Carbon::parse($latest->period_month)
+                ->addMonth()
+                ->startOfMonth()
             : now()->startOfMonth();
 
-        if (VesselPlan::where('period_month', $nextMonth)->exists()) {
+        $existing = VesselPlan::query()
+            ->whereDate('period_month', $nextMonth)
+            ->first();
+
+        if ($existing) {
             return null;
         }
 
-        return VesselPlan::create([
-            'period_month' => $nextMonth,
+        $defaultPorts = VesselPlan::query()
+            ->getModel()
+            ->resolveRoutePortIds();
+
+        $plan = VesselPlan::create([
+            'period_month' => $nextMonth->toDateString(),
+
             'route_code'   => $latest?->route_code ?? 'JKT-BTG',
-            'customer_id'  => $latest?->customer_id ?? VesselPlan::resolveTamCustomerId(),
-            'pol_id'       => $latest?->pol_id ?? VesselPlan::query()->getModel()->resolveRoutePortIds()['pol_id'] ?? null,
-            'pod_id'       => $latest?->pod_id ?? VesselPlan::query()->getModel()->resolveRoutePortIds()['pod_id'] ?? null,
+
+            'pol_id'       => $latest?->pol_id
+                ?? $defaultPorts['pol_id']
+                ?? null,
+
+            'pod_id'       => $latest?->pod_id
+                ?? $defaultPorts['pod_id']
+                ?? null,
+
             'status'       => VesselPlanStatus::Draft,
         ]);
+
+        return $plan;
     }
 
     public function generateForMonth(Carbon $periodMonth): VesselPlan
     {
-        $period = $periodMonth->copy()->startOfMonth();
+        $period = $periodMonth
+            ->copy()
+            ->startOfMonth();
 
-        $existing = VesselPlan::query()->whereDate('period_month', $period)->first();
+        $existing = VesselPlan::query()
+            ->whereDate('period_month', $period)
+            ->first();
+
         if ($existing) {
             return $existing;
         }
 
-        $customerId = VesselPlan::resolveTamCustomerId();
-        if (! $customerId) {
-            throw new DomainException('Customer TAM (Toyota Astra Motor) belum tersedia.');
-        }
-
         $plan = VesselPlan::create([
             'period_month' => $period->toDateString(),
-            'route_code' => 'JKT-BTG',
-            'customer_id' => $customerId,
-            'status' => VesselPlanStatus::Draft,
+
+            'route_code'   => 'JKT-BTG',
+
+            'status'       => VesselPlanStatus::Draft,
         ]);
 
         $plan->syncRoutePorts();
