@@ -1,11 +1,11 @@
-@props(['contact' => null])
+﻿@props(['contact' => null])
 
-<div class="text-sm text-gray-700">
-    @if($contact)
-    <div><strong>{{ $contact['name'] ?? '-' }}</strong></div>
-    <div>{{ $contact['phone'] ?? '-' }}</div>
-    <div class="truncate">{{ $contact['addr'] ?? '-' }}</div>
-    @else
-    <div class="italic text-gray-400">Belum ada kontak</div>
-    @endif
+<div class="text-sm text-gray-700 dark:text-slate-300">
+ @if($contact)
+ <div><strong>{{ $contact['name'] ?? '-' }}</strong></div>
+ <div>{{ $contact['phone'] ?? '-' }}</div>
+ <div class="truncate">{{ $contact['addr'] ?? '-' }}</div>
+ @else
+ <div class="italic text-gray-400">Belum ada kontak</div>
+ @endif
 </div>

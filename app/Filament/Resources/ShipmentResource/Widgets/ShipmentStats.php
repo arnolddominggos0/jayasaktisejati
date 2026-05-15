@@ -71,7 +71,7 @@ class ShipmentStats extends BaseWidget
                 // ->descriptionIcon($deltaDraft['icon'])
                 // ->descriptionColor($deltaDraft['color'])
                 ->chart($dailyDraft) // mini sparkline
-                ->extraAttributes(['class' => 'rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-800 py-4 px-4']),
+                ->extraAttributes(['class' => 'rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-slate-800 py-4 px-4']),
 
             Stat::make('In Progress', number_format($inProgress))
                 ->icon('heroicon-m-arrow-path')
@@ -80,7 +80,7 @@ class ShipmentStats extends BaseWidget
                 // ->descriptionIcon($deltaProgress['icon'])
                 // ->descriptionColor($deltaProgress['color'])
                 ->chart($dailyProgress)
-                ->extraAttributes(['class' => 'rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-800 py-4 px-4']),
+                ->extraAttributes(['class' => 'rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-slate-800 py-4 px-4']),
 
             Stat::make('Delivered', number_format($delivered))
                 ->icon('heroicon-m-check-badge')
@@ -89,7 +89,7 @@ class ShipmentStats extends BaseWidget
                 // ->descriptionIcon($deltaDelivered['icon'])
                 // ->descriptionColor($deltaDelivered['color'])
                 ->chart($dailyDelivered)
-                ->extraAttributes(['class' => 'rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-800 py-4 px-4']),
+                ->extraAttributes(['class' => 'rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-slate-800 py-4 px-4']),
         ];
     }
 

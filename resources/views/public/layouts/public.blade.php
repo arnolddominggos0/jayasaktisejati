@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
@@ -65,18 +65,33 @@
             width: 8px;
             height: 8px;
         }
-        
+
         ::-webkit-scrollbar-track {
             background: #f1f5f9;
         }
-        
+        @media (prefers-color-scheme: dark) {
+            ::-webkit-scrollbar-track {
+                background: #1f2937;
+            }
+        }
+
         ::-webkit-scrollbar-thumb {
             background: #94a3b8;
             border-radius: 4px;
         }
-        
+        @media (prefers-color-scheme: dark) {
+            ::-webkit-scrollbar-thumb {
+                background: #4b5563;
+            }
+        }
+
         ::-webkit-scrollbar-thumb:hover {
             background: #64748b;
+        }
+        @media (prefers-color-scheme: dark) {
+            ::-webkit-scrollbar-thumb:hover {
+                background: #6b7280;
+            }
         }
         
         /* Responsive typography */
@@ -152,10 +167,10 @@
     
     @stack('styles')
 </head>
-<body class="antialiased text-slate-800 bg-white smooth-scroll">
+<body class="antialiased text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950 smooth-scroll">
     
     <!-- Navigation - Modern Corporate Style -->
-    <nav id="navbar" class="fixed w-full z-50 transition-all duration-300 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
+    <nav id="navbar" class="fixed w-full z-50 transition-all duration-300 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800/80 shadow-sm">
         <div class="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
             <div class="flex justify-between items-center h-20">
                 <!-- LEFT: Logo -->
@@ -165,7 +180,7 @@
                             <img src="{{ asset('images/logo.png') }}" alt="JSS Logo" class="h-12 w-auto transition-transform group-hover:scale-105">
                         </div>
                         <div class="hidden lg:block">
-                            <span class="text-slate-900 font-bold text-lg block leading-tight tracking-tight">Jaya Sakti Sejati</span>
+                            <span class="text-slate-900 dark:text-white font-bold text-lg block leading-tight tracking-tight">Jaya Sakti Sejati</span>
                             <span class="text-blue-600 text-xs font-medium uppercase tracking-wider">Freight Forwarding</span>
                         </div>
                     </a>
@@ -173,9 +188,9 @@
                 
                 <!-- CENTER: Navigation Menu -->
                 <div class="hidden md:flex items-center space-x-1">
-                    <a href="{{ route('landing') }}" class="px-4 py-2 text-slate-600 hover:text-blue-600 font-medium transition-all rounded-lg hover:bg-blue-50/50">Beranda</a>
-                    <a href="{{ route('landing') }}#layanan" class="px-4 py-2 text-slate-600 hover:text-blue-600 font-medium transition-all rounded-lg hover:bg-blue-50/50">Layanan</a>
-                    <a href="{{ route('landing') }}#kontak" class="px-4 py-2 text-slate-600 hover:text-blue-600 font-medium transition-all rounded-lg hover:bg-blue-50/50">Kontak</a>
+                    <a href="{{ route('landing') }}" class="px-4 py-2 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-all rounded-lg hover:bg-blue-50/50 dark:hover:bg-blue-900/20">Beranda</a>
+                    <a href="{{ route('landing') }}#layanan" class="px-4 py-2 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-all rounded-lg hover:bg-blue-50/50 dark:hover:bg-blue-900/20">Layanan</a>
+                    <a href="{{ route('landing') }}#kontak" class="px-4 py-2 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 font-medium transition-all rounded-lg hover:bg-blue-50/50 dark:hover:bg-blue-900/20">Kontak</a>
                 </div>
                 
                 <!-- RIGHT: CTA Buttons -->
@@ -189,7 +204,7 @@
                     </a>
                     
                     <!-- Login Button - Secondary -->
-                    <a href="{{ url('/portal') }}" class="inline-flex items-center px-5 py-2.5 border-2 border-slate-200 text-slate-700 font-semibold rounded-xl hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50/50 transition-all">
+                    <a href="{{ url('/portal') }}" class="inline-flex items-center px-5 py-2.5 border-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-xl hover:border-blue-600 hover:text-blue-600 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                         </svg>
@@ -206,7 +221,7 @@
                         </svg>
                     </a>
                     
-                    <button id="mobile-menu-btn" class="text-slate-600 hover:text-blue-600 focus:outline-none p-2 rounded-lg hover:bg-slate-100 transition-colors" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobile-menu">
+                    <button id="mobile-menu-btn" class="text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/40 transition-colors" aria-label="Toggle menu" aria-expanded="false" aria-controls="mobile-menu">
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
@@ -216,28 +231,28 @@
         </div>
         
         <!-- Mobile Menu - Slide Down -->
-        <div id="mobile-menu" class="hidden md:hidden bg-white border-t border-slate-200 shadow-lg">
+        <div id="mobile-menu" class="hidden md:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-lg">
             <div class="px-4 py-4 space-y-2 max-w-[1440px] mx-auto">
-                <a href="{{ route('landing') }}" class="flex items-center px-4 py-3 text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl font-medium transition-colors">
+                <a href="{{ route('landing') }}" class="flex items-center px-4 py-3 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl font-medium transition-colors">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                     </svg>
                     Beranda
                 </a>
-                <a href="{{ route('landing') }}#layanan" class="flex items-center px-4 py-3 text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl font-medium transition-colors">
+                <a href="{{ route('landing') }}#layanan" class="flex items-center px-4 py-3 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl font-medium transition-colors">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                     </svg>
                     Layanan
                 </a>
-                <a href="{{ route('landing') }}#kontak" class="flex items-center px-4 py-3 text-slate-700 hover:text-blue-600 hover:bg-blue-50 rounded-xl font-medium transition-colors">
+                <a href="{{ route('landing') }}#kontak" class="flex items-center px-4 py-3 text-slate-700 dark:text-slate-200 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl font-medium transition-colors">
                     <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                     </svg>
                     Kontak
                 </a>
-                <div class="pt-2 border-t border-slate-200 mt-2">
-                    <a href="{{ url('/portal') }}" class="flex items-center px-4 py-3 text-blue-600 font-semibold hover:bg-blue-50 rounded-xl transition-colors">
+                <div class="pt-2 border-t border-slate-200 dark:border-slate-800 mt-2">
+                    <a href="{{ url('/portal') }}" class="flex items-center px-4 py-3 text-blue-600 dark:text-blue-400 font-semibold hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors">
                         <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                         </svg>

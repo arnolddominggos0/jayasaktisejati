@@ -57,9 +57,9 @@ class VesselPlanAnalysis extends Widget
             },
 
             'statusBg' => match ($sop['color']) {
-                'success' => 'bg-green-50',
-                'danger'  => 'bg-red-50',
-                default   => 'bg-gray-50',
+                'success' => 'bg-green-50 dark:bg-green-950/30',
+                'danger'  => 'bg-red-50 dark:bg-red-950/30',
+                default   => 'bg-gray-50 dark:bg-slate-800',
             },
         ];
     }

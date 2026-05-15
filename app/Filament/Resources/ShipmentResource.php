@@ -262,7 +262,7 @@ class ShipmentResource extends Resource
                                         ->action(fn (Set $set) => $set('pickup_contact_use_custom', false)),
                                 ])
                                 ->extraAttributes([
-                                    'class' => 'text-sm text-gray-700 break-words whitespace-pre-line leading-relaxed md:line-clamp-none line-clamp-4',
+                                    'class' => 'text-sm text-gray-700 dark:text-slate-300 break-words whitespace-pre-line leading-relaxed md:line-clamp-none line-clamp-4',
                                 ])
                                 ->columnSpan(['default' => 12, 'md' => 6]),
                             Placeholder::make('delivery_contact_summary')
@@ -338,7 +338,7 @@ class ShipmentResource extends Resource
                                         ->action(fn (Set $set) => $set('delivery_contact_use_custom', false)),
                                 ])
                                 ->extraAttributes([
-                                    'class' => 'text-sm text-gray-700 break-words whitespace-pre-line leading-relaxed md:line-clamp-none line-clamp-4',
+                                    'class' => 'text-sm text-gray-700 dark:text-slate-300 break-words whitespace-pre-line leading-relaxed md:line-clamp-none line-clamp-4',
                                 ])
                                 ->columnSpan(['default' => 12, 'md' => 6]),
                             Hidden::make('pickup_contact_use_custom')->default(false)->dehydrated(false),

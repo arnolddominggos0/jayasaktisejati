@@ -60,7 +60,7 @@ class FcKpiStats extends Widget
                 ->color($onHold > 0 ? 'warning' : 'gray'),
 
             Stat::make('ETA Dekat', $nearEta)
-                ->description('ETA ≤ 24 jam')
+                ->description('ETA ≤ 1 Hari')
                 ->descriptionIcon('heroicon-m-clock')
                 ->color($nearEta > 0 ? 'warning' : 'success'),
 

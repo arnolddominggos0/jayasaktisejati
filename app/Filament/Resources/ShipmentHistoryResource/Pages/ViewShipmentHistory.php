@@ -86,7 +86,7 @@ class ViewShipmentHistory extends ViewRecord
                 TextEntry::make('destinationCity.name')->label('Tujuan'),
                 TextEntry::make('route_summary')->label('Ringkas')->columnSpan(2)
                     ->formatStateUsing(fn($state) => $state ?: '—')
-                    ->extraAttributes(['class' => 'text-sm text-gray-700']),
+                    ->extraAttributes(['class' => 'text-sm text-gray-700 dark:text-slate-300']),
                 IconEntry::make('mode')->label('Moda')
                     ->icon(fn($state) => ($state?->value ?? $state) === 'sea' ? 'heroicon-o-cog-8-tooth' : 'heroicon-m-truck')
                     ->color(fn($state) => ($state?->value ?? $state) === 'sea' ? 'primary' : 'warning'),

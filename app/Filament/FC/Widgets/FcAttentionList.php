@@ -37,24 +37,18 @@ class FcAttentionList extends BaseWidget
             return null;
         }
 
-        $diff = now()->diffInMinutes($eta, false);
+        $days = now()->diffInDays($eta, false);
 
-        if ($diff <= 0) {
-            $ago = now()->diffForHumans($eta, true);
-            return "Lewat {$ago}";
+        if ($days <= 0) {
+            $pastDays = abs((int) $days);
+            return $pastDays <= 1
+                ? 'Lewat 1 Hari'
+                : "Lewat {$pastDays} Hari";
         }
 
-        if ($diff < 60) {
-            return (int) $diff . ' menit lagi';
-        }
-
-        if ($diff < 1440) {
-            $hours = (int) ($diff / 60);
-            return "{$hours} jam lagi";
-        }
-
-        $days = (int) ($diff / 1440);
-        return "{$days} hari lagi";
+        return $days <= 1
+            ? '1 Hari lagi'
+            : "{$days} Hari lagi";
     }
 
     public function table(Table $table): Table

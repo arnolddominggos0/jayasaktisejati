@@ -1,4 +1,4 @@
-@php
+﻿@php
 use App\Enums\TrackStatus;
 use Illuminate\Support\Facades\Storage;
 
@@ -15,13 +15,13 @@ $order = TrackStatus::orderSea();
 // For progress calculation, use last non-terminal track when current is Hold/Cancelled
 $progressVal = $latestVal;
 if (in_array($progressVal, ['hold', 'cancelled'], true)) {
-    $prev = $tracks->reverse()->first(fn($t) => ! in_array($t->status?->value, ['hold', 'cancelled'], true));
-    $progressVal = $prev?->status?->value;
+ $prev = $tracks->reverse()->first(fn($t) => ! in_array($t->status?->value, ['hold', 'cancelled'], true));
+ $progressVal = $prev?->status?->value;
 }
 
 $fmt = function ($dt) {
 if (! $dt) {
-return '—';
+return '-';
 }
 
 return $dt
@@ -58,20 +58,20 @@ return $isDone ? 'bg-green-600 ring-2 ring-green-200' : 'bg-gray-300 ring-2 ring
 };
 
 $chip = function (bool $isDone, bool $isCurrent) {
-if ($isCurrent) return 'text-blue-900 bg-blue-100 ring-1 ring-blue-300 shadow-sm';
+if ($isCurrent) return 'text-blue-900 bg-blue-100 ring-1 ring-blue-300';
 if ($isDone) return 'text-green-800 bg-green-100 ring-1 ring-green-200';
-return 'text-gray-700 bg-gray-100 ring-1 ring-gray-200';
+return 'text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-800 ring-1 ring-gray-200';
 };
 
 $iconTint = function (bool $isDone, bool $isCurrent) {
-if ($isCurrent) return 'text-blue-600';
-if ($isDone) return 'text-green-600';
+if ($isCurrent) return 'text-blue-600 dark:text-blue-400';
+if ($isDone) return 'text-green-600 dark:text-green-400';
 return 'text-gray-400';
 };
 
 $describeStep = function ($hit, bool $curr, string $val) {
 if (!empty($hit?->note)) {
-return ['text' => $hit->note, 'class' => 'text-gray-900'];
+return ['text' => $hit->note, 'class' => 'text-gray-900 dark:text-white'];
 }
 
 if ($hit) {
@@ -95,10 +95,10 @@ $defaultDone = match ($val) {
 default => 'Selesai.',
 };
 
-return ['text' => $defaultDone, 'class' => 'text-green-700'];
+return ['text' => $defaultDone, 'class' => 'text-green-700 dark:text-green-300'];
 }
 
-return ['text' => 'Menunggu proses ini.', 'class' => 'text-gray-500'];
+return ['text' => 'Menunggu proses ini.', 'class' => 'text-gray-500 dark:text-slate-400'];
 };
 
 $totalSteps = count($order);
@@ -107,150 +107,150 @@ $doneCount = $currentIndex === false ? 0 : $currentIndex + 1;
 $progressPct = $totalSteps > 0 ? intval(round(($doneCount / $totalSteps) * 100)) : 0;
 @endphp
 
-<section class="rounded-xl border border-gray-200 bg-white shadow-sm">
-    <header class="px-4 sm:px-6 py-3 border-b border-gray-100">
-        <div class="flex items-center justify-between gap-2">
-            <h3 class="text-sm font-semibold text-gray-900">Timeline Status</h3>
+<section class="rounded-xl border border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 dark:shadow-sm dark:shadow-black/10">
+ <header class="px-4 sm:px-6 py-3 border-b border-gray-200 dark:border-slate-800">
+ <div class="flex items-center justify-between gap-2">
+ <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Timeline Status</h3>
 
-            @if ($latestVal)
-            @php $latest = $tracks->last(); @endphp
-            <div class="hidden sm:flex items-center gap-2 text-xs">
-                <span class="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 ring-1 ring-gray-200 text-gray-700">
-                    <x-filament::icon :icon="$icon($latest->status->value)" class="h-4 w-4 text-gray-400" />
-                    {{ $label($latest->status ?? null) }}
-                </span>
-                <span class="text-gray-400">•</span>
-                <time class="text-gray-500">{{ $fmt($latest->tracked_at) }}</time>
-            </div>
-            @endif
-        </div>
+ @if ($latestVal)
+ @php $latest = $tracks->last(); @endphp
+ <div class="hidden sm:flex items-center gap-2 text-xs">
+ <span class="inline-flex items-center gap-1 rounded-md bg-gray-50 dark:bg-slate-950 px-2 py-1 ring-1 ring-gray-200 text-gray-700 dark:text-slate-300">
+ <x-filament::icon :icon="$icon($latest->status->value)" class="h-4 w-4 text-gray-400" />
+ {{ $label($latest->status ?? null) }}
+ </span>
+ <span class="text-gray-400">·</span>
+ <time class="text-gray-500 dark:text-slate-400">{{ $fmt($latest->tracked_at) }}</time>
+ </div>
+ @endif
+ </div>
 
-        <div class="mt-3">
-            <div class="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
-                <div class="h-full rounded-full bg-blue-500 bg-gradient-to-r from-green-500 via-green-400 to-blue-500" style="width: {{ $progressPct }}%"></div>
-            </div>
-            <div class="mt-1.5 flex items-center justify-between text-[11px] text-gray-500">
-                <span>{{ $doneCount }}/{{ $totalSteps }} tahap</span>
-                <span>{{ $progressPct }}%</span>
-            </div>
-        </div>
-    </header>
+ <div class="mt-3">
+ <div class="h-1.5 w-full rounded-full bg-gray-100 dark:bg-slate-800 overflow-hidden">
+ <div class="h-full rounded-full bg-blue-500 from-green-500 via-green-400 to-blue-500" style="width: {{ $progressPct }}%"></div>
+ </div>
+ <div class="mt-1.5 flex items-center justify-between text-[11px] text-gray-500 dark:text-slate-400">
+ <span>{{ $doneCount }}/{{ $totalSteps }} tahap</span>
+ <span>{{ $progressPct }}%</span>
+ </div>
+ </div>
+ </header>
 
-    <div class="relative">
-        <div class="absolute left-8 sm:left-10 top-0 bottom-0 w-px bg-gray-200"></div>
+ <div class="relative">
+ <div class="absolute left-8 sm:left-10 top-0 bottom-0 w-px bg-gray-200 dark:bg-slate-700"></div>
 
-        <ul class="m-0 p-0 list-none">
-            @foreach ($order as $idx => $step)
-            @php
-            $val = (string) $step->value;
-            $hit = $tracks->firstWhere('status.value', $val);
-            $done = (bool) $hit;
-            $curr = $latestVal === $val;
+ <ul class="m-0 p-0 list-none">
+ @foreach ($order as $idx => $step)
+ @php
+ $val = (string) $step->value;
+ $hit = $tracks->firstWhere('status.value', $val);
+ $done = (bool) $hit;
+ $curr = $latestVal === $val;
 
-            $hasNext = $idx < ($totalSteps - 1);
-                $connector=$curr || $done ? 'from-green-400 to-green-200' : 'from-gray-200 to-gray-200' ;
-                $rowWrap=$curr ? 'bg-blue-50 ring-1 ring-blue-300' : ($done ? 'bg-white' : 'hover:bg-gray-50' );
+ $hasNext = $idx < ($totalSteps - 1);
+ $connector=$curr || $done ? 'from-green-400 to-green-200' : 'from-gray-200 to-gray-200' ;
+ $rowWrap=$curr ? 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300' : ($done ? 'bg-white dark:bg-slate-900' : 'hover:bg-gray-50 dark:bg-slate-950' );
 
-                $d=$describeStep($hit, $curr, $val);
-                @endphp
+ $d=$describeStep($hit, $curr, $val);
+ @endphp
 
-                <li class="relative">
-                @if ($hasNext)
-                <div class="absolute left-8 sm:left-10 top-9 bottom-[-8px] w-px bg-gradient-to-b {{ $connector }}"></div>
-                @endif
+ <li class="relative">
+ @if ($hasNext)
+ <div class="absolute left-8 sm:left-10 top-9 bottom-[-8px] w-px bg-gradient-to-b {{ $connector }}"></div>
+ @endif
 
-                <div class="rounded-lg {{ $rowWrap }} transition-colors">
-                    <div class="grid grid-cols-[2rem_1fr_auto] sm:grid-cols-[2.5rem_1fr_12rem] items-start gap-3 sm:gap-4 px-3 sm:px-6 py-2.5 sm:py-3">
-                        <div class="flex items-start justify-center">
-                            <div class="mt-1 h-3 w-3 rounded-full {{ $dot($done, $curr) }}"></div>
-                        </div>
+ <div class="rounded-lg {{ $rowWrap }} transition-colors">
+ <div class="grid grid-cols-[2rem_1fr_auto] sm:grid-cols-[2.5rem_1fr_12rem] items-start gap-3 sm:gap-4 px-3 sm:px-6 py-2.5 sm:py-3">
+ <div class="flex items-start justify-center">
+ <div class="mt-1 h-3 w-3 rounded-full {{ $dot($done, $curr) }}"></div>
+ </div>
 
-                        <div class="min-w-0">
-                            <div class="flex items-start gap-3">
-                                <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-gray-200 bg-white shadow-sm">
-                                    <x-filament::icon :icon="$icon($val)" class="h-5 w-5 {{ $iconTint($done, $curr) }}" />
-                                </span>
+ <div class="min-w-0">
+ <div class="flex items-start gap-3">
+                                <span class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-gray-200 bg-white dark:bg-slate-900">
+ <x-filament::icon :icon="$icon($val)" class="h-5 w-5 {{ $iconTint($done, $curr) }}" />
+ </span>
 
-                                <div class="min-w-0">
-                                    <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                        <span class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium {{ $chip($done, $curr) }}">
-                                            {{ $step->label() }}
-                                        </span>
+ <div class="min-w-0">
+ <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+ <span class="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium {{ $chip($done, $curr) }}">
+ {{ $step->label() }}
+ </span>
 
-                                        @if ($curr)
-                                        <span class="inline-flex items-center rounded-md bg-blue-100 text-blue-900 ring-1 ring-blue-300 px-1.5 py-0.5 text-[10px] font-semibold">
-                                            Berlangsung
-                                        </span>
-                                        @endif
+ @if ($curr)
+ <span class="inline-flex items-center rounded-md bg-blue-100 text-blue-900 ring-1 ring-blue-300 px-1.5 py-0.5 text-[10px] font-semibold">
+ Berlangsung
+ </span>
+ @endif
 
-                                        @if ($hit?->location)
-                                        <span class="text-[11px] text-gray-500 italic truncate max-w-[18rem]">{{ $hit->location }}</span>
-                                        @endif
+ @if ($hit?->location)
+ <span class="text-[11px] text-gray-500 dark:text-slate-400 italic truncate max-w-[18rem]">{{ $hit->location }}</span>
+ @endif
 
-                                        @if ($hit?->user?->name)
-                                        <span class="text-[11px] text-gray-500">oleh {{ $hit->user->name }}</span>
-                                        @endif
-                                    </div>
+ @if ($hit?->user?->name)
+ <span class="text-[11px] text-gray-500 dark:text-slate-400">oleh {{ $hit->user->name }}</span>
+ @endif
+ </div>
 
-                                    <p class="mt-1 text-[13px] leading-6 {{ $d['class'] }} line-clamp-2">
-                                        {{ $d['text'] }}
-                                    </p>
+ <p class="mt-1 text-[13px] leading-6 {{ $d['class'] }} line-clamp-2">
+ {{ $d['text'] }}
+ </p>
 
-                                    @if ($hit && !empty($hit->checkseet) && is_array($hit->checkseet))
-                                    <div class="mt-2 space-y-1.5">
-                                        @foreach ($hit->checkseet as $item)
-                                        @php
-                                            $csStatus = $item['checkseet_status'] ?? '-';
-                                            $csBadge = match ($csStatus) {
-                                                'ok' => 'bg-green-100 text-green-800 ring-green-200',
-                                                'ng' => 'bg-red-100 text-red-800 ring-red-200',
-                                                default => 'bg-gray-100 text-gray-700 ring-gray-200',
-                                            };
-                                        @endphp
-                                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                                            <span class="inline-flex items-center rounded px-1.5 py-0.5 ring-1 {{ $csBadge }}">
-                                                {{ strtoupper($csStatus) }}
-                                            </span>
-                                            <span class="text-gray-700">
-                                                {{ $item['model'] ?? '—' }}
-                                                @if (!empty($item['no_rangka']))
-                                                <span class="text-gray-400">· {{ $item['no_rangka'] }}</span>
-                                                @endif
-                                            </span>
-                                        </div>
-                                        @endforeach
-                                    </div>
-                                    @endif
+ @if ($hit && !empty($hit->checkseet) && is_array($hit->checkseet))
+ <div class="mt-2 space-y-1.5">
+ @foreach ($hit->checkseet as $item)
+ @php
+ $csStatus = $item['checkseet_status'] ?? '-';
+ $csBadge = match ($csStatus) {
+ 'ok' => 'bg-green-100 text-green-800 ring-green-200',
+ 'ng' => 'bg-red-100 text-red-800 ring-red-200',
+ default => 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 ring-gray-200',
+ };
+ @endphp
+ <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+ <span class="inline-flex items-center rounded px-1.5 py-0.5 ring-1 {{ $csBadge }}">
+ {{ strtoupper($csStatus) }}
+ </span>
+ <span class="text-gray-700 dark:text-slate-300">
+ {{ $item['model'] ?? '—' }}
+ @if (!empty($item['no_rangka']))
+ <span class="text-gray-400">· {{ $item['no_rangka'] }}</span>
+ @endif
+ </span>
+ </div>
+ @endforeach
+ </div>
+ @endif
 
-                                    @if ($hit && !empty($hit->attachments) && is_array($hit->attachments))
-                                    <div class="mt-2 flex flex-wrap gap-2">
-                                        @foreach ($hit->attachments as $att)
-                                        @if (is_string($att) && $att)
-                                        <a href="{{ Storage::url($att) }}" target="_blank" class="inline-flex items-center gap-1 rounded-md bg-gray-50 px-2 py-1 text-[11px] text-gray-600 ring-1 ring-gray-200 hover:bg-gray-100">
-                                            <x-filament::icon icon="heroicon-m-paper-clip" class="h-3.5 w-3.5 text-gray-400" />
-                                            Lampiran
-                                        </a>
-                                        @endif
-                                        @endforeach
-                                    </div>
-                                    @endif
+ @if ($hit && !empty($hit->attachments) && is_array($hit->attachments))
+ <div class="mt-2 flex flex-wrap gap-2">
+ @foreach ($hit->attachments as $att)
+ @if (is_string($att) && $att)
+ <a href="{{ Storage::url($att) }}" target="_blank" class="inline-flex items-center gap-1 rounded-md bg-gray-50 dark:bg-slate-950 px-2 py-1 text-[11px] text-gray-600 dark:text-slate-400 ring-1 ring-gray-200 hover:bg-gray-100 dark:bg-slate-800">
+ <x-filament::icon icon="heroicon-m-paper-clip" class="h-3.5 w-3.5 text-gray-400" />
+ Lampiran
+ </a>
+ @endif
+ @endforeach
+ </div>
+ @endif
 
-                                    <div class="mt-0.5 text-xs text-gray-500 sm:hidden">
-                                        {{ $hit?->tracked_at ? $fmt($hit->tracked_at) : '' }}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+ <div class="mt-0.5 text-xs text-gray-500 dark:text-slate-400 sm:hidden">
+ {{ $hit?->tracked_at ? $fmt($hit->tracked_at) : '' }}
+ </div>
+ </div>
+ </div>
+ </div>
 
-                        <div class="hidden sm:flex items-start justify-end">
-                            <time class="text-xs text-gray-500">{{ $hit?->tracked_at ? $fmt($hit->tracked_at) : '' }}</time>
-                        </div>
-                    </div>
-                </div>
+ <div class="hidden sm:flex items-start justify-end">
+ <time class="text-xs text-gray-500 dark:text-slate-400">{{ $hit?->tracked_at ? $fmt($hit->tracked_at) : '' }}</time>
+ </div>
+ </div>
+ </div>
 
-                <div class="mx-3 sm:mx-6 h-px bg-gray-50"></div>
-                </li>
-                @endforeach
-        </ul>
-    </div>
+ <div class="mx-3 sm:mx-6 h-px bg-gray-50 dark:bg-slate-950"></div>
+ </li>
+ @endforeach
+ </ul>
+ </div>
 </section>

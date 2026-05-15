@@ -50,7 +50,8 @@ class ViewVesselCheckCases extends ViewRecord
                             ->label('Kategori Keterlambatan'),
 
                         TextEntry::make('delays.delay_minutes')
-                            ->label('Durasi Keterlambatan (menit)'),
+                            ->label('Durasi Keterlambatan (Hari)')
+                            ->formatStateUsing(fn ($state) => $state ? (int) ceil($state / 1440) . ' Hari' : '-'),
 
                         TextEntry::make('delays.delay_reason')
                             ->label('Penyebab Keterlambatan')

@@ -121,21 +121,21 @@ class ShipmentResource extends Resource
             }
 
             if ($isCurrentOrPast) {
-                $label = $status->label() . ' ✓';
+                $label = $status->label() . ' (OK)';
                 $options[$status->value] = $label;
 
                 continue;
             }
 
             if ($isNext) {
-                $options[$status->value] = '➡ ' . $status->label();
+                $options[$status->value] = '-> ' . $status->label();
 
                 continue;
             }
 
             $track = $record->tracks()->where('status', $status->value)->whereNotNull('tracked_at')->exists();
             if ($track) {
-                $options[$status->value] = $status->label() . ' ✓';
+                $options[$status->value] = $status->label() . ' (OK)';
                 $reached = true;
 
                 continue;
@@ -146,8 +146,8 @@ class ShipmentResource extends Resource
 
         $finished = TrackStatus::finished();
         if ($current && ! in_array($current, $finished, true)) {
-            $options[TrackStatus::Hold->value] = '⚠ ' . TrackStatus::Hold->label();
-            $options[TrackStatus::Cancelled->value] = '✕ ' . TrackStatus::Cancelled->label();
+            $options[TrackStatus::Hold->value] = '[Peringatan] ' . TrackStatus::Hold->label();
+            $options[TrackStatus::Cancelled->value] = '[Batal] ' . TrackStatus::Cancelled->label();
         }
 
         return $options;
@@ -173,7 +173,7 @@ class ShipmentResource extends Resource
 
             Forms\Components\Placeholder::make('loading_gate_warning')
                 ->label('')
-                ->content('⚠ Shipment ber-rak: Status "Dimuat di Kapal" diupdate otomatis setelah loading checkpoint selesai di AppSheet.')
+                ->content('PERINGATAN: Shipment ber-rak: Status "Dimuat di Kapal" diupdate otomatis setelah loading checkpoint selesai di AppSheet.')
                 ->visible(
                     fn(Forms\Get $get, ?Shipment $record) => $get('track_status') === TrackStatus::UnitLoading->value
                         && $record

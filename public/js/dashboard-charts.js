@@ -5,6 +5,26 @@
   const brandHex = data.brandHex || '#0137A1';
   window.jssCharts = window.jssCharts || {};
 
+  function isDark() {
+    return document.documentElement.classList.contains('dark');
+  }
+
+  function gridColor() {
+    return isDark() ? 'rgb(30 41 59)' : '#f1f5f9';
+  }
+
+  function tickColor() {
+    return isDark() ? 'rgb(148 163 184)' : 'rgb(100 116 139)';
+  }
+
+  function tooltipBg() {
+    return isDark() ? 'rgb(15 23 42)' : 'rgba(0,0,0,0.8)';
+  }
+
+  function tooltipBorder() {
+    return isDark() ? 'rgb(30 41 59)' : 'transparent';
+  }
+
   function destroyChart(key) {
     if (window.jssCharts[key]) {
       try { window.jssCharts[key].destroy(); } catch (e) {}
@@ -28,15 +48,23 @@
     return new Chart(ctx, {
       type: 'line',
       data: { labels: labels, datasets: [{
-        label: 'Shipment', data: values, borderColor: brandHex, backgroundColor: brandHex + '20', borderWidth: 3, tension: 0.4, fill: true, pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: '#fff', pointBorderColor: brandHex, pointBorderWidth: 2,
+        label: 'Shipment', data: values, borderColor: brandHex, backgroundColor: brandHex + '20', borderWidth: 2, tension: 0.4, fill: true, pointRadius: 3, pointHoverRadius: 5, pointBackgroundColor: isDark() ? 'rgb(15 23 42)' : '#fff', pointBorderColor: brandHex, pointBorderWidth: 2,
       }]},
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 12, cornerRadius: 8, callbacks: { label: function(ctx) { return ctx.parsed.y + ' shipment'; } } }
+          tooltip: {
+            backgroundColor: tooltipBg(),
+            padding: 10,
+            cornerRadius: 6,
+            displayColors: false,
+            borderColor: tooltipBorder(),
+            borderWidth: isDark() ? 1 : 0,
+            callbacks: { label: function(ctx) { return ctx.parsed.y + ' shipment'; } }
+          }
         },
-        scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 10, autoSkip: true } }, y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { precision: 0 } } }
+        scales: { x: { grid: { display: false }, ticks: { maxTicksLimit: 10, autoSkip: true, color: tickColor() } }, y: { beginAtZero: true, grid: { color: gridColor() }, ticks: { precision: 0, color: tickColor() } } }
       }
     });
   }
@@ -49,8 +77,16 @@
       options: {
         responsive: true, maintainAspectRatio: false, cutout: '70%',
         plugins: {
-          legend: { display: true, position: 'bottom', labels: { boxWidth: 12, padding: 12, font: { size: 12 } } },
-          tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 12, cornerRadius: 8, callbacks: { label: function(ctx) { const total = ctx.dataset.data.reduce((a,b)=>a+b,0); const val = ctx.parsed; const pct = total>0?((val/total)*100).toFixed(1):0; return ctx.label + ': ' + val + ' (' + pct + '%)'; } } }
+          legend: { display: true, position: 'bottom', labels: { boxWidth: 12, padding: 12, font: { size: 12 }, color: tickColor() } },
+          tooltip: {
+            backgroundColor: tooltipBg(),
+            padding: 10,
+            cornerRadius: 6,
+            displayColors: false,
+            borderColor: tooltipBorder(),
+            borderWidth: isDark() ? 1 : 0,
+            callbacks: { label: function(ctx) { const total = ctx.dataset.data.reduce((a,b)=>a+b,0); const val = ctx.parsed; const pct = total>0?((val/total)*100).toFixed(1):0; return ctx.label + ': ' + val + ' (' + pct + '%)'; } }
+          }
         }
       }
     });

@@ -1,4 +1,4 @@
-@php
+﻿@php
 use App\Enums\{ShipmentMode, TrackStatus};
 
 $record = $getRecord();
@@ -26,12 +26,12 @@ $order = TrackStatus::orderForMode($modeVal); // <- ganti dari ::order()
         <div class="flex flex-col items-center w-8">
             <div
                 class="w-6 h-6 rounded-full flex items-center justify-center text-[10px]
-                {{ $i <= $idx ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300' }}">
+                {{ $i <= $idx ? 'bg-primary-600 text-white' : 'bg-gray-200 dark:bg-slate-700 text-gray-600 dark:text-slate-300' }}">
                 {{ $i + 1 }}
             </div>
         </div>
         @if ($i < count($order) - 1)
-            <div class="h-0.5 flex-1 {{ $i < $idx ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700' }}">
+            <div class="h-0.5 flex-1 {{ $i < $idx ? 'bg-primary-600' : 'bg-gray-200 dark:bg-slate-700' }}">
     </div>
     @endif
     @endforeach

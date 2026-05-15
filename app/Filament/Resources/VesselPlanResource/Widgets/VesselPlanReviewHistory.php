@@ -51,10 +51,10 @@ class VesselPlanReviewHistory extends Widget
     protected function resolveBadgeColor(string $action): string
     {
         return match ($action) {
-            VesselPlan::REVIEW_ACTION_DRAFT_SUBMITTED => 'bg-blue-50 text-blue-700 border-blue-200',
-            VesselPlan::REVIEW_ACTION_REVISION_REQUESTED => 'bg-amber-50 text-amber-700 border-amber-200',
-            VesselPlan::REVIEW_ACTION_APPROVED => 'bg-green-50 text-green-700 border-green-200',
-            default => 'bg-gray-50 text-gray-700 border-gray-200',
+            VesselPlan::REVIEW_ACTION_DRAFT_SUBMITTED => 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-800',
+            VesselPlan::REVIEW_ACTION_REVISION_REQUESTED => 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800',
+            VesselPlan::REVIEW_ACTION_APPROVED => 'bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-300 dark:border-green-800',
+            default => 'bg-gray-50 text-gray-700 border-gray-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-800',
         };
     }
 }

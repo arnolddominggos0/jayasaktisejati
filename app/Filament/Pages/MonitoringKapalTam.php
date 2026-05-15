@@ -111,7 +111,7 @@ class MonitoringKapalTam extends Page
     protected function buildSummary(): void
     {
         $delays = $this->rows
-            ->pluck('departure_delay_minutes')
+            ->pluck('departure_delay_days')
             ->filter(fn($d) => $d !== null && $d > 0);
 
         $milestoneOverdue = $this->rows
@@ -127,13 +127,13 @@ class MonitoringKapalTam extends Page
 
             'milestone_overdue' => $milestoneOverdue,
 
-            'total_delay_minutes' => $delays->sum(),
+            'total_delay_days' => $delays->sum(),
 
-            'average_delay_minutes' => $delays->count()
-                ? round($delays->avg(), 0)
+            'average_delay_days' => $delays->count()
+                ? (int) round($delays->avg())
                 : 0,
 
-            'max_delay_minutes' => $delays->max() ?? 0,
+            'max_delay_days' => $delays->max() ?? 0,
 
         ];
     }
@@ -178,7 +178,7 @@ class MonitoringKapalTam extends Page
         $topReason = $reasons->keys()->first();
 
         $avgDelay = $this->rows
-            ->pluck('departure_delay_minutes')
+            ->pluck('departure_delay_days')
             ->filter(fn($v) => $v > 0)
             ->avg();
 
@@ -193,7 +193,7 @@ class MonitoringKapalTam extends Page
                 : null,
 
             'rata_rata_delay_berangkat' => $avgDelay
-                ? round($avgDelay / 60, 1)
+                ? (int) round($avgDelay)
                 : 0,
 
         ];

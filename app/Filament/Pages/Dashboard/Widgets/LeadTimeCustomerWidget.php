@@ -135,10 +135,10 @@ class LeadTimeCustomerWidget extends Widget implements HasForms
         ];
 
         foreach ($rows as $r) {
-            $dw = ($r->handover_at && $r->depart_at)    ? Carbon::parse($r->handover_at)->diffInHours($r->depart_at, false)    : null;
-            $sa = ($r->depart_at && $r->arrive_at)      ? Carbon::parse($r->depart_at)->diffInHours($r->arrive_at, false)      : null;
-            $dr = ($r->arrive_at && $r->delivered_at)   ? Carbon::parse($r->arrive_at)->diffInHours($r->delivered_at, false)   : null;
-            $tt = ($r->handover_at && $r->delivered_at) ? Carbon::parse($r->handover_at)->diffInHours($r->delivered_at, false) : null;
+            $dw = ($r->handover_at && $r->depart_at)    ? Carbon::parse($r->handover_at)->diffInDays($r->depart_at, false)    : null;
+            $sa = ($r->depart_at && $r->arrive_at)      ? Carbon::parse($r->depart_at)->diffInDays($r->arrive_at, false)      : null;
+            $dr = ($r->arrive_at && $r->delivered_at)   ? Carbon::parse($r->arrive_at)->diffInDays($r->delivered_at, false)   : null;
+            $tt = ($r->handover_at && $r->delivered_at) ? Carbon::parse($r->handover_at)->diffInDays($r->delivered_at, false) : null;
 
             $this->bump($acc['dwelling'], $dw, self::SLA['dwelling']);
             $this->bump($acc['sailing'],  $sa, self::SLA['sailing']);
@@ -150,10 +150,9 @@ class LeadTimeCustomerWidget extends Widget implements HasForms
     }
 
 
-    private function bump(array &$bucket, ?int $hours, int $slaDays): void
+    private function bump(array &$bucket, ?int $days, int $slaDays): void
     {
-        if ($hours === null) return;
-        $limit = $slaDays * 24;
-        $hours <= $limit ? $bucket['ok']++ : $bucket['ng']++;
+        if ($days === null) return;
+        $days <= $slaDays ? $bucket['ok']++ : $bucket['ng']++;
     }
 }

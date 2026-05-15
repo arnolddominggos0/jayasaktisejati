@@ -1,5 +1,8 @@
 @import "/vendor/filament/filament/resources/css/theme.css";
 
+/* ── Enterprise Dark — Balanced, Refined, Operational ── */
+
+/* Topbar */
 .fi-topbar {
     @apply h-16;
 }
@@ -12,17 +15,12 @@
     display: inline-flex;
     align-items: center;
 }
-.fi-topbar .fi-topbar-item {
-    display: inline-flex;
-    align-items: center;
-}
 
+/*
 .fi-page-header {
     display: none !important;
 }
-.fi-page-header {
-    display: none !important;
-}
+*/
 
 .fi-topbar .fi-global-search {
     max-width: 28rem;
@@ -36,8 +34,9 @@
     }
 }
 
+/* Sidebar */
 .fi-sidebar {
-    @apply bg-white;
+    @apply bg-white dark:bg-slate-900;
 }
 
 .fi-sidebar .fi-sidebar-item a {
@@ -45,11 +44,316 @@
 }
 
 .fi-sidebar .fi-sidebar-item a:hover {
-    @apply bg-slate-100;
+    @apply bg-slate-100 dark:bg-slate-800/60;
+    transition: background-color 150ms ease;
+}
+
+.fi-sidebar .fi-sidebar-item-active a {
+    @apply bg-slate-50 dark:bg-slate-800;
+}
+
+.dark .fi-sidebar-item-active a {
+    box-shadow: inset 2px 0 0 0 rgb(59 130 246);
 }
 
 @media (max-width: 640px) {
     .fi-sidebar {
         max-width: 18rem;
     }
+}
+
+/* Page background */
+.fi-body {
+    @apply bg-slate-50 dark:bg-slate-950;
+}
+
+.fi-main {
+    @apply bg-slate-50 dark:bg-slate-950;
+}
+
+/* Scrollbar */
+.dark ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.dark ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+    background: rgb(51 65 85);
+    border-radius: 3px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+    background: rgb(71 85 105);
+}
+
+/* Sections / Cards — subtle depth */
+.dark .fi-section {
+    background-color: rgb(15 23 42 / 0.8);
+    /* slate-900/80 */
+    border-color: rgb(30 41 59);
+    /* slate-800 */
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.1);
+}
+
+.dark .fi-section-header {
+    border-color: rgb(30 41 59);
+}
+
+/* Form controls */
+.dark .fi-input,
+.dark .fi-select-input,
+.dark .fi-textarea {
+    background-color: rgb(15 23 42);
+    border-color: rgb(51 65 85);
+    color: rgb(248 250 252);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.dark .fi-input:focus,
+.dark .fi-select-input:focus,
+.dark .fi-textarea:focus {
+    border-color: rgb(59 130 246);
+    box-shadow: 0 0 0 1px rgb(59 130 246);
+}
+
+.dark .fi-input::placeholder,
+.dark .fi-textarea::placeholder {
+    color: rgb(100 116 139);
+}
+
+/* Checkbox & Radio */
+.dark .fi-fo-checkbox-input,
+.dark .fi-fo-radio-input {
+    background-color: rgb(15 23 42);
+    border-color: rgb(71 85 105);
+    transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.dark .fi-fo-checkbox-input:checked,
+.dark .fi-fo-radio-input:checked {
+    background-color: rgb(37 99 235);
+    border-color: rgb(37 99 235);
+}
+
+/* Toggle */
+.dark .fi-fo-toggle-input {
+    background-color: rgb(51 65 85);
+    border-color: rgb(51 65 85);
+    transition: background-color 150ms ease;
+}
+
+.dark .fi-fo-toggle-input:checked {
+    background-color: rgb(37 99 235);
+    border-color: rgb(37 99 235);
+}
+
+/* Tables — softer grid */
+.dark .fi-ta {
+    background-color: rgb(15 23 42 / 0.8);
+    border-color: rgb(30 41 59);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.1);
+}
+
+.dark .fi-ta-header-cell {
+    background-color: rgb(15 23 42);
+    color: rgb(148 163 184);
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+}
+
+.dark .fi-ta-row {
+    transition: background-color 150ms ease;
+}
+
+.dark .fi-ta-row:hover {
+    background-color: rgb(30 41 59 / 0.5);
+}
+
+.dark .fi-ta-cell {
+    color: rgb(203 213 225);
+    border-color: rgb(30 41 59);
+}
+
+/* Tabs — refined active/hover */
+.dark .fi-tabs {
+    border-color: rgb(30 41 59);
+}
+
+.dark .fi-tabs-item {
+    color: rgb(148 163 184);
+    transition: color 150ms ease, background-color 150ms ease;
+}
+
+.dark .fi-tabs-item:hover {
+    color: rgb(226 232 240);
+    background-color: rgb(30 41 59 / 0.4);
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+.dark .fi-tabs-item-active {
+    color: rgb(96 165 250);
+    border-bottom-color: rgb(96 165 250);
+    background-color: rgb(30 41 59 / 0.3);
+    border-radius: 0.5rem 0.5rem 0 0;
+}
+
+/* Modal */
+.dark .fi-modal-overlay {
+    background-color: rgba(2, 6, 23, 0.7);
+}
+
+.dark .fi-modal-content {
+    background-color: rgb(15 23 42);
+    border-color: rgb(30 41 59);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.2);
+}
+
+.dark .fi-modal-header {
+    border-color: rgb(30 41 59);
+}
+
+.dark .fi-modal-footer {
+    border-color: rgb(30 41 59);
+}
+
+/* Dropdown / Panel */
+.dark .fi-dropdown-panel {
+    background-color: rgb(15 23 42);
+    border-color: rgb(30 41 59);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.2);
+}
+
+/* Badges — softer */
+.dark .fi-badge {
+    border-color: rgb(30 41 59);
+}
+
+/* Sidebar group labels */
+.dark .fi-sidebar-group-label {
+    color: rgb(100 116 139);
+    font-weight: 500;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Buttons */
+.dark .fi-btn-color-secondary {
+    background-color: rgb(30 41 59);
+    border-color: rgb(51 65 85);
+    color: rgb(226 232 240);
+    transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.dark .fi-btn-color-secondary:hover {
+    background-color: rgb(51 65 85);
+    border-color: rgb(71 85 105);
+}
+
+/* Infolists */
+.dark .fi-in-entry-wrp-label {
+    color: rgb(148 163 184);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.dark .fi-in-entry-wrp-value {
+    color: rgb(248 250 252);
+}
+
+/* DateTime picker & rich editor */
+.dark .fi-fo-date-time-picker input,
+.dark .fi-fo-rich-editor .ProseMirror {
+    background-color: rgb(15 23 42);
+    border-color: rgb(51 65 85);
+    color: rgb(248 250 252);
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.dark .fi-fo-rich-editor .ProseMirror:focus {
+    border-color: rgb(59 130 246);
+    box-shadow: 0 0 0 1px rgb(59 130 246);
+}
+
+/* Pagination */
+.dark .fi-pagination {
+    background-color: rgb(15 23 42 / 0.8);
+    border-color: rgb(30 41 59);
+}
+
+/* Empty state */
+.dark .fi-empty-state-icon {
+    opacity: 0.35;
+}
+
+.dark .fi-empty-state-heading {
+    color: rgb(248 250 252);
+}
+
+.dark .fi-empty-state-description {
+    color: rgb(148 163 184);
+}
+
+/* Filters */
+.dark .fi-filter {
+    background-color: rgb(15 23 42 / 0.8);
+    border-color: rgb(30 41 59);
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.1);
+}
+
+/* Actions / Dropdown items */
+.dark .fi-dropdown-list-item {
+    transition: background-color 150ms ease;
+}
+
+.dark .fi-dropdown-list-item:hover {
+    background-color: rgb(30 41 59 / 0.5);
+}
+
+/* ToggleButtons — refined active/hover transitions */
+.dark .fi-fo-toggle-buttons .fi-btn {
+    transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.dark .fi-fo-toggle-buttons input:checked+.fi-btn {
+    background-color: rgb(51 65 85) !important;
+    color: rgb(248 250 252) !important;
+    border-color: rgb(71 85 105) !important;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.2) !important;
+}
+
+.dark .fi-fo-toggle-buttons input:checked+.fi-btn:hover {
+    background-color: rgb(71 85 105) !important;
+}
+
+.dark .fi-fo-toggle-buttons .fi-btn:hover {
+    background-color: rgb(30 41 59 / 0.6);
+}
+
+/* Panel fade-in animation for tab switching */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* .animate-fade-in-up {
+    animation: fadeInUp 0.2s ease-out both;
+} */
+
+/* Notification / Alerts */
+.dark .fi-alert {
+    border-color: rgb(30 41 59);
 }

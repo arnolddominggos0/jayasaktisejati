@@ -167,8 +167,8 @@ class ArmadaResource extends Resource
                     $pretty = str_replace(' ', '&nbsp;&nbsp;', $safe);
 
                     return new HtmlString(
-                        '<div class="inline-flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2">
-                <span class="font-mono tracking-wider text-base">' . $pretty . '</span>
+                        '<div class="inline-flex items-center gap-2 rounded-lg bg-gray-50 dark:bg-slate-800 px-3 py-2">
+                <span class="font-mono tracking-wider text-base text-gray-900 dark:text-white">' . $pretty . '</span>
             </div>'
                     );
                 })
