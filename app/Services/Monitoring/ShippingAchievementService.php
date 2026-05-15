@@ -53,7 +53,8 @@ class ShippingAchievementService
         $avgDepartureDelay = $departed
             ->map(function ($v) {
                 if (!$v->etd || !$v->atd_at) return 0;
-                return max(0, $v->atd_at->diffInMinutes($v->etd, false) * -1) / 60;
+                $hours = max(0, $v->atd_at->diffInHours($v->etd, false) * -1);
+                return $hours > 0 ? (int) ceil($hours / 24) : 0;
             })
             ->avg();
 

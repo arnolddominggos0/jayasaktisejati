@@ -48,6 +48,7 @@ class CustomerPanelProvider extends PanelProvider
                 'danger' => Color::Red,
             ])
             ->viteTheme('resources/css/filament/admin/theme.css')
+            ->darkMode(false)
             // Discover resources, pages, and widgets in Customer namespace
             ->discoverResources(in: app_path('Filament/Customer/Resources'), for: 'App\\Filament\\Customer\\Resources')
             ->discoverPages(in: app_path('Filament/Customer/Pages'), for: 'App\\Filament\\Customer\\Pages')
@@ -77,7 +78,7 @@ class CustomerPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
                 EnsurePanelRole::class,
- ])
+            ])
             ->renderHook(
                 'panels::head.end',
                 fn(): string => '<meta name="customer-portal" content="true">',

@@ -1,4 +1,4 @@
-<div class="space-y-10">
+﻿<div class="space-y-10">
 
     <div class="space-y-4">
 
@@ -117,7 +117,7 @@
                         </div>
                         <div class="text-lg font-semibold text-orange-600">
                             {{ ($achievement['rata_rata_delay_berangkat'] ?? 0) > 0
-                                ? $achievement['rata_rata_delay_berangkat'] . ' jam'
+                                ? $achievement['rata_rata_delay_berangkat'] . ' hari'
                                 : '—' }}
                         </div>
                     </div>

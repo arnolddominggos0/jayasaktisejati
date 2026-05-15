@@ -1,4 +1,4 @@
-<div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
+﻿<div class="bg-white rounded-2xl border shadow-sm overflow-hidden">
 
     <div class="px-6 py-4 border-b flex justify-between items-center">
         <div class="font-semibold text-sm tracking-wide">
@@ -49,11 +49,9 @@
                         </td>
 
                         @for ($i = 1; $i <= $calendar['days_count']; $i++)
-
                             <td class="border-r p-2 h-24 align-top">
 
                                 @foreach ($calendar['bucket'][$laneKey][$i] as $chip)
-
                                     @php
                                         $status = $chip['status'];
                                         $delayLabel = $chip['delay_label'] ?? null;
@@ -88,11 +86,9 @@
                                         @endif
 
                                     </div>
-
                                 @endforeach
 
                             </td>
-
                         @endfor
 
                     </tr>
@@ -128,19 +124,18 @@
 
         <div class="flex items-center gap-2">
             <span class="w-3 h-3 bg-yellow-400 rounded-full"></span>
-            Terlambat Ringan (≤30 menit)
+            Terlambat Ringan (≤1 Hari)
         </div>
 
         <div class="flex items-center gap-2">
             <span class="w-3 h-3 bg-orange-400 rounded-full"></span>
-            Terlambat Sedang (≤2 jam)
+            Terlambat Sedang (≤3 Hari)
         </div>
 
         <div class="flex items-center gap-2">
             <span class="w-3 h-3 bg-red-500 rounded-full"></span>
-            Terlambat Berat (&gt;2 jam)
+            Terlambat Berat (&gt;3 Hari)
         </div>
 
     </div>
-
 </div>

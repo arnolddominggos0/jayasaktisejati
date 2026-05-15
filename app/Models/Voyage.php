@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\SlaStatus;
 use App\Enums\VoyageDelayReason;
 use App\Enums\VoyageOperationalStatus;
+use App\Services\OperationalDaysHelper;
 use App\Services\SlaEvaluator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -204,14 +205,9 @@ class Voyage extends Model
         return $this->vesselPlanItem?->planned_sailing_days;
     }
 
-    public function getDepartureDelayDaysAttribute(): ?float
+    public function getDepartureDelayDaysAttribute(): ?int
     {
-        if (!$this->etd || !$this->atd_at) return null;
-
-        return round(
-            $this->etd->diffInSeconds($this->atd_at) / 86400,
-            2
-        );
+        return OperationalDaysHelper::delayDays($this->etd, $this->atd_at);
     }
 
     public function getSailingDelayDaysAttribute(): ?float
@@ -295,9 +291,9 @@ class Voyage extends Model
             return false;
         }
 
-        $hours = now()->diffInHours($this->eta, false);
+        $days = now()->diffInDays($this->eta, false);
 
-        return $hours >= 0 && $hours <= 24;
+        return $days >= 0 && $days <= 1;
     }
 
     public function getEtaOverdueAttribute(): bool
@@ -361,16 +357,7 @@ class Voyage extends Model
 
     public function getDepartureDelaySeverityAttribute(): ?string
     {
-        $minutes = $this->departure_delay_minutes;
-
-        if (is_null($minutes) || $minutes <= 0) {
-            return null;
-        }
-
-        if ($minutes <= 30) return 'minor';
-        if ($minutes <= 120) return 'moderate';
-
-        return 'major';
+        return OperationalDaysHelper::severity($this->departure_delay_days);
     }
 
     public function getSlaStatusAttribute(): ?SlaStatus
@@ -391,14 +378,6 @@ class Voyage extends Model
 
     public function getDelayLabelAttribute(): ?string
     {
-        $minutes = $this->departure_delay_minutes;
-
-        if (!$minutes || $minutes <= 0) return null;
-
-        if ($minutes >= 60) {
-            return 'Terlambat ' . round($minutes / 60, 1) . ' jam';
-        }
-
-        return 'Terlambat ' . $minutes . ' menit';
+        return OperationalDaysHelper::delayLabel($this->departure_delay_days);
     }
 }

@@ -1,4 +1,4 @@
-@php
+﻿@php
 
     $overdue = $v->milestones->where('is_overdue', true)->count();
     $dueToday = $v->milestones->where('is_due_today', true)->count();
@@ -13,23 +13,14 @@
     $sailingProgress = null;
 
     if ($v->atd_at) {
+        $days = max(1, $v->atd_at->diffInDays(now()));
 
-        $minutes = $v->atd_at->diffInMinutes(now());
+        $sailingDuration = $days . ' Hari';
 
-        if ($minutes < 60) {
-            $sailingDuration = $minutes . ' menit';
-        } elseif ($minutes < 1440) {
-            $sailingDuration = floor($minutes / 60) . ' jam';
-        } else {
-            $days = floor($minutes / 1440);
-            $sailingDuration = $days . ' hari';
-            $sailingProgress = "Day {$days} / 12";
-        }
-
+        $sailingProgress = "Day {$days} / 12";
     }
 
-    $milestones = $v->milestones
-        ->sortBy(fn ($m) => (int) str_replace('d', '', $m->code));
+    $milestones = $v->milestones->sortBy(fn($m) => (int) str_replace('d', '', $m->code));
 
 @endphp
 
@@ -89,7 +80,7 @@
                 </div>
             @elseif($v->sailing_risk)
                 <div class="inline-block mt-2 px-2 py-0.5 text-[11px] bg-orange-100 text-orange-700 rounded">
-                    ETA &lt; 24 Jam
+                    ETA &lt; 1 Hari
                 </div>
             @endif
 
@@ -140,38 +131,27 @@
     <div class="grid grid-cols-6 gap-3 mt-4 text-xs">
 
         @foreach ($milestones as $m)
-
             @php
 
                 if ($m->actual_date) {
-
                     $icon = '✔';
                     $color = 'bg-green-100 text-green-700 border border-green-200';
-
                 } elseif ($m->is_overdue) {
-
                     $icon = '✖';
                     $color = 'bg-red-100 text-red-700 border border-red-200';
-
                 } elseif ($m->is_due_today) {
-
                     $icon = '⏳';
                     $color = 'bg-orange-100 text-orange-700 border border-orange-200';
-
                 } else {
-
                     $icon = '—';
                     $color = 'bg-gray-100 text-gray-600 border border-gray-200';
-
                 }
 
             @endphp
 
 
-            <button
-                wire:click="showMilestone({{ $m->id }})"
-                class="rounded-md py-2 text-center font-semibold {{ $color }} hover:scale-105 transition"
-            >
+            <button wire:click="showMilestone({{ $m->id }})"
+                class="rounded-md py-2 text-center font-semibold {{ $color }} hover:scale-105 transition">
 
                 <div class="uppercase tracking-wide">
                     {{ strtoupper($m->code) }}
@@ -182,7 +162,6 @@
                 </div>
 
             </button>
-
         @endforeach
 
     </div>

@@ -40,6 +40,7 @@ class AdminPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->colors(['primary' => Color::hex('#0137A1')])
             ->viteTheme('resources/css/filament/admin/theme.css')
+            ->darkMode(false)
             ->assets([
                 Css::make('filament', 'css/filament/filament/app.css'),
                 Css::make('forms', 'css/filament/forms/forms.css'),

@@ -35,6 +35,7 @@ class FieldCoordinatorPanelProvider extends PanelProvider
             ->sidebarCollapsibleOnDesktop()
             ->colors(['primary' => '#0137A1'])
             ->viteTheme('resources/css/filament/fc/theme.css')
+            ->darkMode(false)
 
             ->pages([Dashboard::class])
             ->homeUrl(fn() => Dashboard::getUrl())
