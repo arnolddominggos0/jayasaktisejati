@@ -5,6 +5,8 @@ namespace Tests\Feature\FC;
 use App\Models\AppSheetSyncLog;
 use App\Models\Branch;
 use App\Models\BriefingAttendance;
+use App\Models\BriefingAttendancePpeItem;
+use App\Models\BriefingChecklist;
 use App\Models\BriefingSession;
 use App\Models\City;
 use App\Models\Customer;
@@ -251,6 +253,87 @@ class AppSheetBriefingIngestionTest extends TestCase
             'code' => 'LD-TEST-001',
             'shipment_id' => $shipment->id,
         ]);
+    }
+
+
+    /** @test */
+    public function it_returns_appsheet_briefing_summary_with_related_records(): void
+    {
+        [$branch, $fc, $depot] = $this->createBranchAndDepot();
+
+        $session = BriefingSession::create([
+            'date' => now()->toDateString(),
+            'depot_id' => $depot->id,
+            'coordinator_user_id' => $fc->id,
+            'summary_headcount' => 1,
+            'summary_solution' => 'Siapkan backup internal',
+            'notes' => 'Briefing pagi',
+        ]);
+
+        $manpower = Manpower::create([
+            'name' => 'John Doe',
+            'branch_id' => $branch->id,
+            'depot_id' => $depot->id,
+            'active' => true,
+        ]);
+
+        $attendance = BriefingAttendance::create([
+            'session_id' => $session->id,
+            'manpower_id' => $manpower->id,
+            'attendance_status' => 'present',
+            'temperature' => 36.5,
+            'bp_systolic' => 120,
+            'bp_diastolic' => 80,
+            'has_ppe' => true,
+            'remark' => 'Sehat',
+        ]);
+
+        BriefingAttendancePpeItem::create([
+            'attendance_id' => $attendance->id,
+            'ppe_type' => 'helm',
+            'condition' => 'baik',
+            'remark' => 'OK',
+        ]);
+
+        BriefingChecklist::create([
+            'session_id' => $session->id,
+            'item' => 'Safety Talk',
+            'type' => 'briefing',
+            'status' => 'ok',
+            'remark' => 'Sudah disampaikan',
+        ]);
+
+        LoadingSession::create([
+            'code' => 'LD-SUMMARY-001',
+            'briefing_session_id' => $session->id,
+            'depot_id' => $depot->id,
+            'branch_id' => $branch->id,
+            'coordinator_user_id' => $fc->id,
+            'status' => 'draft',
+            'mp_required' => 1,
+            'mp_present' => 1,
+            'mp_sufficient' => true,
+            'apd_complete' => true,
+            'critical_issues_count' => 0,
+            'warning_issues_count' => 1,
+        ]);
+
+        $response = $this->getJson('/api/appsheet/briefing-summary?'.http_build_query([
+            'session_id' => $session->id,
+            'submitted_by_user_id' => $fc->id,
+        ]));
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.totals.sessions', 1)
+            ->assertJsonPath('data.totals.present', 1)
+            ->assertJsonPath('data.totals.ppe_items', 1)
+            ->assertJsonPath('data.totals.loading_sessions', 1)
+            ->assertJsonPath('data.sessions.0.id', $session->id)
+            ->assertJsonPath('data.sessions.0.attendances.0.manpower_name', 'John Doe')
+            ->assertJsonPath('data.sessions.0.attendances.0.ppe_items.0.ppe_type', 'helm')
+            ->assertJsonPath('data.sessions.0.checklists.0.item', 'Safety Talk')
+            ->assertJsonPath('data.sessions.0.loading_sessions.0.code', 'LD-SUMMARY-001');
     }
 
     /** @test */

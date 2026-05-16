@@ -593,6 +593,157 @@ class AppSheetService
         ]);
     }
 
+
+    public function getBriefingSummary(array $filters = [], ?int $submittedByUserId = null): array
+    {
+        $query = BriefingSession::query()
+            ->with([
+                'depot:id,code,name,branch_id',
+                'coordinator:id,name',
+                'attendances.manpower:id,name,phone,branch_id,depot_id,active',
+                'attendances.ppeItems',
+                'checklists',
+                'loadingSessions:id,code,briefing_session_id,shipment_id,depot_id,branch_id,status,current_step,mp_required,mp_present,mp_absent,mp_sick,mp_sufficient,apd_complete,equipment_safe,rack_container_safe,unit_measurements_ok,final_decision_status,critical_issues_count,warning_issues_count,started_at,completed_at',
+            ])
+            ->when($filters['session_id'] ?? null, fn ($q, $sessionId) => $q->whereKey($sessionId))
+            ->when($filters['date'] ?? null, fn ($q, $date) => $q->whereDate('date', $date))
+            ->when($filters['date_from'] ?? null, fn ($q, $date) => $q->whereDate('date', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn ($q, $date) => $q->whereDate('date', '<=', $date))
+            ->when($filters['depot_id'] ?? null, fn ($q, $depotId) => $q->where('depot_id', $depotId))
+            ->orderByDesc('date')
+            ->orderByDesc('id');
+
+        $sessions = $query->limit((int) ($filters['limit'] ?? 50))->get();
+
+        if ($submittedByUserId !== null) {
+            $sessions->each(fn (BriefingSession $session) => $this->validateFcScope('briefing_sessions', [
+                'depot_id' => $session->depot_id,
+                'coordinator_user_id' => $submittedByUserId,
+            ], $submittedByUserId));
+        }
+
+        return [
+            'generated_at' => now()->toIso8601String(),
+            'filters' => array_filter($filters, fn ($value) => $value !== null && $value !== ''),
+            'totals' => $this->buildBriefingTotals($sessions),
+            'sessions' => $sessions->map(fn (BriefingSession $session) => $this->formatBriefingSessionSummary($session))->values()->all(),
+        ];
+    }
+
+    protected function buildBriefingTotals($sessions): array
+    {
+        $attendances = $sessions->flatMap->attendances;
+        $ppeItems = $attendances->flatMap->ppeItems;
+        $loadingSessions = $sessions->flatMap->loadingSessions;
+
+        return [
+            'sessions' => $sessions->count(),
+            'target_headcount' => (int) $sessions->sum('summary_headcount'),
+            'present' => $attendances->filter(fn ($attendance) => $this->enumValue($attendance->attendance_status) === 'present')->count(),
+            'absent' => $attendances->filter(fn ($attendance) => $this->enumValue($attendance->attendance_status) === 'absent')->count(),
+            'sick' => $attendances->filter(fn ($attendance) => $this->enumValue($attendance->attendance_status) === 'sick')->count(),
+            'leave' => $attendances->filter(fn ($attendance) => $this->enumValue($attendance->attendance_status) === 'leave')->count(),
+            'ppe_items' => $ppeItems->count(),
+            'ppe_good' => $ppeItems->filter(fn ($item) => $this->enumValue($item->condition) === 'baik')->count(),
+            'ppe_issue' => $ppeItems->reject(fn ($item) => $this->enumValue($item->condition) === 'baik')->count(),
+            'loading_sessions' => $loadingSessions->count(),
+            'critical_issues' => (int) $loadingSessions->sum('critical_issues_count'),
+            'warning_issues' => (int) $loadingSessions->sum('warning_issues_count'),
+        ];
+    }
+
+    protected function formatBriefingSessionSummary(BriefingSession $session): array
+    {
+        $attendances = $session->attendances;
+        $ppeItems = $attendances->flatMap->ppeItems;
+        $loadingSessions = $session->loadingSessions;
+        $target = (int) $session->summary_headcount;
+        $present = $attendances->filter(fn ($attendance) => $this->enumValue($attendance->attendance_status) === 'present')->count();
+
+        return [
+            'id' => $session->id,
+            'date' => optional($session->date)->toDateString(),
+            'depot' => [
+                'id' => $session->depot_id,
+                'code' => $session->depot?->code,
+                'name' => $session->depot?->name,
+                'branch_id' => $session->depot?->branch_id,
+            ],
+            'coordinator' => [
+                'id' => $session->coordinator_user_id,
+                'name' => $session->coordinator?->name,
+            ],
+            'notes' => $session->notes,
+            'headcount' => [
+                'target' => $target,
+                'present' => $present,
+                'absent' => $attendances->filter(fn ($attendance) => $this->enumValue($attendance->attendance_status) === 'absent')->count(),
+                'sick' => $attendances->filter(fn ($attendance) => $this->enumValue($attendance->attendance_status) === 'sick')->count(),
+                'leave' => $attendances->filter(fn ($attendance) => $this->enumValue($attendance->attendance_status) === 'leave')->count(),
+                'sufficient' => (bool) $session->summary_sufficient,
+                'shortage' => max(0, $target - $present),
+                'solution' => $session->summary_solution,
+            ],
+            'ppe' => [
+                'items_checked' => $ppeItems->count(),
+                'good' => $ppeItems->filter(fn ($item) => $this->enumValue($item->condition) === 'baik')->count(),
+                'issues' => $ppeItems->reject(fn ($item) => $this->enumValue($item->condition) === 'baik')->count(),
+                'complete_attendances' => $attendances->where('has_ppe', true)->count(),
+            ],
+            'checklists' => $session->checklists->map(fn ($checklist) => [
+                'id' => $checklist->id,
+                'item' => $checklist->item,
+                'type' => $checklist->type,
+                'status' => $this->enumValue($checklist->status),
+                'remark' => $checklist->remark,
+            ])->values()->all(),
+            'attendances' => $attendances->map(fn (BriefingAttendance $attendance) => [
+                'id' => $attendance->id,
+                'manpower_id' => $attendance->manpower_id,
+                'manpower_name' => $attendance->manpower?->name,
+                'attendance_status' => $this->enumValue($attendance->attendance_status),
+                'temperature' => $attendance->temperature,
+                'blood_pressure' => $attendance->bp,
+                'health_complaint' => $attendance->health_complaint,
+                'has_ppe' => (bool) $attendance->has_ppe,
+                'recheck_result' => $attendance->recheck_result,
+                'remark' => $attendance->remark,
+                'ppe_items' => $attendance->ppeItems->map(fn (BriefingAttendancePpeItem $item) => [
+                    'id' => $item->id,
+                    'ppe_type' => $this->enumValue($item->ppe_type),
+                    'condition' => $this->enumValue($item->condition),
+                    'remark' => $item->remark,
+                ])->values()->all(),
+            ])->values()->all(),
+            'loading_sessions' => $loadingSessions->map(fn (LoadingSession $loadingSession) => [
+                'id' => $loadingSession->id,
+                'code' => $loadingSession->code,
+                'shipment_id' => $loadingSession->shipment_id,
+                'status' => $this->enumValue($loadingSession->status),
+                'current_step' => $loadingSession->current_step,
+                'mp_required' => $loadingSession->mp_required,
+                'mp_present' => $loadingSession->mp_present,
+                'mp_absent' => $loadingSession->mp_absent,
+                'mp_sick' => $loadingSession->mp_sick,
+                'mp_sufficient' => $loadingSession->mp_sufficient,
+                'apd_complete' => $loadingSession->apd_complete,
+                'equipment_safe' => $loadingSession->equipment_safe,
+                'rack_container_safe' => $loadingSession->rack_container_safe,
+                'unit_measurements_ok' => $loadingSession->unit_measurements_ok,
+                'final_decision_status' => $this->enumValue($loadingSession->final_decision_status),
+                'critical_issues_count' => $loadingSession->critical_issues_count,
+                'warning_issues_count' => $loadingSession->warning_issues_count,
+                'started_at' => optional($loadingSession->started_at)->toIso8601String(),
+                'completed_at' => optional($loadingSession->completed_at)->toIso8601String(),
+            ])->values()->all(),
+        ];
+    }
+
+    protected function enumValue($value)
+    {
+        return $value instanceof \BackedEnum ? $value->value : $value;
+    }
+
     public function validateWebhookSignature(string $signature, array $payload): bool
     {
         $secret = config('appsheet.webhook_secret');

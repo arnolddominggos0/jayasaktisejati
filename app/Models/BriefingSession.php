@@ -51,6 +51,16 @@ class BriefingSession extends Model
         return $this->hasMany(BriefingAttendance::class, 'session_id');
     }
 
+    public function checklists(): HasMany
+    {
+        return $this->hasMany(BriefingChecklist::class, 'session_id');
+    }
+
+    public function loadingSessions(): HasMany
+    {
+        return $this->hasMany(LoadingSession::class, 'briefing_session_id');
+    }
+
     public function presentAttendances()
     {
         return $this->hasMany(BriefingAttendance::class, 'session_id')
