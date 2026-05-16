@@ -77,7 +77,10 @@ class PpeAssignmentResource extends Resource
                 TextColumn::make('manpower.name')->label('Manpower')->sortable()->searchable(),
                 TextColumn::make('assigned_at')->label('Mulai')->dateTime()->sortable(),
                 TextColumn::make('returned_at')->label('Kembali')->dateTime()->sortable(),
-                TextColumn::make('status')->label('Status')->state(fn($r) => $r->returned_at ? 'Returned' : 'Active')->badge()->color(fn($r) => $r->returned_at ? 'gray' : 'warning'),
+                TextColumn::make('status')->label('Status')
+                    ->state(fn($r) => $r->returned_at ? 'Dikembalikan' : 'Aktif')
+                    ->badge()
+                    ->color(fn($r) => $r->returned_at ? 'gray' : 'warning'),
             ])
             ->filters([
                 Filter::make('active')->label('Aktif')->query(fn(EloquentBuilder $q) => $q->whereNull('returned_at')),

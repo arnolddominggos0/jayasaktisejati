@@ -368,7 +368,7 @@ class ShipmentResource extends Resource
                                             ->columnSpan(['default' => 12, 'md' => 5]),
                                         Select::make('priority')
                                             ->label('Prioritas')
-                                            ->options(['normal' => 'Normal', 'urgent' => 'Urgent'])
+                                            ->options(['normal' => 'Normal', 'urgent' => 'Mendesak'])
                                             ->default('normal')
                                             ->columnSpan(['default' => 12, 'md' => 2]),
                                         DatePicker::make('requested_at')
@@ -1219,7 +1219,13 @@ class ShipmentResource extends Resource
                 TextColumn::make('priority')
                     ->label('Prioritas')
                     ->badge()
-                    ->formatStateUsing(fn (?string $state) => $state ? ucfirst($state) : '-')
+                    ->formatStateUsing(fn (?string $state) => match($state) {
+                        'urgent' => 'Mendesak',
+                        'normal' => 'Normal',
+                        'high'   => 'Tinggi',
+                        'low'    => 'Rendah',
+                        default  => $state ?: '-'
+                    })
                     ->color(fn (?string $state) => $state === 'urgent' ? 'danger' : 'gray'),
 
                 TextColumn::make('packages_total')
@@ -1308,8 +1314,8 @@ class ShipmentResource extends Resource
                         }
 
                         return match ($ev['badge'] ?? null) {
-                            'On Time' => 'success',
-                            'Late' => 'danger',
+                            'On Time', 'Tepat Waktu' => 'success',
+                            'Late', 'Terlambat' => 'danger',
                             'Pending' => 'warning',
                             default => 'gray',
                         };
@@ -1599,12 +1605,18 @@ class ShipmentResource extends Resource
                                 $stype = $r->service_type?->label() ?? (string) $r->service_type;
                                 $opt = (string) $r->service_option ?: '-';
                                 $scope = $r->delivery_scope?->label() ?? (string) $r->delivery_scope ?: '-';
-                                $prio = $r->priority ? ucfirst($r->priority) : '-';
+                                $prioMap = [
+                                    'high'   => 'Tinggi',
+                                    'normal' => 'Normal',
+                                    'low'    => 'Rendah',
+                                    'urgent' => 'Mendesak',
+                                ];
+                                $prio = $r->priority ? ($prioMap[strtolower($r->priority)] ?? ucfirst($r->priority)) : '-';
                                 $cargo = $r->cargo_type?->label() ?? (string) $r->cargo_type;
                                 $status = $r->status?->label() ?? (string) $r->status;
 
                                 $ev = method_exists($r, 'evaluateKpiForManado') ? $r->evaluateKpiForManado() : null;
-                                $kpiBadge = ($ev && ($ev['applies'] ?? false)) ? ($ev['badge'] ?? 'Pending') : 'Non-target';
+                                $kpiBadge = ($ev && ($ev['applies'] ?? false)) ? ($ev['badge'] ?? 'Menunggu') : 'Bukan Target';
                                 $kpiText = method_exists($r, 'kpiManadoSummaryText') ? ($r->kpiManadoSummaryText() ?? '') : '';
 
                                 $cbm = is_null($r->cbm_total) ? null : number_format((float) $r->cbm_total, 3, '.', '');

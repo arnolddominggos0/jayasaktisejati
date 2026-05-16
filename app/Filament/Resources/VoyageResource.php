@@ -2,22 +2,20 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\VesselCheckStatus;
 use App\Enums\VoyageDelayReason;
 use App\Enums\VoyageOperationalStatus;
 use App\Filament\Resources\VoyageResource\Pages;
-use App\Models\Port;
 use App\Models\Vessel;
 use App\Models\Voyage;
 use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Tables\Table;
@@ -32,7 +30,7 @@ class VoyageResource extends Resource
 
     protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationIcon = 'heroicon-o-paper-airplane';
-    protected static ?string $navigationLabel = 'Voyage';
+    protected static ?string $navigationLabel = 'Data Voyage';
     protected static ?string $pluralLabel     = 'Voyage';
     protected static ?string $modelLabel      = 'Voyage';
     protected static ?int    $navigationSort  = 4;
@@ -40,7 +38,8 @@ class VoyageResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Section::make('Informasi Voyage')
+            // ── 1. Voyage Identity ───────────────────────────────
+            Section::make('Identitas Voyage')
                 ->schema([
                     Select::make('shipping_line_id')
                         ->label('Pelayaran')
@@ -61,12 +60,11 @@ class VoyageResource extends Resource
                     Hidden::make('vessel_plan_id')
                         ->default(request('vessel_plan_id')),
 
-                    DatePicker::make('period_month')
-                        ->label('Periode')
-                        ->displayFormat('M Y')
-                        ->native(false)
-                        ->disabled()
-                        ->dehydrated(),
+                    TextInput::make('voyage_no')
+                        ->label('No Voyage')
+                        ->maxLength(50)
+                        ->nullable()
+                        ->required(fn($livewire) => $livewire instanceof EditRecord),
 
                     Select::make('pol_id')
                         ->relationship('pol', 'code')
@@ -82,16 +80,22 @@ class VoyageResource extends Resource
                         ->required()
                         ->label('POD'),
 
-                    TextInput::make('voyage_no')
-                        ->label('No Voyage')
-                        ->maxLength(50)
-                        ->nullable()
-                        ->required(fn($livewire) => $livewire instanceof EditRecord),
+                    DatePicker::make('period_month')
+                        ->label('Periode')
+                        ->displayFormat('M Y')
+                        ->native(false)
+                        ->disabled()
+                        ->dehydrated(),
                 ])
                 ->columns(2),
 
-            Section::make('Rencana Keberangkatan')
+            // ── 2. Planning Schedule ─────────────────────────────
+            Section::make('Jadwal Perencanaan (Planning)')
                 ->schema([
+                    DateTimePicker::make('etb')
+                        ->label('ETB (Estimasi Sandar)')
+                        ->native(false),
+
                     DateTimePicker::make('etd')
                         ->label('ETD (Plan)')
                         ->required()
@@ -112,70 +116,88 @@ class VoyageResource extends Resource
                         ->minValue(0)
                         ->required()
                         ->visible(fn($livewire) => ! ($livewire instanceof EditRecord)),
-                ])
-                ->columns(3),
 
-            Section::make('Perubahan Jadwal')
-                ->visible(fn($livewire) => $livewire instanceof EditRecord)
-                ->schema([
-                    Toggle::make('is_delayed')
-                        ->label('Jadwal Berubah?')
-                        ->reactive(),
-
-                    Select::make('delay_reason')
-                        ->label('Alasan Perubahan')
+                    Select::make('manual_delay_reason')
+                        ->label('Alasan Perubahan Jadwal')
                         ->options(
                             collect(VoyageDelayReason::cases())
                                 ->mapWithKeys(fn($c) => [$c->value => $c->label()])
                                 ->toArray()
                         )
-                        ->visible(fn($get) => $get('is_delayed'))
-                        ->required(fn($get) => $get('is_delayed')),
-
-                    DateTimePicker::make('etd')
-                        ->label('ETD Revisi')
-                        ->native(false)
-                        ->visible(fn($get) => $get('is_delayed'))
-                        ->required(fn($get) => $get('is_delayed')),
-
-                    DateTimePicker::make('eta')
-                        ->label('ETA Revisi')
-                        ->native(false)
-                        ->visible(fn($get) => $get('is_delayed'))
-                        ->required(fn($get) => $get('is_delayed')),
+                        ->helperText('Isi jika terjadi perubahan ETD/ETA. Delay log akan tercatat otomatis.'),
                 ])
                 ->columns(2),
 
-            Section::make('Actual (H-0)')
+            // ── 3. Actual Operation ──────────────────────────────
+            Section::make('Operasi Aktual (Actual)')
                 ->visible(fn($livewire) => $livewire instanceof EditRecord)
                 ->schema([
-                    DateTimePicker::make('atd_at')->label('ATD'),
-
-                    DateTimePicker::make('etb')
-                        ->label('ETB (Estimasi Sandar)')
-                        ->native(false),
-
                     DateTimePicker::make('atb_at')
                         ->label('ATB (Aktual Sandar)')
                         ->native(false),
 
-                    DateTimePicker::make('ata_at')->label('ATA'),
+                    DateTimePicker::make('closing_at')
+                        ->label('Closing Date')
+                        ->native(false),
 
-                    TextInput::make('actual_sailing_days')
-                        ->label('Aktual Berlayar (hari)')
-                        ->disabled()
-                        ->dehydrated(false),
+                    DateTimePicker::make('atd_at')
+                        ->label('ATD (Aktual Berangkat)')
+                        ->native(false),
+
+                    DateTimePicker::make('ata_at')
+                        ->label('ATA (Aktual Tiba)')
+                        ->native(false),
 
                     TextInput::make('cargo_actual')
                         ->label('Aktual Muatan')
                         ->numeric()
                         ->minValue(0),
                 ])
+                ->columns(2),
+
+            // ── 4. KPI & SLA (Read-only) ─────────────────────────
+            Section::make('KPI & SLA')
+                ->visible(fn($livewire) => $livewire instanceof EditRecord)
+                ->schema([
+                    Placeholder::make('otb_status')
+                        ->label('OTB (On Time Berthing)')
+                        ->content(fn($record) => $record->otb_status?->label() ?? '—'),
+
+                    Placeholder::make('otd_status')
+                        ->label('OTD (On Time Departure)')
+                        ->content(fn($record) => $record->otd_status?->label() ?? '—'),
+
+                    Placeholder::make('ota_status')
+                        ->label('OTA (On Time Arrival)')
+                        ->content(fn($record) => $record->ota_status?->label() ?? '—'),
+
+                    Placeholder::make('sla_status')
+                        ->label('SLA Pelayaran')
+                        ->content(fn($record) => $record->sla_status?->label() ?? '—'),
+
+                    Placeholder::make('planned_sailing_days')
+                        ->label('Rencana Berlayar')
+                        ->content(fn($record) => $record->planned_sailing_days ? $record->planned_sailing_days . ' hari' : '—'),
+
+                    Placeholder::make('actual_sailing_days')
+                        ->label('Aktual Berlayar')
+                        ->content(fn($record) => $record->actual_sailing_days ? $record->actual_sailing_days . ' hari' : '—'),
+
+                    Placeholder::make('departure_delay_days')
+                        ->label('Keterlambatan Berangkat')
+                        ->content(fn($record) => $record->departure_delay_days ? $record->departure_delay_days . ' hari' : 'Tepat Waktu'),
+
+                    Placeholder::make('delay_root_cause_label')
+                        ->label('Root Cause Delay')
+                        ->content(fn($record) => $record->delay_root_cause_label ?? '—'),
+                ])
                 ->columns(3),
 
-            Section::make('Catatan')
+            // ── 5. Audit & Notes ─────────────────────────────────
+            Section::make('Audit & Catatan')
                 ->schema([
                     Textarea::make('final_note')
+                        ->label('Catatan Akhir')
                         ->rows(4),
                 ]),
         ]);
@@ -185,61 +207,63 @@ class VoyageResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('vessel.name')
+                    ->sortable()
+                    ->searchable()
+                    ->label('Kapal'),
 
-                TextColumn::make('shippingLine.name')->sortable()->searchable(),
+                TextColumn::make('voyage_no')
+                    ->searchable()
+                    ->label('No Voyage'),
 
-                TextColumn::make('vessel.name')->sortable()->searchable(),
+                TextColumn::make('route')
+                    ->label('Rute')
+                    ->formatStateUsing(fn($record) => ($record->pol?->code ?? '-') . ' → ' . ($record->pod?->code ?? '-')),
 
-                TextColumn::make('voyage_no')->searchable(),
+                TextColumn::make('period_month')
+                    ->date('M Y')
+                    ->label('Periode'),
 
-                TextColumn::make('pol.code'),
-                TextColumn::make('pod.code'),
+                TextColumn::make('etd')
+                    ->dateTime('d M Y H:i')
+                    ->label('ETD (Plan)'),
 
-                TextColumn::make('period_month')->date('M Y'),
+                TextColumn::make('eta')
+                    ->dateTime('d M Y H:i')
+                    ->label('ETA (Plan)'),
 
-                TextColumn::make('etd')->dateTime(),
-                TextColumn::make('eta')->dateTime(),
+                TextColumn::make('atd_at')
+                    ->dateTime('d M Y H:i')
+                    ->label('ATD (Actual)')
+                    ->placeholder('—'),
+
+                TextColumn::make('ata_at')
+                    ->dateTime('d M Y H:i')
+                    ->label('ATA (Actual)')
+                    ->placeholder('—'),
 
                 TextColumn::make('operational_status_enum')
                     ->badge()
                     ->formatStateUsing(fn($state) => $state->label())
-                    ->color(fn($state) => $state->color()),
-
-                TextColumn::make('is_delayed')
-                    ->badge()
-                    ->formatStateUsing(fn($state) => $state ? 'Delay' : 'On Time')
-                    ->color(fn($state) => $state ? 'danger' : 'success'),
-
-                TextColumn::make('delay_root_cause')
-                    ->badge(),
-
-                TextColumn::make('cargo_achievement_ratio')
-                    ->label('Achievement')
-                    ->formatStateUsing(fn($state) => round($state * 100, 1) . '%'),
-
-                TextColumn::make('delayLogs_count')
-                    ->counts('delayLogs')
-                    ->badge(),
-
+                    ->color(fn($state) => match ($state) {
+                        VoyageOperationalStatus::DELAYED => 'danger',
+                        VoyageOperationalStatus::SAILING => 'info',
+                        VoyageOperationalStatus::SCHEDULED => 'gray',
+                        VoyageOperationalStatus::COMPLETED => 'success',
+                    })
+                    ->label('Status'),
             ])
-            ->defaultSort('etd', 'asc')
+            ->defaultSort('created_at', 'desc')
             ->actions([
+                Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ]);
     }
 
     public static function getEloquentQuery(): Builder
     {
-        $ratioExpr = "CASE 
-            WHEN voyages.cargo_plan IS NULL OR voyages.cargo_plan = 0 
-            THEN NULL 
-            ELSE (voyages.cargo_actual * 1.0 / voyages.cargo_plan) 
-        END";
-
         return parent::getEloquentQuery()
-            ->select('voyages.*')
-            ->selectRaw("COALESCE(($ratioExpr), 0) AS cargo_achievement_ratio")
-            ->with(['shippingLine', 'pol', 'pod'])
+            ->with(['shippingLine', 'vessel', 'pol', 'pod'])
             ->withCount('delayLogs');
     }
 
@@ -248,6 +272,7 @@ class VoyageResource extends Resource
         return [
             'index'  => Pages\ListVoyages::route('/'),
             'create' => Pages\CreateVoyage::route('/create'),
+            'view'   => Pages\ViewVoyage::route('/{record}'),
             'edit'   => Pages\EditVoyage::route('/{record}/edit'),
         ];
     }

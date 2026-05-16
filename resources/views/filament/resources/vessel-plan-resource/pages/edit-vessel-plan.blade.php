@@ -1,4 +1,4 @@
-<x-filament-panels::resources.pages.edit-record>
+<x-filament-panels::page>
     @php
         $analysis = $record->analyze();
         $total = $record->items()->count();
@@ -12,10 +12,5 @@
                     : 'Melanggar SOP (ETD > 6 hari)');
     @endphp
 
-    <x-vessel-plan.summary
-        :total="$total"
-        :maxGap="$analysis['max_gap'] ?? 0"
-        :idealGap="$idealGap"
-        :statusLabel="$statusLabel"
-    />
-</x-filament-panels::resources.pages.edit-record>
+    <x-vessel-plan.summary :total="$total" :maxGap="$analysis['max_gap'] ?? 0" :idealGap="$idealGap" :statusLabel="$statusLabel" />
+</x-filament-panels::page>

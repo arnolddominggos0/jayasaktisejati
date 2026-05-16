@@ -461,7 +461,11 @@ class AdminDashboard extends Page implements HasForms
             ->latest('tracked_at')->limit(12)->get()
             ->map(fn($t) => [
                 'shipment_code' => $t->shipment?->code ?? '-',
-                'status' => $t->status instanceof \BackedEnum ? $t->status->value : (string) $t->status,
+                'status' => $t->status instanceof \BackedEnum
+                    ? (method_exists($t->status, 'label')
+                        ? $t->status->label()
+                        : $t->status->value)
+                    : (string) $t->status,
                 'when' => Carbon::parse($t->tracked_at)->diffForHumans(),
                 'who' => $t->user?->name ?? 'Sistem',
                 'note' => $t->note,
@@ -488,9 +492,9 @@ class AdminDashboard extends Page implements HasForms
                 $ev = $s->evaluateKpiForManado();
                 if (! ($ev['applies'] ?? false)) continue;
                 $total++;
-                $badge = $ev['badge'] ?? null;
-                if ($badge === 'On Time') $onTime++;
-                elseif ($badge === 'Late') $late++;
+                $badge = $ev['badge'] ?? null; 
+                if ($badge === 'On Time' || $badge === 'Tepat Waktu') $onTime++;
+                elseif ($badge === 'Late' || $badge === 'Terlambat') $late++;
             }
 
             $onPct = $total > 0 ? round(($onTime / $total) * 100, 1) : 0.0;
@@ -511,7 +515,7 @@ class AdminDashboard extends Page implements HasForms
             if (! method_exists($s, 'evaluateKpiForManado')) continue;
             $ev = $s->evaluateKpiForManado();
             if (! ($ev['applies'] ?? false)) continue;
-            if (($ev['badge'] ?? null) !== 'Late') continue;
+            if (($ev['badge'] ?? null) !== 'Late' && ($ev['badge'] ?? null) !== 'Terlambat') continue;
             $summary = $ev['summary'] ?? [];
             $totalActual = $summary['total']['actual'] ?? null;
             $totalLimit = $summary['total']['limit'] ?? null;

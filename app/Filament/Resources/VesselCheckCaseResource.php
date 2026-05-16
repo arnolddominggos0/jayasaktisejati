@@ -15,7 +15,7 @@ class VesselCheckCaseResource extends Resource
     protected static ?string $model = VesselCheckCase::class;
 
     protected static ?string $navigationLabel = 'Tindak Lanjut Perubahan Jadwal';
-    protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
+    protected static ?string $navigationGroup = 'Monitoring Vessel';
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
     protected static ?int $navigationSort = 3;
 

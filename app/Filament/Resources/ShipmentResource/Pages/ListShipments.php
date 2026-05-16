@@ -112,7 +112,13 @@ class ListShipments extends ListRecords
                             $stype  = $r->service_type?->label()  ?? (string) $r->service_type;
                             $opt    = (string) $r->service_option ?: '-';
                             $scope  = $r->delivery_scope?->label() ?? (string) $r->delivery_scope ?: '-';
-                            $prio   = $r->priority ? ucfirst($r->priority) : '-';
+                            $prioMap = [
+                                'high'   => 'Tinggi',
+                                'normal' => 'Normal',
+                                'low'    => 'Rendah',
+                                'urgent' => 'Mendesak',
+                            ];
+                            $prio   = $r->priority ? ($prioMap[strtolower($r->priority)] ?? ucfirst($r->priority)) : '-';
                             $cargo  = $r->cargo_type?->label()    ?? (string) $r->cargo_type;
                             $status = $r->status?->label()        ?? (string) $r->status;
 

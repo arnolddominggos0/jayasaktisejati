@@ -24,11 +24,11 @@
         <table class="w-full text-sm">
             <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
                 <tr>
-                    <th class="px-4 py-3 text-left">Shipping Line</th>
+                    <th class="px-4 py-3 text-left">Nama Pelayaran</th>
                     <th class="px-4 py-3 text-left">Voyage</th>
                     <th class="px-4 py-3 text-left">ETD</th>
                     <th class="px-4 py-3 text-left">ETA</th>
-                    <th class="px-4 py-3 text-center">ETD Gap</th>
+                    <th class="px-4 py-3 text-center">Selisih ETD</th>
                 </tr>
             </thead>
             <tbody class="divide-y">

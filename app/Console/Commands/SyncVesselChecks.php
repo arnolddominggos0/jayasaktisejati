@@ -43,6 +43,7 @@ class SyncVesselChecks extends Command
                         'check_date' => $today->toDateString(),
                     ],
                     [
+                        'voyage_id'   => $schedule->voyage->id,
                         'day_code'    => $dayCode,
                         'etd_plan'    => $schedule->etd_plan ?? $etd,
                         'etd_current' => $etd,

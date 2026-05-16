@@ -257,7 +257,7 @@ class Voyage extends Model
             'PORT' => 'Delay Pelabuhan',
             'SAILING' => 'Delay Pelayaran',
             'MULTIPLE' => 'Multiple Delay',
-            'ONTIME' => 'On Time',
+            'ONTIME' => 'Tepat Waktu',
             default => '-',
         };
     }

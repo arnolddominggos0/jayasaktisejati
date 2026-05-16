@@ -49,6 +49,7 @@ class GenerateDailyVesselChecks extends Command
                     'check_date' => $today,
                 ],
                 [
+                    'voyage_id' => $schedule->voyage->id,
                     'day_code' => $dayCode,
                     'etd_plan' => $schedule->voyage->etd,
                     'etd_current' => $schedule->voyage->etd,

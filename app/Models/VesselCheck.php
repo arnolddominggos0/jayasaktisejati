@@ -11,6 +11,7 @@ class VesselCheck extends Model
     protected $fillable = [
         'vessel_check_id',
         'shipping_schedule_id',
+        'voyage_id',
         'check_date',
         'day_code',
         'etd_plan',

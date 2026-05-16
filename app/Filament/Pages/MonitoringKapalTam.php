@@ -3,8 +3,10 @@
 namespace App\Filament\Pages;
 
 use App\Enums\VoyageDelayReason;
+use App\Enums\VoyageOperationalStatus;
 use App\Models\Voyage;
 use App\Models\VoyageMilestone;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -13,18 +15,17 @@ class MonitoringKapalTam extends Page
 {
     protected static string $view = 'filament.pages.monitoring-kapal-tam';
     protected static ?string $navigationIcon = 'heroicon-o-globe-alt';
-    protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
+    protected static ?string $navigationGroup = 'Monitoring Vessel';
     protected static ?int $navigationSort = 1;
 
     public string $period;
-    public string $mode = 'control';
     public string $search = '';
 
     public array $monthOptions = [];
     public $rows;
-    public array $calendar = [];
     public array $summary = [];
     public array $achievement = [];
+    public array $calendar = [];
 
     public $selectedMilestone = null;
     public $showMilestoneModal = false;
@@ -39,12 +40,27 @@ class MonitoringKapalTam extends Page
         'status' => '',
     ];
 
+    public array $acknowledged = [];
+
     public function mount(): void
     {
-        $this->mode = 'control';
         $this->period = now()->format('Y-m');
+        $this->acknowledged = session()->get('monitoring_acknowledged', []);
         $this->generateMonthOptions();
         $this->loadData();
+    }
+
+    public function acknowledgeVoyage(int $voyageId): void
+    {
+        if (!in_array($voyageId, $this->acknowledged, true)) {
+            $this->acknowledged[] = $voyageId;
+            session()->put('monitoring_acknowledged', $this->acknowledged);
+        }
+
+        Notification::make()
+            ->title('Issue di-acknowledge')
+            ->success()
+            ->send();
     }
 
     public function updatedPeriod(): void
@@ -63,10 +79,8 @@ class MonitoringKapalTam extends Page
         $end   = now()->addMonths(12)->startOfMonth();
 
         while ($start <= $end) {
-
             $this->monthOptions[$start->format('Y-m')] =
                 $start->translatedFormat('F Y');
-
             $start->addMonth();
         }
     }
@@ -74,13 +88,11 @@ class MonitoringKapalTam extends Page
     protected function baseQuery(Carbon $dt): Builder
     {
         return Voyage::query()
-            ->with(['vessel', 'pol', 'pod', 'milestones'])
+            ->with(['vessel', 'pol', 'pod', 'milestones', 'checkpoints', 'vesselChecks'])
             ->whereYear('period_month', $dt->year)
             ->whereMonth('period_month', $dt->month)
             ->when($this->search, function ($query) {
-
                 $query->where(function ($q) {
-
                     $q->where('voyage_no', 'like', "%{$this->search}%")
                         ->orWhereHas(
                             'vessel',
@@ -94,10 +106,6 @@ class MonitoringKapalTam extends Page
     {
         $dt = Carbon::createFromFormat('Y-m', $this->period)->startOfMonth();
 
-        $start = $dt->copy()->startOfMonth();
-        $end   = $dt->copy()->endOfMonth();
-        $daysCount = $dt->daysInMonth;
-
         $this->rows = $this->baseQuery($dt)
             ->get()
             ->sortByDesc(fn($v) => $v->milestones->where('is_overdue', true)->count())
@@ -105,7 +113,7 @@ class MonitoringKapalTam extends Page
 
         $this->buildSummary();
         $this->buildAchievement();
-        $this->buildCalendar($start, $end, $daysCount);
+        $this->buildCalendar($dt);
     }
 
     protected function buildSummary(): void
@@ -120,21 +128,14 @@ class MonitoringKapalTam extends Page
             ->count();
 
         $this->summary = [
-
             'total_voyage' => $this->rows->count(),
-
             'voyage_delay' => $delays->count(),
-
             'milestone_overdue' => $milestoneOverdue,
-
             'total_delay_days' => $delays->sum(),
-
             'average_delay_days' => $delays->count()
                 ? (int) round($delays->avg())
                 : 0,
-
             'max_delay_days' => $delays->max() ?? 0,
-
         ];
     }
 
@@ -143,7 +144,6 @@ class MonitoringKapalTam extends Page
         $total = $this->rows->count();
 
         $calc = function ($collection) use ($total) {
-
             $ok = $collection->filter(
                 fn($v) => $v !== null && $v->value === 'ontime'
             )->count();
@@ -153,19 +153,15 @@ class MonitoringKapalTam extends Page
             )->count();
 
             return [
-
                 'total' => $total,
                 'ok' => $ok,
                 'ng' => $ng,
-
                 'ok_percent' => $total > 0
                     ? round(($ok / $total) * 100)
                     : 0,
-
                 'ng_percent' => $total > 0
                     ? round(($ng / $total) * 100)
                     : 0,
-
             ];
         };
 
@@ -183,37 +179,32 @@ class MonitoringKapalTam extends Page
             ->avg();
 
         $this->achievement = [
-
             'otd' => $calc($this->rows->pluck('otd_status')),
             'ota' => $calc($this->rows->pluck('ota_status')),
             'otb' => $calc($this->rows->pluck('otb_status')),
-
             'penyebab_terbanyak' => $topReason
                 ? VoyageDelayReason::from($topReason)->label()
                 : null,
-
             'rata_rata_delay_berangkat' => $avgDelay
                 ? (int) round($avgDelay)
                 : 0,
-
         ];
     }
 
-    protected function buildCalendar(Carbon $start, Carbon $end, int $daysCount): void
+    protected function buildCalendar(Carbon $dt): void
     {
+        $start = $dt->copy()->startOfMonth();
+        $end   = $dt->copy()->endOfMonth();
+        $daysCount = $dt->daysInMonth;
+
         $days = [];
-
         for ($i = 1; $i <= $daysCount; $i++) {
-
             $d = $start->copy()->day($i);
-
             $days[] = [
-
                 'n' => $i,
                 'dow' => strtoupper($d->format('D')),
                 'isWeekend' => $d->isWeekend(),
                 'isToday' => $d->isToday(),
-
             ];
         }
 
@@ -225,60 +216,49 @@ class MonitoringKapalTam extends Page
         ];
 
         $bucket = [];
-
         foreach (array_keys($lanes) as $lane) {
             $bucket[$lane] = array_fill(1, $daysCount, []);
         }
 
         foreach ($this->rows as $voyage) {
-
             $delayLabel = $voyage->delay_label;
 
             $planChip = [
-
                 'vessel' => $voyage->vessel?->name ?? '-',
                 'voyage_no' => $voyage->voyage_no,
                 'status' => $voyage->operational_status_enum,
                 'delay_label' => null,
                 'severity' => null,
-
             ];
 
             $actualChip = [
-
                 'vessel' => $voyage->vessel?->name ?? '-',
                 'voyage_no' => $voyage->voyage_no,
                 'status' => $voyage->operational_status_enum,
                 'delay_label' => $delayLabel,
                 'severity' => $voyage->departure_delay_severity,
-
             ];
 
             if ($voyage->etd?->between($start, $end)) {
                 $bucket['etd'][$voyage->etd->day][] = $planChip;
             }
-
             if ($voyage->eta?->between($start, $end)) {
                 $bucket['eta'][$voyage->eta->day][] = $planChip;
             }
-
             if ($voyage->atd_at?->between($start, $end)) {
                 $bucket['atd'][$voyage->atd_at->day][] = $actualChip;
             }
-
             if ($voyage->ata_at?->between($start, $end)) {
                 $bucket['ata'][$voyage->ata_at->day][] = $actualChip;
             }
         }
 
         $this->calendar = [
-
             'month_label' => $start->translatedFormat('F Y'),
             'days' => $days,
             'days_count' => $daysCount,
             'lanes' => $lanes,
             'bucket' => $bucket,
-
         ];
     }
 
@@ -296,7 +276,6 @@ class MonitoringKapalTam extends Page
         }
 
         $this->milestoneForm = [
-
             'code' => $this->selectedMilestone->code,
             'milestone_date' => $this->selectedMilestone->milestone_date?->format('Y-m-d'),
             'actual_date' => $this->selectedMilestone->actual_date?->format('Y-m-d'),
@@ -304,7 +283,6 @@ class MonitoringKapalTam extends Page
             'speed_knots' => $this->selectedMilestone->speed_knots,
             'note' => $this->selectedMilestone->note,
             'status' => $this->selectedMilestone->status,
-
         ];
 
         $this->showMilestoneModal = true;
@@ -329,7 +307,6 @@ class MonitoringKapalTam extends Page
         ]);
 
         $this->showMilestoneModal = false;
-
         $this->loadData();
     }
 }

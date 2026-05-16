@@ -148,7 +148,7 @@ class ShipmentTrackingResource extends Resource
                     ->state(function (Shipment $r) {
                         $ev = $r->evaluateKpiForManado();
 
-                        return $ev['applies'] ? ($ev['badge'] ?? 'Pending') : '—';
+                        return $ev['applies'] ? ($ev['badge'] ?? 'Menunggu') : '—';
                     })
                     ->color(function (Shipment $r) {
                         $ev = $r->evaluateKpiForManado();
@@ -157,8 +157,8 @@ class ShipmentTrackingResource extends Resource
                         }
 
                         return match ($ev['badge'] ?? 'Pending') {
-                            'On Time' => 'success',
-                            'Late' => 'danger',
+                            'On Time', 'Tepat Waktu' => 'success',
+                            'Late', 'Terlambat' => 'danger',
                             default => 'gray',
                         };
                     }),
@@ -225,7 +225,6 @@ class ShipmentTrackingResource extends Resource
                             foreach ($records as $r) {
                                 $ev = $r->evaluateKpiForManado();
                                 $sum = $r->kpiManadoSummaryText() ?? '-';
-                                $bad = $ev['applies'] ? ($ev['badge'] ?? 'Pending') : '—';
 
                                 fputcsv($out, [
                                     $r->code,

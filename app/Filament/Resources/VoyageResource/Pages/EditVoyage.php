@@ -19,7 +19,7 @@ class EditVoyage extends EditRecord
 
     public function getTitle(): string
     {
-        return 'Edit Voyage';
+        return 'Ubah Pelayaran';
     }
 
     protected function getRedirectUrl(): string

@@ -89,7 +89,7 @@ class PpeItemResource extends Resource
                 TextColumn::make('created_at')->label('Dibuat')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                SelectFilter::make('status')->label('Status')->options(self::STATUSES + ['assigned' => 'Assigned']),
+                SelectFilter::make('status')->label('Status')->options(self::STATUSES + ['assigned' => 'Sedang Dipakai']),
                 SelectFilter::make('ppe_sku_id')->label('SKU')->relationship('sku','name'),
                 SelectFilter::make('sku.type')->label('Jenis')->relationship('sku','type')->options(
                     collect(\App\Enums\PpeType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()])

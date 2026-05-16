@@ -15,7 +15,7 @@ class VesselPlanResource extends Resource
 {
     protected static ?string $model = VesselPlan::class;
 
-    protected static ?string $navigationGroup = 'Monitoring Kapal TAM';
+    protected static ?string $navigationGroup = 'Monitoring Vessel';
     protected static ?string $navigationLabel = 'Rencana Jadwal Kapal';
     protected static ?string $pluralLabel     = 'Rencana Jadwal Kapal';
     protected static ?string $modelLabel      = 'Rencana Jadwal Kapal';

@@ -30,7 +30,7 @@ class ManpowerResource extends Resource
             CheckboxList::make('skills')->label('Keahlian')->options([
                 'stuffing'   => 'Stuffing',
                 'unloading'  => 'Unloading',
-                'Racking'    => 'Racking',
+                'racking'    => 'Racking',
                 'loading'    => 'Loading',
                 'checker'    => 'Checker',
             ])->columns(2),
@@ -41,7 +41,7 @@ class ManpowerResource extends Resource
                 'Pelatihan APD',
             ])->splitKeys([',']),
             Forms\Components\TextInput::make('phone')->tel()->label('Telepon'),
-            Forms\Components\TextInput::make('license_number')->label('No. SIM/License'),
+            Forms\Components\TextInput::make('license_number')->label('No. SIM/Lisensi'),
             Forms\Components\Select::make('branch_id')->relationship('branch', 'name')->label('Cabang')->required(),
             Forms\Components\Select::make('depot_id')->relationship('depot', 'name')->label('Depo')->required(),
             Forms\Components\Toggle::make('active')->label('Aktif')->default(true),

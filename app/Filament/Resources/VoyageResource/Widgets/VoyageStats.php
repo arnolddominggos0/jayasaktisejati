@@ -35,32 +35,38 @@ class VoyageStats extends StatsOverviewWidget
         $voyages = $query->get();
 
         $scheduled = $voyages
-            ->where('operational_status', VoyageOperationalStatus::SCHEDULED->value)
+            ->filter(fn($v) => $v->operational_status_enum === VoyageOperationalStatus::SCHEDULED)
             ->count();
 
         $sailing = $voyages
-            ->where('operational_status', VoyageOperationalStatus::SAILING->value)
+            ->filter(fn($v) => $v->operational_status_enum === VoyageOperationalStatus::SAILING)
             ->count();
 
         $delayed = $voyages
-            ->where('operational_status', VoyageOperationalStatus::DELAYED->value)
+            ->filter(fn($v) => $v->operational_status_enum === VoyageOperationalStatus::DELAYED)
             ->count();
 
         $completed = $voyages
-            ->where('operational_status', VoyageOperationalStatus::COMPLETED->value)
+            ->filter(fn($v) => $v->operational_status_enum === VoyageOperationalStatus::COMPLETED)
             ->count();
 
         $total = $voyages->count();
 
-        return [
+        $statusColor = fn(VoyageOperationalStatus $status) => match ($status) {
+            VoyageOperationalStatus::DELAYED   => 'danger',
+            VoyageOperationalStatus::SAILING   => 'info',
+            VoyageOperationalStatus::SCHEDULED => 'gray',
+            VoyageOperationalStatus::COMPLETED => 'success',
+        };
 
+        return [
             Stat::make(
                 VoyageOperationalStatus::DELAYED->label(),
                 $delayed
             )
                 ->description('Perlu perhatian')
                 ->descriptionIcon('heroicon-m-exclamation-triangle')
-                ->color(VoyageOperationalStatus::DELAYED->color()),
+                ->color($statusColor(VoyageOperationalStatus::DELAYED)),
 
             Stat::make(
                 VoyageOperationalStatus::SAILING->label(),
@@ -68,7 +74,7 @@ class VoyageStats extends StatsOverviewWidget
             )
                 ->description('Dalam perjalanan')
                 ->descriptionIcon('heroicon-m-paper-airplane')
-                ->color(VoyageOperationalStatus::SAILING->color()),
+                ->color($statusColor(VoyageOperationalStatus::SAILING)),
 
             Stat::make(
                 VoyageOperationalStatus::SCHEDULED->label(),
@@ -76,7 +82,7 @@ class VoyageStats extends StatsOverviewWidget
             )
                 ->description('Belum berangkat')
                 ->descriptionIcon('heroicon-m-clock')
-                ->color(VoyageOperationalStatus::SCHEDULED->color()),
+                ->color($statusColor(VoyageOperationalStatus::SCHEDULED)),
 
             Stat::make(
                 VoyageOperationalStatus::COMPLETED->label(),
@@ -84,7 +90,7 @@ class VoyageStats extends StatsOverviewWidget
             )
                 ->description('Sudah tiba')
                 ->descriptionIcon('heroicon-m-check-circle')
-                ->color(VoyageOperationalStatus::COMPLETED->color()),
+                ->color($statusColor(VoyageOperationalStatus::COMPLETED)),
 
             Stat::make('Total Voyage', $total)
                 ->description('Total periode ini')

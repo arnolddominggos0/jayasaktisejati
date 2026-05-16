@@ -156,14 +156,14 @@ class ShipmentHistoryResource extends Resource
                     ->badge()
                     ->state(function (Shipment $r) {
                         $ev = $r->evaluateKpiForManado();
-                        return $ev['applies'] ? ($ev['badge'] ?? 'Pending') : '—';
+                        return $ev['applies'] ? ($ev['badge'] ?? 'Menunggu') : '—';
                     })
                     ->color(function (Shipment $r) {
                         $ev = $r->evaluateKpiForManado();
                         if (!($ev['applies'] ?? false)) return 'gray';
                         return match ($ev['badge'] ?? 'Pending') {
-                            'On Time' => 'success',
-                            'Late'    => 'danger',
+                            'On Time', 'Tepat Waktu' => 'success',
+                            'Late', 'Terlambat'    => 'danger',
                             default   => 'gray',
                         };
                     }),

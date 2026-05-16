@@ -15,6 +15,7 @@ class VesselCheckService
 {
     public function recordDailyCheck(
         int $shippingScheduleId,
+        ?int $voyageId,
         string $dayCode,
         string $etdPlan,
         string $etdCurrent,
@@ -27,6 +28,7 @@ class VesselCheckService
                 'check_date' => today(),
             ],
             [
+                'voyage_id'   => $voyageId,
                 'day_code'    => $dayCode,
                 'etd_plan'    => $etdPlan,
                 'etd_current' => $etdCurrent,

@@ -166,4 +166,6 @@
 
     </div>
 
+    @include('components.voyage-readiness-timeline', ['voyage' => $v])
+
 </div>
