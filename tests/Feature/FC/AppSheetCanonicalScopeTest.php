@@ -2,15 +2,8 @@
 
 namespace Tests\Feature\FC;
 
-use App\Models\AppSheetSyncLog;
 use App\Models\Branch;
-use App\Models\BriefingSession;
-use App\Models\City;
-use App\Models\Customer;
 use App\Models\Depot;
-use App\Models\LoadingSession;
-use App\Models\Manpower;
-use App\Models\Shipment;
 use App\Models\User;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Spatie\Permission\Models\Role;
@@ -141,6 +134,7 @@ class AppSheetCanonicalScopeTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJsonFragment(['success' => false, 'error_code' => 'SCOPE_VIOLATION']);
+        $this->assertStringContainsString('[SCOPE_MISMATCH]', $response->json('message'));
         $this->assertStringStartsWith('[SCOPE_MISMATCH]', $response->json('message'));
     }
 
@@ -168,6 +162,7 @@ class AppSheetCanonicalScopeTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJsonFragment(['success' => false, 'error_code' => 'SCOPE_VIOLATION']);
+        $this->assertStringContainsString('[IMPERSONATION_REJECTED]', $response->json('message'));
         $this->assertStringStartsWith('[IMPERSONATION_REJECTED]', $response->json('message'));
     }
 
@@ -218,6 +213,7 @@ class AppSheetCanonicalScopeTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJsonFragment(['success' => false, 'error_code' => 'SCOPE_VIOLATION']);
+        $this->assertStringContainsString('[SCOPE_MISMATCH]', $response->json('message'));
         $this->assertStringStartsWith('[SCOPE_MISMATCH]', $response->json('message'));
     }
 
@@ -278,6 +274,7 @@ class AppSheetCanonicalScopeTest extends TestCase
 
         $response->assertStatus(403)
             ->assertJsonFragment(['success' => false, 'error_code' => 'SCOPE_VIOLATION']);
+        $this->assertStringContainsString('[LEGACY_SCOPE_DENIED]', $response->json('message'));
         $this->assertStringStartsWith('[LEGACY_SCOPE_DENIED]', $response->json('message'));
     }
 
