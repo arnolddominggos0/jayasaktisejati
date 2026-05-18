@@ -11,6 +11,7 @@ class VesselCheckCase extends Model
 {
     protected $fillable = [
         'shipping_schedule_id',
+        'voyage_id',
         'case_status',
         'delay_flag',
         'opened_at',
@@ -27,6 +28,11 @@ class VesselCheckCase extends Model
     public function shippingSchedule(): BelongsTo
     {
         return $this->belongsTo(ShippingSchedule::class);
+    }
+
+    public function voyage(): BelongsTo
+    {
+        return $this->belongsTo(Voyage::class);
     }
 
     public function delays(): HasMany
@@ -54,14 +60,5 @@ class VesselCheckCase extends Model
         return $this->alternatives()
             ->where('approval_status', 'APPROVED')
             ->exists();
-    }
-    public function vesselChecks()
-    {
-        return $this->hasMany(VesselCheck::class);
-    }
-
-    public function vesselCheckCase()
-    {
-        return $this->hasOne(VesselCheckCase::class);
     }
 }

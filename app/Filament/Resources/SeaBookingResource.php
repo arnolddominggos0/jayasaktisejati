@@ -24,13 +24,12 @@ use Illuminate\Database\Eloquent\Builder;
 class SeaBookingResource extends Resource
 {
     protected static ?string $model = SeaBooking::class;
-    protected static ?string $navigationGroup = 'Pelayaran & Kapal';
+    protected static ?string $navigationGroup = 'Eksekusi Pengiriman';
     protected static ?string $pluralModelLabel = 'Booking Kontainer';
     protected static ?string $navigationLabel = 'Booking Kontainer';
     protected static ?string $navigationIcon = 'heroicon-m-cube';
     protected static ?string $modelLabel = 'Booking Kontainer';
-    protected static ?int    $navigationSort  = 20;
-
+    protected static ?int    $navigationSort  = 2;
 
     public static function form(Forms\Form $form): Forms\Form
     {

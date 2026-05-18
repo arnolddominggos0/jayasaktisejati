@@ -35,7 +35,7 @@ class UserResource extends Resource
 
     protected static ?string $navigationGroup = 'Master Data';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 6;
 
     public static function canViewAny(): bool
     {

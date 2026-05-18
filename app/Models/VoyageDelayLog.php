@@ -14,15 +14,19 @@ class VoyageDelayLog extends Model
         'new_eta',
         'reason',
         'changed_by',
+        'new_etb',
+        'new_atb_at',
         'snapshot_before',
         'snapshot_after',
     ];
 
     protected $casts = [
-        'old_etd' => 'datetime',
-        'new_etd' => 'datetime',
-        'old_eta' => 'datetime',
-        'new_eta' => 'datetime',
+        'old_etd'       => 'datetime',
+        'new_etd'       => 'datetime',
+        'old_eta'       => 'datetime',
+        'new_eta'       => 'datetime',
+        'new_etb'       => 'datetime',
+        'new_atb_at'    => 'datetime',
         'snapshot_before' => 'array',
         'snapshot_after' => 'array',
     ];

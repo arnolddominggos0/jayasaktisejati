@@ -31,12 +31,13 @@ class VoyageResource extends Resource
 {
     protected static ?string $model = Voyage::class;
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'Operasional';
+
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
-    protected static ?string $navigationLabel = 'Voyage Registry';
-    protected static ?string $pluralLabel     = 'Voyage Registry';
+    protected static ?string $navigationLabel = 'Registry Voyage';
+    protected static ?string $pluralLabel     = 'Registry Voyage';
     protected static ?string $modelLabel      = 'Voyage';
-    protected static ?int    $navigationSort  = 4;
+    protected static ?int    $navigationSort  = 5;
 
     public static function form(Form $form): Form
     {
@@ -140,7 +141,7 @@ class VoyageResource extends Resource
                         ->native(false),
 
                     DateTimePicker::make('closing_at')
-                        ->label('Closing Date')
+                        ->label('Tanggal Closing')
                         ->native(false),
 
                     DateTimePicker::make('atd_at')
@@ -212,7 +213,7 @@ class VoyageResource extends Resource
                         ->content(fn($record) => $record->departure_delay_days ? $record->departure_delay_days . ' hari' : 'Tepat Waktu'),
 
                     Placeholder::make('delay_root_cause_label')
-                        ->label('Root Cause Delay')
+                        ->label('Penyebab Delay')
                         ->content(fn($record) => $record->delay_root_cause_label ?? '—'),
                 ])
                 ->columns(3),
@@ -323,7 +324,7 @@ class VoyageResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('period_month')
-                    ->label('Period')
+                    ->label('Periode')
                     ->options(
                         fn() => Voyage::query()
                             ->whereNotNull('period_month')
@@ -345,7 +346,7 @@ class VoyageResource extends Resource
                     ->native(false),
 
                 SelectFilter::make('vessel_id')
-                    ->label('Vessel')
+                    ->label('Kapal')
                     ->relationship('vessel', 'name')
                     ->searchable()
                     ->preload()
@@ -361,7 +362,7 @@ class VoyageResource extends Resource
                     ->native(false),
 
                 TernaryFilter::make('include_archived')
-                    ->label('Show Archived')
+                    ->label('Tampilkan Arsip')
                     ->placeholder('Hide Archived')
                     ->trueLabel('Show Archived')
                     ->falseLabel('Hide Archived')
@@ -436,7 +437,7 @@ class VoyageResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkAction::make('archive')
-                    ->label('Archive Selected')
+                    ->label('Arsipkan Terpilih')
                     ->icon('heroicon-o-archive-box')
                     ->requiresConfirmation()
                     ->action(function ($records) {

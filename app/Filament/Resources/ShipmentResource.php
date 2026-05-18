@@ -62,7 +62,7 @@ class ShipmentResource extends Resource
 {
     protected static ?string $model = Shipment::class;
 
-    protected static ?string $navigationGroup = 'Transaksi';
+    protected static ?string $navigationGroup = 'Eksekusi Pengiriman';
 
     protected static ?string $navigationLabel = 'Permintaan Pengiriman';
 
@@ -72,7 +72,7 @@ class ShipmentResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-m-queue-list';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 1;
 
     protected static function resolveDepotId(?int $branchId, ?string $mode, ?int $voyageId): ?int
     {

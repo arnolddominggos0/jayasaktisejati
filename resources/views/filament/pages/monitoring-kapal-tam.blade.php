@@ -1,35 +1,33 @@
 <x-filament-panels::page>
-    <div class="space-y-4">
+    <div class="space-y-5">
 
         {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- COMPACT HEADER                                                --}}
+        {{-- OPERATIONAL HEADER                                            --}}
         {{-- ═══════════════════════════════════════════════════════════════ --}}
-        <div class="flex items-center justify-between -mx-2">
-            <div class="flex items-center gap-3">
-                <h1 class="text-base font-bold text-gray-900 tracking-tight">Monitoring Vessel</h1>
-                <span class="text-xs text-gray-400">—</span>
-                <p class="text-xs text-gray-500">{{ \Illuminate\Support\Carbon::createFromFormat('Y-m', $period)->translatedFormat('F Y') }}</p>
+        <div class="flex items-center justify-between">
+            <div class="flex items-baseline gap-3">
+                <h1 class="text-lg font-bold text-gray-900 tracking-tight">Monitoring Voyage</h1>
+                <span class="text-sm text-gray-400">—</span>
+                <p class="text-sm text-gray-500 font-medium">{{ \Illuminate\Support\Carbon::createFromFormat('Y-m', $period)->translatedFormat('F Y') }}</p>
             </div>
 
-            <div class="flex items-center gap-2 -my-1">
+            <div class="flex items-center gap-2">
                 <select wire:model.live="period"
-                    class="rounded border-gray-200 text-xs font-medium focus:ring-0 focus:border-gray-300 py-1 pl-2 pr-6">
+                    class="rounded border-gray-200 text-xs font-medium focus:ring-0 focus:border-gray-300 py-1.5 pl-2 pr-6 bg-white">
                     @foreach ($monthOptions as $value => $label)
                         <option value="{{ $value }}">{{ $label }}</option>
                     @endforeach
                 </select>
 
                 <input wire:model.live="search" placeholder="Cari kapal / voyage"
-                    class="rounded border-gray-200 text-xs w-40 focus:ring-0 focus:border-gray-300 py-1 px-2">
+                    class="rounded border-gray-200 text-xs w-44 focus:ring-0 focus:border-gray-300 py-1.5 px-2.5 bg-white">
             </div>
         </div>
 
 
         {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- COMPACT OPERATIONAL SUMMARY STRIP                          --}}
-        {{-- Critical: Delayed + Overdue dominant                       --}}
-        {{-- Informational: lighter tone                                --}}
-        {{-- KPI: lightest, white bg                                   --}}
+        {{-- OPERATIONAL SUMMARY STRIP                                     --}}
+        {{-- Critical dominant, informational secondary, KPI tertiary      --}}
         {{-- ═══════════════════════════════════════════════════════════════ --}}
         @php
             $delayed = $rows->filter(
@@ -54,54 +52,54 @@
             $overdueCount = $rows->sum(fn($v) => $v->milestones->where('is_overdue', true)->count());
         @endphp
 
-        <div class="flex items-center gap-1 -my-1">
+        <div class="flex items-center gap-2 flex-wrap">
             @if ($delayed->count())
-                <div class="bg-red-50 border border-red-200/70 rounded px-1.5 py-1">
-                    <span class="text-[9px] text-red-700 font-semibold uppercase tracking-wide">Delayed</span>
-                    <span class="ml-1 text-sm font-bold text-red-800">{{ $delayed->count() }}</span>
+                <div class="bg-red-50 border border-red-200 rounded px-2.5 py-1.5 shadow-sm">
+                    <span class="text-[10px] text-red-700 font-bold uppercase tracking-wider">Delay</span>
+                    <span class="ml-1.5 text-base font-bold text-red-800">{{ $delayed->count() }}</span>
                 </div>
             @endif
 
             @if ($sailing->count())
-                <div class="bg-blue-50/40 border border-blue-100/50 rounded px-1.5 py-1">
-                    <span class="text-[9px] text-blue-600/80 font-medium uppercase tracking-wide">Sailing</span>
-                    <span class="ml-1 text-sm font-bold text-blue-700/80">{{ $sailing->count() }}</span>
+                <div class="bg-blue-50/50 border border-blue-200/50 rounded px-2.5 py-1.5">
+                    <span class="text-[10px] text-blue-700 font-semibold uppercase tracking-wider">Berlayar</span>
+                    <span class="ml-1.5 text-base font-bold text-blue-800">{{ $sailing->count() }}</span>
                 </div>
             @endif
 
             @if ($completed->count())
-                <div class="bg-gray-50/40 border border-gray-100/50 rounded px-1.5 py-1">
-                    <span class="text-[9px] text-gray-500/80 font-medium uppercase tracking-wide">Done</span>
-                    <span class="ml-1 text-sm font-bold text-gray-600/80">{{ $completed->count() }}</span>
+                <div class="bg-gray-50/60 border border-gray-200/60 rounded px-2.5 py-1.5">
+                    <span class="text-[10px] text-gray-600 font-semibold uppercase tracking-wider">Selesai</span>
+                    <span class="ml-1.5 text-base font-bold text-gray-700">{{ $completed->count() }}</span>
                 </div>
             @endif
 
             @if ($scheduled->count())
-                <div class="bg-gray-50/30 border border-gray-100/40 rounded px-1.5 py-1">
-                    <span class="text-[9px] text-gray-400/80 font-medium uppercase tracking-wide">Sched</span>
-                    <span class="ml-1 text-sm font-bold text-gray-500/80">{{ $scheduled->count() }}</span>
+                <div class="bg-white border border-gray-200/50 rounded px-2.5 py-1.5">
+                    <span class="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Terjadwal</span>
+                    <span class="ml-1.5 text-base font-bold text-gray-600">{{ $scheduled->count() }}</span>
                 </div>
             @endif
 
-            <span class="text-gray-300 mx-0.5">|</span>
+            <div class="w-px h-6 bg-gray-200 mx-0.5"></div>
 
             @if ($overdueCount)
-                <div class="bg-orange-50 border border-orange-200/70 rounded px-1.5 py-1">
-                    <span class="text-[9px] text-orange-700 font-semibold uppercase tracking-wide">Overdue</span>
-                    <span class="ml-1 text-sm font-bold text-orange-800">{{ $overdueCount }}</span>
+                <div class="bg-orange-50 border border-orange-200 rounded px-2.5 py-1.5 shadow-sm">
+                    <span class="text-[10px] text-orange-700 font-bold uppercase tracking-wider">Lewat</span>
+                    <span class="ml-1.5 text-base font-bold text-orange-800">{{ $overdueCount }}</span>
                 </div>
             @endif
 
-            <span class="text-gray-300 mx-0.5">|</span>
+            <div class="w-px h-6 bg-gray-200 mx-0.5"></div>
 
-            <div class="bg-white border border-gray-100/50 rounded px-1.5 py-1">
-                <span class="text-[9px] text-gray-400 font-medium uppercase tracking-wide">OTD</span>
-                <span class="ml-1 text-sm font-bold text-gray-600">{{ $total > 0 ? round(($otdOk / $total) * 100) : 0 }}%</span>
+            <div class="bg-white border border-gray-200/50 rounded px-2.5 py-1.5">
+                <span class="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">OTD</span>
+                <span class="ml-1.5 text-base font-bold text-gray-700">{{ $total > 0 ? round(($otdOk / $total) * 100) : 0 }}%</span>
             </div>
 
-            <div class="bg-white border border-gray-100/50 rounded px-1.5 py-1">
-                <span class="text-[9px] text-gray-400 font-medium uppercase tracking-wide">OTA</span>
-                <span class="ml-1 text-sm font-bold text-gray-600">{{ $total > 0 ? round(($otaOk / $total) * 100) : 0 }}%</span>
+            <div class="bg-white border border-gray-200/50 rounded px-2.5 py-1.5">
+                <span class="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">OTA</span>
+                <span class="ml-1.5 text-base font-bold text-gray-700">{{ $total > 0 ? round(($otaOk / $total) * 100) : 0 }}%</span>
             </div>
         </div>
 
@@ -177,6 +175,92 @@
                             class="px-4 py-2 border rounded-lg text-sm">Batal</button>
                         <button wire:click="saveMilestone"
                             class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm">Simpan</button>
+                    </div>
+
+                </div>
+            </div>
+        @endif
+
+
+        {{-- ═══════════════════════════════════════════════════════════════ --}}
+        {{-- INLINE OPERATIONAL MODAL                                      --}}
+        {{-- ═══════════════════════════════════════════════════════════════ --}}
+        @if ($showInlineModal)
+            <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" wire:click.self="closeInlineModal">
+                <div class="bg-white rounded-lg shadow-xl w-[340px] p-4">
+
+                    {{-- Header --}}
+                    <div class="flex justify-between items-center mb-3">
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-800">
+                                @php
+                                    $modalTitle = match($inlineModalType) {
+                                        'atb' => 'Mark ATB',
+                                        'atd' => 'Mark ATD',
+                                        'ata' => 'Mark ATA',
+                                        'closing' => 'Mark Closing',
+                                        'vessel_check' => 'Update Readiness',
+                                        'delay_case' => 'Create Delay Case',
+                                        default => 'Action',
+                                    };
+                                @endphp
+                                {{ $modalTitle }}
+                            </h3>
+                            @php
+                                $modalVessel = $inlineModalVoyageId ? \App\Models\Voyage::find($inlineModalVoyageId)?->vessel?->name : null;
+                            @endphp
+                            @if ($modalVessel)
+                                <p class="text-[10px] text-gray-400">{{ $modalVessel }}</p>
+                            @endif
+                        </div>
+                        <button wire:click="closeInlineModal" class="text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                    </div>
+
+                    {{-- Body --}}
+                    <div class="space-y-3">
+                        @if (in_array($inlineModalType, ['atb', 'atd', 'ata', 'closing']))
+                            <div>
+                                <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Tanggal & Waktu</label>
+                                <input type="datetime-local" wire:model="inlineForm.datetime"
+                                    class="w-full rounded border-gray-200 text-xs py-1.5 px-2 focus:ring-0 focus:border-gray-300">
+                            </div>
+                        @endif
+
+                        @if ($inlineModalType === 'vessel_check')
+                            <div>
+                                <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Status</label>
+                                <select wire:model="inlineForm.status"
+                                    class="w-full rounded border-gray-200 text-xs py-1.5 px-2 focus:ring-0 focus:border-gray-300">
+                                    <option value="on_schedule">On Schedule</option>
+                                    <option value="potential_delay">Potential Delay</option>
+                                </select>
+                            </div>
+                        @endif
+
+                        @if ($inlineModalType === 'delay_case')
+                            <div class="text-xs text-gray-600">
+                                Buat kasus delay baru untuk voyage ini?
+                            </div>
+                        @endif
+
+                        @if (in_array($inlineModalType, ['atb', 'atd', 'ata', 'closing', 'vessel_check']))
+                            <div>
+                                <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Catatan</label>
+                                <textarea wire:model="inlineForm.note" rows="2"
+                                    class="w-full rounded border-gray-200 text-xs py-1.5 px-2 focus:ring-0 focus:border-gray-300 resize-none"
+                                    placeholder="Catatan operasional opsional..."></textarea>
+                            </div>
+                        @endif
+                    </div>
+
+                    {{-- Footer --}}
+                    <div class="mt-4 flex justify-end gap-2">
+                            <button wire:click="closeInlineModal"
+                            class="px-3 py-1.5 border border-gray-200 rounded text-[11px] text-gray-600 hover:bg-gray-50 transition">Batal</button>
+                        <button wire:click="saveInlineModal"
+                            class="px-3 py-1.5 bg-gray-900 text-white rounded text-[11px] hover:bg-gray-800 transition">
+                            @if ($inlineModalType === 'delay_case') Create Case @else Save @endif
+                        </button>
                     </div>
 
                 </div>

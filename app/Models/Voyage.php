@@ -205,6 +205,11 @@ class Voyage extends Model
         return $this->hasMany(VesselCheck::class);
     }
 
+    public function vesselCheckCases(): HasMany
+    {
+        return $this->hasMany(VesselCheckCase::class);
+    }
+
     public function getPlannedSailingDaysAttribute(): ?float
     {
         return $this->vesselPlanItem?->planned_sailing_days;

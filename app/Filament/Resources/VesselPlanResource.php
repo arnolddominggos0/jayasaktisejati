@@ -15,10 +15,10 @@ class VesselPlanResource extends Resource
 {
     protected static ?string $model = VesselPlan::class;
 
-    protected static ?string $navigationGroup = 'Monitoring Vessel';
-    protected static ?string $navigationLabel = 'Rencana Jadwal Kapal';
-    protected static ?string $pluralLabel     = 'Rencana Jadwal Kapal';
-    protected static ?string $modelLabel      = 'Rencana Jadwal Kapal';
+    protected static ?string $navigationGroup = 'Perencanaan';
+    protected static ?string $navigationLabel = 'Perencanaan Kapal';
+    protected static ?string $pluralLabel     = 'Perencanaan Kapal';
+    protected static ?string $modelLabel      = 'Perencanaan Kapal';
     protected static ?int    $navigationSort  = 1;
     protected static ?string $navigationIcon  = 'heroicon-o-calendar-days';
 

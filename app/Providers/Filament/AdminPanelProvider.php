@@ -65,10 +65,10 @@ class AdminPanelProvider extends PanelProvider
                 Widgets\FilamentInfoWidget::class,
             ])
             ->navigationGroups([
-                // NavigationGroup::make('Manajemen Armada & MP')->collapsible(),
-                NavigationGroup::make('Pelayaran & Kapal')->collapsible(),
-                NavigationGroup::make('Pengiriman')->collapsible(),
-                NavigationGroup::make('Manajemen Pengguna')->collapsible(),
+                NavigationGroup::make('Operasional')->collapsible(),
+                NavigationGroup::make('Perencanaan')->collapsible(),
+                NavigationGroup::make('Eksekusi Pengiriman')->collapsible(),
+                NavigationGroup::make('Master Data')->collapsible(),
             ])
             ->middleware([
                 EnsurePanelRole::class,

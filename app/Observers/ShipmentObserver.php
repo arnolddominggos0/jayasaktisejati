@@ -68,8 +68,8 @@ class ShipmentObserver
         $portIds = [];
 
         if ($s->voyage_id) {
-            $v = Voyage::select('port_from_id', 'port_to_id')->find($s->voyage_id);
-            if ($v) $portIds = array_values(array_filter([$v->port_from_id, $v->port_to_id]));
+            $v = Voyage::select('pol_id', 'pod_id')->find($s->voyage_id);
+            if ($v) $portIds = array_values(array_filter([$v->pol_id, $v->pod_id]));
         }
 
         if (empty($portIds)) {

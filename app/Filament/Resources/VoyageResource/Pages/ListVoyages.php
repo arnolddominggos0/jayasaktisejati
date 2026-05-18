@@ -4,7 +4,6 @@ namespace App\Filament\Resources\VoyageResource\Pages;
 
 use App\Enums\VoyageRegistryStatus;
 use App\Filament\Resources\VoyageResource;
-use App\Filament\Resources\VoyageResource\Widgets\VoyageRegistrySummaryStrip;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,25 +14,18 @@ class ListVoyages extends ListRecords
 
     public function getTitle(): string
     {
-        return 'Voyage Registry';
+        return 'Registry Voyage';
     }
 
     public function getSubheading(): ?string
     {
-        return 'Fleet movement registry & administrative lifecycle';
+        return 'Data operasional dan pergerakan voyage';
     }
 
     protected function getHeaderActions(): array
     {
         return [
             Actions\CreateAction::make()->label('Tambah Voyage'),
-        ];
-    }
-
-    protected function getHeaderWidgets(): array
-    {
-        return [
-            VoyageRegistrySummaryStrip::class,
         ];
     }
 

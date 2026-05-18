@@ -3,6 +3,10 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
+
+use Spatie\Permission\Models\Role;
+
 use App\Models\User;
 use App\Models\Depot;
 use App\Models\Branch;
@@ -11,40 +15,100 @@ class InitialSetupSeeder extends Seeder
 {
     public function run(): void
     {
-        $jkt = Branch::where('code', 'JKT')->firstOrFail();
-        $mdo = Branch::where('code', 'MDO')->firstOrFail();
+        Role::firstOrCreate(['name' => 'super_admin']);
+        Role::firstOrCreate(['name' => 'admin']);
+        Role::firstOrCreate(['name' => 'fc']);
+        Role::firstOrCreate(['name' => 'koordinator']);
 
-        $fcJkt = User::where('email', 'koor.jkt@jss.local')->firstOrFail();
-        $fcMdo = User::where('email', 'koor.mdo@jss.local')->firstOrFail();
-        $fcPriok = User::where('email', 'fc.jkt@jss.local')->firstOrFail();
+        $jkt = Branch::updateOrCreate(
+            ['code' => 'JKT'],
+            [
+                'name' => 'Jakarta',
+            ]
+        );
+
+        $mdo = Branch::updateOrCreate(
+            ['code' => 'MDO'],
+            [
+                'name' => 'Manado',
+            ]
+        );
+
+        $superAdmin = User::updateOrCreate(
+            ['email' => 'admin@jss.local'],
+            [
+                'name' => 'Super Admin',
+                'password' => Hash::make('password'),
+                'branch_id' => null,
+            ]
+        );
+
+        $superAdmin->assignRole('super_admin');
+
+        $fcJkt = User::updateOrCreate(
+            ['email' => 'koor.jkt@jss.local'],
+            [
+                'name' => 'Koordinator Jakarta',
+                'password' => Hash::make('password'),
+                'branch_id' => $jkt->id,
+            ]
+        );
+
+        $fcJkt->assignRole('koordinator');
+
+        $fcMdo = User::updateOrCreate(
+            ['email' => 'koor.mdo@jss.local'],
+            [
+                'name' => 'Koordinator Manado',
+                'password' => Hash::make('password'),
+                'branch_id' => $mdo->id,
+            ]
+        );
+
+        $fcMdo->assignRole('koordinator');
+
+        $fcPriok = User::updateOrCreate(
+            ['email' => 'fc.jkt@jss.local'],
+            [
+                'name' => 'FC Tanjung Priok',
+                'password' => Hash::make('password'),
+                'branch_id' => $jkt->id,
+            ]
+        );
+
+        $fcPriok->assignRole('fc');
 
         Depot::updateOrCreate(
-            ['name' => 'Depo Tanjung Priok'],
+            ['code' => 'DPTJKT'],
             [
+                'name' => 'Depo Tanjung Priok',
                 'branch_id' => $jkt->id,
                 'coordinator_user_id' => $fcPriok->id,
             ]
         );
 
         Depot::updateOrCreate(
-            ['name' => 'Depo PDI Jakarta'],
+            ['code' => 'DPDJKT'],
             [
+                'name' => 'Depo PDI Jakarta',
                 'branch_id' => $jkt->id,
                 'coordinator_user_id' => $fcJkt->id,
             ]
         );
 
         Depot::updateOrCreate(
-            ['name' => 'Depo Bitung'],
+            ['code' => 'DPBTG'],
             [
+                'name' => 'Depo Bitung',
                 'branch_id' => $mdo->id,
                 'coordinator_user_id' => $fcMdo->id,
             ]
         );
 
         Depot::updateOrCreate(
-            ['name' => 'Depo Bitung Manado'],
+            ['code' => 'DPBTGMDO'],
             [
+                'name' => 'Depo Bitung Manado',
                 'branch_id' => $mdo->id,
                 'coordinator_user_id' => null,
             ]

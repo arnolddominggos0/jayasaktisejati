@@ -14,12 +14,12 @@ class VesselCheckResource extends Resource
 {
     protected static ?string $model = VesselCheck::class;
 
-    protected static ?string $navigationLabel = 'Pemeriksaan Jadwal Kapal';
-    protected static ?string $pluralLabel     = 'Pemeriksaan Jadwal Kapal';
-    protected static ?string $modelLabel      = 'Pemeriksaan Jadwal Kapal';
-    protected static ?string $navigationGroup = 'Monitoring Vessel';
-    protected static ?string $navigationIcon  = 'heroicon-o-clipboard-document-check';
-    protected static ?int $navigationSort = 2;
+    protected static ?string $navigationLabel = 'Kesiapan Kapal';
+    protected static ?string $pluralLabel     = 'Kesiapan Kapal';
+    protected static ?string $modelLabel      = 'Kesiapan Kapal';
+    protected static ?string $navigationGroup = 'Operasional';
+    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
+    protected static ?int $navigationSort = 3;
 
     public static function table(Table $table): Table
     {

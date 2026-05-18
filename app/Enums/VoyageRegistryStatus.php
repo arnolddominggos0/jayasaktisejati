@@ -15,13 +15,13 @@ enum VoyageRegistryStatus: string
     public function label(): string
     {
         return match ($this) {
-            self::DRAFT     => 'Draft',
-            self::PLANNED   => 'Planned',
-            self::ACTIVE    => 'Active',
-            self::DELAYED   => 'Delayed',
-            self::COMPLETED => 'Completed',
-            self::CLOSED    => 'Closed',
-            self::ARCHIVED  => 'Archived',
+            self::DRAFT     => 'Rancangan',
+            self::PLANNED   => 'Direncanakan',
+            self::ACTIVE    => 'Aktif',
+            self::DELAYED   => 'Tertunda',
+            self::COMPLETED => 'Selesai',
+            self::CLOSED    => 'Ditutup',
+            self::ARCHIVED  => 'Diarsipkan',
         };
     }
 

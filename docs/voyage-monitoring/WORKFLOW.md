@@ -1,73 +1,128 @@
-# Operational Workflow
+# WORKFLOW — VOYAGE OPERATIONAL FLOW
 
-## 1. Planning
+## REAL OPERATIONAL FLOW
 
-VesselPlan (Draft)
-→ Submit
-→ Review
-→ Final
+Shipping Line Schedule
+→ Internal Draft Vessel Plan
+→ Operational Analysis
+→ Sent to TAM
+→ TAM Final Approved Schedule
 → Generate Voyage
+→ Operational Execution
+→ Monitoring / Shipment / KPI
 
-## 2. Readiness Monitoring
+---
 
-ETA set
-→ Auto generate D-2 / D-1 checkpoints
+# FLOW DETAIL
 
-ETD approaching
-→ Auto generate H-3 / H-2 / H-1 vessel checks
+## 1. Shipping Line Schedule
 
-## 3. Actual Operation
+Internal ops menerima jadwal kapal dari:
+- Tanto
+- Meratus
+- dll
 
-ATB
-→ Closing
-→ ATD
-→ Milestones
-→ ATA
+Data awal:
+- vessel
+- ETD
+- ETA
+- route
+- voyage number
 
-## 4. KPI Evaluation
+Masih berupa:
+- draft
+- tentative
+- belum customer-approved
 
-OTB = ATB <= ETB
-OTD = ATD <= ETD
-OTA = ATA <= ETA
+---
 
-## Operational Monitoring Lifecycle
+## 2. Draft Vessel Plan
 
-Vessel Plan
-→ Voyage generation
-→ Readiness monitoring
-→ Vessel check
-→ Operational monitoring (per period)
-→ Milestone tracking
-→ KPI evaluation
-→ Management analytics
+Internal ops membuat:
+Draft Vessel Plan
 
-## Period-Centric Operational Scanning Flow
+Tujuan:
+- prepare monthly operation
+- evaluate vessel spacing
+- evaluate dwelling
+- evaluate route timing
 
-Operator membuka Monitoring Vessel.
+Status:
+- editable
+- planning only
+- belum execution
 
-Pilih periode operasional.
+---
 
-Matrix menampilkan seluruh vessel dalam periode:
-- scan horizontal: bandingkan vessel
-- identifikasi anomaly: delay, ETA risk, readiness issue
-- inline action: update milestone, update actual, acknowledge
+## 3. Operational Analysis
 
-Priority scanning (dalam satu matrix, sudah sorted):
-1. delayed voyage
-2. sailing voyage with ETA risk
-3. sailing normal
-4. readiness issue
-5. scheduled voyage
-6. completed voyage
+Ops melakukan:
+- dwelling analysis
+- spacing validation
+- vessel availability check
+- route validation
 
-Jika ditemukan issue:
-→ lihat di matrix (detail terlihat di row)
-→ atau klik Detail → ViewVoyage untuk investigasi detail
-→ update milestone / operation dari matrix (modal inline)
-→ monitor progress per periode
+Jika tidak feasible:
+- revisi draft
+- cari kapal alternatif
 
-## History Flow
+---
 
-Switch periode → lihat vessel pada periode tersebut → lihat completed voyage → lihat KPI periode sebelumnya.
+## 4. Sent To TAM
 
-History berbasis periode, bukan individual voyage navigation.
+Draft vessel plan dikirim ke TAM.
+
+TAM:
+- review
+- adjust
+- approve final operational commitment
+
+---
+
+## 5. Final Approved Schedule
+
+Schedule final dari TAM menjadi:
+canonical operational commitment.
+
+Hasil final:
+- vessel
+- ETD
+- ETA
+- voyage number
+- cargo allocation
+
+---
+
+## 6. Generate Voyage
+
+Approved schedule digenerate menjadi:
+Voyage.
+
+Voyage menjadi:
+- operational execution object
+- canonical transport object
+
+---
+
+## 7. Operational Execution
+
+Operational execution berjalan:
+- ATB
+- Closing
+- ATD
+- ATA
+- SLA
+- KPI
+
+---
+
+## 8. Monitoring & Shipment
+
+Monitoring Vessel:
+consume Voyage.
+
+Shipment:
+attach ke Voyage.
+
+KPI:
+consume Voyage operational data.

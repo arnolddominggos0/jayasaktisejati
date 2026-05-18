@@ -3,251 +3,207 @@
 
     $events = collect();
 
-    // 1. Readiness: Checkpoints (D-2, D-1)
     foreach ($voyage->checkpoints ?? [] as $cp) {
         $events->push((object)[
-            'type' => 'readiness',
-            'icon' => 'CP',
-            'icon_color' => 'bg-blue-400',
-            'label' => strtoupper($cp->code),
+            'ts' => $cp->scheduled_at?->timestamp ?? PHP_INT_MAX,
             'date' => $cp->scheduled_at,
-            'status' => $cp->is_completed
-                ? (object)['text' => 'Done', 'color' => 'text-green-600', 'bg' => 'bg-green-50 border-green-200']
-                : ($cp->is_late
-                    ? (object)['text' => 'Late', 'color' => 'text-red-600', 'bg' => 'bg-red-50 border-red-200']
-                    : (object)['text' => 'Pending', 'color' => 'text-gray-500', 'bg' => 'bg-gray-50 border-gray-200']
-                ),
-            'detail' => $cp->checked_at
-                ? 'Checked: ' . $cp->checked_at->format('d M H:i')
-                : 'Scheduled: ' . optional($cp->scheduled_at)->format('d M H:i'),
-            'note' => $cp->note,
-        ]);
-    }
-
-    // 2. Readiness: Vessel Checks (H-3, H-2, H-1)
-    foreach ($voyage->vesselChecks ?? [] as $vc) {
-        $statusLabel = match ($vc->status?->value) {
-            'on_schedule' => 'OK',
-            'potential_delay' => 'Risk',
-            default => '-',
-        };
-        $statusColor = match ($vc->status?->value) {
-            'on_schedule' => 'text-green-600',
-            'potential_delay' => 'text-orange-600',
-            default => 'text-gray-500',
-        };
-        $statusBg = match ($vc->status?->value) {
-            'on_schedule' => 'bg-green-50 border-green-200',
-            'potential_delay' => 'bg-orange-50 border-orange-200',
-            default => 'bg-gray-50 border-gray-200',
-        };
-
-        $events->push((object)[
             'type' => 'readiness',
-            'icon' => 'VC',
-            'icon_color' => 'bg-purple-400',
-            'label' => strtoupper($vc->day_code),
-            'date' => $vc->check_date?->startOfDay(),
-            'status' => (object)[
-                'text' => $statusLabel,
-                'color' => $statusColor,
-                'bg' => $statusBg,
-            ],
-            'detail' => 'ETD: ' . optional($vc->etd_plan)->format('d M H:i'),
-            'note' => $vc->note,
+            'code' => strtoupper($cp->code),
+            'label' => strtoupper($cp->code),
+            'state' => $cp->is_completed ? '✓' : ($cp->is_late ? '!' : '•'),
+            'stateColor' => $cp->is_completed ? 'text-green-600' : ($cp->is_late ? 'text-red-600' : 'text-gray-400'),
+            'detail' => $cp->checked_at ? $cp->checked_at->format('d M H:i') : optional($cp->scheduled_at)->format('d M H:i'),
+            'note' => $cp->note,
+            'priority' => $cp->is_late ? 3 : ($cp->is_completed ? 1 : 2),
         ]);
     }
 
-    // 3. Actual Operation: ETB
+    foreach ($voyage->vesselChecks ?? [] as $vc) {
+        $st = match ($vc->status?->value) {
+            'on_schedule' => ['✓', 'text-green-600', 1],
+            'potential_delay' => ['!', 'text-orange-600', 3],
+            default => ['•', 'text-gray-400', 2],
+        };
+        $events->push((object)[
+            'ts' => $vc->check_date?->startOfDay()->timestamp ?? PHP_INT_MAX,
+            'date' => $vc->check_date?->startOfDay(),
+            'type' => 'readiness',
+            'code' => strtoupper($vc->day_code),
+            'label' => strtoupper($vc->day_code),
+            'state' => $st[0],
+            'stateColor' => $st[1],
+            'detail' => optional($vc->etd_plan)->format('d M H:i'),
+            'note' => $vc->note,
+            'priority' => $st[2],
+        ]);
+    }
+
     if ($voyage->etb) {
         $events->push((object)[
-            'type' => 'plan',
-            'icon' => 'EB',
-            'icon_color' => 'bg-indigo-400',
-            'label' => 'ETB (Plan)',
+            'ts' => $voyage->etb->timestamp,
             'date' => $voyage->etb,
-            'status' => (object)[
-                'text' => 'Plan',
-                'color' => 'text-indigo-600',
-                'bg' => 'bg-indigo-50 border-indigo-200',
-            ],
+            'type' => 'plan',
+            'code' => 'ETB',
+            'label' => 'ETB',
+            'state' => 'P',
+            'stateColor' => 'text-indigo-500',
             'detail' => $voyage->etb->format('d M H:i'),
-            'note' => null,
+            'priority' => 1,
         ]);
     }
 
-    // 4. Actual Operation: ATB
     if ($voyage->atb_at) {
-        $atbStatus = $voyage->otb_status;
+        $ok = $voyage->otb_status === \App\Enums\SlaStatus::ONTIME;
         $events->push((object)[
-            'type' => 'actual',
-            'icon' => 'AB',
-            'icon_color' => 'bg-green-500',
-            'label' => 'ATB (Actual)',
+            'ts' => $voyage->atb_at->timestamp,
             'date' => $voyage->atb_at,
-            'status' => (object)[
-                'text' => $atbStatus?->label() ?? 'OK',
-                'color' => $atbStatus === \App\Enums\SlaStatus::ONTIME ? 'text-green-600' : ($atbStatus === \App\Enums\SlaStatus::LATE ? 'text-red-600' : 'text-gray-500'),
-                'bg' => $atbStatus === \App\Enums\SlaStatus::ONTIME ? 'bg-green-50 border-green-200' : ($atbStatus === \App\Enums\SlaStatus::LATE ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'),
-            ],
+            'type' => 'actual',
+            'code' => 'ATB',
+            'label' => 'ATB',
+            'state' => $ok ? '✓' : '✗',
+            'stateColor' => $ok ? 'text-green-600' : 'text-red-600',
             'detail' => $voyage->atb_at->format('d M H:i'),
-            'note' => null,
+            'priority' => $ok ? 1 : 3,
         ]);
     }
 
-    // 5. Actual Operation: Closing
     if ($voyage->closing_at) {
         $events->push((object)[
-            'type' => 'actual',
-            'icon' => 'CL',
-            'icon_color' => 'bg-gray-500',
-            'label' => 'Closing',
+            'ts' => $voyage->closing_at->timestamp,
             'date' => $voyage->closing_at,
-            'status' => (object)[
-                'text' => 'Done',
-                'color' => 'text-gray-600',
-                'bg' => 'bg-gray-50 border-gray-200',
-            ],
+            'type' => 'actual',
+            'code' => 'CL',
+            'label' => 'Closing',
+            'state' => '✓',
+            'stateColor' => 'text-gray-500',
             'detail' => $voyage->closing_at->format('d M H:i'),
-            'note' => null,
+            'priority' => 1,
         ]);
     }
 
-    // 6. Actual Operation: ATD
     if ($voyage->atd_at) {
-        $otdStatus = $voyage->otd_status;
+        $ok = $voyage->otd_status === \App\Enums\SlaStatus::ONTIME;
         $events->push((object)[
-            'type' => 'actual',
-            'icon' => 'AD',
-            'icon_color' => 'bg-blue-500',
-            'label' => 'ATD (Actual)',
+            'ts' => $voyage->atd_at->timestamp,
             'date' => $voyage->atd_at,
-            'status' => (object)[
-                'text' => $otdStatus?->label() ?? 'OK',
-                'color' => $otdStatus === \App\Enums\SlaStatus::ONTIME ? 'text-green-600' : ($otdStatus === \App\Enums\SlaStatus::LATE ? 'text-red-600' : 'text-gray-500'),
-                'bg' => $otdStatus === \App\Enums\SlaStatus::ONTIME ? 'bg-green-50 border-green-200' : ($otdStatus === \App\Enums\SlaStatus::LATE ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'),
-            ],
-            'detail' => $voyage->atd_at->format('d M H:i'),
-            'note' => null,
-        ]);
-    }
-
-    // 7. Milestones (D+2 s.d. D+12)
-    foreach ($voyage->milestones ?? [] as $m) {
-        $mStatus = (object)[
-            'text' => 'Pending',
-            'color' => 'text-gray-500',
-            'bg' => 'bg-gray-50 border-gray-200',
-        ];
-
-        if ($m->actual_date) {
-            $mStatus = (object)[
-                'text' => $m->status === 'ontime' ? 'OK' : 'Late',
-                'color' => $m->status === 'ontime' ? 'text-green-600' : 'text-red-600',
-                'bg' => $m->status === 'ontime' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200',
-            ];
-        } elseif ($m->is_overdue) {
-            $mStatus = (object)[
-                'text' => 'Overdue',
-                'color' => 'text-red-600',
-                'bg' => 'bg-red-50 border-red-200',
-            ];
-        } elseif ($m->is_due_today) {
-            $mStatus = (object)[
-                'text' => 'Today',
-                'color' => 'text-orange-600',
-                'bg' => 'bg-orange-50 border-orange-200',
-            ];
-        }
-
-        $events->push((object)[
-            'type' => 'milestone',
-            'icon' => strtoupper($m->code),
-            'icon_color' => 'bg-amber-400',
-            'label' => strtoupper($m->code) . ' Milestone',
-            'date' => $m->actual_date ?? $m->milestone_date,
-            'status' => $mStatus,
-            'detail' => $m->actual_date
-                ? 'Actual: ' . $m->actual_date->format('d M')
-                : 'Target: ' . optional($m->milestone_date)->format('d M'),
-            'note' => $m->note ? $m->note : ($m->speed_knots ? 'Speed: ' . $m->speed_knots . 'kn' : null),
-        ]);
-    }
-
-    // 8. Actual Operation: ATA
-    if ($voyage->ata_at) {
-        $otaStatus = $voyage->ota_status;
-        $events->push((object)[
             'type' => 'actual',
-            'icon' => 'AA',
-            'icon_color' => 'bg-emerald-500',
-            'label' => 'ATA (Actual)',
-            'date' => $voyage->ata_at,
-            'status' => (object)[
-                'text' => $otaStatus?->label() ?? 'OK',
-                'color' => $otaStatus === \App\Enums\SlaStatus::ONTIME ? 'text-green-600' : ($otaStatus === \App\Enums\SlaStatus::LATE ? 'text-red-600' : 'text-gray-500'),
-                'bg' => $otaStatus === \App\Enums\SlaStatus::ONTIME ? 'bg-green-50 border-green-200' : ($otaStatus === \App\Enums\SlaStatus::LATE ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200'),
-            ],
-            'detail' => $voyage->ata_at->format('d M H:i'),
-            'note' => null,
+            'code' => 'ATD',
+            'label' => 'ATD',
+            'state' => $ok ? '✓' : '✗',
+            'stateColor' => $ok ? 'text-green-600' : 'text-red-600',
+            'detail' => $voyage->atd_at->format('d M H:i'),
+            'priority' => $ok ? 1 : 3,
         ]);
     }
 
-    // 9. Delay Events
+    foreach ($voyage->milestones ?? [] as $m) {
+        if ($m->actual_date) {
+            $ok = $m->status === 'ontime';
+            $events->push((object)[
+                'ts' => $m->actual_date->timestamp,
+                'date' => $m->actual_date,
+                'type' => 'milestone',
+                'code' => strtoupper($m->code),
+                'label' => strtoupper($m->code),
+                'state' => $ok ? '✓' : '✗',
+                'stateColor' => $ok ? 'text-green-600' : 'text-red-600',
+                'detail' => $m->actual_date->format('d M') . ($m->speed_knots ? " · {$m->speed_knots}kn" : ''),
+                'note' => $m->note,
+                'priority' => $ok ? 1 : 3,
+            ]);
+        } else {
+            $prio = $m->is_overdue ? 3 : ($m->is_due_today ? 3 : 2);
+            $events->push((object)[
+                'ts' => optional($m->milestone_date)->timestamp ?? PHP_INT_MAX,
+                'date' => $m->milestone_date,
+                'type' => 'milestone',
+                'code' => strtoupper($m->code),
+                'label' => strtoupper($m->code),
+                'state' => $m->is_overdue ? '!' : ($m->is_due_today ? '●' : '•'),
+                'stateColor' => $m->is_overdue ? 'text-red-600' : ($m->is_due_today ? 'text-orange-500' : 'text-gray-300'),
+                'detail' => optional($m->milestone_date)->format('d M') . ' (plan)',
+                'note' => $m->note,
+                'priority' => $prio,
+            ]);
+        }
+    }
+
+    if ($voyage->ata_at) {
+        $ok = $voyage->ota_status === \App\Enums\SlaStatus::ONTIME;
+        $events->push((object)[
+            'ts' => $voyage->ata_at->timestamp,
+            'date' => $voyage->ata_at,
+            'type' => 'actual',
+            'code' => 'ATA',
+            'label' => 'ATA',
+            'state' => $ok ? '✓' : '✗',
+            'stateColor' => $ok ? 'text-green-600' : 'text-red-600',
+            'detail' => $voyage->ata_at->format('d M H:i'),
+            'priority' => $ok ? 1 : 3,
+        ]);
+    }
+
     foreach ($voyage->delayLogs ?? [] as $log) {
         $events->push((object)[
-            'type' => 'delay',
-            'icon' => '!',
-            'icon_color' => 'bg-red-500',
-            'label' => 'Delay',
+            'ts' => $log->created_at->timestamp,
             'date' => $log->created_at,
-            'status' => (object)[
-                'text' => 'Changed',
-                'color' => 'text-red-600',
-                'bg' => 'bg-red-50 border-red-200',
-            ],
-            'detail' => 'ETD: ' . optional($log->old_etd)->format('d M H:i') . ' → ' . optional($log->new_etd)->format('d M H:i'),
-            'note' => $log->reason ? 'Reason: ' . $log->reason : null,
+            'type' => 'delay',
+            'code' => '!',
+            'label' => 'Delay',
+            'state' => '!',
+            'stateColor' => 'text-red-600',
+            'detail' => optional($log->old_etd)->format('d M H:i') . ' → ' . optional($log->new_etd)->format('d M H:i'),
+            'note' => $log->reason,
+            'priority' => 3,
         ]);
     }
 
-    // Sort by date
     $timeline = $events
-        ->sortBy(fn($item) => $item->date?->timestamp ?? PHP_INT_MAX)
+        ->sortBy([
+            fn ($item) => -$item->priority,
+            fn ($item) => $item->ts,
+        ])
         ->values();
 @endphp
 
 @if ($timeline->isNotEmpty())
-    <div class="space-y-1">
+    <div class="space-y-0">
         @foreach ($timeline as $item)
-            <div class="flex items-center gap-2 py-1 border-b border-gray-100/40 last:border-0">
-                <div class="w-7 h-7 rounded-full {{ $item->icon_color }} text-white flex items-center justify-center text-[9px] font-bold flex-shrink-0">
-                    {{ $item->icon }}
+            @php
+                $rowBg = $item->priority >= 3 ? 'bg-red-50/30' : '';
+                $rowBorder = $item->priority >= 3 ? 'border-l-2 border-l-red-300' : 'border-l-2 border-l-transparent';
+            @endphp
+            <div class="flex items-center gap-2 py-1.5 px-2 {{ $rowBg }} {{ $rowBorder }}">
+                <div class="w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0
+                    {{ match($item->type) {
+                        'readiness' => 'bg-blue-100 text-blue-700',
+                        'plan' => 'bg-indigo-100 text-indigo-700',
+                        'actual' => 'bg-gray-100 text-gray-700',
+                        'milestone' => 'bg-amber-100 text-amber-700',
+                        'delay' => 'bg-red-100 text-red-700',
+                    } }}">
+                    {{ $item->code }}
                 </div>
 
                 <div class="flex-1 min-w-0">
-                    <div class="flex items-center justify-between gap-2">
-                        <span class="text-[11px] font-semibold text-gray-800 truncate">{{ $item->label }}</span>
-                        <span class="text-[10px] font-medium {{ $item->status->color }} px-1.5 py-0.5 rounded bg-white/60 flex-shrink-0">
-                            {{ $item->status->text }}
-                        </span>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[11px] font-medium text-gray-800">{{ $item->label }}</span>
+                        <span class="text-xs {{ $item->stateColor }}">{{ $item->state }}</span>
                     </div>
-                    <div class="text-[10px] text-gray-500 truncate">{{ $item->detail }}</div>
                     @if ($item->note)
-                        <div class="text-[10px] text-gray-400 truncate italic">{{ $item->note }}</div>
+                        <div class="text-[10px] text-gray-400 truncate">{{ $item->note }}</div>
                     @endif
                 </div>
 
-                @if ($item->date)
-                    <div class="text-[9px] text-gray-400 flex-shrink-0">
-                        {{ $item->date->format('d M H:i') }}
-                    </div>
-                @endif
+                <div class="text-[10px] text-gray-500 tabular-nums flex-shrink-0 text-right">
+                    <div>{{ $item->detail }}</div>
+                    @if ($item->date)
+                        <div class="text-[9px] text-gray-400">{{ $item->date->format('d M H:i') }}</div>
+                    @endif
+                </div>
             </div>
         @endforeach
     </div>
 @else
-    <div class="text-xs text-gray-400 italic py-3">
-        No operational data yet.
-    </div>
+    <div class="text-[11px] text-gray-400 italic py-3 px-2">Belum ada kejadian operasional.</div>
 @endif

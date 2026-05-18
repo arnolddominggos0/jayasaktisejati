@@ -1,32 +1,20 @@
 @php
     $milestones = collect($voyage->milestones ?? [])
-        ->sortBy(fn($m) => (int) str_replace('d', '', $m->code))
+        ->sortBy(fn ($m) => (int) str_replace('d', '', $m->code))
         ->values();
 
     $total = $milestones->count();
     $completed = $milestones->whereNotNull('actual_date')->count();
-    $overdue = $milestones->where('is_overdue', true)->count();
-    $dueToday = $milestones->where('is_due_today', true)->count();
-
-    $progressPercent = $total > 0 ? round(($completed / $total) * 100) : 0;
 @endphp
 
 <div>
-    <div class="flex justify-between items-center mb-2">
-        <div class="text-[11px] font-semibold text-gray-600">
-            Milestones
-        </div>
-        <div class="text-[10px] text-gray-400">
-            {{ $completed }}/{{ $total }}
-        </div>
-    </div>
-
-    <div class="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-2">
-        <div class="h-full bg-blue-400 rounded-full transition-all" style="width: {{ $progressPercent }}%"></div>
+    <div class="flex items-center justify-between mb-1.5">
+        <span class="text-[11px] font-semibold text-gray-600 uppercase tracking-wide">Milestone Rail</span>
+        <span class="text-[10px] text-gray-400">{{ $completed }}/{{ $total }}</span>
     </div>
 
     @if ($milestones->isNotEmpty())
-        <div class="grid grid-cols-6 gap-1">
+        <div class="flex gap-1 overflow-x-auto pb-1">
             @foreach ($milestones as $m)
                 @php
                     if ($m->actual_date) {
@@ -43,23 +31,14 @@
                         $mIcon = '—';
                     }
                 @endphp
-
-                <div class="rounded border {{ $mColor }} px-1.5 py-1 text-center">
-                    <div class="text-[9px] uppercase font-semibold tracking-wide">
-                        {{ strtoupper($m->code) }}
-                    </div>
-                    <div class="text-xs font-bold mt-0.5">
-                        {{ $mIcon }}
-                    </div>
-                    <div class="text-[8px] text-gray-400 mt-0.5">
-                        {{ optional($m->milestone_date)->format('d M') }}
-                    </div>
+                <div class="flex-1 min-w-[56px] rounded border {{ $mColor }} px-1.5 py-1.5 text-center">
+                    <div class="text-[9px] uppercase font-semibold tracking-wide">{{ strtoupper($m->code) }}</div>
+                    <div class="text-sm font-bold mt-0.5 leading-none">{{ $mIcon }}</div>
+                    <div class="text-[8px] text-gray-400 mt-0.5 tabular-nums">{{ optional($m->milestone_date)->format('d M') }}</div>
                 </div>
             @endforeach
         </div>
     @else
-        <div class="text-[10px] text-gray-400 italic py-2">
-            No milestones generated. Set ATD to generate D+ milestones.
-        </div>
+        <div class="text-[11px] text-gray-400 italic py-2">Belum ada milestone. Isi ATD untuk generate milestone D+.</div>
     @endif
 </div>

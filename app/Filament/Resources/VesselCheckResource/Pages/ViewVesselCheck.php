@@ -16,8 +16,8 @@ class ViewVesselCheck extends ViewRecord
     {
         return $infolist->schema([
 
-            Section::make('Ringkasan Pemeriksaan Jadwal Kapal')
-                ->description('Pemeriksaan kesiapan jadwal kapal sebelum keberangkatan (H-3 s.d. H-1)')
+            Section::make('Ringkasan Kesiapan Kapal')
+                ->description('Pemeriksaan kesiapan sebelum keberangkatan (D-3 s.d. D-1)')
                 ->schema([
 
                     TextEntry::make('shippingSchedule.voyage.voyage_no')

@@ -17,7 +17,7 @@ class VesselResource extends Resource
     protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationIcon = 'heroicon-o-lifebuoy';
     protected static ?string $navigationLabel = 'Kapal';
-    protected static bool $shouldRegisterNavigation = false;
+    protected static ?int    $navigationSort  = 3;
 
     public static function form(Form $form): Form
     {

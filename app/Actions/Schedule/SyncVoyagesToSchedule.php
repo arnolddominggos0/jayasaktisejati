@@ -20,8 +20,8 @@ class SyncVoyagesToSchedule
             $voy = Voyage::firstOrCreate(
                 [
                     'voyage_no'       => $it->voyage_no,
-                    'port_from_id'    => $polId,
-                    'port_to_id'      => $podId,
+                    'pol_id'          => $polId,
+                    'pod_id'          => $podId,
                 ],
                 [
                     'vessel_id'        => null,

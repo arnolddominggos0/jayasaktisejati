@@ -30,7 +30,7 @@ class CustomerResource extends Resource
     protected static ?string $pluralModelLabel = 'Pelanggan';
     protected static ?string $modelLabel       = 'Pelanggan';
     protected static ?string $navigationGroup  = 'Master Data';
-    protected static ?int    $navigationSort   = 20;
+    protected static ?int    $navigationSort   = 5;
 
     public static function canViewAny(): bool
     {

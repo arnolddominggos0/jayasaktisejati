@@ -14,10 +14,10 @@ class VesselCheckCaseResource extends Resource
 {
     protected static ?string $model = VesselCheckCase::class;
 
-    protected static ?string $navigationLabel = 'Tindak Lanjut Perubahan Jadwal';
-    protected static ?string $navigationGroup = 'Monitoring Vessel';
+    protected static ?string $navigationLabel = 'Kasus Delay';
+    protected static ?string $navigationGroup = 'Operasional';
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path';
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     public static function table(Table $table): Table
     {

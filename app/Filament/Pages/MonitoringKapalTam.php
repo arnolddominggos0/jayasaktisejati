@@ -2,8 +2,13 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\VesselCheckLogStatus;
+use App\Enums\VesselCheckStatus;
 use App\Enums\VoyageDelayReason;
 use App\Enums\VoyageOperationalStatus;
+use App\Models\ShippingSchedule;
+use App\Models\VesselCheck;
+use App\Models\VesselCheckCase;
 use App\Models\Voyage;
 use App\Models\VoyageMilestone;
 use Filament\Notifications\Notification;
@@ -15,7 +20,7 @@ class MonitoringKapalTam extends Page
 {
     protected static string $view = 'filament.pages.monitoring-kapal-tam';
     protected static ?string $navigationIcon = 'heroicon-o-globe-alt';
-    protected static ?string $navigationGroup = 'Monitoring Vessel';
+    protected static ?string $navigationGroup = 'Operasional';
     protected static ?int $navigationSort = 1;
 
     public string $period;
@@ -41,6 +46,19 @@ class MonitoringKapalTam extends Page
     ];
 
     public array $acknowledged = [];
+
+    // ── Inline operational modal state ─────────────────────────────────
+    public bool $showInlineModal = false;
+    public string $inlineModalType = ''; // atb, atd, ata, closing, vessel_check, delay_case
+    public ?int $inlineModalVoyageId = null;
+    public ?int $inlineModalVesselCheckId = null;
+    public ?int $inlineModalCaseId = null;
+
+    public array $inlineForm = [
+        'datetime' => '',
+        'status' => '',
+        'note' => '',
+    ];
 
     public function mount(): void
     {
@@ -73,6 +91,207 @@ class MonitoringKapalTam extends Page
         $this->loadData();
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // Inline operational action modals
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function openAtbModal(int $voyageId): void
+    {
+        $this->resetInlineModal();
+        $this->inlineModalType = 'atb';
+        $this->inlineModalVoyageId = $voyageId;
+        $v = Voyage::find($voyageId);
+        $this->inlineForm['datetime'] = $v?->atb_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i');
+        $this->showInlineModal = true;
+    }
+
+    public function openAtdModal(int $voyageId): void
+    {
+        $this->resetInlineModal();
+        $this->inlineModalType = 'atd';
+        $this->inlineModalVoyageId = $voyageId;
+        $v = Voyage::find($voyageId);
+        $this->inlineForm['datetime'] = $v?->atd_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i');
+        $this->showInlineModal = true;
+    }
+
+    public function openAtaModal(int $voyageId): void
+    {
+        $this->resetInlineModal();
+        $this->inlineModalType = 'ata';
+        $this->inlineModalVoyageId = $voyageId;
+        $v = Voyage::find($voyageId);
+        $this->inlineForm['datetime'] = $v?->ata_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i');
+        $this->showInlineModal = true;
+    }
+
+    public function openClosingModal(int $voyageId): void
+    {
+        $this->resetInlineModal();
+        $this->inlineModalType = 'closing';
+        $this->inlineModalVoyageId = $voyageId;
+        $v = Voyage::find($voyageId);
+        $this->inlineForm['datetime'] = $v?->closing_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i');
+        $this->showInlineModal = true;
+    }
+
+    public function openVesselCheckModal(int $vesselCheckId): void
+    {
+        $this->resetInlineModal();
+        $this->inlineModalType = 'vessel_check';
+        $this->inlineModalVesselCheckId = $vesselCheckId;
+        $vc = VesselCheck::find($vesselCheckId);
+        $this->inlineForm['status'] = $vc?->status?->value ?? 'on_schedule';
+        $this->inlineForm['note'] = $vc?->note ?? '';
+        $this->showInlineModal = true;
+    }
+
+    public function openDelayCaseModal(int $voyageId): void
+    {
+        $this->resetInlineModal();
+        $this->inlineModalType = 'delay_case';
+        $this->inlineModalVoyageId = $voyageId;
+        $this->showInlineModal = true;
+    }
+
+    public function saveInlineModal(): void
+    {
+        match ($this->inlineModalType) {
+            'atb', 'atd', 'ata', 'closing' => $this->saveVoyageTimestamp(),
+            'vessel_check' => $this->saveVesselCheck(),
+            'delay_case' => $this->saveDelayCase(),
+            default => null,
+        };
+
+        $this->closeInlineModal();
+        $this->loadData();
+    }
+
+    protected function saveVoyageTimestamp(): void
+    {
+        $field = match ($this->inlineModalType) {
+            'atb' => 'atb_at',
+            'atd' => 'atd_at',
+            'ata' => 'ata_at',
+            'closing' => 'closing_at',
+            default => null,
+        };
+
+        if (!$field || !$this->inlineModalVoyageId) {
+            return;
+        }
+
+        $this->validate([
+            'inlineForm.datetime' => 'nullable|date',
+            'inlineForm.note' => 'nullable|string|max:500',
+        ]);
+
+        $voyage = Voyage::find($this->inlineModalVoyageId);
+        if (!$voyage) {
+            return;
+        }
+
+        $data = [$field => $this->inlineForm['datetime'] ?: null];
+
+        if ($this->inlineForm['note']) {
+            $prefix = now()->format('d M H:i') . ' [' . strtoupper($this->inlineModalType) . ']: ';
+            $data['final_note'] = $voyage->final_note
+                ? $voyage->final_note . "\n" . $prefix . $this->inlineForm['note']
+                : $prefix . $this->inlineForm['note'];
+        }
+
+        $voyage->update($data);
+
+        Notification::make()
+            ->title(strtoupper($this->inlineModalType) . ' updated')
+            ->success()
+            ->send();
+    }
+
+    protected function saveVesselCheck(): void
+    {
+        if (!$this->inlineModalVesselCheckId) {
+            return;
+        }
+
+        $this->validate([
+            'inlineForm.status' => 'nullable|in:on_schedule,potential_delay',
+            'inlineForm.note' => 'nullable|string|max:500',
+        ]);
+
+        $vc = VesselCheck::find($this->inlineModalVesselCheckId);
+        if (!$vc) {
+            return;
+        }
+
+        $data = ['note' => $this->inlineForm['note']];
+
+        if ($this->inlineForm['status']) {
+            $data['status'] = $this->inlineForm['status'];
+        }
+
+        $vc->update($data);
+
+        Notification::make()
+            ->title('Readiness updated')
+            ->success()
+            ->send();
+    }
+
+    protected function saveDelayCase(): void
+    {
+        if (!$this->inlineModalVoyageId) {
+            return;
+        }
+
+        $voyage = Voyage::find($this->inlineModalVoyageId);
+        if (!$voyage) {
+            return;
+        }
+
+        $ss = ShippingSchedule::where('voyage_id', $voyage->id)->first();
+        if (!$ss) {
+            Notification::make()
+                ->title('No shipping schedule found for this voyage')
+                ->warning()
+                ->send();
+            return;
+        }
+
+        VesselCheckCase::create([
+            'shipping_schedule_id' => $ss->id,
+            'voyage_id' => $voyage->id,
+            'case_status' => VesselCheckStatus::ETD_DELAY,
+            'delay_flag' => true,
+            'opened_at' => now(),
+        ]);
+
+        Notification::make()
+            ->title('Delay case created')
+            ->success()
+            ->send();
+    }
+
+    public function closeInlineModal(): void
+    {
+        $this->showInlineModal = false;
+        $this->inlineModalType = '';
+        $this->inlineModalVoyageId = null;
+        $this->inlineModalVesselCheckId = null;
+        $this->inlineModalCaseId = null;
+        $this->inlineForm = ['datetime' => '', 'status' => '', 'note' => ''];
+    }
+
+    protected function resetInlineModal(): void
+    {
+        $this->inlineForm = ['datetime' => '', 'status' => '', 'note' => ''];
+        $this->inlineModalVoyageId = null;
+        $this->inlineModalVesselCheckId = null;
+        $this->inlineModalCaseId = null;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+
     protected function generateMonthOptions(): void
     {
         $start = now()->subMonths(12)->startOfMonth();
@@ -88,7 +307,15 @@ class MonitoringKapalTam extends Page
     protected function baseQuery(Carbon $dt): Builder
     {
         return Voyage::query()
-            ->with(['vessel', 'pol', 'pod', 'milestones', 'checkpoints', 'vesselChecks'])
+            ->with([
+                'vessel',
+                'pol',
+                'pod',
+                'milestones',
+                'checkpoints',
+                'vesselChecks',
+                'vesselCheckCases',
+            ])
             ->whereYear('period_month', $dt->year)
             ->whereMonth('period_month', $dt->month)
             ->when($this->search, function ($query) {
