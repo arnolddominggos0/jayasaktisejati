@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VoyageResource\Pages;
 
+use App\Enums\VoyageRegistryStatus;
 use App\Filament\Resources\VoyageResource;
 use App\Models\VesselPlan;
 use Filament\Resources\Pages\CreateRecord;
@@ -31,13 +32,14 @@ class CreateVoyage extends CreateRecord
         $item = $plan->items->first();
 
         $this->form->fill([
-            'vessel_plan_id' => $plan->id,
-            'vessel_id'      => $item->vessel_id,
-            'pol_id'         => $plan->pol_id,
-            'pod_id'         => $plan->pod_id,
-            'etd'            => $item->planned_etd,
-            'eta'            => $item->planned_eta,
-            'period_month'   => $plan->period_month,
+            'vessel_plan_id'   => $plan->id,
+            'vessel_id'        => $item->vessel_id,
+            'pol_id'           => $plan->pol_id,
+            'pod_id'           => $plan->pod_id,
+            'etd'              => $item->planned_etd,
+            'eta'              => $item->planned_eta,
+            'period_month'     => $plan->period_month,
+            'registry_status'  => VoyageRegistryStatus::PLANNED->value,
         ]);
     }
 }

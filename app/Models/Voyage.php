@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\SlaStatus;
 use App\Enums\VoyageDelayReason;
 use App\Enums\VoyageOperationalStatus;
+use App\Enums\VoyageRegistryStatus;
 use App\Services\OperationalDaysHelper;
 use App\Services\SlaEvaluator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -43,6 +44,8 @@ class Voyage extends Model
         'final_note',
 
         'closing_at',
+        'registry_status',
+        'archived_at',
     ];
 
     protected $casts = [
@@ -59,6 +62,8 @@ class Voyage extends Model
 
         'actual_sailing_days' => 'decimal:2',
         'manual_delay_reason' => VoyageDelayReason::class,
+        'registry_status' => VoyageRegistryStatus::class,
+        'archived_at' => 'datetime',
 
         'cargo_plan' => 'integer',
         'cargo_actual' => 'integer',
@@ -379,5 +384,62 @@ class Voyage extends Model
     public function getDelayLabelAttribute(): ?string
     {
         return OperationalDaysHelper::delayLabel($this->departure_delay_days);
+    }
+
+    public function getRegistryStatusLabelAttribute(): ?string
+    {
+        return $this->registry_status?->label() ?? '—';
+    }
+
+    public function getIsActiveAttribute(): bool
+    {
+        return $this->registry_status === VoyageRegistryStatus::ACTIVE;
+    }
+
+    public function getIsClosedAttribute(): bool
+    {
+        return $this->registry_status === VoyageRegistryStatus::CLOSED
+            || $this->closing_at !== null;
+    }
+
+    public function getIsArchivedAttribute(): bool
+    {
+        return $this->registry_status === VoyageRegistryStatus::ARCHIVED
+            || $this->archived_at !== null;
+    }
+
+    public function transitionRegistryStatus(VoyageRegistryStatus $newStatus): bool
+    {
+        if ($this->registry_status && ! $this->registry_status->canTransitionTo($newStatus)) {
+            return false;
+        }
+
+        $this->registry_status = $newStatus;
+
+        if ($newStatus === VoyageRegistryStatus::CLOSED && ! $this->closing_at) {
+            $this->closing_at = now();
+        }
+
+        if ($newStatus === VoyageRegistryStatus::ARCHIVED && ! $this->archived_at) {
+            $this->archived_at = now();
+        }
+
+        return true;
+    }
+
+    public function scopeRegistryActive($query)
+    {
+        return $query->whereNotIn('registry_status', [
+            VoyageRegistryStatus::CLOSED->value,
+            VoyageRegistryStatus::ARCHIVED->value,
+        ]);
+    }
+
+    public function scopeRegistryClosed($query)
+    {
+        return $query->whereIn('registry_status', [
+            VoyageRegistryStatus::CLOSED->value,
+            VoyageRegistryStatus::ARCHIVED->value,
+        ]);
     }
 }
