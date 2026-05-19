@@ -13,7 +13,7 @@ enum VoyageOperationalStatus: string
     {
         return match ($this) {
             self::SCHEDULED => 'Terjadwal',
-            self::SAILING   => 'Sedang Berlayar',
+            self::SAILING   => 'Berlayar',
             self::DELAYED   => 'Terlambat',
             self::COMPLETED => 'Selesai',
         };

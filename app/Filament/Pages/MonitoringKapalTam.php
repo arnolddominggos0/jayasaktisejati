@@ -335,7 +335,7 @@ class MonitoringKapalTam extends Page
 
         $this->rows = $this->baseQuery($dt)
             ->get()
-            ->sortByDesc(fn($v) => $v->milestones->where('is_overdue', true)->count())
+            ->sortByDesc(fn($v) => $v->operationalState->priorityWeight())
             ->values();
 
         $this->buildSummary();
@@ -448,12 +448,12 @@ class MonitoringKapalTam extends Page
         }
 
         foreach ($this->rows as $voyage) {
-            $delayLabel = $voyage->delay_label;
+            $state = $voyage->operationalState;
 
             $planChip = [
                 'vessel' => $voyage->vessel?->name ?? '-',
                 'voyage_no' => $voyage->voyage_no,
-                'status' => $voyage->operational_status_enum,
+                'status' => $state->status,
                 'delay_label' => null,
                 'severity' => null,
             ];
@@ -461,9 +461,9 @@ class MonitoringKapalTam extends Page
             $actualChip = [
                 'vessel' => $voyage->vessel?->name ?? '-',
                 'voyage_no' => $voyage->voyage_no,
-                'status' => $voyage->operational_status_enum,
-                'delay_label' => $delayLabel,
-                'severity' => $voyage->departure_delay_severity,
+                'status' => $state->status,
+                'delay_label' => $state->delayLabel(),
+                'severity' => $state->calendarSeverity(),
             ];
 
             if ($voyage->etd?->between($start, $end)) {

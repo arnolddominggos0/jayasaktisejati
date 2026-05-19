@@ -1,27 +1,6 @@
 ﻿@php
-
-    $overdue = $v->milestones->where('is_overdue', true)->count();
-    $dueToday = $v->milestones->where('is_due_today', true)->count();
-
-    $border = match (true) {
-        $overdue > 0 => 'border-red-400',
-        $dueToday > 0 => 'border-orange-400',
-        default => 'border-gray-200',
-    };
-
-    $sailingDuration = null;
-    $sailingProgress = null;
-
-    if ($v->atd_at) {
-        $days = max(1, $v->atd_at->diffInDays(now()));
-
-        $sailingDuration = $days . ' Hari';
-
-        $sailingProgress = "Day {$days} / 12";
-    }
-
-    $milestones = $v->milestones->sortBy(fn($m) => (int) str_replace('d', '', $m->code));
-
+    $state = $v->operationalState;
+    $border = \App\Supports\OperationalUi::severityBorder($state->severity);
 @endphp
 
 
@@ -58,27 +37,27 @@
                     ETA: {{ optional($v->eta)->format('d M H:i') ?? '-' }}
                 </span>
 
-                @if ($sailingDuration)
+                @if ($state->sailingDays)
                     <span>
-                        Berlayar {{ $sailingDuration }}
+                        Berlayar {{ $state->sailingDays }} hari
                     </span>
                 @endif
 
             </div>
 
 
-            @if ($sailingProgress)
+            @if ($state->sailingDays)
                 <div class="text-xs text-blue-600 mt-1 font-semibold">
-                    {{ $sailingProgress }}
+                    Day {{ $state->sailingDays }} / 12
                 </div>
             @endif
 
 
-            @if ($v->eta_overdue)
+            @if ($state->hasEtaOverdue)
                 <div class="inline-block mt-2 px-2 py-0.5 text-[11px] bg-red-100 text-red-700 rounded">
                     ETA Terlewati
                 </div>
-            @elseif($v->sailing_risk)
+            @elseif($state->hasSailingRisk)
                 <div class="inline-block mt-2 px-2 py-0.5 text-[11px] bg-orange-100 text-orange-700 rounded">
                     ETA &lt; 1 Hari
                 </div>
@@ -103,19 +82,19 @@
 
         <div class="text-right text-xs space-y-1">
 
-            @if ($overdue > 0)
+            @if ($state->milestoneOverdueCount > 0)
                 <div class="text-red-600 font-semibold">
-                    {{ $overdue }} laporan belum diinput
+                    {{ $state->milestoneOverdueCount }} laporan belum diinput
                 </div>
             @endif
 
-            @if ($dueToday > 0)
+            @if ($state->milestoneDueTodayCount > 0)
                 <div class="text-orange-600 font-semibold">
-                    {{ $dueToday }} jatuh tempo hari ini
+                    {{ $state->milestoneDueTodayCount }} jatuh tempo hari ini
                 </div>
             @endif
 
-            @if ($overdue === 0 && $dueToday === 0)
+            @if ($state->milestoneOverdueCount === 0 && $state->milestoneDueTodayCount === 0)
                 <div class="text-green-600 font-semibold">
                     Laporan aman
                 </div>
@@ -130,35 +109,18 @@
     {{-- GRID MILESTONE --}}
     <div class="grid grid-cols-6 gap-3 mt-4 text-xs">
 
-        @foreach ($milestones as $m)
-            @php
-
-                if ($m->actual_date) {
-                    $icon = '✔';
-                    $color = 'bg-green-100 text-green-700 border border-green-200';
-                } elseif ($m->is_overdue) {
-                    $icon = '✖';
-                    $color = 'bg-red-100 text-red-700 border border-red-200';
-                } elseif ($m->is_due_today) {
-                    $icon = '⏳';
-                    $color = 'bg-orange-100 text-orange-700 border border-orange-200';
-                } else {
-                    $icon = '—';
-                    $color = 'bg-gray-100 text-gray-600 border border-gray-200';
-                }
-
-            @endphp
-
+        @foreach ($v->milestones->sortBy(fn($m) => (int) str_replace('d', '', $m->code)) as $m)
+            @php $chip = \App\Supports\OperationalUi::milestoneChip($m); @endphp
 
             <button wire:click="showMilestone({{ $m->id }})"
-                class="rounded-md py-2 text-center font-semibold {{ $color }} hover:scale-105 transition">
+                class="rounded-md py-2 text-center font-semibold {{ $chip['class'] }} hover:scale-105 transition">
 
                 <div class="uppercase tracking-wide">
                     {{ strtoupper($m->code) }}
                 </div>
 
                 <div class="mt-1 text-base">
-                    {{ $icon }}
+                    {{ $chip['icon'] }}
                 </div>
 
             </button>

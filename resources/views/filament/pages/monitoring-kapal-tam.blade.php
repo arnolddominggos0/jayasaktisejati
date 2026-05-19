@@ -6,7 +6,7 @@
         {{-- ═══════════════════════════════════════════════════════════════ --}}
         <div class="flex items-center justify-between">
             <div class="flex items-baseline gap-3">
-                <h1 class="text-lg font-bold text-gray-900 tracking-tight">Monitoring Voyage</h1>
+                <h1 class="text-lg font-bold text-gray-900 tracking-tight">Monitoring Kapal TAM</h1>
                 <span class="text-sm text-gray-400">—</span>
                 <p class="text-sm text-gray-500 font-medium">{{ \Illuminate\Support\Carbon::createFromFormat('Y-m', $period)->translatedFormat('F Y') }}</p>
             </div>

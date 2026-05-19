@@ -129,7 +129,7 @@ class EditVesselPlan extends EditRecord
     protected function submitDraftDisabledReason(): string
     {
         if ($this->record->items()->count() === 0) {
-            return 'Tambahkan jadwal kapal terlebih dahulu.';
+            return 'Tambahkan rencana kapal terlebih dahulu.';
         }
 
         if (! $this->record->customer_id) {

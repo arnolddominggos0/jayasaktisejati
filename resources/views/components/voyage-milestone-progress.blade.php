@@ -1,4 +1,6 @@
 @php
+    use App\Supports\OperationalUi;
+
     $milestones = collect($voyage->milestones ?? [])
         ->sortBy(fn ($m) => (int) str_replace('d', '', $m->code))
         ->values();
@@ -16,24 +18,10 @@
     @if ($milestones->isNotEmpty())
         <div class="flex gap-1 overflow-x-auto pb-1">
             @foreach ($milestones as $m)
-                @php
-                    if ($m->actual_date) {
-                        $mColor = $m->status === 'ontime' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200';
-                        $mIcon = $m->status === 'ontime' ? '✓' : '✗';
-                    } elseif ($m->is_overdue) {
-                        $mColor = 'bg-red-50 text-red-700 border-red-200';
-                        $mIcon = '!';
-                    } elseif ($m->is_due_today) {
-                        $mColor = 'bg-orange-50 text-orange-700 border-orange-200';
-                        $mIcon = '●';
-                    } else {
-                        $mColor = 'bg-gray-50 text-gray-400 border-gray-100';
-                        $mIcon = '—';
-                    }
-                @endphp
-                <div class="flex-1 min-w-[56px] rounded border {{ $mColor }} px-1.5 py-1.5 text-center">
+                @php $chip = OperationalUi::milestoneChip($m); @endphp
+                <div class="flex-1 min-w-[56px] rounded border {{ $chip['class'] }} px-1.5 py-1.5 text-center">
                     <div class="text-[9px] uppercase font-semibold tracking-wide">{{ strtoupper($m->code) }}</div>
-                    <div class="text-sm font-bold mt-0.5 leading-none">{{ $mIcon }}</div>
+                    <div class="text-sm font-bold mt-0.5 leading-none">{{ $chip['icon'] }}</div>
                     <div class="text-[8px] text-gray-400 mt-0.5 tabular-nums">{{ optional($m->milestone_date)->format('d M') }}</div>
                 </div>
             @endforeach

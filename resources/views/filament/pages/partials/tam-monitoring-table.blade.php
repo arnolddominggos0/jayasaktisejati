@@ -1,14 +1,23 @@
 @php
-    $aktif = $rows->filter(fn($v) => $v->operational_status_enum !== \App\Enums\VoyageOperationalStatus::COMPLETED);
+    use App\Enums\VoyageOperationalStatus;
 
-    $delayed = $aktif->filter(fn($v) => $v->operational_status_enum === \App\Enums\VoyageOperationalStatus::DELAYED);
+    $aktif = $rows->filter(fn($v) => $v->operational_status_enum !== VoyageOperationalStatus::COMPLETED);
 
-    $sailing = $aktif->filter(fn($v) => $v->operational_status_enum === \App\Enums\VoyageOperationalStatus::SAILING);
+    $delayed = $aktif->filter(fn($v) => $v->operational_status_enum === VoyageOperationalStatus::DELAYED);
+
+    $sailing = $aktif->filter(fn($v) => $v->operational_status_enum === VoyageOperationalStatus::SAILING);
 
     $sailingEtaRisk = $sailing->filter(fn($v) => $v->eta_overdue || $v->sailing_risk);
     $sailingNormal = $sailing->reject(fn($v) => $v->eta_overdue || $v->sailing_risk);
 
-    $scheduled = $aktif->filter(fn($v) => $v->operational_status_enum === \App\Enums\VoyageOperationalStatus::SCHEDULED);
+    $scheduled = $aktif->filter(fn($v) => $v->operational_status_enum === VoyageOperationalStatus::SCHEDULED);
+
+    $readinessIssue = $scheduled->filter(fn($v) =>
+        $v->checkpoints->contains(fn($cp) => !$cp->is_completed && $cp->scheduled_at?->isPast())
+        || $v->vesselChecks->contains(fn($vc) => $vc->status?->value === 'potential_delay')
+    );
+
+    $scheduledNormal = $scheduled->diff($readinessIssue);
 @endphp
 
 <div class="space-y-8">
@@ -17,7 +26,7 @@
         <div>
             <div class="flex items-center gap-2 mb-3">
                 <span class="w-2.5 h-2.5 rounded-full bg-red-600"></span>
-                <h2 class="font-bold text-red-700 uppercase text-sm tracking-wide">Delayed</h2>
+                <h2 class="font-bold text-red-700 uppercase text-sm tracking-wide">Terlambat</h2>
             </div>
             <div class="space-y-3">
                 @foreach ($delayed as $v)
@@ -31,7 +40,7 @@
         <div>
             <div class="flex items-center gap-2 mb-3">
                 <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
-                <h2 class="font-bold text-orange-700 uppercase text-sm tracking-wide">Sailing — ETA Risk</h2>
+                <h2 class="font-bold text-orange-700 uppercase text-sm tracking-wide">Berlayar — Risiko ETA</h2>
             </div>
             <div class="space-y-3">
                 @foreach ($sailingEtaRisk as $v)
@@ -45,7 +54,7 @@
         <div>
             <div class="flex items-center gap-2 mb-3">
                 <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-                <h2 class="font-bold text-blue-700 uppercase text-sm tracking-wide">Sailing — Normal</h2>
+                <h2 class="font-bold text-blue-700 uppercase text-sm tracking-wide">Berlayar — Normal</h2>
             </div>
             <div class="space-y-3">
                 @foreach ($sailingNormal as $v)
@@ -59,7 +68,7 @@
         <div>
             <div class="flex items-center gap-2 mb-3">
                 <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                <h2 class="font-bold text-amber-700 uppercase text-sm tracking-wide">Readiness Issue</h2>
+                <h2 class="font-bold text-amber-700 uppercase text-sm tracking-wide">Masalah Kesiapan</h2>
             </div>
             <div class="space-y-3">
                 @foreach ($readinessIssue as $v)
@@ -73,7 +82,7 @@
         <div>
             <div class="flex items-center gap-2 mb-3">
                 <span class="w-2.5 h-2.5 rounded-full bg-gray-400"></span>
-                <h2 class="font-bold text-gray-600 uppercase text-sm tracking-wide">Scheduled — Normal</h2>
+                <h2 class="font-bold text-gray-600 uppercase text-sm tracking-wide">Terjadwal — Normal</h2>
             </div>
             <div class="space-y-3">
                 @foreach ($scheduledNormal as $v)

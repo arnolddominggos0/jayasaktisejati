@@ -56,13 +56,13 @@ class ViewVesselCheck extends ViewRecord
                         ->badge()
                         ->getStateUsing(
                             fn($record) =>
-                            $record->etd_plan->equalTo($record->etd_current)
+                            \App\Filament\Resources\VesselCheckResource::etdIsOnSchedule($record)
                                 ? 'Sesuai Jadwal'
                                 : 'Terjadi Perubahan'
                         )
                         ->color(
                             fn($record) =>
-                            $record->etd_plan->equalTo($record->etd_current)
+                            \App\Filament\Resources\VesselCheckResource::etdIsOnSchedule($record)
                                 ? 'success'
                                 : 'warning'
                         ),
@@ -77,22 +77,22 @@ class ViewVesselCheck extends ViewRecord
                         ->label('Kesimpulan Pemeriksaan')
                         ->badge()
                         ->getStateUsing(function ($record) {
-                            if ($record->shippingSchedule->vesselCheckCase) {
+                            if (\App\Filament\Resources\VesselCheckResource::hasOpenCase($record)) {
                                 return 'Perlu Tindak Lanjut';
                             }
 
-                            if (! $record->etd_plan->equalTo($record->etd_current)) {
+                            if (! \App\Filament\Resources\VesselCheckResource::etdIsOnSchedule($record)) {
                                 return 'Perlu Perhatian';
                             }
 
                             return 'Aman';
                         })
                         ->color(function ($record) {
-                            if ($record->shippingSchedule->vesselCheckCase) {
+                            if (\App\Filament\Resources\VesselCheckResource::hasOpenCase($record)) {
                                 return 'danger';
                             }
 
-                            if (! $record->etd_plan->equalTo($record->etd_current)) {
+                            if (! \App\Filament\Resources\VesselCheckResource::etdIsOnSchedule($record)) {
                                 return 'warning';
                             }
 
@@ -104,7 +104,7 @@ class ViewVesselCheck extends ViewRecord
                         ->badge()
                         ->visible(
                             fn($record) =>
-                            $record->shippingSchedule->vesselCheckCase !== null
+                            \App\Filament\Resources\VesselCheckResource::hasOpenCase($record)
                         )
                         ->formatStateUsing(fn($state) => $state->label())
                         ->color(fn($state) => $state->color()),

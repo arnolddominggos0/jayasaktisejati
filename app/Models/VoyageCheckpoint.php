@@ -10,9 +10,10 @@ class VoyageCheckpoint extends Model
     protected $fillable = [
         'voyage_id',
         'code',
+        'name',
         'offset_days',
         'scheduled_at',
-        'checked_at',
+        'completed_at',
         'status',
         'note',
         'checked_by',
@@ -22,6 +23,28 @@ class VoyageCheckpoint extends Model
         'scheduled_at' => 'datetime',
         'checked_at'   => 'datetime',
     ];
+
+    // ── Canonical field mapping (legacy: title → name, checked_at → completed_at) ──
+
+    public function setNameAttribute(?string $value): void
+    {
+        $this->attributes['title'] = $value;
+    }
+
+    public function getNameAttribute(): ?string
+    {
+        return $this->attributes['title'] ?? null;
+    }
+
+    public function setCompletedAtAttribute(?\Illuminate\Support\Carbon $value): void
+    {
+        $this->attributes['checked_at'] = $value;
+    }
+
+    public function getCompletedAtAttribute(): ?\Illuminate\Support\Carbon
+    {
+        return $this->getAttributeValue('checked_at');
+    }
 
     public function voyage(): BelongsTo
     {

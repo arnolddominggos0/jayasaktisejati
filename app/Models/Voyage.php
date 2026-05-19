@@ -413,6 +413,15 @@ class Voyage extends Model
             || $this->archived_at !== null;
     }
 
+    /**
+     * Canonical operational state engine for this voyage.
+     * Centralizes severity, readiness, KPI, and action evaluation.
+     */
+    public function getOperationalStateAttribute(): \App\Services\Operational\VoyageOperationalState
+    {
+        return \App\Services\Operational\VoyageOperationalState::for($this);
+    }
+
     public function transitionRegistryStatus(VoyageRegistryStatus $newStatus): bool
     {
         if ($this->registry_status && ! $this->registry_status->canTransitionTo($newStatus)) {

@@ -1,4 +1,6 @@
 @php
+    use App\Supports\OperationalUi;
+
     $items = collect();
 
     foreach ($voyage->checkpoints ?? [] as $cp) {
@@ -6,25 +8,25 @@
             'ts' => $cp->scheduled_at?->timestamp ?? PHP_INT_MAX,
             'code' => strtoupper($cp->code),
             'kind' => 'CP',
-            'status' => $cp->is_completed ? 'Done' : ($cp->is_late ? 'Late' : 'Open'),
-            'statusColor' => $cp->is_completed ? 'text-green-600' : ($cp->is_late ? 'text-red-600' : 'text-gray-400'),
+            'status' => $cp->is_completed ? 'Selesai' : ($cp->is_late ? 'Lewat' : 'Terbuka'),
+            'statusColor' => $cp->is_completed ? 'text-emerald-600' : ($cp->is_late ? 'text-red-600' : 'text-gray-400'),
             'detail' => $cp->checked_at ? $cp->checked_at->format('d M H:i') : optional($cp->scheduled_at)->format('d M H:i'),
             'note' => $cp->note,
         ]);
     }
 
     foreach ($voyage->vesselChecks ?? [] as $vc) {
-        $st = match ($vc->status?->value) {
-            'on_schedule' => ['OK', 'text-green-600'],
-            'potential_delay' => ['Risk', 'text-orange-600'],
-            default => ['—', 'text-gray-400'],
-        };
+        $cell = OperationalUi::vesselCheckCell($vc);
         $items->push((object)[
             'ts' => $vc->check_date?->startOfDay()->timestamp ?? PHP_INT_MAX,
             'code' => strtoupper($vc->day_code),
             'kind' => 'VC',
-            'status' => $st[0],
-            'statusColor' => $st[1],
+            'status' => $cell['label'],
+            'statusColor' => match ($cell['state']) {
+                'success' => 'text-emerald-600',
+                'danger'  => 'text-orange-600',
+                default   => 'text-gray-400',
+            },
             'detail' => optional($vc->check_date)->format('d M'),
             'note' => $vc->note,
         ]);

@@ -2,9 +2,10 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\VesselCheckLogStatus;
 use App\Filament\Resources\VesselCheckResource\Pages;
 use App\Models\VesselCheck;
-use App\Services\VesselCheckService;
+use App\Models\VesselCheckCase;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -49,13 +50,13 @@ class VesselCheckResource extends Resource
                     ->badge()
                     ->getStateUsing(
                         fn($record) =>
-                        $record->etd_plan->equalTo($record->etd_current)
+                        static::etdIsOnSchedule($record)
                             ? 'Aman – Sesuai Jadwal'
                             : 'ETD Berubah'
                     )
                     ->color(
                         fn($record) =>
-                        $record->etd_plan->equalTo($record->etd_current)
+                        static::etdIsOnSchedule($record)
                             ? 'success'
                             : 'warning'
                     ),
@@ -65,20 +66,18 @@ class VesselCheckResource extends Resource
                     ->badge()
                     ->getStateUsing(
                         fn($record) =>
-                        $record->shippingSchedule->vesselCheckCase
+                        static::hasOpenCase($record)
                             ? 'Perlu Tindak Lanjut'
-                            : (
-                                $record->etd_plan->equalTo($record->etd_current)
+                            : (static::etdIsOnSchedule($record)
                                 ? 'Aman'
                                 : 'Perlu Perhatian'
                             )
                     )
                     ->color(
                         fn($record) =>
-                        $record->shippingSchedule->vesselCheckCase
+                        static::hasOpenCase($record)
                             ? 'danger'
-                            : (
-                                $record->etd_plan->equalTo($record->etd_current)
+                            : (static::etdIsOnSchedule($record)
                                 ? 'success'
                                 : 'warning'
                             )
@@ -89,22 +88,22 @@ class VesselCheckResource extends Resource
                     ->badge()
                     ->getStateUsing(
                         fn($record) =>
-                        $record->etd_plan->equalTo($record->etd_current)
+                        static::etdIsOnSchedule($record)
                             ? '—'
                             : (
-                                $record->shippingSchedule->vesselCheckCase
-                                ? 'Sedang Ditangani'
-                                : 'Perlu Dibuat'
+                                static::hasOpenCase($record)
+                                    ? 'Sedang Ditangani'
+                                    : 'Perlu Dibuat'
                             )
                     )
                     ->color(
                         fn($record) =>
-                        $record->etd_plan->equalTo($record->etd_current)
+                        static::etdIsOnSchedule($record)
                             ? 'gray'
                             : (
-                                $record->shippingSchedule->vesselCheckCase
-                                ? 'info'
-                                : 'danger'
+                                static::hasOpenCase($record)
+                                    ? 'info'
+                                    : 'danger'
                             )
                     ),
             ])
@@ -116,41 +115,69 @@ class VesselCheckResource extends Resource
                 Tables\Actions\Action::make('tindak_lanjut')
                     ->label(
                         fn($record) =>
-                        $record->shippingSchedule->vesselCheckCase
+                        static::hasOpenCase($record)
                             ? 'Lihat Tindak Lanjut'
                             : 'Buat Tindak Lanjut'
                     )
                     ->icon(
                         fn($record) =>
-                        $record->shippingSchedule->vesselCheckCase
+                        static::hasOpenCase($record)
                             ? 'heroicon-o-eye'
                             : 'heroicon-o-exclamation-triangle'
                     )
                     ->color(
                         fn($record) =>
-                        $record->shippingSchedule->vesselCheckCase
+                        static::hasOpenCase($record)
                             ? 'info'
                             : 'danger'
                     )
                     ->visible(
                         fn($record) =>
-                        ! $record->etd_plan->equalTo($record->etd_current)
+                        ! static::etdIsOnSchedule($record)
                     )
                     ->action(function ($record) {
-                        if ($record->shippingSchedule->vesselCheckCase) {
+                        $existingCase = $record->shippingSchedule?->vesselCheckCase;
+
+                        if ($existingCase) {
                             return redirect()->route(
                                 'filament.admin.resources.vessel-check-cases.view',
-                                $record->shippingSchedule->vesselCheckCase
+                                $existingCase
                             );
                         }
 
-                        app(VesselCheckService::class)
-                            ->openIssueFromCheck($record->id);
+                        $status = $record->status;
+
+                        if (! $status instanceof VesselCheckLogStatus) {
+                            $status = VesselCheckLogStatus::tryFrom((string) $status)
+                                ?? VesselCheckLogStatus::ON_SCHEDULE;
+                        }
+
+                        if ($status !== VesselCheckLogStatus::POTENTIAL_DELAY) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Tidak dapat membuat tindak lanjut')
+                                ->body('Tindak lanjut hanya dapat dibuat dari status Potential Delay.')
+                                ->warning()
+                                ->send();
+                            return;
+                        }
+
+                        VesselCheckCase::create([
+                            'shipping_schedule_id' => $record->shipping_schedule_id,
+                            'voyage_id'            => $record->voyage_id,
+                            'case_status'          => \App\Enums\VesselCheckStatus::ETD_DELAY,
+                            'delay_flag'           => true,
+                            'opened_at'            => now(),
+                        ]);
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Tindak lanjut berhasil dibuat')
+                            ->success()
+                            ->send();
                     }),
             ])
 
             ->emptyStateHeading('Belum ada data pemeriksaan')
-            ->emptyStateDescription('Pemeriksaan jadwal kapal otomatis dibuat pada H-3, H-2, dan H-1 sebelum keberangkatan.');
+            ->emptyStateDescription('Pemeriksaan kesiapan kapal otomatis dibuat pada H-3, H-2, dan H-1 sebelum keberangkatan.');
     }
 
     public static function getPages(): array
@@ -159,5 +186,21 @@ class VesselCheckResource extends Resource
             'index' => Pages\ListVesselChecks::route('/'),
             'view'  => Pages\ViewVesselCheck::route('/{record}'),
         ];
+    }
+
+    // ── Operational safety helpers ───────────────────────────────────────
+
+    public static function etdIsOnSchedule(VesselCheck $record): bool
+    {
+        if (! $record->etd_plan || ! $record->etd_current) {
+            return true;
+        }
+
+        return $record->etd_plan->equalTo($record->etd_current);
+    }
+
+    public static function hasOpenCase(VesselCheck $record): bool
+    {
+        return (bool) $record->shippingSchedule?->vesselCheckCase;
     }
 }

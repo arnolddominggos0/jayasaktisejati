@@ -31,25 +31,25 @@ class EditVoyage extends EditRecord
     {
         $voyage = $this->record;
 
-        if ($voyage->etb) {
+        // ── Canonical checkpoint sync (code, name, scheduled_at, completed_at) ──
 
+        if ($voyage->etb) {
             $voyage->checkpoints()->updateOrCreate(
-                ['type' => 'etb'],
+                ['code' => 'ETB'],
                 [
-                    'title' => 'Estimasi Sandar (ETB)',
+                    'name' => 'Estimasi Sandar',
                     'scheduled_at' => $voyage->etb,
                 ]
             );
         }
 
         if ($voyage->atb_at) {
-
             $voyage->checkpoints()->updateOrCreate(
-                ['type' => 'atb'],
+                ['code' => 'ATB'],
                 [
-                    'title' => 'Aktual Sandar (ATB)',
+                    'name' => 'Aktual Sandar',
                     'scheduled_at' => $voyage->atb_at,
-                    'checked_at' => $voyage->atb_at,
+                    'completed_at' => $voyage->atb_at,
                 ]
             );
         }

@@ -29,22 +29,11 @@ class ViewVoyage extends ViewRecord
 
     public function getHeading(): string
     {
-        return 'Lembar Eksekusi Operasional';
+        return '';
     }
 
     public function getSubheading(): ?string
     {
-        return 'Detail operasional voyage — untuk monitoring harian gunakan Monitoring Voyage';
-    }
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            \Filament\Actions\Action::make('monitoring')
-                ->label('Kembali ke Monitoring')
-                ->url(fn () => \App\Filament\Pages\MonitoringKapalTam::getUrl())
-                ->icon('heroicon-o-arrow-left')
-                ->color('gray'),
-        ];
+        return null;
     }
 }
