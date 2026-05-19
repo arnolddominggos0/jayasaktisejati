@@ -27,7 +27,9 @@ class VesselPlanDashboard extends Widget
             'totalVoyages'   => $voyages->count(),
             'totalCargoPlan' => $voyages->sum('cargo_plan'),
             'avgDwelling'    => round($voyages->avg('dwelling_days') ?? 0, 1),
-            'delayCount'     => $voyages->where('is_delayed', true)->count(),
+            'delayCount'     => $voyages->filter(
+                fn($v) => $v->operationalState->isDelayed
+            )->count(),
         ];
     }
 }

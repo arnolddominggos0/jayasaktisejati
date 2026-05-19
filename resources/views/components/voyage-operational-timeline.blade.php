@@ -1,5 +1,8 @@
 @php
-    use Illuminate\Support\Carbon;
+    use App\Supports\OperationalUi;
+    use App\Enums\SlaStatus;
+
+    $events = collect();
 
     $events = collect();
 
@@ -18,25 +21,23 @@
         ]);
     }
 
-    foreach ($voyage->vesselChecks ?? [] as $vc) {
-        $st = match ($vc->status?->value) {
-            'on_schedule' => ['✓', 'text-green-600', 1],
-            'potential_delay' => ['!', 'text-orange-600', 3],
-            default => ['•', 'text-gray-400', 2],
-        };
+@foreach ($voyage->vesselChecks ?? [] as $vc)
+        @php
+        $vcTimeline = OperationalUi::vesselCheckTimelineState($vc);
+        @endphp
         $events->push((object)[
             'ts' => $vc->check_date?->startOfDay()->timestamp ?? PHP_INT_MAX,
             'date' => $vc->check_date?->startOfDay(),
             'type' => 'readiness',
             'code' => strtoupper($vc->day_code),
             'label' => strtoupper($vc->day_code),
-            'state' => $st[0],
-            'stateColor' => $st[1],
+            'state' => $vcTimeline['state'],
+            'stateColor' => $vcTimeline['color'],
             'detail' => optional($vc->etd_plan)->format('d M H:i'),
             'note' => $vc->note,
-            'priority' => $st[2],
+            'priority' => $vcTimeline['priority'],
         ]);
-    }
+    @endforeach
 
     if ($voyage->etb) {
         $events->push((object)[
@@ -53,17 +54,17 @@
     }
 
     if ($voyage->atb_at) {
-        $ok = $voyage->otb_status === \App\Enums\SlaStatus::ONTIME;
+        $otbDisplay = OperationalUi::slaStatusDisplay($voyage->otb_status);
         $events->push((object)[
             'ts' => $voyage->atb_at->timestamp,
             'date' => $voyage->atb_at,
             'type' => 'actual',
             'code' => 'ATB',
             'label' => 'ATB',
-            'state' => $ok ? '✓' : '✗',
-            'stateColor' => $ok ? 'text-green-600' : 'text-red-600',
+            'state' => $otbDisplay['icon'],
+            'stateColor' => $otbDisplay['color'],
             'detail' => $voyage->atb_at->format('d M H:i'),
-            'priority' => $ok ? 1 : 3,
+            'priority' => $otbDisplay['priority'],
         ]);
     }
 
@@ -82,45 +83,59 @@
     }
 
     if ($voyage->atd_at) {
-        $ok = $voyage->otd_status === \App\Enums\SlaStatus::ONTIME;
+        $otdDisplay = OperationalUi::slaStatusDisplay($voyage->otd_status);
         $events->push((object)[
             'ts' => $voyage->atd_at->timestamp,
             'date' => $voyage->atd_at,
             'type' => 'actual',
             'code' => 'ATD',
             'label' => 'ATD',
-            'state' => $ok ? '✓' : '✗',
-            'stateColor' => $ok ? 'text-green-600' : 'text-red-600',
+            'state' => $otdDisplay['icon'],
+            'stateColor' => $otdDisplay['color'],
             'detail' => $voyage->atd_at->format('d M H:i'),
-            'priority' => $ok ? 1 : 3,
+            'priority' => $otdDisplay['priority'],
         ]);
     }
 
     foreach ($voyage->milestones ?? [] as $m) {
         if ($m->actual_date) {
-            $ok = $m->status === 'ontime';
+            $mState = OperationalUi::milestoneIndicatorState($m);
+            $mIcon = OperationalUi::milestoneChip($m)['icon'];
             $events->push((object)[
                 'ts' => $m->actual_date->timestamp,
                 'date' => $m->actual_date,
                 'type' => 'milestone',
                 'code' => strtoupper($m->code),
                 'label' => strtoupper($m->code),
-                'state' => $ok ? '✓' : '✗',
-                'stateColor' => $ok ? 'text-green-600' : 'text-red-600',
+                'state' => $mIcon,
+                'stateColor' => match ($mState) {
+                    'success' => 'text-green-600',
+                    'danger'  => 'text-red-600',
+                    default   => 'text-gray-400',
+                },
                 'detail' => $m->actual_date->format('d M') . ($m->speed_knots ? " · {$m->speed_knots}kn" : ''),
                 'note' => $m->note,
-                'priority' => $ok ? 1 : 3,
+                'priority' => $mState === 'success' ? 1 : 3,
             ]);
         } else {
-            $prio = $m->is_overdue ? 3 : ($m->is_due_today ? 3 : 2);
+            $mState = OperationalUi::milestoneIndicatorState($m);
+            $prio = $mState === 'danger' ? 3 : ($mState === 'warning' ? 3 : 2);
             $events->push((object)[
                 'ts' => optional($m->milestone_date)->timestamp ?? PHP_INT_MAX,
                 'date' => $m->milestone_date,
                 'type' => 'milestone',
                 'code' => strtoupper($m->code),
                 'label' => strtoupper($m->code),
-                'state' => $m->is_overdue ? '!' : ($m->is_due_today ? '●' : '•'),
-                'stateColor' => $m->is_overdue ? 'text-red-600' : ($m->is_due_today ? 'text-orange-500' : 'text-gray-300'),
+                'state' => match ($mState) {
+                    'danger'  => '!',
+                    'warning' => '●',
+                    default   => '•',
+                },
+                'stateColor' => match ($mState) {
+                    'danger'  => 'text-red-600',
+                    'warning' => 'text-orange-500',
+                    default   => 'text-gray-300',
+                },
                 'detail' => optional($m->milestone_date)->format('d M') . ' (plan)',
                 'note' => $m->note,
                 'priority' => $prio,
@@ -129,17 +144,17 @@
     }
 
     if ($voyage->ata_at) {
-        $ok = $voyage->ota_status === \App\Enums\SlaStatus::ONTIME;
+        $otaDisplay = OperationalUi::slaStatusDisplay($voyage->ota_status);
         $events->push((object)[
             'ts' => $voyage->ata_at->timestamp,
             'date' => $voyage->ata_at,
             'type' => 'actual',
             'code' => 'ATA',
             'label' => 'ATA',
-            'state' => $ok ? '✓' : '✗',
-            'stateColor' => $ok ? 'text-green-600' : 'text-red-600',
+            'state' => $otaDisplay['icon'],
+            'stateColor' => $otaDisplay['color'],
             'detail' => $voyage->ata_at->format('d M H:i'),
-            'priority' => $ok ? 1 : 3,
+            'priority' => $otaDisplay['priority'],
         ]);
     }
 

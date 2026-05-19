@@ -1,23 +1,15 @@
 @php
-    use App\Enums\VoyageOperationalStatus;
+    $kpi = \App\Services\Operational\VoyageOperationalSnapshot::kpiSummary($rows);
 
-    $aktif = $rows->filter(fn($v) => $v->operational_status_enum !== VoyageOperationalStatus::COMPLETED);
+    $groups = \App\Services\Operational\VoyageOperationalSnapshot::categorize($rows);
 
-    $delayed = $aktif->filter(fn($v) => $v->operational_status_enum === VoyageOperationalStatus::DELAYED);
+    $delayed = $groups['delayed'];
+    $sailingEtaRisk = $groups['sailingEtaRisk'];
+    $sailingNormal = $groups['sailingNormal'];
+    $readinessIssue = $groups['readinessIssue'];
+    $scheduledNormal = $groups['scheduledNormal'];
 
-    $sailing = $aktif->filter(fn($v) => $v->operational_status_enum === VoyageOperationalStatus::SAILING);
-
-    $sailingEtaRisk = $sailing->filter(fn($v) => $v->eta_overdue || $v->sailing_risk);
-    $sailingNormal = $sailing->reject(fn($v) => $v->eta_overdue || $v->sailing_risk);
-
-    $scheduled = $aktif->filter(fn($v) => $v->operational_status_enum === VoyageOperationalStatus::SCHEDULED);
-
-    $readinessIssue = $scheduled->filter(fn($v) =>
-        $v->checkpoints->contains(fn($cp) => !$cp->is_completed && $cp->scheduled_at?->isPast())
-        || $v->vesselChecks->contains(fn($vc) => $vc->status?->value === 'potential_delay')
-    );
-
-    $scheduledNormal = $scheduled->diff($readinessIssue);
+    $aktif = $delayed->merge($sailingEtaRisk)->merge($sailingNormal)->merge($readinessIssue)->merge($scheduledNormal);
 @endphp
 
 <div class="space-y-8">
@@ -25,8 +17,7 @@
     @if ($delayed->count())
         <div>
             <div class="flex items-center gap-2 mb-3">
-                <span class="w-2.5 h-2.5 rounded-full bg-red-600"></span>
-                <h2 class="font-bold text-red-700 uppercase text-sm tracking-wide">Terlambat</h2>
+                {!! OperationalUi::sectionHeading('Terlambat', 'critical') !!}
             </div>
             <div class="space-y-3">
                 @foreach ($delayed as $v)
@@ -39,8 +30,7 @@
     @if ($sailingEtaRisk->count())
         <div>
             <div class="flex items-center gap-2 mb-3">
-                <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
-                <h2 class="font-bold text-orange-700 uppercase text-sm tracking-wide">Berlayar — Risiko ETA</h2>
+                {!! OperationalUi::sectionHeading('Berlayar — Risiko ETA', 'warning') !!}
             </div>
             <div class="space-y-3">
                 @foreach ($sailingEtaRisk as $v)
@@ -53,8 +43,7 @@
     @if ($sailingNormal->count())
         <div>
             <div class="flex items-center gap-2 mb-3">
-                <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
-                <h2 class="font-bold text-blue-700 uppercase text-sm tracking-wide">Berlayar — Normal</h2>
+                {!! OperationalUi::sectionHeading('Berlayar — Normal', 'info') !!}
             </div>
             <div class="space-y-3">
                 @foreach ($sailingNormal as $v)
@@ -67,8 +56,7 @@
     @if ($readinessIssue->count())
         <div>
             <div class="flex items-center gap-2 mb-3">
-                <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
-                <h2 class="font-bold text-amber-700 uppercase text-sm tracking-wide">Masalah Kesiapan</h2>
+                {!! OperationalUi::sectionHeading('Masalah Kesiapan', 'caution') !!}
             </div>
             <div class="space-y-3">
                 @foreach ($readinessIssue as $v)
@@ -81,8 +69,7 @@
     @if ($scheduledNormal->count())
         <div>
             <div class="flex items-center gap-2 mb-3">
-                <span class="w-2.5 h-2.5 rounded-full bg-gray-400"></span>
-                <h2 class="font-bold text-gray-600 uppercase text-sm tracking-wide">Terjadwal — Normal</h2>
+                {!! OperationalUi::sectionHeading('Terjadwal — Normal', 'normal') !!}
             </div>
             <div class="space-y-3">
                 @foreach ($scheduledNormal as $v)

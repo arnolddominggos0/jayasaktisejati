@@ -134,7 +134,7 @@
             <div class="grid grid-cols-2 gap-3">
                 @forelse ($v->vesselChecks as $vc)
                 @php
-                $ok = $vc->status?->value === 'on_schedule';
+                $vcDisplay = OperationalUi::vesselCheckStatusLabel($vc);
                 @endphp
 
                 <div class="rounded-xl border border-gray-100 px-3 py-2">
@@ -149,8 +149,8 @@
                             </div>
                         </div>
 
-                        <div class="{{ $ok ? 'text-emerald-600' : 'text-red-600' }} font-bold text-sm">
-                            {{ $ok ? 'OK' : 'Delay' }}
+                        <div class="{{ $vcDisplay['class'] }} font-bold text-sm">
+                            {{ $vcDisplay['label'] }}
                         </div>
                     </div>
 

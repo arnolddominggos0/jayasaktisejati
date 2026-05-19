@@ -1,11 +1,9 @@
 @php
-    use App\Enums\VoyageOperationalStatus;
     use App\Supports\OperationalUi;
 
     $state = $v->operationalState;
-    $status = $state->status;
     $severity = $state->severity;
-    $statusBadge = OperationalUi::operationalStatusLight($status);
+    $statusBadge = OperationalUi::operationalStatusLight($state->status);
 
     $milestones = $v->milestones->sortBy(fn($m) => (int) str_replace('d', '', $m->code));
 @endphp
@@ -37,13 +35,8 @@
         </div>
 
         <div class="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
-            {{-- Operational status badge --}}
             <x-operational.badge :label="$statusBadge['label']" :color="$statusBadge['class']" size="xs" />
-
-            {{-- Severity badge --}}
             <x-operational.severity-badge :severity="$severity" size="xs" />
-
-            {{-- KPI badges (compact) --}}
             {!! OperationalUi::kpiBadge($state->otb, 'OTB') !!}
             {!! OperationalUi::kpiBadge($state->otd, 'OTD') !!}
             {!! OperationalUi::kpiBadge($state->ota, 'OTA') !!}
@@ -132,33 +125,29 @@
     {{-- ISSUE & DELAY SECTION                                   --}}
     {{-- ═══════════════════════════════════════════════════════ --}}
     <div class="mt-3">
-        @if ($status === VoyageOperationalStatus::DELAYED && $state->voyage->overdue_days)
+        @if ($state->delayOverdueDays())
             <div class="flex items-center gap-2 flex-wrap">
-                <x-operational.badge label="TERLAMBAT {{ $state->voyage->overdue_days }} HARI" color="bg-red-600 text-white border-red-600" size="xs" />
+                <x-operational.badge label="TERLAMBAT {{ $state->delayOverdueDays() }} HARI" color="bg-red-600 text-white border-red-600" size="xs" />
                 @if ($v->manual_delay_reason)
                     <x-operational.badge :label="$v->manual_delay_reason->label()" color="bg-gray-100 text-gray-700 border-gray-200" size="xs" />
                 @endif
             </div>
         @endif
 
-        @if ($status === VoyageOperationalStatus::SAILING)
+        @if ($state->isSailing())
             <div class="flex items-center gap-2 flex-wrap">
-                @if ($state->sailingDays)
+                @if ($state->sailingDayLabel())
                     <span class="text-[11px] text-blue-700 font-semibold">
-                        Berlayar hari ke-{{ $state->sailingDays }}
+                        {{ $state->sailingDayLabel() }}
                     </span>
                 @endif
 
-                @if ($state->hasEtaOverdue)
-                    <x-operational.badge label="ETA TERLEWATI" color="bg-red-100 text-red-700 border-red-200" size="xs" />
-                @elseif ($state->hasSailingRisk)
-                    <x-operational.badge label="RISIKO ETA &lt; 24 JAM" color="bg-orange-100 text-orange-700 border-orange-200" size="xs" />
+                @if ($state->etaStatusLabel())
+                    <x-operational.badge :label="$state->etaStatusLabel()" :color="OperationalUi::severityBadge($state->etaStatusSeverity())" size="xs" />
                 @endif
 
-                @if ($state->milestoneOverdueCount > 0)
-                    <x-operational.badge :label="$state->milestoneOverdueCount . ' MILESTONE LEWAT'" color="bg-red-50 text-red-600 border-red-100" size="xs" />
-                @elseif ($state->milestoneDueTodayCount > 0)
-                    <x-operational.badge :label="$state->milestoneDueTodayCount . ' MILESTONE HARI INI'" color="bg-orange-50 text-orange-600 border-orange-100" size="xs" />
+                @if ($state->milestoneOverdueLabel())
+                    <x-operational.badge :label="$state->milestoneOverdueLabel()" :color="OperationalUi::indicatorClasses($state->milestoneSeverity())" size="xs" />
                 @endif
 
                 @if ($v->manual_delay_reason)
@@ -167,13 +156,13 @@
             </div>
         @endif
 
-        @if ($status === VoyageOperationalStatus::SCHEDULED)
+        @if ($state->isScheduled())
             <div class="flex items-center gap-2 flex-wrap">
-                @if ($state->daysUntilEtd !== null)
+                @if ($state->daysUntilEtdLabel())
                     @if ($state->daysUntilEtd === 0)
-                        <x-operational.badge label="ETD HARI INI" color="bg-orange-100 text-orange-700 border-orange-200" size="xs" />
+                        <x-operational.badge :label="$state->daysUntilEtdLabel()" color="bg-orange-100 text-orange-700 border-orange-200" size="xs" />
                     @elseif ($state->daysUntilEtd <= 2)
-                        <x-operational.badge label="ETD {{ $state->daysUntilEtd }} HARI LAGI" color="bg-blue-100 text-blue-700 border-blue-200" size="xs" />
+                        <x-operational.badge :label="$state->daysUntilEtdLabel()" color="bg-blue-100 text-blue-700 border-blue-200" size="xs" />
                     @else
                         <span class="text-[11px] text-gray-500">
                             ETD {{ $state->daysUntilEtd }} hari lagi
@@ -181,8 +170,8 @@
                     @endif
                 @endif
 
-                @if ($state->hasReadinessIssue)
-                    <x-operational.badge label="MASALAH KESIAPAN" color="bg-orange-100 text-orange-700 border-orange-200" size="xs" />
+                @if ($state->readinessIssueLabel())
+                    <x-operational.badge :label="$state->readinessIssueLabel()" color="bg-orange-100 text-orange-700 border-orange-200" size="xs" />
                 @endif
 
                 @if ($v->manual_delay_reason)
@@ -244,7 +233,7 @@
             Detail
         </a>
 
-        @if ($state->canShowMilestone && $status === VoyageOperationalStatus::SAILING)
+        @if ($state->canShowMilestone && $state->isSailing())
             <button wire:click="showMilestone({{ $milestones->firstWhere('actual_date', null)?->id ?? $milestones->last()->id }})"
                 class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-gray-300 text-gray-700 text-xs font-medium hover:bg-gray-50 transition">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">

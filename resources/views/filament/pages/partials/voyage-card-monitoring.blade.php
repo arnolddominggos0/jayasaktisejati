@@ -37,30 +37,24 @@
                     ETA: {{ optional($v->eta)->format('d M H:i') ?? '-' }}
                 </span>
 
-                @if ($state->sailingDays)
+                @if ($state->sailingDayLabel())
                     <span>
-                        Berlayar {{ $state->sailingDays }} hari
+                        {{ $state->sailingDayLabel() }}
                     </span>
                 @endif
 
             </div>
 
 
-            @if ($state->sailingDays)
+            @if ($state->sailingDayLabel())
                 <div class="text-xs text-blue-600 mt-1 font-semibold">
-                    Day {{ $state->sailingDays }} / 12
+                    {{ $state->sailingDayLabel() }}
                 </div>
             @endif
 
 
-            @if ($state->hasEtaOverdue)
-                <div class="inline-block mt-2 px-2 py-0.5 text-[11px] bg-red-100 text-red-700 rounded">
-                    ETA Terlewati
-                </div>
-            @elseif($state->hasSailingRisk)
-                <div class="inline-block mt-2 px-2 py-0.5 text-[11px] bg-orange-100 text-orange-700 rounded">
-                    ETA &lt; 1 Hari
-                </div>
+            @if ($state->etaStatusLabel())
+                <x-operational.badge :label="$state->etaStatusLabel()" :color="\App\Supports\OperationalUi::severityBadge($state->etaStatusSeverity())" size="xs" />
             @endif
 
 
@@ -71,10 +65,8 @@
             @endif
 
 
-            @if ($v->delay_reason)
-                <div class="inline-block mt-2 px-2 py-0.5 text-[11px] bg-gray-100 text-gray-700 rounded">
-                    Reason: {{ $v->delay_reason->label() }}
-                </div>
+            @if ($v->manual_delay_reason)
+                <x-operational.badge :label="$v->manual_delay_reason->label()" color="bg-gray-100 text-gray-700 border-gray-200" size="xs" />
             @endif
 
         </div>
@@ -110,20 +102,7 @@
     <div class="grid grid-cols-6 gap-3 mt-4 text-xs">
 
         @foreach ($v->milestones->sortBy(fn($m) => (int) str_replace('d', '', $m->code)) as $m)
-            @php $chip = \App\Supports\OperationalUi::milestoneChip($m); @endphp
-
-            <button wire:click="showMilestone({{ $m->id }})"
-                class="rounded-md py-2 text-center font-semibold {{ $chip['class'] }} hover:scale-105 transition">
-
-                <div class="uppercase tracking-wide">
-                    {{ strtoupper($m->code) }}
-                </div>
-
-                <div class="mt-1 text-base">
-                    {{ $chip['icon'] }}
-                </div>
-
-            </button>
+            <x-operational.milestone-chip :milestone="$m" />
         @endforeach
 
     </div>

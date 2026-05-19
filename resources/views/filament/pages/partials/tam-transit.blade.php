@@ -1,10 +1,12 @@
 <div class="space-y-6">
 
     @php
-        $sailingVoyages = $rows->filter(fn($v) =>
-            $v->operational_status_enum->value === 'sailing'
-        );
-    @endphp
+    use App\Enums\VoyageOperationalStatus;
+
+    $sailingVoyages = $rows->filter(fn($v) =>
+        $v->operational_status_enum === VoyageOperationalStatus::SAILING
+    );
+@endphp
 
     @forelse($sailingVoyages as $v)
 

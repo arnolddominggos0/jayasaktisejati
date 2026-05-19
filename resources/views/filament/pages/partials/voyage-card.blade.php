@@ -3,7 +3,7 @@
     $statusBadge = \App\Supports\OperationalUi::operationalStatusLight($state->status);
 @endphp
 
-<div class="bg-white rounded-xl p-4 shadow-sm border">
+<div class="bg-white rounded-xl p-4 shadow-sm border {{ \App\Supports\OperationalUi::severityBorder($state->severity) }}">
 
     <div class="flex justify-between items-start">
 
@@ -17,22 +17,12 @@
                 {{ $v->pol?->code }} → {{ $v->pod?->code }}
             </div>
 
-            @if ($state->voyage->overdue_days)
-                <div class="text-sm text-red-600 font-bold mt-1">
-                    TERLAMBAT {{ $state->voyage->overdue_days }} HARI
-                </div>
+            @if ($state->delayOverdueDays())
+                <x-operational.badge label="TERLAMBAT {{ $state->delayOverdueDays() }} HARI" color="bg-red-100 text-red-700 border-red-200" size="xs" />
             @endif
 
-            @if ($state->hasSailingRisk)
-                <div class="text-sm text-orange-600 font-semibold mt-1">
-                    ⚠ ETA kurang dari 24 jam
-                </div>
-            @endif
-
-            @if ($state->hasEtaOverdue)
-                <div class="text-sm text-red-600 font-semibold mt-1">
-                    ETA Terlewati
-                </div>
+            @if ($state->etaStatusLabel())
+                <x-operational.badge :label="$state->etaStatusLabel()" :color="\App\Supports\OperationalUi::severityBadge($state->etaStatusSeverity())" size="xs" />
             @endif
 
         </div>

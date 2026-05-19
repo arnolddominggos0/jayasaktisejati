@@ -141,7 +141,7 @@ class MonitoringKapalTam extends Page
         $this->inlineModalType = 'vessel_check';
         $this->inlineModalVesselCheckId = $vesselCheckId;
         $vc = VesselCheck::find($vesselCheckId);
-        $this->inlineForm['status'] = $vc?->status?->value ?? 'on_schedule';
+        $this->inlineForm['status'] = $vc?->status?->value ?? VesselCheckLogStatus::ON_SCHEDULE->value;
         $this->inlineForm['note'] = $vc?->note ?? '';
         $this->showInlineModal = true;
     }
@@ -215,7 +215,7 @@ class MonitoringKapalTam extends Page
         }
 
         $this->validate([
-            'inlineForm.status' => 'nullable|in:on_schedule,potential_delay',
+            'inlineForm.status' => 'nullable|in:' . implode(',', array_column(VesselCheckLogStatus::cases(), 'value')),
             'inlineForm.note' => 'nullable|string|max:500',
         ]);
 
