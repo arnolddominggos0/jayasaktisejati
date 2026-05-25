@@ -24,6 +24,7 @@ class BriefingAttendance extends Model
         'created_by',
         'rest_started_at',
         'recheck_result',
+	'signature_path',
     ];
 
     protected $casts = [
