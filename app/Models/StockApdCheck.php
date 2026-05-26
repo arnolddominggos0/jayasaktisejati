@@ -8,15 +8,24 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class StockApdCheck extends Model
 {
     protected $fillable = [
+
         'session_id',
+
         'ppe_type',
+
         'stock_available',
         'required_quantity',
+
+        'status',
+
         'remark',
     ];
 
     public function session(): BelongsTo
     {
-        return $this->belongsTo(BriefingSession::class, 'session_id');
+        return $this->belongsTo(
+            BriefingSession::class,
+            'session_id'
+        );
     }
 }

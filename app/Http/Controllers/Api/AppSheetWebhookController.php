@@ -24,7 +24,7 @@ class AppSheetWebhookController extends Controller
     public function handle(Request $request): JsonResponse
     {
         try {
-	            $signature = $request->header('X-AppSheet-Signature');
+            $signature = $request->header('X-AppSheet-Signature');
             if ($signature && ! $this->appSheetService->validateWebhookSignature($signature, $request->all())) {
                 return response()->json([
                     'success' => false,
@@ -37,21 +37,12 @@ class AppSheetWebhookController extends Controller
                 'operation' => 'required|string|in:create,update,delete',
                 'data' => 'required|array',
                 'submitted_by_user_id' => 'nullable|integer|exists:users,id',
-		'submitted_by_email' => 'nullable|email',
             ]);
 
             $table = $data['table'];
             $operation = $data['operation'];
             $recordData = $data['data'];
             $submittedByUserId = $data['submitted_by_user_id'] ?? null;
-
-	   if (! $submittedByUserId && ! empty($data['submitted_by_email'])) {
-
-		 $submittedByUserId = \App\Models\User::where(
-			'email',
-        		$data['submitted_by_email']
-    		)->value('id');
-	   }
 
             $allowedTables = array_keys(config('appsheet.tables', []));
             if (! in_array($table, $allowedTables, true)) {

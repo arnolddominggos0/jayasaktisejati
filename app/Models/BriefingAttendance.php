@@ -11,26 +11,59 @@ class BriefingAttendance extends Model
     protected $table = 'briefing_attendances';
 
     protected $fillable = [
+
+        // relations
         'session_id',
         'manpower_id',
-        'ppeitem_id',
+
+        // attendance
         'attendance_status',
+
+        // health check
         'temperature',
         'bp_systolic',
         'bp_diastolic',
-        'has_ppe',
-        'remark',
         'health_complaint',
-        'created_by',
+
+        // fit status
+        'fit_status',
+
+        // recheck
+        'recheck_required',
         'rest_started_at',
         'recheck_result',
-	'signature_path',
+
+        // medical
+        'medical_action',
+
+        // APD
+        'has_ppe',
+        'personal_ppe_status',
+
+        // notes
+        'remark',
+
+        // signature
+        'signature_path',
+
+        // audit
+        'created_by',
     ];
 
     protected $casts = [
         'has_ppe' => 'boolean',
+        'recheck_required' => 'boolean',
+
         'attendance_status' => AttendanceStatus::class,
+
+        'rest_started_at' => 'datetime',
     ];
+
+    /*
+    |--------------------------------------------------------------------------
+    | RELATIONS
+    |--------------------------------------------------------------------------
+    */
 
     public function session(): BelongsTo
     {
@@ -41,21 +74,21 @@ class BriefingAttendance extends Model
     {
         return $this->belongsTo(Manpower::class, 'manpower_id');
     }
+
     public function ppeItems()
     {
-        return $this->hasMany(\App\Models\BriefingAttendancePpeItem::class, 'attendance_id');
+        return $this->hasMany(
+            BriefingAttendancePpeItem::class,
+            'attendance_id'
+        );
     }
 
-    public function ppeInspections()
-    {
-        return $this->hasMany(\App\Models\PpeInspection::class, 'briefing_attendance_id');
-    }
+    /*
+    |--------------------------------------------------------------------------
+    | ACCESSORS
+    |--------------------------------------------------------------------------
+    */
 
-    public function getPpeAllGoodAttribute(): bool
-    {
-        $items = $this->ppeItems()->pluck('condition', 'ppe_type');
-        return $items->count() >= 4 && $items->every(fn($c) => $c === \App\Enums\PpeCondition::Baik);
-    }
     public function getBpAttribute(): ?string
     {
         if ($this->bp_systolic && $this->bp_diastolic) {
@@ -67,24 +100,53 @@ class BriefingAttendance extends Model
 
     public function setBpAttribute(?string $value): void
     {
-        if (! $value) {
+        if (!$value) {
+
             $this->bp_systolic = null;
             $this->bp_diastolic = null;
+
             return;
         }
 
         if (preg_match('/^\s*(\d{2,3})\s*\/\s*(\d{2,3})\s*$/', $value, $m)) {
+
             $this->bp_systolic = (int) $m[1];
             $this->bp_diastolic = (int) $m[2];
         }
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | HELPERS
+    |--------------------------------------------------------------------------
+    */
+
+    public function getPpeAllGoodAttribute(): bool
+    {
+        $items = $this->ppeItems()
+            ->pluck('condition', 'ppe_type');
+
+        return $items->count() >= 4
+            && $items->every(
+                fn($c) => $c === \App\Enums\PpeCondition::Baik
+            );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | BOOT
+    |--------------------------------------------------------------------------
+    */
+
     protected static function booted()
     {
         static::saved(function ($attendance) {
+
             $session = $attendance->session;
 
-            if (!$session) return;
+            if (!$session) {
+                return;
+            }
 
             $presentCount = $session->attendances()
                 ->where('attendance_status', 'present')
