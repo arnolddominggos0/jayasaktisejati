@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Enums\ShipmentStatus;
-use App\Enums\MPCheckStatus;
 use App\Models\AppSheetSyncLog;
 use App\Models\BriefingAttendance;
 use App\Models\BriefingAttendancePpeItem;
@@ -21,9 +20,6 @@ use App\Models\User;
 use DomainException;
 use Exception;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class AppSheetService
 {
@@ -103,76 +99,39 @@ class AppSheetService
         }
     }
 
-   protected function syncBriefingSession(array $data, string $operation, ?int $submittedByUserId = null)
-{
-    $mappedData = $this->mapFields('mp_check', $data, $submittedByUserId);
+    protected function syncBriefingSession(array $data, string $operation, ?int $submittedByUserId = null)
+    {
+        $mappedData = $this->mapFields('mp_check', $data, $submittedByUserId);
+	if ($submittedByUserId) {
+   	 	$mappedData['coordinator_user_id'] = $submittedByUserId;
+	}
+	Log::info('MAPPED DATA MP CHECK', $mappedData);
+        $date = $mappedData['date'] ?? null;
+	$date = \Carbon\Carbon::parse($date)->format('Y-m-d');
+	$mappedData['date'] = $date;
+        $depotId = $mappedData['depot_id'] ?? null;
 
-    if ($submittedByUserId) {
-        $mappedData['coordinator_user_id'] = $submittedByUserId;
+        if (! $date || ! $depotId) {
+            throw new Exception('Tanggal dan Depot ID wajib diisi untuk Briefing Session');
+        }
+
+        Depot::where('id', $depotId)->exists()
+            || throw new Exception("Depot ID {$depotId} tidak ditemukan");
+
+        return match ($operation) {
+            'create' => BriefingSession::updateOrCreate(
+                ['date' => $date, 'depot_id' => $depotId],
+                $mappedData
+            ),
+            'update' => BriefingSession::updateOrCreate(
+                ['date' => $date, 'depot_id' => $depotId],
+                $mappedData
+            ),
+            'delete' => BriefingSession::where('date', $date)
+                ->where('depot_id', $depotId)->delete(),
+            default => throw new Exception("Unknown operation: {$operation}"),
+        };
     }
-
-    if (! empty($mappedData['briefing_evidence_path'])
-    && str_contains($mappedData['briefing_evidence_path'], 'appsheet.com')) {
-
-    $localPath = $this->downloadAndStoreImage(
-        $mappedData['briefing_evidence_path'],
-        'briefings'
-    );
-
-    if ($localPath) {
-        $mappedData['briefing_evidence_path'] = $localPath;
-    }
-}
-
-    Log::info('MAPPED DATA MP CHECK', $mappedData);
-
-    $date = $mappedData['date'] ?? null;
-    $depotId = $mappedData['depot_id'] ?? null;
-
-    if (! $date || ! $depotId) {
-        throw new Exception('Tanggal dan Depot ID wajib diisi untuk Briefing Session');
-    }
-
-    // Normalize date
-    $date = \Carbon\Carbon::parse($date)->format('Y-m-d');
-    $mappedData['date'] = $date;
-
-    Depot::where('id', $depotId)->exists()
-        || throw new Exception("Depot ID {$depotId} tidak ditemukan");
-
-    Log::info('UPSERT BRIEFING SESSION', [
-        'where' => [
-            'date' => $date,
-            'depot_id' => $depotId,
-        ],
-        'payload' => $mappedData,
-    ]);
-
-    return match ($operation) {
-
-        'create' => BriefingSession::updateOrCreate(
-            [
-                'date' => $date,
-                'depot_id' => $depotId,
-            ],
-            $mappedData
-        ),
-
-        'update' => BriefingSession::updateOrCreate(
-            [
-                'date' => $date,
-                'depot_id' => $depotId,
-            ],
-            $mappedData
-        ),
-
-        'delete' => BriefingSession::where('date', $date)
-            ->where('depot_id', $depotId)
-            ->delete(),
-
-        default => throw new Exception("Unknown operation: {$operation}"),
-    };
-}
 
     protected function syncBriefingAttendance(array $data, string $operation, ?int $submittedByUserId = null)
     {
@@ -326,58 +285,6 @@ class AppSheetService
 
         default => throw new Exception("Unknown operation: {$operation}"),
     };
-}
-
-    protected function evaluateMpCheckStatus(BriefingSession $session): void
-{
-    $requiredHeadcount = $session->summary_headcount ?? 0;
-
-    $attendanceCount = $session->attendances()
-        ->where('attendance_status', 'present')
-        ->count();
-
-    $checklistIncomplete = $session->checklists()
-        ->where('status', '!=', 'ok')
-        ->exists();
-
-    $apdIssue = $session->attendances()
-        ->where('has_ppe', false)
-        ->exists();
-
-    $status = MPCheckStatus::Cleared;
-
-    // Tidak ada manpower sama sekali
-    if ($attendanceCount === 0) {
-        $status = MPCheckStatus::Draft;
-    }
-
-    // Masih proses checking
-    elseif ($attendanceCount < $requiredHeadcount) {
-        $status = MPCheckStatus::OnCheck;
-    }
-
-    // Ada issue operasional
-    elseif ($checklistIncomplete || $apdIssue) {
-        $status = MPCheckStatus::WaitingAction;
-    }
-
-    // Semua aman
-    else {
-        $status = MPCheckStatus::Cleared;
-    }
-
-    $session->update([
-        'mp_check_status' => $status,
-    ]);
-
-    Log::info('MP CHECK STATUS EVALUATED', [
-        'session_id' => $session->id,
-        'attendance_count' => $attendanceCount,
-        'required_headcount' => $requiredHeadcount,
-        'checklist_incomplete' => $checklistIncomplete,
-        'apd_issue' => $apdIssue,
-        'status' => $status->value,
-    ]);
 }
 
     protected function syncLoadingSession(array $data, string $operation, ?int $submittedByUserId = null)
@@ -749,52 +656,4 @@ class AppSheetService
 
         return hash_equals($computed, $signature);
     }
-
-    protected function downloadAndStoreImage(string $url, string $folder = 'briefings'): ?string
-{
-    try {
-        $response = Http::timeout(30)->get($url);
-
-        if (! $response->successful()) {
-            Log::warning('Failed to download AppSheet image', [
-                'url' => $url,
-                'status' => $response->status(),
-            ]);
-
-            return null;
-        }
-
-        $extension = 'jpg';
-
-        $contentType = $response->header('Content-Type');
-
-        if ($contentType) {
-            $mimeMap = [
-                'image/jpeg' => 'jpg',
-                'image/png' => 'png',
-                'image/webp' => 'webp',
-            ];
-
-            $extension = $mimeMap[$contentType] ?? 'jpg';
-        }
-
-        $filename = $folder.'/'.now()->format('Y/m').'/'
-            .Str::uuid().'.'.$extension;
-
-        Storage::disk('public')->put(
-            $filename,
-            $response->body()
-        );
-
-        return $filename;
-
-    } catch (\Throwable $e) {
-        Log::error('Image download failed', [
-            'url' => $url,
-            'error' => $e->getMessage(),
-        ]);
-
-        return null;
-    }
-  }
 }
