@@ -38,26 +38,28 @@ return [
     'tables' => [
 
         // ── Briefing (sebelum loading) ──────────────────────────
-        'briefing_sessions' => [
-            'appsheet_table' => 'Briefing Sessions',
+        'mp_check' => [
+            'appsheet_table' => 'mp_check',
             'model' => \App\Models\BriefingSession::class,
             'primary_key' => ['date', 'depot_id'],
+
             'fields' => [
                 'date' => 'Tanggal',
                 'depot_id' => 'Depot ID',
                 'coordinator_user_id' => 'Koordinator ID',
-                'notes' => 'Catatan',
-                'summary_headcount' => 'Jumlah MP Dibutuhkan',
+                'summary_headcount' => 'Kebutuhan MP',
                 'summary_solution' => 'Solusi Kekurangan',
+		'notes' => 'Catatan Operasional',
                 'briefing_evidence_path' => 'Foto Briefing',
             ],
         ],
 
-        'briefing_attendances' => [
-            'appsheet_table' => 'Briefing Attendances',
+        'detail_mp_check' => [
+            'appsheet_table' => 'detail_mp_check',
             'model' => BriefingAttendance::class,
             'primary_key' => ['session_id', 'manpower_id'],
             'add_checked_by' => false,
+
             'fields' => [
                 'session_id' => 'Sesi ID',
                 'manpower_id' => 'MP ID',
@@ -65,13 +67,39 @@ return [
                 'temperature' => 'Suhu',
                 'bp_systolic' => 'TD Sistolik',
                 'bp_diastolic' => 'TD Diastolik',
-                'health_complaint' => 'Keluhan Kesehatan',
+                'health_complaint' => 'Keluhan',
                 'has_ppe' => 'APD Lengkap',
-                'recheck_result' => 'Hasil Cek Ulang',
                 'remark' => 'Catatan',
+		'signature_path' => 'Tanda Tangan MP',
             ],
             'after_sync' => 'recalculate_briefing_session',
         ],
+
+	'stok_apd_check' => [
+   	     'appsheet_table' => 'stok_apd_check',
+    	     'model' => StockApdCheck::class,
+    	     'primary_key' => ['session_id', 'ppe_type'],
+    	     'fields' => [
+                'session_id' => 'Sesi ID',
+                'ppe_type' => 'Jenis APD',
+                'stock_available' => 'Stok Tersedia',
+                'required_quantity' => 'Kebutuhan',
+                'remark' => 'Catatan',
+    	    ],
+	],
+	
+	'briefing_checklists' => [
+   	 'appsheet_table' => 'briefing_checklists',
+   	 'model' => BriefingChecklist::class,
+    	'primary_key' => ['session_id', 'item'],
+    	'fields' => [
+           'session_id' => 'Sesi ID',
+           'item' => 'Item',
+           'type' => 'Tipe',
+           'status' => 'Status',
+           'remark' => 'Catatan',
+        ],
+   ],
 
         'briefing_attendance_ppe_items' => [
             'appsheet_table' => 'Briefing Attendance PPE Items',

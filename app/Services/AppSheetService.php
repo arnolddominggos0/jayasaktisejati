@@ -7,6 +7,7 @@ use App\Models\AppSheetSyncLog;
 use App\Models\BriefingAttendance;
 use App\Models\BriefingAttendancePpeItem;
 use App\Models\BriefingChecklist;
+use App\Models\StockApdCheck;
 use App\Models\BriefingSession;
 use App\Models\Depot;
 use App\Models\EquipmentCheck;
@@ -48,8 +49,7 @@ class AppSheetService
         while (isset($data['data']) && is_array($data['data'])) {
             $data = $data['data'];
         }
-
-        $data = array_merge($data, [
+	 $data = array_merge($data, [
             'attendance_id' => $root['attendance_id'] ?? $data['attendance_id'] ?? null
         ]);
 
@@ -72,8 +72,9 @@ class AppSheetService
             $this->validateShipmentStatusGuard($tableName, $mappedData);
 
             $result = match ($tableName) {
-                'briefing_sessions' => $this->syncBriefingSession($data, $operation, $submittedByUserId),
-                'briefing_attendances' => $this->syncBriefingAttendance($data, $operation, $submittedByUserId),
+                'mp_check' => $this->syncBriefingSession($data, $operation, $submittedByUserId),
+                'detail_mp_check' => $this->syncBriefingAttendance($data, $operation, $submittedByUserId),
+		'stok_apd_check' => $this->syncStockApdCheck($data, $operation, $submittedByUserId),	
                 'briefing_checklists' => $this->syncBriefingChecklist($data, $operation, $submittedByUserId),
                 'loading_sessions' => $this->syncLoadingSession($data, $operation, $submittedByUserId),
                 'rack_container_checks' => $this->syncRackContainerCheck($data, $operation, $submittedByUserId),
@@ -98,37 +99,67 @@ class AppSheetService
         }
     }
 
-    protected function syncBriefingSession(array $data, string $operation, ?int $submittedByUserId = null)
-    {
-        $mappedData = $this->mapFields('briefing_sessions', $data, $submittedByUserId);
-        $date = $mappedData['date'] ?? null;
-        $depotId = $mappedData['depot_id'] ?? null;
+   protected function syncBriefingSession(array $data, string $operation, ?int $submittedByUserId = null)
+{
+    $mappedData = $this->mapFields('mp_check', $data, $submittedByUserId);
 
-        if (! $date || ! $depotId) {
-            throw new Exception('Tanggal dan Depot ID wajib diisi untuk Briefing Session');
-        }
-
-        Depot::where('id', $depotId)->exists()
-            || throw new Exception("Depot ID {$depotId} tidak ditemukan");
-
-        return match ($operation) {
-            'create' => BriefingSession::firstOrCreate(
-                ['date' => $date, 'depot_id' => $depotId],
-                $mappedData
-            ),
-            'update' => BriefingSession::updateOrCreate(
-                ['date' => $date, 'depot_id' => $depotId],
-                $mappedData
-            ),
-            'delete' => BriefingSession::where('date', $date)
-                ->where('depot_id', $depotId)->delete(),
-            default => throw new Exception("Unknown operation: {$operation}"),
-        };
+    if ($submittedByUserId) {
+        $mappedData['coordinator_user_id'] = $submittedByUserId;
     }
+
+    Log::info('MAPPED DATA MP CHECK', $mappedData);
+
+    $date = $mappedData['date'] ?? null;
+    $depotId = $mappedData['depot_id'] ?? null;
+
+    if (! $date || ! $depotId) {
+        throw new Exception('Tanggal dan Depot ID wajib diisi untuk Briefing Session');
+    }
+
+    // Normalize date
+    $date = \Carbon\Carbon::parse($date)->format('Y-m-d');
+    $mappedData['date'] = $date;
+
+    Depot::where('id', $depotId)->exists()
+        || throw new Exception("Depot ID {$depotId} tidak ditemukan");
+
+    Log::info('UPSERT BRIEFING SESSION', [
+        'where' => [
+            'date' => $date,
+            'depot_id' => $depotId,
+        ],
+        'payload' => $mappedData,
+    ]);
+
+    return match ($operation) {
+
+        'create' => BriefingSession::updateOrCreate(
+            [
+                'date' => $date,
+                'depot_id' => $depotId,
+            ],
+            $mappedData
+        ),
+
+        'update' => BriefingSession::updateOrCreate(
+            [
+                'date' => $date,
+                'depot_id' => $depotId,
+            ],
+            $mappedData
+        ),
+
+        'delete' => BriefingSession::where('date', $date)
+            ->where('depot_id', $depotId)
+            ->delete(),
+
+        default => throw new Exception("Unknown operation: {$operation}"),
+    };
+}
 
     protected function syncBriefingAttendance(array $data, string $operation, ?int $submittedByUserId = null)
     {
-        $mappedData = $this->mapFields('briefing_attendances', $data, $submittedByUserId);
+        $mappedData = $this->mapFields('detail_mp_check', $data, $submittedByUserId);
         $sessionId = $mappedData['session_id'] ?? null;
         $manpowerId = $mappedData['manpower_id'] ?? null;
 
@@ -140,7 +171,7 @@ class AppSheetService
             || throw new Exception("Briefing Session ID {$sessionId} tidak ditemukan");
 
         return match ($operation) {
-            'create' => BriefingAttendance::firstOrCreate(
+            'create' => BriefingAttendance::updateOrCreate(
                 ['session_id' => $sessionId, 'manpower_id' => $manpowerId],
                 $mappedData
             ),
@@ -244,9 +275,45 @@ class AppSheetService
         };
     }
 
+   protected function syncStockApdCheck(array $data, string $operation, ?int $submittedByUserId = null)
+   {
+    $mappedData = $this->mapFields('stok_apd_check', $data, $submittedByUserId);
+
+    $sessionId = $mappedData['session_id'] ?? null;
+    $ppeType = $mappedData['ppe_type'] ?? null;
+
+    if (! $sessionId || ! $ppeType) {
+        throw new Exception('Session ID dan Jenis APD wajib diisi');
+    }
+
+    return match ($operation) {
+        'create' => StockApdCheck::updateOrCreate(
+            [
+                'session_id' => $sessionId,
+                'ppe_type' => $ppeType,
+            ],
+            $mappedData
+        ),
+
+        'update' => StockApdCheck::updateOrCreate(
+            [
+                'session_id' => $sessionId,
+                'ppe_type' => $ppeType,
+            ],
+            $mappedData
+        ),
+
+        'delete' => StockApdCheck::where('session_id', $sessionId)
+            ->where('ppe_type', $ppeType)
+            ->delete(),
+
+        default => throw new Exception("Unknown operation: {$operation}"),
+    };
+}
+
     protected function syncLoadingSession(array $data, string $operation, ?int $submittedByUserId = null)
     {
-        $mappedData = $this->mapFields('loading_sessions', $data, $submittedByUserId);
+         $mappedData = $this->mapFields('loading_sessions', $data, $submittedByUserId);
 
         return match ($operation) {
             'create' => LoadingSession::firstOrCreate(
@@ -339,7 +406,7 @@ class AppSheetService
 
         $user = auth()->id() ?? $submittedByUserId ?? 1;
         $mapped['created_by'] = $user;
-        if (! in_array($table, ['briefing_attendances', 'briefing_attendance_ppe_items', 'briefing_checklists'])) {
+        if (! in_array($table, ['detail_mp_check', 'briefing_attendance_ppe_items', 'briefing_checklists'])) {
             $mapped['checked_by'] = $user;
         }
 
@@ -350,15 +417,23 @@ class AppSheetService
     {
         $user = User::find($submittedByUserId);
 
-        if (! $user || ! $user->hasRole('field_coordinator')) {
-            throw new DomainException('Pengguna tidak memiliki role Field Coordinator.');
-        }
+        if (! $user) {
+   		 throw new DomainException('Pengguna tidak ditemukan.');
+	}
+
+	if ($user->hasRole('super_admin')) {
+    		return;
+	}
+
+	if (! $user->hasRole('field_coordinator')) {
+    		throw new DomainException('Pengguna tidak memiliki role Field Coordinator.');
+	}
 
         $branchId = null;
         $depotId = null;
 
         match ($tableName) {
-            'briefing_sessions' => (function () use ($mappedData, &$branchId, &$depotId) {
+            'mp_check' => (function () use ($mappedData, &$branchId, &$depotId) {
                 $depotId = $mappedData['depot_id'] ?? null;
                 if ($depotId) {
                     $depot = Depot::find($depotId);
@@ -366,7 +441,7 @@ class AppSheetService
                 }
             })(),
 
-            'briefing_attendances', 'briefing_checklists' => (function () use ($mappedData, &$branchId, &$depotId) {
+            'detail_mp_check', 'briefing_checklists' => (function () use ($mappedData, &$branchId, &$depotId) {
                 $sessionId = $mappedData['session_id'] ?? null;
                 if ($sessionId) {
                     $session = BriefingSession::with('depot')->find($sessionId);
