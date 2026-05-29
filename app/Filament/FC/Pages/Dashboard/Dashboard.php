@@ -2,14 +2,17 @@
 
 namespace App\Filament\FC\Pages\Dashboard;
 
+use App\Enums\MPCheckStatus;
 use App\Enums\ShipmentStatus;
 use App\Models\Branch;
+use App\Models\BriefingSession;
 use App\Models\Depot;
 use App\Models\Shipment;
 use Filament\Pages\Page;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 class Dashboard extends Page
 {
@@ -125,5 +128,39 @@ class Dashboard extends Page
                     });
             })
             ->count();
+    }
+
+    public function getTodayBriefingSession(): ?BriefingSession
+    {
+        $depotId = $this->getDepotContext()?->id;
+
+        if (! $depotId) {
+            return null;
+        }
+
+        return BriefingSession::withCount([
+            'attendances as hadir_count' => fn ($q) => $q->where('attendance_status', 'present'),
+        ])
+        ->whereDate('date', Carbon::today())
+        ->where('depot_id', $depotId)
+        ->first();
+    }
+
+    public function getOperationalReadinessBadge(): array
+    {
+        $session = $this->getTodayBriefingSession();
+
+        if (! $session) {
+            return ['label' => 'Belum Ada Briefing', 'color' => 'gray', 'icon' => 'heroicon-m-clock'];
+        }
+
+        $status = $session->mp_check_status;
+        $isReady = in_array($status?->value, ['cleared', 'approved'], true);
+
+        return [
+            'label' => $isReady ? 'Operasional: SIAP' : 'Operasional: BELUM SIAP',
+            'color' => $isReady ? 'success' : 'danger',
+            'icon' => $isReady ? 'heroicon-m-check-circle' : 'heroicon-m-exclamation-triangle',
+        ];
     }
 }
