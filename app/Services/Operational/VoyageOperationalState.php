@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Operational;
 
 use App\Enums\SlaStatus;
-use App\Enums\VesselCheckLogStatus;
 use App\Enums\VoyageOperationalStatus;
 use App\Models\Voyage;
 use App\Models\VoyageCheckpoint;
@@ -109,7 +108,7 @@ final class VoyageOperationalState
             ->contains(fn(VoyageCheckpoint $cp) => !$cp->is_completed && $cp->scheduled_at?->isPast());
 
         $this->hasPotentialDelay = collect($this->voyage->vesselChecks ?? [])
-            ->contains(fn($vc) => $vc->status?->value === VesselCheckLogStatus::POTENTIAL_DELAY->value);
+            ->contains(fn($vc) => $vc->status?->isPotentialDelay());
 
         $this->hasReadinessIssue = $this->hasCheckpointOverdue || $this->hasPotentialDelay;
     }
@@ -215,6 +214,37 @@ final class VoyageOperationalState
     // Convenience
     // ═════════════════════════════════════════════════════════════════
 
+
+    public function hasCriticalIssues(): bool
+    {
+        return count($this->criticalIssues) > 0;
+    }
+
+    public function hasWarningIssues(): bool
+    {
+        return count($this->warningIssues) > 0;
+    }
+
+    public function hasAnyIssues(): bool
+    {
+        return $this->hasCriticalIssues() || $this->hasWarningIssues();
+    }
+
+    public function hasReadinessIssues(): bool
+    {
+        return $this->hasReadinessIssue;
+    }
+
+    public function hasEtaRisk(): bool
+    {
+        return $this->hasSailingRisk;
+    }
+
+    public function hasMilestoneIssues(): bool
+    {
+        return $this->hasMilestoneOverdue;
+    }
+
     public function kpiOk(string $kpi): bool
     {
         return match ($kpi) {
@@ -263,19 +293,119 @@ final class VoyageOperationalState
         return $this->voyage->delay_label;
     }
 
-    public function hasCriticalIssues(): bool
+    // ═════════════════════════════════════════════════════════════════
+    // Display convenience methods
+    // ═════════════════════════════════════════════════════════════════
+    // WHY: Previously, Blade computed badge labels, severity display
+    // strings, and issue descriptors inline — duplicating Tailwind
+    // classes and conditional logic across multiple templates.  These
+    // methods give Blade a single source of truth for WHAT to show,
+    // while OperationalUi controls HOW to show it.
+
+    public function delayOverdueDays(): ?int
     {
-        return count($this->criticalIssues) > 0;
+        if ($this->status === VoyageOperationalStatus::DELAYED && $this->voyage->overdue_days > 0) {
+            return $this->voyage->overdue_days;
+        }
+        return null;
     }
 
-    public function hasWarningIssues(): bool
+    public function sailingDayLabel(): ?string
     {
-        return count($this->warningIssues) > 0;
+        if ($this->sailingDays !== null) {
+            return "Berlayar hari ke-{$this->sailingDays}";
+        }
+        return null;
     }
 
-    public function hasIssues(): bool
+    public function etaStatusLabel(): ?string
     {
-        return $this->hasCriticalIssues()
-            || $this->hasWarningIssues();
+        if ($this->hasEtaOverdue) {
+            return 'ETA TERLEWATI';
+        }
+        if ($this->hasSailingRisk) {
+            return 'RISIKO ETA < 24 JAM';
+        }
+        return null;
+    }
+
+    public function etaStatusSeverity(): ?string
+    {
+        if ($this->hasEtaOverdue) {
+            return 'critical';
+        }
+        if ($this->hasSailingRisk) {
+            return 'warning';
+        }
+        return null;
+    }
+
+    public function readinessIssueLabel(): ?string
+    {
+        if ($this->hasReadinessIssue) {
+            return 'MASALAH KESIAPAN';
+        }
+        return null;
+    }
+
+    public function daysUntilEtdLabel(): ?string
+    {
+        if ($this->daysUntilEtd === null) {
+            return null;
+        }
+        if ($this->daysUntilEtd === 0) {
+            return 'ETD HARI INI';
+        }
+        if ($this->daysUntilEtd <= 2) {
+            return "ETD {$this->daysUntilEtd} HARI LAGI";
+        }
+        return null;
+    }
+
+    public function milestoneOverdueLabel(): ?string
+    {
+        if ($this->milestoneOverdueCount > 0) {
+            return "{$this->milestoneOverdueCount} MILESTONE LEWAT";
+        }
+        if ($this->milestoneDueTodayCount > 0) {
+            return "{$this->milestoneDueTodayCount} MILESTONE HARI INI";
+        }
+        return null;
+    }
+
+    public function milestoneSeverity(): ?string
+    {
+        if ($this->milestoneOverdueCount > 0) {
+            return 'danger';
+        }
+        if ($this->milestoneDueTodayCount > 0) {
+            return 'warning';
+        }
+        return null;
+    }
+
+    public function hasOverdueCheckpoints(): bool
+    {
+        return $this->hasCheckpointOverdue;
+    }
+
+    public function isSailing(): bool
+    {
+        return $this->status === VoyageOperationalStatus::SAILING;
+    }
+
+    public function isDelayed(): bool
+    {
+        return $this->status === VoyageOperationalStatus::DELAYED;
+    }
+
+    public function isScheduled(): bool
+    {
+        return $this->status === VoyageOperationalStatus::SCHEDULED;
+    }
+
+    public function isCompleted(): bool
+    {
+        return $this->status === VoyageOperationalStatus::COMPLETED;
     }
 }

@@ -7,6 +7,7 @@ use App\Models\EquipmentCheck;
 use App\Models\LoadingFinding;
 use App\Models\LoadingSession;
 use App\Models\RackContainerCheck;
+use App\Models\StockApdCheck;
 use App\Models\UnitCheck;
 
 return [
@@ -38,39 +39,115 @@ return [
     'tables' => [
 
         // ── Briefing (sebelum loading) ──────────────────────────
-        'briefing_sessions' => [
-            'appsheet_table' => 'Briefing Sessions',
+        'mp_check' => [
+            'appsheet_table' => 'mp_check',
+
             'model' => \App\Models\BriefingSession::class,
+
             'primary_key' => ['date', 'depot_id'],
+
             'fields' => [
+
+                // session
                 'date' => 'Tanggal',
                 'depot_id' => 'Depot ID',
                 'coordinator_user_id' => 'Koordinator ID',
-                'notes' => 'Catatan',
-                'summary_headcount' => 'Jumlah MP Dibutuhkan',
-                'summary_solution' => 'Solusi Kekurangan',
+
+                // briefing
+                'notes' => 'Catatan Operasional',
                 'briefing_evidence_path' => 'Foto Briefing',
+
+                // manpower
+                'summary_headcount' => 'Kebutuhan MP',
+                'summary_solution' => 'Solusi Kekurangan',
+
+                // backup MP
+                'backup_required' => 'Backup MP',
+                'backup_type' => 'Sumber Backup',
+                'backup_notes' => 'Catatan Backup',
+
+                // pending
+                'pending_activity' => 'Aktivitas Pending',
+                'pending_reason' => 'Alasan Pending',
+
+                // APD request
+                'apd_request_status' => 'Status Permintaan APD',
+                'apd_request_note' => 'Catatan Permintaan APD',
             ],
         ],
 
-        'briefing_attendances' => [
-            'appsheet_table' => 'Briefing Attendances',
-            'model' => BriefingAttendance::class,
+        'detail_mp_check' => [
+
+            'appsheet_table' => 'detail_mp_check',
+
+            'model' => \App\Models\BriefingAttendance::class,
+
             'primary_key' => ['session_id', 'manpower_id'],
+
             'add_checked_by' => false,
+
             'fields' => [
+
+                // relation
                 'session_id' => 'Sesi ID',
                 'manpower_id' => 'MP ID',
+
+                // attendance
                 'attendance_status' => 'Status Kehadiran',
+
+                // health
                 'temperature' => 'Suhu',
                 'bp_systolic' => 'TD Sistolik',
                 'bp_diastolic' => 'TD Diastolik',
-                'health_complaint' => 'Keluhan Kesehatan',
+                'health_complaint' => 'Keluhan',
+
+                // fit
+                'fit_status' => 'Status Fit',
+
+                // recheck
+                'recheck_required' => 'Pemeriksaan Ulang',
+                'rest_started_at' => 'Waktu Istirahat',
+                'recheck_result' => 'Hasil Pemeriksaan Ulang',
+
+                // medical
+                'medical_action' => 'Tindakan Medis',
+
+                // APD
                 'has_ppe' => 'APD Lengkap',
-                'recheck_result' => 'Hasil Cek Ulang',
+                'personal_ppe_status' => 'Status APD Personal',
+
+                // notes
+                'remark' => 'Catatan',
+
+                // signature
+                'signature_path' => 'Tanda Tangan MP',
+            ],
+
+            'after_sync' => 'recalculate_briefing_session',
+        ],
+
+        'stok_apd_check' => [
+
+            'appsheet_table' => 'stok_apd_check',
+
+            'model' => \App\Models\StockApdCheck::class,
+
+            'primary_key' => ['session_id', 'ppe_type'],
+
+            'fields' => [
+
+                'session_id' => 'Sesi ID',
+
+                'ppe_type' => 'Jenis APD',
+
+                'stock_available' => 'Stok Tersedia',
+
+                'required_quantity' => 'Kebutuhan',
+
+                'status' => 'Status APD',
+
                 'remark' => 'Catatan',
             ],
-            'after_sync' => 'recalculate_briefing_session',
         ],
 
         'briefing_attendance_ppe_items' => [
@@ -231,4 +308,6 @@ return [
 
     // Timeout untuk API calls (dalam detik)
     'timeout' => 30,
+    
 ];
+

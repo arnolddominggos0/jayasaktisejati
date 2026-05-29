@@ -5,18 +5,11 @@
 <div class="space-y-6">
     @foreach($rows as $v)
         @php
-            $totalCp = $v->checkpoints->count();
-            $done = $v->checkpoints->whereNotNull('checked_at')->count();
-            $pending = $v->checkpoints->whereNull('checked_at')->count();
-            $overdue = $v->checkpoints->filter(fn($cp) =>
-                !$cp->checked_at && $cp->scheduled_at?->isPast()
-            )->count();
-
-            $status = $v->operational_status_enum;
-            $statusBadge = OperationalUi::operationalStatusLight($status);
+            $state = $v->operationalState;
+            $statusBadge = \App\Supports\OperationalUi::operationalStatusLight($state->status);
         @endphp
 
-        @if($totalCp > 0)
+        @if($state->milestoneTotalCount > 0)
         <div class="bg-white rounded-xl border p-4">
             <div class="flex justify-between items-center">
                 <div>
@@ -32,15 +25,15 @@
                 </div>
 
                 <div class="flex gap-3 text-xs">
-                    <x-operational.badge label="Total {{ $totalCp }}" color="bg-gray-100 text-gray-700 border-gray-200" size="xs" />
-                    @if($pending > 0)
-                        <x-operational.badge label="Menunggu {{ $pending }}" color="bg-orange-100 text-orange-700 border-orange-200" size="xs" />
+                    <x-operational.badge label="Total {{ $state->milestoneTotalCount }}" color="bg-gray-100 text-gray-700 border-gray-200" size="xs" />
+                    @if($state->milestoneTotalCount - $state->milestoneCompletedCount > 0)
+                        <x-operational.badge label="Menunggu {{ $state->milestoneTotalCount - $state->milestoneCompletedCount }}" color="bg-orange-100 text-orange-700 border-orange-200" size="xs" />
                     @endif
-                    @if($overdue > 0)
-                        <x-operational.badge label="Lewat {{ $overdue }}" color="bg-red-100 text-red-700 border-red-200" size="xs" />
+                    @if($state->milestoneOverdueCount > 0)
+                        <x-operational.badge label="Lewat {{ $state->milestoneOverdueCount }}" color="bg-red-100 text-red-700 border-red-200" size="xs" />
                     @endif
-                    @if($done > 0)
-                        <x-operational.badge label="OK {{ $done }}" color="bg-emerald-100 text-emerald-700 border-emerald-200" size="xs" />
+                    @if($state->milestoneCompletedCount > 0)
+                        <x-operational.badge label="OK {{ $state->milestoneCompletedCount }}" color="bg-emerald-100 text-emerald-700 border-emerald-200" size="xs" />
                     @endif
                 </div>
             </div>

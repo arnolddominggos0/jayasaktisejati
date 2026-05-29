@@ -1,4 +1,4 @@
-<x-filament-panels::page>
+﻿<x-filament-panels::page>
     <div class="space-y-5">
 
         {{-- ═══════════════════════════════════════════════════════════════ --}}
@@ -8,7 +8,8 @@
             <div class="flex items-baseline gap-3">
                 <h1 class="text-lg font-bold text-gray-900 tracking-tight">Monitoring Kapal TAM</h1>
                 <span class="text-sm text-gray-400">—</span>
-                <p class="text-sm text-gray-500 font-medium">{{ \Illuminate\Support\Carbon::createFromFormat('Y-m', $period)->translatedFormat('F Y') }}</p>
+                <p class="text-sm text-gray-500 font-medium">
+                    {{ \Illuminate\Support\Carbon::createFromFormat('Y-m', $period)->translatedFormat('F Y') }}</p>
             </div>
 
             <div class="flex items-center gap-2">
@@ -30,63 +31,44 @@
         {{-- Critical dominant, informational secondary, KPI tertiary      --}}
         {{-- ═══════════════════════════════════════════════════════════════ --}}
         @php
-            $delayed = $rows->filter(
-                fn($v) => $v->operational_status_enum === \App\Enums\VoyageOperationalStatus::DELAYED,
-            );
-
-            $sailing = $rows->filter(
-                fn($v) => $v->operational_status_enum === \App\Enums\VoyageOperationalStatus::SAILING,
-            );
-
-            $completed = $rows->filter(
-                fn($v) => $v->operational_status_enum === \App\Enums\VoyageOperationalStatus::COMPLETED,
-            );
-
-            $scheduled = $rows->filter(
-                fn($v) => $v->operational_status_enum === \App\Enums\VoyageOperationalStatus::SCHEDULED,
-            );
-
-            $total = $rows->count();
-            $otdOk = $rows->filter(fn($v) => $v->otd_status?->value === 'ontime')->count();
-            $otaOk = $rows->filter(fn($v) => $v->ota_status?->value === 'ontime')->count();
-            $overdueCount = $rows->sum(fn($v) => $v->milestones->where('is_overdue', true)->count());
+            $kpi = \App\Services\Operational\VoyageOperationalSnapshot::kpiSummary($rows);
         @endphp
 
         <div class="flex items-center gap-2 flex-wrap">
-            @if ($delayed->count())
+            @if ($kpi['delayed_count'])
                 <div class="bg-red-50 border border-red-200 rounded px-2.5 py-1.5 shadow-sm">
                     <span class="text-[10px] text-red-700 font-bold uppercase tracking-wider">Delay</span>
-                    <span class="ml-1.5 text-base font-bold text-red-800">{{ $delayed->count() }}</span>
+                    <span class="ml-1.5 text-base font-bold text-red-800">{{ $kpi['delayed_count'] }}</span>
                 </div>
             @endif
 
-            @if ($sailing->count())
+            @if ($kpi['sailing_count'])
                 <div class="bg-blue-50/50 border border-blue-200/50 rounded px-2.5 py-1.5">
                     <span class="text-[10px] text-blue-700 font-semibold uppercase tracking-wider">Berlayar</span>
-                    <span class="ml-1.5 text-base font-bold text-blue-800">{{ $sailing->count() }}</span>
+                    <span class="ml-1.5 text-base font-bold text-blue-800">{{ $kpi['sailing_count'] }}</span>
                 </div>
             @endif
 
-            @if ($completed->count())
+            @if ($kpi['completed_count'])
                 <div class="bg-gray-50/60 border border-gray-200/60 rounded px-2.5 py-1.5">
                     <span class="text-[10px] text-gray-600 font-semibold uppercase tracking-wider">Selesai</span>
-                    <span class="ml-1.5 text-base font-bold text-gray-700">{{ $completed->count() }}</span>
+                    <span class="ml-1.5 text-base font-bold text-gray-700">{{ $kpi['completed_count'] }}</span>
                 </div>
             @endif
 
-            @if ($scheduled->count())
+            @if ($kpi['scheduled_count'])
                 <div class="bg-white border border-gray-200/50 rounded px-2.5 py-1.5">
                     <span class="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Terjadwal</span>
-                    <span class="ml-1.5 text-base font-bold text-gray-600">{{ $scheduled->count() }}</span>
+                    <span class="ml-1.5 text-base font-bold text-gray-600">{{ $kpi['scheduled_count'] }}</span>
                 </div>
             @endif
 
             <div class="w-px h-6 bg-gray-200 mx-0.5"></div>
 
-            @if ($overdueCount)
+            @if ($kpi['overdue_count'])
                 <div class="bg-orange-50 border border-orange-200 rounded px-2.5 py-1.5 shadow-sm">
                     <span class="text-[10px] text-orange-700 font-bold uppercase tracking-wider">Lewat</span>
-                    <span class="ml-1.5 text-base font-bold text-orange-800">{{ $overdueCount }}</span>
+                    <span class="ml-1.5 text-base font-bold text-orange-800">{{ $kpi['overdue_count'] }}</span>
                 </div>
             @endif
 
@@ -94,12 +76,12 @@
 
             <div class="bg-white border border-gray-200/50 rounded px-2.5 py-1.5">
                 <span class="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">OTD</span>
-                <span class="ml-1.5 text-base font-bold text-gray-700">{{ $total > 0 ? round(($otdOk / $total) * 100) : 0 }}%</span>
+                <span class="ml-1.5 text-base font-bold text-gray-700">{{ $kpi['otd_percent'] }}%</span>
             </div>
 
             <div class="bg-white border border-gray-200/50 rounded px-2.5 py-1.5">
                 <span class="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">OTA</span>
-                <span class="ml-1.5 text-base font-bold text-gray-700">{{ $total > 0 ? round(($otaOk / $total) * 100) : 0 }}%</span>
+                <span class="ml-1.5 text-base font-bold text-gray-700">{{ $kpi['ota_percent'] }}%</span>
             </div>
         </div>
 
@@ -148,7 +130,8 @@
                         </div>
                         <div>
                             <div class="text-gray-500">Tanggal Milestone</div>
-                            <div class="font-semibold">{{ optional($selectedMilestone->milestone_date)->format('d M Y') }}</div>
+                            <div class="font-semibold">
+                                {{ optional($selectedMilestone->milestone_date)->format('d M Y') }}</div>
                         </div>
                     </div>
 
@@ -165,8 +148,7 @@
                         </div>
                         <div>
                             <div class="text-gray-500">Catatan Monitoring</div>
-                            <textarea wire:model="milestoneForm.note" rows="3"
-                                class="w-full rounded-lg border-gray-300 text-sm"></textarea>
+                            <textarea wire:model="milestoneForm.note" rows="3" class="w-full rounded-lg border-gray-300 text-sm"></textarea>
                         </div>
                     </div>
 
@@ -186,7 +168,8 @@
         {{-- INLINE OPERATIONAL MODAL                                      --}}
         {{-- ═══════════════════════════════════════════════════════════════ --}}
         @if ($showInlineModal)
-            <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" wire:click.self="closeInlineModal">
+            <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+                wire:click.self="closeInlineModal">
                 <div class="bg-white rounded-lg shadow-xl w-[340px] p-4">
 
                     {{-- Header --}}
@@ -194,7 +177,7 @@
                         <div>
                             <h3 class="text-sm font-semibold text-gray-800">
                                 @php
-                                    $modalTitle = match($inlineModalType) {
+                                    $modalTitle = match ($inlineModalType) {
                                         'atb' => 'Mark ATB',
                                         'atd' => 'Mark ATD',
                                         'ata' => 'Mark ATA',
@@ -207,20 +190,25 @@
                                 {{ $modalTitle }}
                             </h3>
                             @php
-                                $modalVessel = $inlineModalVoyageId ? \App\Models\Voyage::find($inlineModalVoyageId)?->vessel?->name : null;
+                                $modalVessel = $inlineModalVoyageId
+                                    ? \App\Models\Voyage::find($inlineModalVoyageId)?->vessel?->name
+                                    : null;
                             @endphp
                             @if ($modalVessel)
                                 <p class="text-[10px] text-gray-400">{{ $modalVessel }}</p>
                             @endif
                         </div>
-                        <button wire:click="closeInlineModal" class="text-gray-400 hover:text-gray-600 text-xs">✕</button>
+                        <button wire:click="closeInlineModal"
+                            class="text-gray-400 hover:text-gray-600 text-xs">✕</button>
                     </div>
 
                     {{-- Body --}}
                     <div class="space-y-3">
                         @if (in_array($inlineModalType, ['atb', 'atd', 'ata', 'closing']))
                             <div>
-                                <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Tanggal & Waktu</label>
+                                <label
+                                    class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Tanggal
+                                    & Waktu</label>
                                 <input type="datetime-local" wire:model="inlineForm.datetime"
                                     class="w-full rounded border-gray-200 text-xs py-1.5 px-2 focus:ring-0 focus:border-gray-300">
                             </div>
@@ -228,7 +216,8 @@
 
                         @if ($inlineModalType === 'vessel_check')
                             <div>
-                                <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Status</label>
+                                <label
+                                    class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Status</label>
                                 <select wire:model="inlineForm.status"
                                     class="w-full rounded border-gray-200 text-xs py-1.5 px-2 focus:ring-0 focus:border-gray-300">
                                     <option value="on_schedule">On Schedule</option>
@@ -245,7 +234,8 @@
 
                         @if (in_array($inlineModalType, ['atb', 'atd', 'ata', 'closing', 'vessel_check']))
                             <div>
-                                <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Catatan</label>
+                                <label
+                                    class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">Catatan</label>
                                 <textarea wire:model="inlineForm.note" rows="2"
                                     class="w-full rounded border-gray-200 text-xs py-1.5 px-2 focus:ring-0 focus:border-gray-300 resize-none"
                                     placeholder="Catatan operasional opsional..."></textarea>
@@ -255,11 +245,15 @@
 
                     {{-- Footer --}}
                     <div class="mt-4 flex justify-end gap-2">
-                            <button wire:click="closeInlineModal"
+                        <button wire:click="closeInlineModal"
                             class="px-3 py-1.5 border border-gray-200 rounded text-[11px] text-gray-600 hover:bg-gray-50 transition">Batal</button>
                         <button wire:click="saveInlineModal"
                             class="px-3 py-1.5 bg-gray-900 text-white rounded text-[11px] hover:bg-gray-800 transition">
-                            @if ($inlineModalType === 'delay_case') Create Case @else Save @endif
+                            @if ($inlineModalType === 'delay_case')
+                                Create Case
+                            @else
+                                Save
+                            @endif
                         </button>
                     </div>
 

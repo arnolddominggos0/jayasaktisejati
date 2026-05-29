@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Supports;
 
 use App\Enums\SlaStatus;
+use App\Enums\VesselCheckLogStatus;
 use App\Enums\VoyageOperationalStatus;
 use App\Models\VoyageCheckpoint;
 use App\Models\VoyageMilestone;
@@ -242,5 +243,109 @@ final class OperationalUi
             str_contains($action, 'Input')     => 'text-blue-700 bg-blue-50 border-blue-200',
             default                            => 'text-gray-600 bg-gray-50 border-gray-200',
         };
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // Operational section heading
+    // ═════════════════════════════════════════════════════════════════
+    // WHY: Section headings with colored dots were duplicated across
+    // tam-monitoring-table with hardcoded Tailwind classes.  Now
+    // centralized here for consistent dot+label styling.
+
+    public static function sectionHeading(string $label, string $severity): string
+    {
+        $dot = match ($severity) {
+            'critical' => 'bg-red-600',
+            'warning'  => 'bg-orange-500',
+            'info'     => 'bg-blue-600',
+            'caution'  => 'bg-amber-500',
+            'normal'   => 'bg-gray-400',
+            'success'  => 'bg-emerald-600',
+            default    => 'bg-gray-400',
+        };
+
+        $text = match ($severity) {
+            'critical' => 'text-red-700',
+            'warning'  => 'text-orange-700',
+            'info'     => 'text-blue-700',
+            'caution'  => 'text-amber-700',
+            'normal'   => 'text-gray-600',
+            'success'  => 'text-emerald-700',
+            default    => 'text-gray-600',
+        };
+
+        return sprintf(
+            '<span class="w-2.5 h-2.5 rounded-full %s"></span><h2 class="font-bold %s uppercase text-sm tracking-wide">%s</h2>',
+            $dot,
+            $text,
+            e($label)
+        );
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // Vessel check display (replaces inline status comparison in Blade)
+    // ═════════════════════════════════════════════════════════════════
+    // WHY: view-voyage.blade.php was comparing $vc->status?->value === 'on_schedule'
+    // inline.  Now uses isOnSchedule() and gets canonical display.
+
+    public static function vesselCheckStatusLabel(object $vc): array
+    {
+        $status = $vc->status ?? null;
+
+        if ($status instanceof \App\Enums\VesselCheckLogStatus) {
+            $ok = $status->isOnSchedule();
+        } else {
+            $ok = $status?->value === 'on_schedule';
+        }
+
+        return [
+            'label' => $ok ? 'OK' : 'Delay',
+            'class' => $ok ? 'text-emerald-600' : 'text-red-600',
+        ];
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // SlaStatus badge for timeline reuse (replaces inline logic)
+    // ═════════════════════════════════════════════════════════════════
+
+    public static function slaStatusDisplay(?SlaStatus $status): array
+    {
+        if (!$status) {
+            return ['icon' => '·', 'color' => 'text-gray-400', 'priority' => 2];
+        }
+
+        return match ($status) {
+            SlaStatus::ONTIME => ['icon' => '✓', 'color' => 'text-green-600', 'priority' => 1],
+            SlaStatus::LATE   => ['icon' => '✗', 'color' => 'text-red-600', 'priority' => 3],
+            SlaStatus::RISK   => ['icon' => '⚠', 'color' => 'text-orange-600', 'priority' => 3],
+        };
+    }
+
+    // ═════════════════════════════════════════════════════════════════
+    // Vessel check timeline display (replaces inline match in Blade)
+    // ═════════════════════════════════════════════════════════════════
+
+    public static function vesselCheckTimelineState(object $vc): array
+    {
+        $status = $vc->status ?? null;
+
+        if ($status instanceof \App\Enums\VesselCheckLogStatus) {
+            $st = $status->isOnSchedule()
+                ? ['✓', 'text-green-600', 1]
+                : ['!', 'text-orange-600', 3];
+        } else {
+            $value = $status?->value;
+            $st = match ($value) {
+                'on_schedule'     => ['✓', 'text-green-600', 1],
+                'potential_delay' => ['!', 'text-orange-600', 3],
+                default           => ['·', 'text-gray-400', 2],
+            };
+        }
+
+        return [
+            'state'     => $st[0],
+            'color'     => $st[1],
+            'priority'  => $st[2],
+        ];
     }
 }

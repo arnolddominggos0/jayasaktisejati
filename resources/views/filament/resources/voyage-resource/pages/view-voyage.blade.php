@@ -134,6 +134,7 @@ $headerBorder = OperationalUi::severityBorder($state->severity);
             <div class="grid grid-cols-2 gap-3">
                 @forelse ($v->vesselChecks as $vc)
                 @php
+                $vcDisplay = OperationalUi::vesselCheckStatusLabel($vc);
                 $ok = data_get($vc, 'status.value') === 'on_schedule';  
                 @endphp
 
@@ -149,8 +150,8 @@ $headerBorder = OperationalUi::severityBorder($state->severity);
                             </div>
                         </div>
 
-                        <div class="{{ $ok ? 'text-emerald-600' : 'text-red-600' }} font-bold text-sm">
-                            {{ $ok ? 'OK' : 'Delay' }}
+                        <div class="{{ $vcDisplay['class'] }} font-bold text-sm">
+                            {{ $vcDisplay['label'] }}
                         </div>
                     </div>
 

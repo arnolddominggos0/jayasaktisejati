@@ -22,4 +22,14 @@ enum VesselCheckLogStatus: string
             self::POTENTIAL_DELAY => 'warning',
         };
     }
+
+    public function isPotentialDelay(): bool
+    {
+        return $this === self::POTENTIAL_DELAY;
+    }
+
+    public function isOnSchedule(): bool
+    {
+        return $this === self::ON_SCHEDULE;
+    }
 }

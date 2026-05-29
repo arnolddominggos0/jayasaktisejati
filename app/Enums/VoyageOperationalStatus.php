@@ -28,4 +28,19 @@ enum VoyageOperationalStatus: string
             self::COMPLETED => 'bg-green-600 text-white',
         };
     }
+
+    public function canTransitionTo(self $target): bool
+    {
+        return match ($this) {
+            self::SCHEDULED => in_array($target, [self::SAILING, self::DELAYED], true),
+            self::SAILING  => in_array($target, [self::COMPLETED, self::DELAYED], true),
+            self::DELAYED  => in_array($target, [self::SAILING, self::COMPLETED], true),
+            self::COMPLETED => false,
+        };
+    }
+
+    public function isActive(): bool
+    {
+        return in_array($this, [self::SCHEDULED, self::SAILING, self::DELAYED], true);
+    }
 }

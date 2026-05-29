@@ -152,7 +152,7 @@ class VesselCheckResource extends Resource
                                 ?? VesselCheckLogStatus::ON_SCHEDULE;
                         }
 
-                        if ($status !== VesselCheckLogStatus::POTENTIAL_DELAY) {
+                        if (! $status->isPotentialDelay()) {
                             \Filament\Notifications\Notification::make()
                                 ->title('Tidak dapat membuat tindak lanjut')
                                 ->body('Tindak lanjut hanya dapat dibuat dari status Potential Delay.')
