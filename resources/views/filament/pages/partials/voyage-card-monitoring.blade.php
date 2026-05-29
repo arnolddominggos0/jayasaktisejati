@@ -1,6 +1,8 @@
 ﻿@php
+    use App\Supports\OperationalUi;
+
     $state = $v->operationalState;
-    $border = \App\Supports\OperationalUi::severityBorder($state->severity);
+    $border = OperationalUi::severityBorder($state->severity);
 @endphp
 
 
@@ -110,7 +112,8 @@
     <div class="grid grid-cols-6 gap-3 mt-4 text-xs">
 
         @foreach ($v->milestones->sortBy(fn($m) => (int) str_replace('d', '', $m->code)) as $m)
-            @php $chip = \App\Supports\OperationalUi::milestoneChip($m); @endphp
+            @php
+                            $chip = OperationalUi::milestoneChip($m); @endphp
 
             <button wire:click="showMilestone({{ $m->id }})"
                 class="rounded-md py-2 text-center font-semibold {{ $chip['class'] }} hover:scale-105 transition">

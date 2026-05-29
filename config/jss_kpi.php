@@ -11,6 +11,7 @@ return [
                 'normal' => 19,
                 'urgent' => 18,
             ],
+            'etd_gap_max' => 6,
         ],
     ],
 ];

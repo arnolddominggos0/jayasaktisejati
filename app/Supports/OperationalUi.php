@@ -202,6 +202,38 @@ final class OperationalUi
     // Next-action badge (matrix view)
     // ═════════════════════════════════════════════════════════════════
 
+    public static function readinessDot(?object $d1, ?object $h1): array
+    {
+        $d1State = 'neutral';
+        if ($d1) {
+            $d1State = $d1->is_completed ? 'done' : ($d1->is_late || $d1->scheduled_at?->isPast() ? 'overdue' : 'pending');
+        }
+
+        $h1State = 'neutral';
+        if ($h1) {
+            $h1State = match ($h1->status?->value) {
+                'on_schedule' => 'done',
+                'potential_delay' => 'overdue',
+                default => 'pending',
+            };
+        }
+
+        return [
+            'd1' => $d1State,
+            'h1' => $h1State,
+        ];
+    }
+
+    public static function readinessDotClasses(string $state): string
+    {
+        return match ($state) {
+            'done'    => 'bg-emerald-400',
+            'overdue' => 'bg-red-500',
+            'pending' => 'bg-orange-400',
+            default   => 'bg-gray-300',
+        };
+    }
+
     public static function nextActionClasses(string $action): string
     {
         return match (true) {

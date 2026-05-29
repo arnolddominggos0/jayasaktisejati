@@ -41,55 +41,21 @@ class VesselPlanResource extends Resource
 
                 TextColumn::make('items_count')
                     ->counts('items')
-                    ->label('Jumlah Jadwal'),
+                    ->label('Jadwal'),
 
-                TextColumn::make('kpi_total')
-                    ->label('Total KPI')
-                    ->getStateUsing(
-                        fn($record) =>
-                        $record?->kpi_total ? $record->kpi_total . ' hari' : '-'
-                    )
-                    ->color(fn($record) => $record?->sopStatus()['color'] ?? 'gray'),
-
-                TextColumn::make('draft_kpi_total')
-                    ->label('Draft KPI')
-                    ->suffix(' hari')
-                    ->toggleable(),
-
-                TextColumn::make('final_kpi_total')
-                    ->label('Final KPI')
-                    ->suffix(' hari')
-                    ->toggleable(),
-
-                TextColumn::make('kpi_deviation_label')
-                    ->label('Deviasi')
-                    ->badge()
-                    ->color(fn($record) => match (true) {
-                        is_null($record?->kpi_deviation) => 'gray',
-                        $record->kpi_deviation > 0 => 'danger',
-                        $record->kpi_deviation < 0 => 'success',
-                        default => 'warning',
-                    }),
-
-                TextColumn::make('kpi_breakdown')
-                    ->label('Dw/Sa/Dr')
+                TextColumn::make('avg_sailing')
+                    ->label('Avg Sailing')
                     ->getStateUsing(function ($record) {
-
                         if (!$record) return '-';
 
-                        $a = $record->analyze();
+                        $avg = $record->analyze()['sailing_avg'] ?? 0;
 
-                        $dw = $a['dwelling'] ?? 0;
-                        $sa = $a['sailing_avg'] ?? 0;
-                        $dr = $a['dooring'] ?? 0;
-
-                        return "{$dw} / {$sa} / {$dr}";
+                        return $avg ? $avg . ' hari' : '-';
                     }),
 
                 TextColumn::make('max_gap')
                     ->label('Max Gap')
                     ->getStateUsing(function ($record) {
-
                         if (!$record) return '-';
 
                         $gap = $record->analyze()['max_gap'] ?? 0;
@@ -112,20 +78,6 @@ class VesselPlanResource extends Resource
                         $record?->sopStatus()['color'] ?? 'gray'
                     )
                     ->tooltip(fn($record) => $record?->sopStatus()['reason'] ?? null),
-
-                TextColumn::make('status_kpi')
-                    ->label('Status KPI')
-                    ->badge()
-                    ->getStateUsing(fn($record) => ($record?->analyze()['kpi_ok'] ?? false) ? 'Sesuai' : 'Melebihi')
-                    ->color(fn($record) => ($record?->analyze()['kpi_ok'] ?? false) ? 'success' : 'danger')
-                    ->toggleable(isToggledHiddenByDefault: true),
-
-                TextColumn::make('status_gap')
-                    ->label('Status Gap')
-                    ->badge()
-                    ->getStateUsing(fn($record) => ($record?->analyze()['gap_ok'] ?? false) ? 'Sesuai' : 'Melebihi')
-                    ->color(fn($record) => ($record?->analyze()['gap_ok'] ?? false) ? 'success' : 'danger')
-                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('feedback_reason')
                     ->label('Alasan Revisi')

@@ -27,7 +27,7 @@ class VesselPlanFinalizationService
             $plan->snapshots()->create([
                 'stage' => VesselPlan::SNAPSHOT_STAGE_FINAL,
                 'schedule_payload' => $plan->buildScheduleSnapshot(),
-                'kpi_payload' => $plan->buildKpiSnapshot($analysis),
+                'kpi_payload' => $plan->buildSopSnapshot($analysis),
                 'created_by' => $userId,
             ]);
 
@@ -40,7 +40,7 @@ class VesselPlanFinalizationService
 
             $plan->update([
                 'status' => VesselPlanStatus::Final,
-                'final_kpi_total' => $analysis['total'],
+                'final_kpi_total' => round($analysis['sailing_avg'] ?? 0),
                 'approved_at' => now(),
                 'approved_by' => $userId,
                 'finalized_at' => now(),
@@ -53,7 +53,7 @@ class VesselPlanFinalizationService
                 'Final schedule disetujui dan vessel plan difinalisasi.',
                 [
                     'status' => VesselPlanStatus::Final->value,
-                    'final_kpi_total' => $analysis['total'],
+                    'sailing_avg' => $analysis['sailing_avg'] ?? 0,
                     'voyage_count' => $count,
                 ]
             );

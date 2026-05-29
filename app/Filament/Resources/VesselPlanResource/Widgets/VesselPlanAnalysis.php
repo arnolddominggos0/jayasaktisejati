@@ -23,26 +23,21 @@ class VesselPlanAnalysis extends Widget
         $analysis = $this->record->analyze();
         $draftSnapshot = $this->record->draftSnapshot();
         $finalSnapshot = $this->record->finalSnapshot();
-        $draftKpi = $draftSnapshot?->kpi_payload ?? null;
-        $finalKpi = $finalSnapshot?->kpi_payload ?? null;
+        $draftPayload = $draftSnapshot?->kpi_payload ?? null;
+        $finalPayload = $finalSnapshot?->kpi_payload ?? null;
         $sop = $this->record->sopStatus();
         $draftPanel = $this->getDraftPanelMeta();
         $finalPanel = $this->getFinalPanelMeta();
 
         return [
             'total'    => $analysis['schedule_count'] ?? 0,
-            'dwelling' => $analysis['dwelling'] ?? 0,
             'sailingAvg' => $analysis['sailing_avg'] ?? 0,
-            'dooring' => $analysis['dooring'] ?? 0,
-            'totalKpi' => $analysis['total'] ?? 0,
-            'kpiLimit' => $analysis['limit'] ?? 0,
             'maxGap'   => $analysis['max_gap'] ?? 0,
             'idealGap' => $analysis['gap_limit'] ?? 6,
-            'kpiOk' => $analysis['kpi_ok'] ?? false,
             'gapOk' => $analysis['gap_ok'] ?? false,
             'violations' => $analysis['violations'] ?? [],
-            'draftKpi' => $draftKpi,
-            'finalKpi' => $finalKpi,
+            'draftPayload' => $draftPayload,
+            'finalPayload' => $finalPayload,
             'draftPanelTitle' => $draftPanel['title'],
             'draftPanelCaption' => $draftPanel['caption'],
             'finalPanelTitle' => $finalPanel['title'],

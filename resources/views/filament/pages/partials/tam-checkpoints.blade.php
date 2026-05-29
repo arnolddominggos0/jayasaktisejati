@@ -1,3 +1,7 @@
+@php
+    use App\Supports\OperationalUi;
+@endphp
+
 <div class="space-y-6">
     @foreach($rows as $v)
         @php
@@ -9,7 +13,7 @@
             )->count();
 
             $status = $v->operational_status_enum;
-            $statusBadge = \App\Supports\OperationalUi::operationalStatusLight($status);
+            $statusBadge = OperationalUi::operationalStatusLight($status);
         @endphp
 
         @if($totalCp > 0)

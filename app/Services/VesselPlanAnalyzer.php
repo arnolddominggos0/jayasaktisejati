@@ -12,61 +12,41 @@ class VesselPlanAnalyzer
 
         if ($items->isEmpty()) {
             return [
-                'dwelling' => 0,
                 'sailing_avg' => 0,
-                'dooring' => 0,
-                'total' => 0,
-                'limit' => 0,
                 'max_gap' => 0,
                 'gaps' => [],
                 'schedule_count' => 0,
-                'kpi_ok' => false,
                 'gap_ok' => false,
+                'gap_limit' => 6,
                 'violations' => ['Belum ada jadwal kapal.'],
                 'ok' => false,
             ];
         }
 
-        $dwelling = config('jss_kpi.manado.thresholds.dwelling_days', 6);
-        $dooring  = config('jss_kpi.manado.thresholds.dooring_days', 3);
-        $limit    = config('jss_kpi.manado.thresholds.total_days.normal', 19);
-
         $avgSailing = $items->map(fn($i) => $i->planned_sailing_days)
             ->filter()
             ->avg() ?? 0;
 
-        $total = $dwelling + $avgSailing + $dooring;
-
         $gapData = $this->calculateEtdGaps($items);
         $maxGap = $gapData['max_gap'];
 
-        $kpiOk = $total <= $limit;
-        $gapLimit = 6;
+        $gapLimit = config('jss_kpi.manado.thresholds.etd_gap_max', 6);
         $gapOk = $maxGap <= $gapLimit;
-        $ok = $kpiOk && $gapOk;
 
         $violations = [];
-        if (! $kpiOk) {
-            $violations[] = 'Total KPI ' . round($total, 2) . ' hari melebihi batas ' . $limit . ' hari.';
-        }
         if (! $gapOk) {
             $violations[] = 'Max ETD Gap ' . $maxGap . ' hari melebihi batas ' . $gapLimit . ' hari.';
         }
 
         return [
-            'dwelling'    => $dwelling,
             'sailing_avg' => round($avgSailing, 2),
-            'dooring'     => $dooring,
-            'total'       => round($total, 2),
-            'limit'       => $limit,
-            'max_gap'     => $maxGap,
-            'gaps'        => $gapData['gaps'],
+            'max_gap' => $maxGap,
+            'gaps' => $gapData['gaps'],
             'schedule_count' => $items->count(),
-            'kpi_ok' => $kpiOk,
             'gap_ok' => $gapOk,
             'gap_limit' => $gapLimit,
             'violations' => $violations,
-            'ok'          => $ok,
+            'ok' => $gapOk,
         ];
     }
 

@@ -1,16 +1,16 @@
 @php
-    use App\Supports\OperationalUi;
+use App\Supports\OperationalUi;
 
-    $v = $this->record;
+$v = $this->record;
 
-    if (!$v) {
-        echo '<div class="text-sm text-gray-500">Voyage tidak ditemukan.</div>';
-        return;
-    }
+if (!$v) {
+echo '<div class="text-sm text-gray-500">Voyage tidak ditemukan.</div>';
+return;
+}
 
-    $state = $v->operationalState;
-    $statusBadge = OperationalUi::operationalStatusLight($state->status);
-    $headerBorder = OperationalUi::severityBorder($state->severity);
+$state = $v->operationalState;
+$statusBadge = OperationalUi::operationalStatusLight($state->status);
+$headerBorder = OperationalUi::severityBorder($state->severity);
 @endphp
 
 <x-filament-panels::page>
@@ -134,7 +134,7 @@
             <div class="grid grid-cols-2 gap-3">
                 @forelse ($v->vesselChecks as $vc)
                 @php
-                $ok = $vc->status?->value === 'on_schedule';
+                $ok = data_get($vc, 'status.value') === 'on_schedule';  
                 @endphp
 
                 <div class="rounded-xl border border-gray-100 px-3 py-2">
@@ -154,9 +154,13 @@
                         </div>
                     </div>
 
-                    @if ($vc->note)
+                    @php
+                    $note = data_get($vc, 'note');
+                    @endphp
+
+                    @if ($note)
                     <div class="mt-1 text-[12px] text-gray-500">
-                        {{ $vc->note }}
+                        {{ $note }}
                     </div>
                     @endif
                 </div>

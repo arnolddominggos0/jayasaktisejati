@@ -10,7 +10,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             InitialSetupSeeder::class,
-            // May 2026 canonical operational seeding
+            // May2026VesselPlanDraftSeeder::class,
             May2026Seeder::class,
         ]);
     }

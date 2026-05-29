@@ -27,14 +27,14 @@ class VesselPlanSubmissionService
         $analysis = $plan->analyze();
 
         if (! ($analysis['ok'] ?? false)) {
-            throw new DomainException('KPI atau gap tidak sesuai SOP.');
+            throw new DomainException('Jadwal tidak memenuhi validasi SOP.');
         }
 
         return DB::transaction(function () use ($plan, $userId, $analysis) {
             $snapshot = $plan->snapshots()->create([
                 'stage' => VesselPlan::SNAPSHOT_STAGE_DRAFT,
                 'schedule_payload' => $plan->buildScheduleSnapshot(),
-                'kpi_payload' => $plan->buildKpiSnapshot($analysis),
+                'kpi_payload' => $plan->buildSopSnapshot($analysis),
                 'created_by' => $userId,
             ]);
 
@@ -42,7 +42,7 @@ class VesselPlanSubmissionService
                 'status' => VesselPlanStatus::Sent,
                 'sent_at' => now(),
                 'sent_by' => $userId,
-                'draft_kpi_total' => $analysis['total'],
+                'draft_kpi_total' => round($analysis['sailing_avg'] ?? 0),
             ]);
 
             $plan->logReviewAction(
@@ -51,7 +51,7 @@ class VesselPlanSubmissionService
                 'Draft vessel plan dikirim ke customer untuk review.',
                 [
                     'status' => VesselPlanStatus::Sent->value,
-                    'draft_kpi_total' => $analysis['total'],
+                    'sailing_avg' => $analysis['sailing_avg'] ?? 0,
                     'snapshot_id' => $snapshot->id,
                 ]
             );

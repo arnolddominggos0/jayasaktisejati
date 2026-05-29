@@ -5,7 +5,6 @@ namespace App\Filament\Resources\VesselPlanResource\Pages;
 use App\Enums\VesselPlanStatus;
 use App\Filament\Resources\VesselPlanResource;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanAnalysis;
-use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanDashboard;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanReviewHistory;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
@@ -18,10 +17,6 @@ class EditVesselPlan extends EditRecord
 
     protected function getHeaderWidgets(): array
     {
-        if ($this->record->isFinal()) {
-            return [VesselPlanDashboard::class, VesselPlanReviewHistory::class];
-        }
-
         return [VesselPlanAnalysis::class, VesselPlanReviewHistory::class];
     }
 
@@ -54,7 +49,7 @@ class EditVesselPlan extends EditRecord
 
                     Notification::make()
                         ->title('Draft Dikirim ke TAM')
-                        ->body('Snapshot draft dan KPI draft berhasil disimpan.')
+                        ->body('Snapshot draft berhasil disimpan.')
                         ->success()
                         ->send();
 

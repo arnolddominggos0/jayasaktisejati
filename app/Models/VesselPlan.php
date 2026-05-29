@@ -154,7 +154,7 @@ class VesselPlan extends Model
         return match ($this->status) {
             VesselPlanStatus::Final => $this->final_kpi_total,
             VesselPlanStatus::Sent  => $this->draft_kpi_total,
-            default => $this->analyze()['total'] ?? null,
+            default => $this->analyze()['sailing_avg'] ?? null,
         };
     }
 
@@ -203,7 +203,7 @@ class VesselPlan extends Model
     {
         return $this->status === VesselPlanStatus::Revision;
     }
-    
+
     public function isEditable(): bool
     {
         return $this->isDraft() || $this->isRevision();
@@ -237,17 +237,15 @@ class VesselPlan extends Model
             ->all();
     }
 
-    public function buildKpiSnapshot(?array $analysis = null): array
+    public function buildSopSnapshot(?array $analysis = null): array
     {
         $analysis ??= $this->analyze();
 
         return [
-            'dwelling' => $analysis['dwelling'] ?? 0,
             'sailing_avg' => $analysis['sailing_avg'] ?? 0,
-            'dooring' => $analysis['dooring'] ?? 0,
-            'total' => $analysis['total'] ?? 0,
-            'limit' => $analysis['limit'] ?? 0,
             'max_gap' => $analysis['max_gap'] ?? 0,
+            'gap_limit' => $analysis['gap_limit'] ?? 6,
+            'gap_ok' => $analysis['gap_ok'] ?? false,
             'schedule_count' => $analysis['schedule_count'] ?? $this->items()->count(),
             'ok' => $analysis['ok'] ?? false,
         ];
@@ -295,6 +293,9 @@ class VesselPlan extends Model
         $message = app(WhatsappMessageBuilder::class)->buildFullMessage($this);
         $normalizedPhone = preg_replace('/\D+/', '', $this->whatsapp_phone);
 
+        if (str_starts_with($normalizedPhone, '0')) {
+            $normalizedPhone = '62' . substr($normalizedPhone, 1);
+        }
         return 'https://wa.me/' . $normalizedPhone . '?text=' . rawurlencode($message);
     }
 
@@ -314,7 +315,7 @@ class VesselPlan extends Model
             return [
                 'label' => 'SESUAI SOP',
                 'color' => 'success',
-                'reason' => 'Total KPI dan ETD gap masih dalam batas SOP.',
+                'reason' => 'Jadwal dan ETD gap masih dalam batas SOP.',
             ];
         }
 
@@ -382,5 +383,4 @@ class VesselPlan extends Model
             ['status' => VesselPlanStatus::Revision->value]
         );
     }
-
 }

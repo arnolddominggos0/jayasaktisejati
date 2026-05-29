@@ -262,4 +262,20 @@ final class VoyageOperationalState
     {
         return $this->voyage->delay_label;
     }
+
+    public function hasCriticalIssues(): bool
+    {
+        return count($this->criticalIssues) > 0;
+    }
+
+    public function hasWarningIssues(): bool
+    {
+        return count($this->warningIssues) > 0;
+    }
+
+    public function hasIssues(): bool
+    {
+        return $this->hasCriticalIssues()
+            || $this->hasWarningIssues();
+    }
 }

@@ -536,4 +536,5 @@ class MonitoringKapalTam extends Page
         $this->showMilestoneModal = false;
         $this->loadData();
     }
+    
 }
