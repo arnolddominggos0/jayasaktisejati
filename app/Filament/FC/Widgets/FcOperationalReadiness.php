@@ -91,17 +91,29 @@ class FcOperationalReadiness extends Widget
         ];
     }
 
-    protected function getDepotId(): ?int
-    {
-        $user = Filament::auth()->user();
-        if (! $user) {
-            return null;
-        }
+   protected function getDepotId(): ?int
+   {
+   	 $user = Filament::auth()->user();
 
-        return app()->bound('scope.depot_id')
-            ? app('scope.depot_id')
-            : ($user->scope_unit_type === 'depot' ? $user->scope_unit_id : null);
+    	if (! $user) {
+            return null;
+   	 }
+
+    $depotId = app()->bound('scope.depot_id')
+        ? app('scope.depot_id')
+        : ($user->scope_unit_type === 'depot'
+            ? $user->scope_unit_id
+            : null);
+
+     if (! $depotId) {
+        $depotId = \App\Models\Depot::where(
+            'coordinator_user_id',
+            $user->id
+        )->value('id');
     }
+
+    return $depotId;
+   }
 
     protected function emptyData(): array
     {

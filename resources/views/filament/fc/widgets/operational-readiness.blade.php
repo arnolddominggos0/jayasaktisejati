@@ -36,7 +36,7 @@
         <div class="flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <x-heroicon-o-check-circle x-show="{{$state === 'ready'}}" class="h-8 w-8 text-white" />
-                <x-heroicon-o-exclamation-triangle x-show="{{$state === 'not_ready'}}" class="h-8 w-8 text-white" />
+                <x-heroicon-o-exclamation-triangle class="h-5 w-5 text-red-600 dark:text-red-400" />
                 <x-heroicon-o-clock x-show="{{$state === 'no_session'}}" class="h-8 w-8 text-white" />
                 <div>
                     <div class="text-lg font-bold text-white">{{ $bannerText }}</div>
