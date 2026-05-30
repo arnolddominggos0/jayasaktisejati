@@ -48,7 +48,10 @@
 
     {{-- SECTION 1: Operational Readiness --}}
     <div class="mb-6">
-        <x-filament-widgets::widget :widget="\App\Filament\FC\Widgets\FcOperationalReadiness::class" />
+        <x-filament-widgets::widgets
+            :widgets="[\App\Filament\FC\Widgets\FcOperationalReadiness::class]"
+            :columns="1"
+        />
     </div>
 
     {{-- SECTION 2: MP Roster --}}
@@ -58,7 +61,10 @@
             <span
                 class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Manpower</span>
         </div>
-        <x-filament-widgets::widget :widget="\App\Filament\FC\Widgets\FcTodayManpower::class" />
+        <x-filament-widgets::widgets
+            :widgets="[\App\Filament\FC\Widgets\FcTodayManpower::class]"
+            :columns="1"
+        />
     </div>
 
     {{-- SECTION 3: Shipment Monitoring --}}
@@ -69,8 +75,13 @@
                 class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Pengiriman</span>
         </div>
         <div class="space-y-4">
-            <x-filament-widgets::widget :widget="\App\Filament\FC\Widgets\FcKpiStats::class" />
-            <x-filament-widgets::widget :widget="\App\Filament\FC\Widgets\FcAttentionList::class" />
+            <x-filament-widgets::widgets
+                :widgets="[
+                    \App\Filament\FC\Widgets\FcKpiStats::class,
+                    \App\Filament\FC\Widgets\FcAttentionList::class,
+                ]"
+                :columns="1"
+            />
         </div>
     </div>
 
@@ -81,7 +92,12 @@
             <span
                 class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Aktivitas</span>
         </div>
-        <x-filament-widgets::widget :widget="\App\Filament\FC\Widgets\FcStatusChart::class" />
-        <x-filament-widgets::widget :widget="\App\Filament\FC\Widgets\FcRecentActivities::class" />
+        <x-filament-widgets::widgets
+            :widgets="[
+                \App\Filament\FC\Widgets\FcStatusChart::class,
+                \App\Filament\FC\Widgets\FcRecentActivities::class,
+            ]"
+            :columns="1"
+        />
     </div>
 </x-filament-panels::page>
