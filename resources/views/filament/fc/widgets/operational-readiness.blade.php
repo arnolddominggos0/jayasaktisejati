@@ -149,7 +149,7 @@
                 </div>
                 <div class="flex h-10 w-10 items-center justify-center rounded-lg {{ $d['apdKurang'] > 0 ? 'bg-red-100 dark:bg-red-900/30' : ($d['apdTotal'] > 0 ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-gray-100 dark:bg-gray-700') }}">
                     @if($d['apdKurang'] > 0)
-                        <x-heroicon-o-exclamation class="h-5 w-5 text-red-600 dark:text-red-400" />
+                        <x-heroicon-o-exclamation-circle class="h-5 w-5 text-red-600 dark:text-red-400" />
                     @elseif($d['apdTotal'] > 0)
                         <x-heroicon-o-shield-check class="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                     @else
