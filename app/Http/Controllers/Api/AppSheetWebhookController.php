@@ -24,12 +24,23 @@ class AppSheetWebhookController extends Controller
     public function handle(Request $request): JsonResponse
     {
         try {
+            $secret = config('appsheet.webhook_secret');
             $signature = $request->header('X-AppSheet-Signature');
-            if ($signature && ! $this->appSheetService->validateWebhookSignature($signature, $request->all())) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Invalid signature',
-                ], 401);
+
+            if (! empty($secret)) {
+                if (empty($signature)) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Missing webhook signature',
+                    ], 403);
+                }
+
+                if (! $this->appSheetService->validateWebhookSignature($signature, $request->all())) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Invalid signature',
+                    ], 401);
+                }
             }
 
             $data = $request->validate([

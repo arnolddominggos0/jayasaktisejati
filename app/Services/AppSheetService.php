@@ -392,58 +392,6 @@ class AppSheetService
         return $result;
     }
 
-    protected function evaluateMpCheckStatus(BriefingSession $session): void
-    {
-        $requiredHeadcount = $session->summary_headcount ?? 0;
-
-        $attendanceCount = $session->attendances()
-            ->where('attendance_status', 'present')
-            ->count();
-
-        $checklistIncomplete = $session->checklists()
-            ->where('status', '!=', 'ok')
-            ->exists();
-
-        $apdIssue = $session->attendances()
-            ->where('has_ppe', false)
-            ->exists();
-
-        $status = MPCheckStatus::Cleared;
-
-        // Tidak ada manpower sama sekali
-        if ($attendanceCount === 0) {
-            $status = MPCheckStatus::Draft;
-        }
-
-        // Masih proses checking
-        elseif ($attendanceCount < $requiredHeadcount) {
-            $status = MPCheckStatus::OnCheck;
-        }
-
-        // Ada issue operasional
-        elseif ($checklistIncomplete || $apdIssue) {
-            $status = MPCheckStatus::WaitingAction;
-        }
-
-        // Semua aman
-        else {
-            $status = MPCheckStatus::Cleared;
-        }
-
-        $session->update([
-            'mp_check_status' => $status,
-        ]);
-
-        Log::info('MP CHECK STATUS EVALUATED', [
-            'session_id' => $session->id,
-            'attendance_count' => $attendanceCount,
-            'required_headcount' => $requiredHeadcount,
-            'checklist_incomplete' => $checklistIncomplete,
-            'apd_issue' => $apdIssue,
-            'status' => $status->value,
-        ]);
-    }
-
     protected function syncLoadingSession(array $data, string $operation, ?int $submittedByUserId = null)
     {
         $mappedData = $this->mapFields('loading_sessions', $data, $submittedByUserId);
@@ -537,7 +485,8 @@ class AppSheetService
             if (array_key_exists($appSheetField, $data)) {
 
                 $mapped[$laravelField] = $this->normalizeValue(
-                    $data[$appSheetField]
+                    $data[$appSheetField],
+                    $laravelField
                 );
             }
         }
@@ -558,7 +507,7 @@ class AppSheetService
         return $mapped;
     }
 
-    protected function normalizeValue($value)
+    protected function normalizeValue($value, string $fieldName = '')
     {
         if (is_string($value)) {
             $lower = strtolower($value);
@@ -567,6 +516,10 @@ class AppSheetService
             }
             if ($lower === 'false') {
                 return false;
+            }
+
+            if ($fieldName === 'fit_status') {
+                return strtoupper(trim($value));
             }
         }
 
@@ -829,17 +782,17 @@ class AppSheetService
             return;
         }
 
-        $present = $session->attendances()
-            ->where('attendance_status', 'present')
+        $fit = $session->attendances()
+            ->where('fit_status', 'FIT')
             ->count();
 
         $target = (int) $session->summary_headcount;
-        $session->summary_sufficient = $target > 0 && $present >= $target;
+        $session->summary_sufficient = $target > 0 && $fit >= $target;
         $session->saveQuietly();
 
         if ($this->loggingEnabled) {
             Log::channel('appsheet')->info("Recalculated briefing session #{$sessionId}", [
-                'present' => $present,
+                'fit' => $fit,
                 'target' => $target,
                 'sufficient' => $session->summary_sufficient,
             ]);

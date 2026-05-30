@@ -148,12 +148,12 @@ class BriefingAttendance extends Model
                 return;
             }
 
-            $presentCount = $session->attendances()
-                ->where('attendance_status', 'present')
+            $fitCount = $session->attendances()
+                ->where('fit_status', 'FIT')
                 ->count();
 
             $session->summary_sufficient =
-                $presentCount >= $session->summary_headcount;
+                $session->summary_headcount > 0 && $fitCount >= $session->summary_headcount;
 
             $session->saveQuietly();
         });

@@ -117,12 +117,14 @@ class BriefingSession extends Model
 
     public function refreshSufficientFlag(): void
     {
-        $present = $this->presentAttendances()->count();
+        $fit = $this->attendances()
+            ->where('fit_status', 'FIT')
+            ->count();
 
         $target = (int) $this->summary_headcount;
 
         $this->summary_sufficient =
-            $target > 0 && $present >= $target;
+            $target > 0 && $fit >= $target;
 
         $this->saveQuietly();
     }
@@ -137,12 +139,14 @@ class BriefingSession extends Model
     {
         static::saving(function ($session) {
 
-            $present = $session->presentAttendances()->count();
+            $fit = $session->attendances()
+                ->where('fit_status', 'FIT')
+                ->count();
 
             $target = (int) $session->summary_headcount;
 
             $session->summary_sufficient =
-                $target > 0 && $present >= $target;
+                $target > 0 && $fit >= $target;
         });
     }
 }
