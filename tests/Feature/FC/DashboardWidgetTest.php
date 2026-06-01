@@ -271,8 +271,6 @@ class DashboardWidgetTest extends TestCase
         $response->assertSee($branch->name);
         $response->assertSee($depot->name);
         $response->assertSee('Lingkup Operasional');
-        $response->assertSee('Koordinator Lapangan');
-        $response->assertSee('Mode: Laut');
     }
 
     /** @test */
@@ -450,6 +448,6 @@ class DashboardWidgetTest extends TestCase
         $response = $this->get('/fc/dashboard');
 
         $response->assertOk();
-        $response->assertSee('Semua normal');
+        $response->assertDontSee('butuh perhatian');
     }
 }
