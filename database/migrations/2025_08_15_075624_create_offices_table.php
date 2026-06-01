@@ -1,17 +1,28 @@
 <?php
 
+
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+
 return new class extends Migration {
-    public function up(): void {
+    public function up(): void
+    {
         Schema::create('offices', function (Blueprint $table) {
             $table->id();
-            $table->string('name');           // Jakarta, Manado
-            $table->string('code')->unique(); // JKT, MDO
+            $table->string('code', 32)->unique();
+            $table->string('name');
+            $table->string('city')->nullable();
+            $table->string('address')->nullable();
+            $table->foreignId('branch_id')->constrained()->cascadeOnDelete();
             $table->timestamps();
         });
     }
-    public function down(): void { Schema::dropIfExists('offices'); }
+
+
+    public function down(): void
+    {
+        Schema::dropIfExists('offices');
+    }
 };

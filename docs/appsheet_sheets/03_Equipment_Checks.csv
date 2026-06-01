@@ -1,0 +1,3 @@
+ID,Loading_Session_ID,Pulley_Top_Status,Pulley_Bottom_Status,Mono_Rope_Condition,Chain_Strength,Bolt_Nut_Status,Bamboo_Condition,Ladder_Stability,Sponds_Cleanliness,Pulley_Safe,Mono_Rope_Safe,Chain_Safe,Bolt_Nut_Safe,Bamboo_Safe,Ladder_Safe,Sponds_Safe,Overall_Safe,Critical_Issues_Count,Warning_Issues_Count,Checked_By,Checked_At
+1,3,ok,ok,new,strong,tight,thick,stable,clean,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,0,0,12,2026-04-14 10:15:00
+2,4,ok,ok,new,strong,tight,thick,stable,clean,Yes,Yes,Yes,Yes,Yes,Yes,Yes,Yes,0,0,12,2026-04-13 09:15:00

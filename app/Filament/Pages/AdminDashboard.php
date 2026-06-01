@@ -1,0 +1,628 @@
+<?php
+
+namespace App\Filament\Pages;
+
+use App\Enums\ShipmentMode;
+use App\Enums\ShipmentStatus;
+use App\Enums\TrackStatus;
+use App\Models\Customer;
+use App\Models\Shipment;
+use App\Models\ShipmentTrack;
+use Filament\Forms;
+use Filament\Forms\Concerns\InteractsWithForms;
+use Filament\Forms\Contracts\HasForms;
+use Filament\Forms\Get;
+use Filament\Pages\Page;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+
+class AdminDashboard extends Page implements HasForms
+{
+    use InteractsWithForms;
+
+    protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
+    protected static ?string $navigationLabel = 'Dashboard';
+    protected static string $view = 'filament.pages.admin-dashboard';
+    protected static ?string $title = 'Dashboard';
+
+    public ?int $branchId = null;
+    public ?int $branch_id = null;
+    public ?string $mode = null;
+
+    public string $period = 'this_month';
+    public ?string $periodMonth = null;
+    public ?string $period_month = null;
+
+    public string $brandHex = '#0137A1';
+    public string $dashboardView = 'all';
+
+    public function mount(): void
+    {
+        $this->periodMonth = now()->format('Y-m');
+        $this->period_month = $this->periodMonth;
+        $this->branch_id = $this->branchId;
+
+        $this->form->fill([
+            'dashboardView' => 'all',
+            'branch_id'     => $this->branch_id,
+            'mode'          => null,
+            'period'        => 'this_month',
+            'period_month'  => $this->period_month,
+        ]);
+    }
+
+    protected function getFormSchema(): array
+    {
+        return [
+            Forms\Components\Grid::make()
+                ->columns(['default' => 1, 'sm' => 2, 'lg' => 5])
+                ->schema([
+                    Forms\Components\ToggleButtons::make('dashboardView')
+                        ->options(['all' => 'Dashboard Umum', 'tam' => 'Dashboard TAM'])
+                        ->inline()->default('all')->reactive()
+                        ->afterStateUpdated(fn($state) => $this->dashboardView = $state ?: 'all')
+                        ->hiddenLabel()->columnSpan(['default' => 2, 'lg' => 1]),
+
+                    Forms\Components\Select::make('period')
+                        ->label('Periode')
+                        ->options(['this_month' => 'Bulan ini', 'this_year' => 'Tahun ini', 'by_month' => 'Per bulan'])
+                        ->default('this_month')->reactive()
+                        ->afterStateUpdated(function ($state) {
+                            $this->period = $state ?: 'this_month';
+                            if ($this->period === 'by_month' && ! $this->periodMonth) {
+                                $this->periodMonth = now()->format('Y-m');
+                                $this->period_month = $this->periodMonth;
+                            }
+                        })->columnSpan(1),
+
+                    Forms\Components\Select::make('period_month')
+                        ->label('Bulan')
+                        ->options($this->getMonthOptions())
+                        ->default(now()->format('Y-m'))
+                        ->reactive()
+                        ->hidden(fn(Get $get) => $get('period') !== 'by_month')
+                        ->afterStateUpdated(function ($state) {
+                            $this->periodMonth = $state ?: now()->format('Y-m');
+                            $this->period_month = $this->periodMonth;
+                        })
+                        ->columnSpan(1),
+
+                    Forms\Components\Select::make('branch_id')
+                        ->label('Cabang')
+                        ->placeholder('Semua cabang')
+                        ->options($this->getBranchOptions())
+                        ->reactive()
+                        ->afterStateUpdated(function ($state) {
+                            $this->branchId = $state ?: null;
+                            $this->branch_id = $this->branchId;
+                        })
+                        ->columnSpan(1),
+
+                    Forms\Components\Select::make('mode')
+                        ->label('Moda')
+                        ->placeholder('Semua moda')
+                        ->options([ShipmentMode::Sea->value => 'Laut', ShipmentMode::Land->value => 'Darat'])
+                        ->reactive()
+                        ->afterStateUpdated(fn($state) => $this->mode = $state ?: null)
+                        ->columnSpan(1),
+                ]),
+        ];
+    }
+
+    protected function getMonthOptions(): array
+    {
+        $options = [];
+        for ($i = 0; $i < 12; $i++) {
+            $month = now()->copy()->subMonths($i)->startOfMonth();
+            $options[$month->format('Y-m')] = $month->translatedFormat('F Y');
+        }
+        return $options;
+    }
+
+    protected function getBranchOptions(): array
+    {
+        return DB::table('branches')->orderBy('name')->pluck('name', 'id')->toArray();
+    }
+
+    protected function parsePeriodMonth(): Carbon
+    {
+        if ($this->period === 'by_month' && $this->periodMonth) {
+            try {
+                return Carbon::createFromFormat('Y-m', $this->periodMonth)->startOfMonth();
+            } catch (\Throwable $e) {
+                return now()->startOfMonth();
+            }
+        }
+        return now()->startOfMonth();
+    }
+
+    protected function getPeriodRange(): array
+    {
+        if ($this->period === 'by_month' && $this->periodMonth) {
+            $base = Carbon::createFromFormat('Y-m', $this->periodMonth)->startOfMonth();
+            return [$base->copy()->startOfMonth(), $base->copy()->endOfMonth()];
+        }
+
+        if ($this->period === 'this_year') {
+            return [now()->startOfYear(), now()->endOfYear()];
+        }
+
+        return [now()->startOfMonth(), now()->endOfMonth()];
+    }
+
+    protected function applyFilters(Builder $q): Builder
+    {
+        return $q
+            ->when($this->branchId, fn($qq) => $qq->where('branch_id', $this->branchId))
+            ->when($this->mode, fn($qq) => $qq->where('mode', $this->mode));
+    }
+
+    protected function baseShipmentQuery(): Builder
+    {
+        return $this->applyFilters(Shipment::query());
+    }
+
+    protected function getConfigCustomerIds(): array
+    {
+        $cfg = config('jss_kpi.manado', []);
+        return array_map('intval', $cfg['customer_ids'] ?? []);
+    }
+
+
+    protected function tamBaseQuery(): Builder
+    {
+        $customerIds = $this->getConfigCustomerIds();
+        return $this->baseShipmentQuery()
+            ->when(! empty($customerIds), fn($qq) => $qq->whereIn('customer_id', $customerIds))
+            ->whereNotNull('delivered_at');
+    }
+
+    protected function tamPortStockBaseQuery(): Builder
+    {
+        $customerIds = $this->getConfigCustomerIds();
+
+        return $this->baseShipmentQuery()
+            ->when(! empty($customerIds), fn($qq) => $qq->whereIn('customer_id', $customerIds))
+            ->whereNull('delivered_at');
+    }
+
+
+    public function getTamPortStock(): array
+    {
+        [$start, $end] = $this->getPeriodRange();
+
+        $cacheKey = 'tam_port_stock_historical:' . md5(implode('|', [
+            $start->toIso8601String(),
+            $end->toIso8601String(),
+            $this->branchId ?: 'all',
+            $this->mode ?: 'all',
+        ]));
+
+        return Cache::remember($cacheKey, now()->addSeconds(30), function () use ($start, $end) {
+
+            $shipments = $this->baseShipmentQuery()
+                ->whereHas(
+                    'tracks',
+                    fn($q) =>
+                    $q->whereBetween('tracked_at', [$start, $end])
+                )
+                ->with([
+                    'tracks' => fn($q) =>
+                    $q->whereBetween('tracked_at', [$start, $end])
+                        ->orderBy('tracked_at', 'asc')
+                ])
+                ->get();
+
+            $items = [];
+            $total = 0;
+            $sumAge = 0;
+            $over3 = 0;
+
+            foreach ($shipments as $shipment) {
+                $tracks = $shipment->tracks;
+                if ($tracks->isEmpty()) continue;
+
+                $last = $tracks->last();
+
+                $lastStatus = $last->status instanceof \BackedEnum
+                    ? $last->status->value
+                    : (string) $last->status;
+
+                if (!in_array($lastStatus, [
+                    TrackStatus::DeliveryToPort->value,
+                    TrackStatus::Stacking->value,
+                ], true)) {
+                    continue;
+                }
+
+                $alreadyLoaded = $tracks->contains(fn($t) => in_array(
+                    $t->status instanceof \BackedEnum ? $t->status->value : (string) $t->status,
+                    [
+                        TrackStatus::UnitLoading->value,
+                        TrackStatus::OnShip->value,
+                        TrackStatus::VesselDepart->value,
+                    ],
+                    true
+                ));
+
+                if ($alreadyLoaded) continue;
+                if (! $last->tracked_at) continue;
+
+                $age = Carbon::parse($last->tracked_at)
+                    ->startOfDay()
+                    ->diffInDays($end->copy()->startOfDay());
+
+                $total++;
+                $sumAge += $age;
+                if ($age >= 3) $over3++;
+
+                $items[] = [
+                    'shipment_id' => $shipment->id,
+                    'code'        => $shipment->code,
+                    'route'       => $shipment->route_label,
+                    'status'      => $lastStatus,
+                    'age_days'    => $age,
+                    'stacking_at' => $last->tracked_at->toDateTimeString(),
+                ];
+            }
+
+            return [
+                'total'      => $total,
+                'avg_age'    => $total > 0 ? round($sumAge / $total, 1) : 0,
+                'over_three' => $over3,
+                'items'      => $items,
+            ];
+        });
+    }
+
+
+    public function getKpis(): array
+    {
+        [$start, $end] = $this->getPeriodRange();
+
+        $q = $this->baseShipmentQuery()
+            ->whereBetween('created_at', [$start, $end]);
+
+        $totalAktif = (clone $q)
+            ->whereNotIn('status', [
+                ShipmentStatus::Cancelled,
+                ShipmentStatus::Delivered
+            ])->count();
+
+        $pendingPickup = (clone $q)
+            ->whereIn('status', [
+                ShipmentStatus::Draft->value,
+                ShipmentStatus::Pending->value,
+                ShipmentStatus::Pickup->value
+            ])->count();
+
+        $aktivitasPeriode = ShipmentTrack::query()
+            ->when(
+                $this->branchId,
+                fn($qq) =>
+                $qq->whereHas(
+                    'shipment',
+                    fn($s) =>
+                    $s->where('branch_id', $this->branchId)
+                )
+            )
+            ->when(
+                $this->mode,
+                fn($qq) =>
+                $qq->whereHas(
+                    'shipment',
+                    fn($s) =>
+                    $s->where('mode', $this->mode)
+                )
+            )
+            ->whereBetween('tracked_at', [$start, $end])
+            ->count();
+
+        return [
+            'totalAktif'       => $totalAktif,
+            'pendingPickup'    => $pendingPickup,
+            'aktivitasHariIni' => $aktivitasPeriode,
+            'sparkline'        => $this->buildSparkline($start, $end),
+        ];
+    }
+
+    protected function buildSparkline(Carbon $start, Carbon $end): array
+    {
+        $days = min(14, $start->diffInDays($end));
+
+        return collect(range($days, 0))->map(function ($i) use ($end) {
+            $day = $end->copy()->subDays($i);
+
+            $count = ShipmentTrack::query()
+                ->when(
+                    $this->branchId,
+                    fn($qq) =>
+                    $qq->whereHas(
+                        'shipment',
+                        fn($s) =>
+                        $s->where('branch_id', $this->branchId)
+                    )
+                )
+                ->when(
+                    $this->mode,
+                    fn($qq) =>
+                    $qq->whereHas(
+                        'shipment',
+                        fn($s) =>
+                        $s->where('mode', $this->mode)
+                    )
+                )
+                ->whereDate('tracked_at', $day)
+                ->count();
+
+            return [
+                'label' => $day->format('d M'),
+                'value' => $count,
+            ];
+        })->values()->all();
+    }
+
+
+
+    public function getTrendSeries(): array
+    {
+        [$start, $end] = $this->getPeriodRange();
+
+        $labels = collect();
+        $series = collect();
+
+        if ($this->period === 'this_year') {
+            $cursor = $start->copy()->startOfMonth();
+            while ($cursor->lte($end)) {
+                $labels->push($cursor->format('M Y'));
+                $monthStart = $cursor->copy()->startOfMonth();
+                $monthEnd = $cursor->copy()->endOfMonth();
+                $series->push($this->baseShipmentQuery()->whereBetween('created_at', [$monthStart, $monthEnd])->count());
+                $cursor->addMonth();
+            }
+        } else {
+            $cursor = $start->copy();
+            while ($cursor->lte($end)) {
+                $labels->push($cursor->format('d M'));
+                $series->push($this->baseShipmentQuery()->whereDate('created_at', $cursor)->count());
+                $cursor->addDay();
+            }
+        }
+
+        return ['labels' => $labels->values()->all(), 'series' => $series->values()->all()];
+    }
+
+    public function getStatusDistribution(): array
+    {
+        [$start, $end] = $this->getPeriodRange();
+
+        $statuses = [ShipmentStatus::Draft, ShipmentStatus::Pending, ShipmentStatus::Pickup, ShipmentStatus::Transit, ShipmentStatus::Delivered, ShipmentStatus::Hold, ShipmentStatus::Cancelled];
+
+        $labels = [];
+        $values = [];
+        foreach ($statuses as $st) {
+            $labels[] = $st->label();
+            $values[] = $this->baseShipmentQuery()->whereBetween('created_at', [$start, $end])->where('status', $st)->count();
+        }
+
+        return ['labels' => $labels, 'values' => $values];
+    }
+
+    public function getTopCustomers(): array
+    {
+        [$start, $end] = $this->getPeriodRange();
+
+        $rows = Customer::query()
+            ->select(['customers.id', 'customers.name'])
+            ->selectRaw('COUNT(shipments.id) as total')
+            ->leftJoin('shipments', 'shipments.customer_id', '=', 'customers.id')
+            ->when($this->branchId, fn($qq) => $qq->where('shipments.branch_id', $this->branchId))
+            ->when($this->mode, fn($qq) => $qq->where('shipments.mode', $this->mode))
+            ->whereBetween('shipments.created_at', [$start, $end])
+            ->groupBy(['customers.id', 'customers.name'])
+            ->orderByDesc('total')->limit(5)->get();
+
+        return $rows->map(fn($r) => ['name' => $r->name, 'total' => (int)$r->total])->values()->all();
+    }
+
+    public function getLeadTimeSummary(): array
+    {
+        [$start, $end] = $this->getPeriodRange();
+
+        $avg = $this->baseShipmentQuery()
+            ->whereNotNull('delivered_at')
+            ->whereBetween('delivered_at', [$start, $end])
+            ->selectRaw('AVG(EXTRACT(EPOCH FROM (delivered_at - created_at)) / 86400) as avg_days')
+            ->value('avg_days');
+
+        $avgDays = $avg ? round($avg, 1) : 0.0;
+        $targetDays = 12;
+
+        $progress = 0;
+        if ($avgDays > 0) {
+            $p = (($targetDays - $avgDays) / $targetDays) * 100;
+            $progress = (int) max(0, min(100, round($p)));
+        }
+
+        return ['avg_days' => $avgDays, 'target' => $targetDays, 'progress' => $progress];
+    }
+
+    public function getRecentActivities(): array
+    {
+        [$start, $end] = $this->getPeriodRange();
+
+        return ShipmentTrack::query()
+            ->with(['shipment:id,code', 'user:id,name'])
+            ->when($this->branchId, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('branch_id', $this->branchId)))
+            ->when($this->mode, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('mode', $this->mode)))
+            ->whereBetween('tracked_at', [$start, $end])
+            ->latest('tracked_at')->limit(12)->get()
+            ->map(fn($t) => [
+                'shipment_code' => $t->shipment?->code ?? '-',
+                'status' => $t->status instanceof \BackedEnum
+                    ? (method_exists($t->status, 'label')
+                        ? $t->status->label()
+                        : $t->status->value)
+                    : (string) $t->status,
+                'when' => Carbon::parse($t->tracked_at)->diffForHumans(),
+                'who' => $t->user?->name ?? 'Sistem',
+                'note' => $t->note,
+            ])->all();
+    }
+
+    public function getTamKpiSummary(): array
+    {
+        $cfg = config('jss_kpi.manado', []);
+        $thresholds = $cfg['thresholds'] ?? [];
+        $targetTotal = (int) ($thresholds['total_days']['normal'] ?? 19);
+        [$start, $end] = $this->getPeriodRange();
+
+        $cacheKey = 'tam_kpi_summary:' . md5(implode('|', [$start->toIso8601String(), $end->toIso8601String(), $this->branchId ?: 'all', $this->mode ?: 'all']));
+
+        return Cache::remember($cacheKey, now()->addSeconds(30), function () use ($start, $end, $targetTotal) {
+            $rows = $this->tamBaseQuery()->whereBetween('delivered_at', [$start, $end])->with('tracks:id,shipment_id,status,tracked_at')->get();
+
+            $total = 0;
+            $onTime = 0;
+            $late = 0;
+            foreach ($rows as $s) {
+                if (! method_exists($s, 'evaluateKpiForManado')) continue;
+                $ev = $s->evaluateKpiForManado();
+                if (! ($ev['applies'] ?? false)) continue;
+                $total++;
+                $badge = $ev['badge'] ?? null; 
+                if ($badge === 'On Time' || $badge === 'Tepat Waktu') $onTime++;
+                elseif ($badge === 'Late' || $badge === 'Terlambat') $late++;
+            }
+
+            $onPct = $total > 0 ? round(($onTime / $total) * 100, 1) : 0.0;
+            $latePct = $total > 0 ? round(($late / $total) * 100, 1) : 0.0;
+
+            return ['total' => $total, 'on_time' => $onTime, 'late' => $late, 'on_time_pct' => $onPct, 'late_pct' => $latePct, 'target_total' => $targetTotal];
+        });
+    }
+
+    public function getTamLateShipments(): array
+    {
+        [$start, $end] = $this->getPeriodRange();
+
+        $rows = $this->tamBaseQuery()->whereBetween('delivered_at', [$start, $end])->latest('delivered_at')->limit(50)->with('tracks:id,shipment_id,status,tracked_at')->get();
+
+        $result = [];
+        foreach ($rows as $s) {
+            if (! method_exists($s, 'evaluateKpiForManado')) continue;
+            $ev = $s->evaluateKpiForManado();
+            if (! ($ev['applies'] ?? false)) continue;
+            if (($ev['badge'] ?? null) !== 'Late' && ($ev['badge'] ?? null) !== 'Terlambat') continue;
+            $summary = $ev['summary'] ?? [];
+            $totalActual = $summary['total']['actual'] ?? null;
+            $totalLimit = $summary['total']['limit'] ?? null;
+            $lateBy = null;
+            if (! is_null($totalActual) && ! is_null($totalLimit)) $lateBy = max(0, (int)$totalActual - (int)$totalLimit);
+            $result[] = ['code' => $s->code, 'late_by' => $lateBy, 'summary' => $s->kpiManadoSummaryText() ?? null];
+            if (count($result) >= 10) break;
+        }
+
+        return $result;
+    }
+
+    public function getTamLeadTimeSeries(): array
+    {
+        $cfg = config('jss_kpi.manado', []);
+        $thresholds = $cfg['thresholds'] ?? [];
+        $targetDw = (float)($thresholds['dwelling_days'] ?? 6);
+        $targetSa = (float)($thresholds['sailing_days'] ?? 10);
+        $targetDo = (float)($thresholds['dooring_days'] ?? 2);
+        $targetTotal = (float)($thresholds['total_days']['normal'] ?? 19);
+        [$start, $end] = $this->getPeriodRange();
+
+        $rows = $this->tamBaseQuery()->whereBetween('delivered_at', [$start, $end])->with('tracks:id,shipment_id,status,tracked_at')->get();
+
+        $sumDw = 0.0;
+        $sumSa = 0.0;
+        $sumDo = 0.0;
+        $sumTotal = 0.0;
+        $n = 0;
+        foreach ($rows as $s) {
+            if (! method_exists($s, 'evaluateKpiForManado')) continue;
+            $ev = $s->evaluateKpiForManado();
+            if (! ($ev['applies'] ?? false)) continue;
+            $summary = $ev['summary'] ?? [];
+            $dw = $summary['dwelling']['actual'] ?? null;
+            $sa = $summary['sailing']['actual'] ?? null;
+            $do = $summary['dooring']['actual'] ?? null;
+            $tt = $summary['total']['actual'] ?? null;
+            if ($dw !== null && $sa !== null && $do !== null && $tt !== null) {
+                $sumDw += (float)$dw;
+                $sumSa += (float)$sa;
+                $sumDo += (float)$do;
+                $sumTotal += (float)$tt;
+                $n++;
+            }
+        }
+
+        if ($n > 0) {
+            $avgDw = $sumDw / $n;
+            $avgSa = $sumSa / $n;
+            $avgDo = $sumDo / $n;
+            $avgTotal = $sumTotal / $n;
+        } else {
+            $avgDw = $avgSa = $avgDo = $avgTotal = 0.0;
+        }
+
+        return ['labels' => ['Dwelling', 'Sailing', 'Dooring', 'Total'], 'values' => [$avgDw, $avgSa, $avgDo, $avgTotal], 'avg_days' => ['dwelling' => $avgDw, 'sailing' => $avgSa, 'dooring' => $avgDo, 'total' => $avgTotal], 'targets' => [$targetDw, $targetSa, $targetDo, $targetTotal]];
+    }
+
+    public function getTamLeadTimeEvaluation(): array
+    {
+        [$start, $end] = $this->getPeriodRange();
+        $rows = $this->tamBaseQuery()->whereBetween('delivered_at', [$start, $end])->with('tracks:id,shipment_id,status,tracked_at')->get();
+
+        $metrics = ['dwelling' => ['ok' => 0, 'ng' => 0, 'pending' => 0], 'sailing' => ['ok' => 0, 'ng' => 0, 'pending' => 0], 'dooring' => ['ok' => 0, 'ng' => 0, 'pending' => 0], 'total' => ['ok' => 0, 'ng' => 0, 'pending' => 0]];
+
+        foreach ($rows as $s) {
+            if (! method_exists($s, 'evaluateKpiForManado')) continue;
+            $ev = $s->evaluateKpiForManado();
+            if (! ($ev['applies'] ?? false)) continue;
+            $summary = $ev['summary'] ?? [];
+            foreach (['dwelling', 'sailing', 'dooring', 'total'] as $key) {
+                if (! isset($summary[$key])) continue;
+                $st = $summary[$key]['status'] ?? 'PENDING';
+                if ($st === 'OK') $metrics[$key]['ok']++;
+                elseif ($st === 'LATE') $metrics[$key]['ng']++;
+                else $metrics[$key]['pending']++;
+            }
+        }
+
+        foreach ($metrics as $key => $val) {
+            $total = $val['ok'] + $val['ng'];
+            if ($total > 0) {
+                $metrics[$key]['ok_pct'] = round(($val['ok'] / $total) * 100, 1);
+                $metrics[$key]['ng_pct'] = round(($val['ng'] / $total) * 100, 1);
+            } else {
+                $metrics[$key]['ok_pct'] = 0;
+                $metrics[$key]['ng_pct'] = 0;
+            }
+        }
+
+        return $metrics;
+    }
+
+    public function getTamPortStockList(): array
+    {
+        return $this->getTamPortStock()['items'] ?? [];
+    }
+
+    public function getTamPortStockSummary(): array
+    {
+        $d = $this->getTamPortStock();
+
+        return [
+            'total'      => $d['total'] ?? 0,
+            'avg_age'    => $d['avg_age'] ?? 0,
+            'over_three' => $d['over_three'] ?? 0,
+        ];
+    }
+}

@@ -1,0 +1,5 @@
+ID,Code,Name,Type,Branch_ID,Branch_Name,Port_ID,Port_Name,Coordinator_User_ID,Coordinator_Name,Address
+1,JKT,Jakarta,cabang,,,,,,,Jl Tanjung Priok No 1
+2,BTG,Bontang,cabang,,,,,,,Jl Pelabuhan Bontang
+5,DEP-TAM-JKT,Depo TAM Tanjung Priok,depo,1,Jakarta,1,Tanjung Priok,12,Field Coordinator Jakarta,Jl Pelabuhan Tanjung Priok Area TAM
+6,DEP-BTG-01,Depo Bontang,depo,2,Bontang,2,Bontang Port,15,Field Coordinator Bontang,Jl Pelabuhan Bontang

@@ -1,0 +1,4 @@
+ID,Name,Email,Role,Branch_ID,Branch_Name
+12,Field Coordinator Jakarta,fc-jkt@jss.co.id,field_coordinator,1,Jakarta
+15,Field Coordinator Bontang,fc-btg@jss.co.id,field_coordinator,2,Bontang
+20,Admin Jakarta,admin-jkt@jss.co.id,super_admin,1,Jakarta
