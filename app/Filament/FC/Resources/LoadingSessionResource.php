@@ -38,7 +38,8 @@ class LoadingSessionResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return Filament::auth()->user()?->hasRole('field_coordinator') ?? false;
+        $user = Filament::auth()->user();
+        return $user?->hasRole('field_coordinator') || $user?->hasRole('super_admin') ?? false;
     }
 
     public static function getEloquentQuery(): Builder

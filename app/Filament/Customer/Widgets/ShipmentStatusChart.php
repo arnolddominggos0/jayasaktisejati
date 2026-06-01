@@ -2,6 +2,7 @@
 
 namespace App\Filament\Customer\Widgets;
 
+use App\Enums\ShipmentStatus;
 use App\Models\Shipment;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\Auth;
@@ -46,19 +47,11 @@ class ShipmentStatusChart extends ChartWidget
         $data = [];
         $colors = [];
 
-        $colorMap = [
-            'Draft' => '#9CA3AF',      // Gray
-            'Pickup' => '#3B82F6',     // Blue
-            'Transit' => '#F59E0B',    // Amber
-            'Delivered' => '#10B981',  // Green
-            'Hold' => '#EF4444',       // Red
-            'Cancelled' => '#DC2626',  // Dark Red
-        ];
-
-        foreach ($statusCounts as $status => $count) {
-            $labels[] = $this->formatStatusLabel($status);
+        foreach ($statusCounts as $statusValue => $count) {
+            $enum = ShipmentStatus::tryFrom($statusValue);
+            $labels[] = $enum?->label() ?? $statusValue;
             $data[] = $count;
-            $colors[] = $colorMap[$status] ?? '#9CA3AF';
+            $colors[] = $this->getHexColor($enum);
         }
 
         return [
@@ -80,18 +73,19 @@ class ShipmentStatusChart extends ChartWidget
     }
 
     /**
-     * Format status label for display
+     * Get hex color for status
      */
-    private function formatStatusLabel(string $status): string
+    private function getHexColor(?ShipmentStatus $status): string
     {
         return match ($status) {
-            'Draft' => 'Draft',
-            'Pickup' => 'Pickup',
-            'Transit' => 'Dalam Perjalanan',
-            'Delivered' => 'Terkirim',
-            'Hold' => 'Tertahan',
-            'Cancelled' => 'Dibatalkan',
-            default => $status,
+            ShipmentStatus::Draft => '#9CA3AF',
+            ShipmentStatus::Pending => '#F59E0B',
+            ShipmentStatus::Pickup => '#3B82F6',
+            ShipmentStatus::Transit => '#F59E0B',
+            ShipmentStatus::Delivered => '#10B981',
+            ShipmentStatus::Hold => '#EF4444',
+            ShipmentStatus::Cancelled => '#DC2626',
+            null => '#9CA3AF',
         };
     }
 

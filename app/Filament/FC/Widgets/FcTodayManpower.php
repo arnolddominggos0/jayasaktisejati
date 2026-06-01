@@ -20,21 +20,23 @@ class FcTodayManpower extends Widget
         $today = Carbon::today();
         $depotId = $this->getDepotId();
 
-        $query = BriefingAttendance::query()
+        $countsQuery = BriefingAttendance::query()
             ->with(['manpower', 'session'])
             ->whereHas('session', fn ($q) => $q->whereDate('date', $today));
 
         if ($depotId) {
-            $query->whereHas('session', fn ($q) => $q->where('depot_id', $depotId));
+            $countsQuery->whereHas('session', fn ($q) => $q->where('depot_id', $depotId));
         }
 
-        $attendances = $query->latest('created_at')->limit(20)->get();
+        $allAttendances = $countsQuery->get();
 
-        $totalPresent = $attendances->where('attendance_status', 'present')->count();
-        $totalFit = $attendances->where('fit_status', 'FIT')->count();
-        $totalUnfit = $attendances->filter(fn ($a) => $a->fit_status !== 'FIT' && $a->attendance_status === 'present')->count();
-        $totalSick = $attendances->where('attendance_status', 'sick')->count();
-        $totalAbsent = $attendances->where('attendance_status', 'absent')->count();
+        $totalPresent = $allAttendances->where('attendance_status', 'present')->count();
+        $totalFit = $allAttendances->where('fit_status', 'FIT')->count();
+        $totalUnfit = $allAttendances->filter(fn ($a) => $a->fit_status !== 'FIT' && $a->attendance_status === 'present')->count();
+        $totalSick = $allAttendances->where('attendance_status', 'sick')->count();
+        $totalAbsent = $allAttendances->where('attendance_status', 'absent')->count();
+
+        $attendances = (clone $countsQuery)->latest('created_at')->limit(20)->get();
 
         $items = $attendances
             ->sortByDesc(fn ($a) => match (true) {

@@ -45,6 +45,52 @@ enum TrackStatus: string
         };
     }
 
+    public function color(): string
+    {
+        return match ($this) {
+            self::Pickup,
+            self::Handover,
+            self::HandoverTrucking => 'info',
+
+            self::Stuffing,
+            self::DeliveryToPort,
+            self::Stacking,
+            self::UnitLoading,
+            self::Unloading,
+            self::DeliveryToCustomer => 'warning',
+
+            self::OnShip,
+            self::VesselDepart,
+            self::VesselArrival => 'primary',
+
+            self::Delivered => 'success',
+
+            self::Hold,
+            self::Cancelled => 'danger',
+        };
+    }
+
+    public function icon(): string
+    {
+        return match ($this) {
+            self::Pickup => 'heroicon-o-map-pin',
+            self::Handover => 'heroicon-o-building-office',
+            self::Stuffing => 'heroicon-o-wrench-screwdriver',
+            self::DeliveryToPort => 'heroicon-o-arrow-up-right',
+            self::Stacking => 'heroicon-o-rectangle-group',
+            self::UnitLoading => 'heroicon-o-arrow-up-tray',
+            self::OnShip => 'heroicon-o-rocket-launch',
+            self::VesselDepart => 'heroicon-o-paper-airplane',
+            self::VesselArrival => 'heroicon-o-flag',
+            self::Unloading => 'heroicon-o-arrow-down-tray',
+            self::HandoverTrucking => 'heroicon-o-truck',
+            self::DeliveryToCustomer => 'heroicon-o-user',
+            self::Delivered => 'heroicon-o-check-circle',
+            self::Hold => 'heroicon-o-exclamation-triangle',
+            self::Cancelled => 'heroicon-o-x-circle',
+        };
+    }
+
     public static function orderSea(): array
     {
         return [

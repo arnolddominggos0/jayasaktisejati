@@ -2,6 +2,7 @@
 
 namespace App\Filament\Customer\Widgets;
 
+use App\Enums\ShipmentStatus;
 use App\Models\Shipment;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -33,15 +34,15 @@ class CustomerStatsOverview extends BaseWidget
 
         $totalShipments = (clone $query)->count();
         $activeShipments = (clone $query)
-            ->whereNotIn('status', ['Draft', 'Delivered', 'Cancelled'])
+            ->whereNotIn('status', ShipmentStatus::completed())
             ->count();
         $deliveredThisMonth = (clone $query)
-            ->where('status', 'Delivered')
+            ->where('status', ShipmentStatus::Delivered->value)
             ->whereMonth('delivered_at', now()->month)
             ->whereYear('delivered_at', now()->year)
             ->count();
         $inTransit = (clone $query)
-            ->where('status', 'Transit')
+            ->where('status', ShipmentStatus::Transit->value)
             ->count();
 
         return [

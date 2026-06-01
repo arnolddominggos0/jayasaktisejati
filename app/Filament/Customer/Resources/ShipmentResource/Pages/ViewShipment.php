@@ -2,6 +2,7 @@
 
 namespace App\Filament\Customer\Resources\ShipmentResource\Pages;
 
+use App\Enums\ShipmentStatus;
 use App\Filament\Customer\Resources\ShipmentResource;
 use App\Models\Shipment;
 use Filament\Infolists;
@@ -57,24 +58,8 @@ class ViewShipment extends ViewRecord
                         Infolists\Components\TextEntry::make('status')
                             ->label('Status Terkini')
                             ->badge()
-                            ->color(fn (string $state): string => match ($state) {
-                                'Draft' => 'gray',
-                                'Pickup' => 'info',
-                                'Transit' => 'warning',
-                                'Delivered' => 'success',
-                                'Hold' => 'danger',
-                                'Cancelled' => 'danger',
-                                default => 'gray',
-                            })
-                            ->formatStateUsing(fn (string $state): string => match ($state) {
-                                'Draft' => 'Draft',
-                                'Pickup' => 'Pickup',
-                                'Transit' => 'Dalam Perjalanan',
-                                'Delivered' => 'Terkirim',
-                                'Hold' => 'Tertahan',
-                                'Cancelled' => 'Dibatalkan',
-                                default => $state,
-                            })
+                            ->color(fn (string $state): string => ShipmentStatus::tryFrom($state)?->color() ?? 'gray')
+                            ->formatStateUsing(fn (string $state): string => ShipmentStatus::tryFrom($state)?->label() ?? $state)
                             ->size(Infolists\Components\TextEntry\TextEntrySize::Large)
                             ->weight('font-bold'),
 

@@ -35,6 +35,32 @@ enum ShipmentStatus: string
         return [self::Pending, self::Pickup, self::Transit];
     }
 
+    public function color(): string
+    {
+        return match ($this) {
+            self::Draft => 'gray',
+            self::Pending => 'warning',
+            self::Pickup => 'info',
+            self::Transit => 'warning',
+            self::Delivered => 'success',
+            self::Hold => 'danger',
+            self::Cancelled => 'danger',
+        };
+    }
+
+    public function icon(): string
+    {
+        return match ($this) {
+            self::Draft => 'heroicon-o-document',
+            self::Pending => 'heroicon-o-clock',
+            self::Pickup => 'heroicon-o-map-pin',
+            self::Transit => 'heroicon-o-truck',
+            self::Delivered => 'heroicon-o-check-circle',
+            self::Hold => 'heroicon-o-exclamation-triangle',
+            self::Cancelled => 'heroicon-o-x-circle',
+        };
+    }
+
     public static function notInProgress(): array
     {
         return [self::Draft, self::Delivered, self::Hold, self::Cancelled];

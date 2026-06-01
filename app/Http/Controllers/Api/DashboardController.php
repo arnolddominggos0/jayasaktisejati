@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\ShipmentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\ApiResponseTrait;
 use App\Models\Shipment;
@@ -35,10 +36,10 @@ class DashboardController extends Controller
             return [
                 'shipments' => [
                     'total' => (clone $shipmentQuery)->count(),
-                    'draft' => (clone $shipmentQuery)->where('status', 'Draft')->count(),
-                    'active' => (clone $shipmentQuery)->whereNotIn('status', ['Draft', 'Delivered', 'Cancelled'])->count(),
-                    'delivered' => (clone $shipmentQuery)->where('status', 'Delivered')->count(),
-                    'cancelled' => (clone $shipmentQuery)->where('status', 'Cancelled')->count(),
+                    'draft' => (clone $shipmentQuery)->where('status', ShipmentStatus::Draft->value)->count(),
+                    'active' => (clone $shipmentQuery)->whereNotIn('status', ShipmentStatus::completed())->count(),
+                    'delivered' => (clone $shipmentQuery)->where('status', ShipmentStatus::Delivered->value)->count(),
+                    'cancelled' => (clone $shipmentQuery)->where('status', ShipmentStatus::Cancelled->value)->count(),
                 ],
                 'voyages' => [
                     'upcoming' => Voyage::where('etd', '>=', now())->where('etd', '<=', now()->addDays(7))->count(),

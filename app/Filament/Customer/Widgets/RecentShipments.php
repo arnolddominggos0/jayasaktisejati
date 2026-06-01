@@ -2,6 +2,7 @@
 
 namespace App\Filament\Customer\Widgets;
 
+use App\Enums\ShipmentStatus;
 use App\Filament\Customer\Resources\ShipmentResource;
 use App\Models\Shipment;
 use Filament\Tables;
@@ -53,15 +54,7 @@ class RecentShipments extends BaseWidget
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'Draft' => 'gray',
-                        'Pickup' => 'info',
-                        'Transit' => 'warning',
-                        'Delivered' => 'success',
-                        'Hold' => 'danger',
-                        'Cancelled' => 'danger',
-                        default => 'gray',
-                    }),
+                    ->color(fn (string $state): string => ShipmentStatus::tryFrom($state)?->color() ?? 'gray'),
 
                 Tables\Columns\TextColumn::make('eta')
                     ->label('Estimasi Sampai')

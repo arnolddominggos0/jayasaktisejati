@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\ShipmentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\ApiResponseTrait;
 use App\Http\Requests\Api\ShipmentIndexRequest;
@@ -98,7 +99,7 @@ class ShipmentController extends Controller
                 if (!$request->user()->hasRole('super_admin')) {
                     $validated['branch_id'] = $request->user()->effectiveBranchId();
                 }
-                $validated['status'] = 'Draft';
+                $validated['status'] = ShipmentStatus::Draft->value;
                 return Shipment::create($validated);
             });
 
@@ -176,7 +177,7 @@ class ShipmentController extends Controller
             throw new NotFoundException('Shipment', (string) $id);
         }
 
-        if ($shipment->status?->value !== 'Draft') {
+        if ($shipment->status?->value !== ShipmentStatus::Draft->value) {
             return $this->errorResponse(
                 'Only draft shipments can be deleted',
                 'CANNOT_DELETE',

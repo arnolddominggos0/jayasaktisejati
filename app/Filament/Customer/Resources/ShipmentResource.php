@@ -2,6 +2,7 @@
 
 namespace App\Filament\Customer\Resources;
 
+use App\Enums\ShipmentStatus;
 use App\Filament\Customer\Resources\ShipmentResource\Pages;
 use App\Models\Shipment;
 use Filament\Forms;
@@ -139,24 +140,8 @@ class ShipmentResource extends Resource
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'Draft' => 'gray',
-                        'Pickup' => 'info',
-                        'Transit' => 'warning',
-                        'Delivered' => 'success',
-                        'Hold' => 'danger',
-                        'Cancelled' => 'danger',
-                        default => 'gray',
-                    })
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'Draft' => 'Draft',
-                        'Pickup' => 'Pickup',
-                        'Transit' => 'Dalam Perjalanan',
-                        'Delivered' => 'Terkirim',
-                        'Hold' => 'Tertahan',
-                        'Cancelled' => 'Dibatalkan',
-                        default => $state,
-                    }),
+                    ->color(fn (string $state): string => ShipmentStatus::tryFrom($state)?->color() ?? 'gray')
+                    ->formatStateUsing(fn (string $state): string => ShipmentStatus::tryFrom($state)?->label() ?? $state),
 
                 Tables\Columns\TextColumn::make('eta')
                     ->label('Estimasi Sampai')
@@ -173,14 +158,7 @@ class ShipmentResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Status')
-                    ->options([
-                        'Draft' => 'Draft',
-                        'Pickup' => 'Pickup',
-                        'Transit' => 'Dalam Perjalanan',
-                        'Delivered' => 'Terkirim',
-                        'Hold' => 'Tertahan',
-                        'Cancelled' => 'Dibatalkan',
-                    ]),
+                    ->options(ShipmentStatus::class),
 
                 Tables\Filters\Filter::make('created_at')
                     ->label('Tanggal Dibuat')
@@ -238,7 +216,7 @@ class ShipmentResource extends Resource
         }
 
         return static::getModel()::where('customer_id', $customerId)
-            ->whereNotIn('status', ['Delivered', 'Cancelled'])
+            ->whereNotIn('status', ShipmentStatus::completed())
             ->count() ?: null;
     }
 
