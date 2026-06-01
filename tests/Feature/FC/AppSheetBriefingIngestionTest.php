@@ -112,6 +112,7 @@ class AppSheetBriefingIngestionTest extends TestCase
                 'Suhu' => 36.5,
                 'TD Sistolik' => 120,
                 'TD Diastolik' => 80,
+		'Status Fit'  => 'FIT',
                 'APD Lengkap' => true,
                 'Catatan' => 'Sehat',
             ],
