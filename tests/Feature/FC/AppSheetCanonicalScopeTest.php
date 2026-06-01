@@ -52,15 +52,15 @@ class AppSheetCanonicalScopeTest extends TestCase
         [$branch, $fc, $depot] = $this->createFcWithCanonicalScope();
 
         $payload = [
-            'table' => 'briefing_sessions',
+            'table' => 'mp_check',
             'operation' => 'create',
             'submitted_by_user_id' => $fc->id,
             'data' => [
                 'Tanggal' => now()->toDateString(),
                 'Depot ID' => $depot->id,
                 'Koordinator ID' => $fc->id,
-                'Jumlah MP Dibutuhkan' => 5,
-                'Catatan' => 'Briefing pagi',
+                'Kebutuhan MP' => 5,
+                'Catatan Operasional' => 'Briefing pagi',
             ],
         ];
 
@@ -89,14 +89,14 @@ class AppSheetCanonicalScopeTest extends TestCase
         ]);
 
         $payload = [
-            'table' => 'briefing_sessions',
+            'table' => 'mp_check',
             'operation' => 'create',
             'submitted_by_user_id' => $fc->id,
             'data' => [
                 'Tanggal' => now()->toDateString(),
                 'Depot ID' => $otherDepot->id,
                 'Koordinator ID' => $fc->id,
-                'Catatan' => 'Briefing pagi',
+                'Catatan Operasional' => 'Briefing pagi',
             ],
         ];
 
@@ -106,8 +106,8 @@ class AppSheetCanonicalScopeTest extends TestCase
             ->assertJsonFragment(['success' => false, 'error_code' => 'SCOPE_VIOLATION']);
         $this->assertStringContainsString('[SCOPE_MISMATCH]', $response->json('message'));
 
-        $this->assertDatabaseHas('appsheet_sync_logs', [
-            'table_name' => 'briefing_sessions',
+        $this->assertDatabaseHas('app_sheet_sync_logs', [
+            'table_name' => 'mp_check',
             'status' => 'failed',
         ]);
     }
@@ -119,14 +119,14 @@ class AppSheetCanonicalScopeTest extends TestCase
         [$mdoBranch, $mdoFc, $mdoDepot] = $this->createFcWithCanonicalScope('MDO', 'Manado');
 
         $payload = [
-            'table' => 'briefing_sessions',
+            'table' => 'mp_check',
             'operation' => 'create',
             'submitted_by_user_id' => $jktFc->id,
             'data' => [
                 'Tanggal' => now()->toDateString(),
                 'Depot ID' => $mdoDepot->id,
                 'Koordinator ID' => $jktFc->id,
-                'Catatan' => 'Briefing pagi',
+                'Catatan Operasional' => 'Briefing pagi',
             ],
         ];
 
@@ -147,14 +147,14 @@ class AppSheetCanonicalScopeTest extends TestCase
         $otherFc->assignRole('field_coordinator');
 
         $payload = [
-            'table' => 'briefing_sessions',
+            'table' => 'mp_check',
             'operation' => 'create',
             'submitted_by_user_id' => $fc->id,
             'data' => [
                 'Tanggal' => now()->toDateString(),
                 'Depot ID' => $depot->id,
                 'Koordinator ID' => $otherFc->id,
-                'Catatan' => 'Briefing pagi',
+                'Catatan Operasional' => 'Briefing pagi',
             ],
         ];
 
@@ -198,14 +198,14 @@ class AppSheetCanonicalScopeTest extends TestCase
         ]);
 
         $payload = [
-            'table' => 'briefing_sessions',
+            'table' => 'mp_check',
             'operation' => 'create',
             'submitted_by_user_id' => $fc->id,
             'data' => [
                 'Tanggal' => now()->toDateString(),
                 'Depot ID' => $depot->id,
                 'Koordinator ID' => $fc->id,
-                'Catatan' => 'Briefing pagi',
+                'Catatan Operasional' => 'Briefing pagi',
             ],
         ];
 
@@ -235,14 +235,14 @@ class AppSheetCanonicalScopeTest extends TestCase
         // NO canonical scope set (legacy)
 
         $payload = [
-            'table' => 'briefing_sessions',
+            'table' => 'mp_check',
             'operation' => 'create',
             'submitted_by_user_id' => $fc->id,
             'data' => [
                 'Tanggal' => now()->toDateString(),
                 'Depot ID' => $depot->id,
                 'Koordinator ID' => $fc->id,
-                'Catatan' => 'Briefing pagi',
+                'Catatan Operasional' => 'Briefing pagi',
             ],
         ];
 
@@ -259,14 +259,14 @@ class AppSheetCanonicalScopeTest extends TestCase
         [$mdoBranch, $mdoFc, $mdoDepot] = $this->createLegacyFc('MDO', 'Manado');
 
         $payload = [
-            'table' => 'briefing_sessions',
+            'table' => 'mp_check',
             'operation' => 'create',
             'submitted_by_user_id' => $mdoFc->id,
             'data' => [
                 'Tanggal' => now()->toDateString(),
                 'Depot ID' => $jktDepot->id,
                 'Koordinator ID' => $mdoFc->id,
-                'Catatan' => 'Briefing pagi',
+                'Catatan Operasional' => 'Briefing pagi',
             ],
         ];
 
