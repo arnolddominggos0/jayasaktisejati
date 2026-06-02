@@ -521,7 +521,16 @@ class AppSheetService
             if ($fieldName === 'fit_status') {
                 return strtoupper(trim($value));
             }
-        }
+       	    if ($fieldName === 'attendance_status') {
+                return match (strtolower(trim($value))) {
+                    'hadir' => 'present',
+                    'tidak hadir' => 'absent',
+                    'sakit' => 'sick',
+                    'izin' => 'leave',
+                    default => $value,
+                 };
+             }
+          }
 
         return $value;
     }

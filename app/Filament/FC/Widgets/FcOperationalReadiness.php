@@ -7,6 +7,7 @@ use App\Models\BriefingSession;
 use Filament\Facades\Filament;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class FcOperationalReadiness extends Widget
 {
@@ -18,7 +19,7 @@ class FcOperationalReadiness extends Widget
     public function getViewData(): array
     {
         $depotId = $this->getDepotId();
-        $today = Carbon::today();
+	$today = Carbon::today();
 
         $session = BriefingSession::with(['attendances.manpower', 'stockApdChecks'])
             ->whereDate('date', $today)
@@ -72,7 +73,6 @@ class FcOperationalReadiness extends Widget
         if (! $isReady && $status?->value !== null) {
             $issues[] = 'Status pemeriksaan: ' . $statusLabel;
         }
-
         return [
             'session' => $session,
             'state' => $state,

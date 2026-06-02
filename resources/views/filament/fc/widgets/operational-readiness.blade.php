@@ -1,6 +1,20 @@
 @php
-    $d = $this->getViewData();
-    $state = $d['state'];
+   $d = [
+        'session' => $session,
+        'state' => $state,
+        'statusLabel' => $statusLabel,
+        'statusColor' => $statusColor,
+        'isReady' => $isReady,
+        'kebutuhan' => $kebutuhan,
+        'hadir' => $hadir,
+        'fit' => $fit,
+        'unfit' => $unfit,
+        'recheck' => $recheck,
+        'apdTotal' => $apdTotal,
+        'apdKurang' => $apdKurang,
+        'issues' => $issues,
+        'mpPercent' => $mpPercent,
+    ];
 
     $bannerClasses = match($state) {
         'ready'      => 'bg-gradient-to-r from-emerald-600 to-emerald-500',

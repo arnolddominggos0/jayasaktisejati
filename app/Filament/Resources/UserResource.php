@@ -94,10 +94,10 @@ class UserResource extends Resource
                                     ->password()
                                     ->revealable()
                                     ->required(fn (?User $record) => $record === null)
-                                    ->rule(fn (?User $record) => $record === null ? 'required|min:8' : 'nullable|min:8')
-                                    ->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make(trim($state)) : null)
-                                    ->dehydrated(fn (?string $state) => filled($state))
-                                    ->maxLength(100),
+                                    ->minLength(8)
+    				    ->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make(trim($state)) : null)
+    				    ->dehydrated(fn (?string $state) => filled($state))
+    				    ->maxLength(100)
                             ])
                             ->columns(2),
 
