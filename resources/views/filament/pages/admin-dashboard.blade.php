@@ -67,9 +67,9 @@
     @endphp
 
     <div class="space-y-6">
-        <div class="rounded-xl p-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md">
-            <h1 class="text-2xl font-bold">Dashboard Operasional</h1>
-            <p class="mt-1 text-sm opacity-80">Pantau performa operasional dan aktivitas shipment</p>
+        <div class="rounded-xl p-6 bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md">
+            <h1 class="text-2xl font-bold">Dashboard TAM</h1>
+            <p class="mt-1 text-sm opacity-80">Monitoring KPI Lead Time — Rute Jakarta → Manado (Toyota Astra Motor)</p>
         </div>
 
         <div class="{{ $cardClass }} p-6" id="filter-section">
@@ -80,7 +80,7 @@
             {{ $this->form }}
         </div>
 
-        <div class="{{ $this->dashboardView === 'all' ? '' : 'hidden' }} space-y-6">
+        <div class="hidden space-y-6"> {{-- Dashboard Umum: hidden, TAM is default --}}
             <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 <div class="p-6 rounded-xl shadow-sm border bg-white">
                     <p class="text-sm font-medium text-gray-600">Total Shipment Aktif</p>
@@ -238,7 +238,7 @@
             </div>
         </div>
 
-        <div class="{{ $this->dashboardView === 'tam' ? '' : 'hidden' }} space-y-6">
+        <div class="space-y-6"> {{-- Dashboard TAM: always visible --}}
             
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <div>

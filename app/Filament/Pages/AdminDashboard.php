@@ -44,7 +44,7 @@ class AdminDashboard extends Page implements HasForms
 
     public string $brandHex = '#0137A1';
 
-    public string $dashboardView = 'all';
+    public string $dashboardView = 'tam';
 
     public function mount(): void
     {
@@ -53,7 +53,7 @@ class AdminDashboard extends Page implements HasForms
         $this->branch_id = $this->branchId;
 
         $this->form->fill([
-            'dashboardView' => 'all',
+            'dashboardView' => 'tam',
             'branch_id' => $this->branch_id,
             'mode' => null,
             'period' => 'this_month',
@@ -69,9 +69,10 @@ class AdminDashboard extends Page implements HasForms
                 ->schema([
                     Forms\Components\ToggleButtons::make('dashboardView')
                         ->options(['all' => 'Dashboard Umum', 'tam' => 'Dashboard TAM'])
-                        ->inline()->default('all')->reactive()
-                        ->afterStateUpdated(fn ($state) => $this->dashboardView = $state ?: 'all')
-                        ->hiddenLabel()->columnSpan(['default' => 2, 'lg' => 1]),
+                        ->inline()->default('tam')->reactive()
+                        ->afterStateUpdated(fn ($state) => $this->dashboardView = $state ?: 'tam')
+                        ->hiddenLabel()->columnSpan(['default' => 2, 'lg' => 1])
+                        ->hidden(),
 
                     Forms\Components\Select::make('period')
                         ->label('Periode')
