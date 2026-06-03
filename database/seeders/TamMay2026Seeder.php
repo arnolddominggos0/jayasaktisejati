@@ -29,8 +29,8 @@ class TamMay2026Seeder extends Seeder
 
     private array $vessels = [
         [
-            'vessel' => 'KM Tanto Cahaya V.384',
-            'voyage_no' => 'VOY151TSLMNDJSS',
+            'vessel' => 'KM Tanto Cahaya',
+            'voyage_no' => 'V.384',
             'units' => [
                 [
                     'model' => 'Avanza 1.5 G',
@@ -51,8 +51,8 @@ class TamMay2026Seeder extends Seeder
             ],
         ],
         [
-            'vessel' => 'KM Tanto Jaya V.309',
-            'voyage_no' => 'VOY180MVIMNDJSS',
+            'vessel' => 'KM Tanto Jaya',
+            'voyage_no' => 'V.309',
             'units' => [
                 [
                     'model' => 'Innova 2.4 V',
@@ -81,8 +81,8 @@ class TamMay2026Seeder extends Seeder
             ],
         ],
         [
-            'vessel' => 'KM Tanto Tangguh V.248',
-            'voyage_no' => 'VOY182TTGMNDJSS',
+            'vessel' => 'KM Tanto Tangguh',
+            'voyage_no' => 'V.248',
             'units' => [
                 [
                     'model' => 'Yaris 1.5 E',
@@ -103,8 +103,8 @@ class TamMay2026Seeder extends Seeder
             ],
         ],
         [
-            'vessel' => 'KM Tanto Salam V.161',
-            'voyage_no' => 'VOY184TSLMNDJSS',
+            'vessel' => 'KM Tanto Salam',
+            'voyage_no' => 'V.161',
             'units' => [
                 [
                     'model' => 'Avanza 1.3 E',
@@ -125,8 +125,8 @@ class TamMay2026Seeder extends Seeder
             ],
         ],
         [
-            'vessel' => 'KM Tanto Sejahtera V.155',
-            'voyage_no' => 'VOY186TSHMNDJSS',
+            'vessel' => 'KM Tanto Sejahtera',
+            'voyage_no' => 'V.155',
             'units' => [
                 [
                     'model' => 'Fortuner 2.8 GR',

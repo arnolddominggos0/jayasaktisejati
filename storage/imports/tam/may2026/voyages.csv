@@ -1,0 +1,10 @@
+shipping_line,vessel_name,voyage_no,etd,eta,cargo_plan,cargo_actual
+Tanto,Tanto Sejahtera,154,2026-05-08,2026-05-20,58,17
+Tanto,Tanto Cahaya,384,2026-05-09,2026-05-22,6,6
+Tanto,Tanto Jaya,309,2026-05-15,2026-05-27,57,38
+Meratus,Meratus Gorontalo,210,2026-05-16,2026-05-26,0,0
+Tanto,Tanto Tangguh,248,2026-05-19,2026-05-31,20,44
+Meratus,Meratus Wakatobi,211,2026-05-20,2026-05-30,14,0
+Tanto,Tanto Salam,161,2026-05-25,2026-06-06,49,0
+Meratus,Meratus Medan,212,2026-05-26,2026-06-05,8,0
+Tanto,Tanto Sejahtera,155,2026-05-30,2026-06-11,27,0

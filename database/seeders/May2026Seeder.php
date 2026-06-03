@@ -40,29 +40,29 @@ class May2026Seeder extends Seeder
             'etb' => '2026-05-07 00:00:00',
             'etd' => '2026-05-09 00:00:00',
             'eta' => '2026-05-21 00:00:00',
-            'vessel' => 'KM Tanto Sejahtera V.154',
+            'vessel' => 'KM Tanto Sejahtera',
             'cargo_plan' => 58,
-            'voyage_no' => 'VOY179MVLMNDJSS',
-            'shipping_line' => 'Tanto',
+            'voyage_no' => 'V.154',
+            'shipping_line' => 'Tanto Intim Line',
             'status' => 'completed',
             'atb' => '2026-05-05 00:00:00',
             'closing_at' => '2026-05-07 12:00:00',
             'atd' => '2026-05-08 00:00:00',
-            'ata' => null,
+            'ata' => '2026-05-18 00:00:00',
             'cargo_actual' => 17,
             'otb' => true,
             'otd' => true,
-            'ota' => false,
+            'ota' => true,
         ],
 
         [
             'etb' => '2026-05-08 00:00:00',
             'etd' => '2026-05-10 00:00:00',
             'eta' => '2026-05-22 00:00:00',
-            'vessel' => 'KM Tanto Cahaya V.384',
+            'vessel' => 'KM Tanto Cahaya',
             'cargo_plan' => 6,
-            'voyage_no' => 'VOY151TSLMNDJSS',
-            'shipping_line' => 'Tanto',
+            'voyage_no' => 'V.384',
+            'shipping_line' => 'Tanto Intim Line',
             'status' => 'completed',
             'atb' => '2026-05-06 00:00:00',
             'closing_at' => '2026-05-07 12:00:00',
@@ -78,19 +78,19 @@ class May2026Seeder extends Seeder
             'etb' => '2026-05-13 00:00:00',
             'etd' => '2026-05-15 00:00:00',
             'eta' => '2026-05-27 00:00:00',
-            'vessel' => 'KM Tanto Jaya V.309',
+            'vessel' => 'KM Tanto Jaya',
             'cargo_plan' => 57,
-            'voyage_no' => 'VOY180MVIMNDJSS',
-            'shipping_line' => 'Tanto',
+            'voyage_no' => 'V.309',
+            'shipping_line' => 'Tanto Intim Line',
             'status' => 'completed',
             'atb' => '2026-05-09 00:00:00',
             'closing_at' => '2026-05-12 14:00:00',
             'atd' => '2026-05-12 00:00:00',
-            'ata' => null,
+            'ata' => '2026-05-26 00:00:00',
             'cargo_actual' => 38,
             'otb' => true,
             'otd' => true,
-            'ota' => false,
+            'ota' => true,
         ],
 
         [
@@ -116,10 +116,10 @@ class May2026Seeder extends Seeder
             'etb' => '2026-05-17 00:00:00',
             'etd' => '2026-05-19 00:00:00',
             'eta' => '2026-05-31 00:00:00',
-            'vessel' => 'KM Tanto Tangguh V.248',
+            'vessel' => 'KM Tanto Tangguh',
             'cargo_plan' => 20,
-            'voyage_no' => 'VOY182TTGMNDJSS',
-            'shipping_line' => 'Tanto',
+            'voyage_no' => 'V.248',
+            'shipping_line' => 'Tanto Intim Line',
             'status' => 'sailing',
             'atb' => '2026-05-13 00:00:00',
             'closing_at' => '2026-05-13 10:00:00',
@@ -154,10 +154,10 @@ class May2026Seeder extends Seeder
             'etb' => '2026-05-23 00:00:00',
             'etd' => '2026-05-25 00:00:00',
             'eta' => '2026-06-06 00:00:00',
-            'vessel' => 'KM Tanto Salam V.161',
+            'vessel' => 'KM Tanto Salam',
             'cargo_plan' => 49,
-            'voyage_no' => 'VOY184TSLMNDJSS',
-            'shipping_line' => 'Tanto',
+            'voyage_no' => 'V.161',
+            'shipping_line' => 'Tanto Intim Line',
             'status' => 'planned',
             'atb' => null,
             'closing_at' => null,
@@ -192,10 +192,10 @@ class May2026Seeder extends Seeder
             'etb' => '2026-05-28 00:00:00',
             'etd' => '2026-05-30 00:00:00',
             'eta' => '2026-06-11 00:00:00',
-            'vessel' => 'KM Tanto Sejahtera V.155',
+            'vessel' => 'KM Tanto Sejahtera',
             'cargo_plan' => 27,
-            'voyage_no' => 'VOY186TSHMNDJSS',
-            'shipping_line' => 'Tanto',
+            'voyage_no' => 'V.155',
+            'shipping_line' => 'Tanto Intim Line',
             'status' => 'planned',
             'atb' => null,
             'closing_at' => null,
@@ -257,7 +257,7 @@ class May2026Seeder extends Seeder
         // Shipping Lines
         $tanto = ShippingLine::updateOrCreate(
             ['code' => 'TANTO'],
-            ['name' => 'Tanto']
+            ['name' => 'Tanto Intim Line']
         );
         $meratus = ShippingLine::updateOrCreate(
             ['code' => 'MERATUS'],
@@ -266,9 +266,9 @@ class May2026Seeder extends Seeder
 
         // Customer (TAM as the operational customer)
         $customer = Customer::updateOrCreate(
-            ['email' => 'tam@jss.local'],
+            ['code' => 'TAM-0001'],
             [
-                'code' => 'TAM-0001',
+                'email' => 'tam@jss.local',
                 'name' => 'TAM',
                 'phone' => '081234567890',
                 'type' => 'company',
@@ -298,7 +298,7 @@ class May2026Seeder extends Seeder
         // Vessels
         $vesselMap = [];
         foreach ($this->dataset as $row) {
-            $slCode = $row['shipping_line'] === 'Tanto' ? 'TANTO' : 'MERATUS';
+            $slCode = str_contains($row['shipping_line'], 'Tanto') ? 'TANTO' : 'MERATUS';
             $slId = $slCode === 'TANTO' ? $tanto->id : $meratus->id;
 
             $vessel = Vessel::updateOrCreate(
@@ -356,7 +356,7 @@ class May2026Seeder extends Seeder
         $voyages = [];
 
         foreach ($this->dataset as $row) {
-            $sl = $row['shipping_line'] === 'Tanto'
+            $sl = str_contains($row['shipping_line'], 'Tanto')
                 ? $base['tanto']
                 : $base['meratus'];
 
@@ -459,6 +459,37 @@ class May2026Seeder extends Seeder
             if (! $item->voyage_id) {
                 $item->voyage_id = $voyage->id;
                 $item->save();
+            }
+
+            // Seed Milestones
+            if ($voyage->atd_at) {
+                foreach ([2, 4, 6, 8, 10, 12] as $d) {
+                    \App\Models\VoyageMilestone::updateOrCreate(
+                        [
+                            'voyage_id' => $voyage->id,
+                            'code' => "d{$d}"
+                        ],
+                        [
+                            'milestone_date' => $voyage->atd_at->copy()->addDays($d)
+                        ]
+                    );
+                }
+            }
+
+            // Seed Checkpoints
+            if ($voyage->eta) {
+                foreach ([-2, -1] as $offset) {
+                    \App\Models\VoyageCheckpoint::updateOrCreate(
+                        [
+                            'voyage_id' => $voyage->id,
+                            'code' => 'eta_d' . abs($offset)
+                        ],
+                        [
+                            'offset_days' => $offset,
+                            'scheduled_at' => $voyage->eta->copy()->addDays($offset),
+                        ]
+                    );
+                }
             }
 
             $voyages[] = $voyage;
@@ -598,9 +629,7 @@ class May2026Seeder extends Seeder
                         'day_code' => 'D-1',
                         'etd_plan' => $voyage->etd,
                         'etd_current' => $voyage->etd,
-                        'status' => rand(0, 4) === 0
-                            ? 'potential_delay'
-                            : 'on_schedule',
+                        'status' => 'on_schedule',
                         'note' => 'Operational readiness check',
                         'source' => 'System',
                     ]
@@ -643,7 +672,7 @@ class May2026Seeder extends Seeder
 
                 if (! $exists) {
 
-                    VesselCheck::create([
+                    $vc = VesselCheck::create([
                         'shipping_schedule_id' => $schedule->id,
                         'voyage_id' => $voyage->id,
                         'day_code' => 'H-1',
@@ -656,6 +685,20 @@ class May2026Seeder extends Seeder
                     ]);
 
                     $checkCount++;
+
+                    // For the "Delayed" voyage or NG voyage, we can add a Case
+                    if ($voyage->voyage_no === 'VOY180MVIMNDJSS') {
+                        DB::table('vessel_check_cases')->insert([
+                            'voyage_id' => $voyage->id,
+                            'shipping_schedule_id' => $schedule->id,
+                            'case_status' => 'ETD_DELAY',
+                            'delay_flag' => true,
+                            'opened_at' => $voyage->etd,
+                            'note' => 'Automatic case: High sailing duration detected (NG)',
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+                    }
                 }
             }
         }

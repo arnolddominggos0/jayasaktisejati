@@ -4,7 +4,6 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
-
 use Spatie\Permission\Models\Role;
 
 use App\Models\User;
@@ -15,10 +14,20 @@ class InitialSetupSeeder extends Seeder
 {
     public function run(): void
     {
+        /*
+        |--------------------------------------------------------------------------
+        | Roles
+        |--------------------------------------------------------------------------
+        */
+
         Role::firstOrCreate(['name' => 'super_admin']);
-        Role::firstOrCreate(['name' => 'admin']);
         Role::firstOrCreate(['name' => 'fc']);
-        Role::firstOrCreate(['name' => 'koordinator']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | Branches
+        |--------------------------------------------------------------------------
+        */
 
         $jkt = Branch::updateOrCreate(
             ['code' => 'JKT'],
@@ -34,6 +43,12 @@ class InitialSetupSeeder extends Seeder
             ]
         );
 
+        /*
+        |--------------------------------------------------------------------------
+        | Super Admin
+        |--------------------------------------------------------------------------
+        */
+
         $superAdmin = User::updateOrCreate(
             ['email' => 'admin@jss.local'],
             [
@@ -43,47 +58,54 @@ class InitialSetupSeeder extends Seeder
             ]
         );
 
-        $superAdmin->assignRole('super_admin');
+        $superAdmin->syncRoles(['super_admin']);
 
-        $fcJkt = User::updateOrCreate(
-            ['email' => 'koor.jkt@jss.local'],
+        /*
+        |--------------------------------------------------------------------------
+        | FC Jakarta
+        |--------------------------------------------------------------------------
+        */
+
+        $fcJakarta = User::updateOrCreate(
+            ['email' => 'fc.jkt@jss.local'],
             [
-                'name' => 'Koordinator Jakarta',
+                'name' => 'FC Jakarta',
                 'password' => Hash::make('password'),
                 'branch_id' => $jkt->id,
             ]
         );
 
-        $fcJkt->assignRole('koordinator');
+        $fcJakarta->syncRoles(['fc']);
 
-        $fcMdo = User::updateOrCreate(
-            ['email' => 'koor.mdo@jss.local'],
+        /*
+        |--------------------------------------------------------------------------
+        | FC Manado
+        |--------------------------------------------------------------------------
+        */
+
+        $fcManado = User::updateOrCreate(
+            ['email' => 'fc.mdo@jss.local'],
             [
-                'name' => 'Koordinator Manado',
+                'name' => 'FC Manado',
                 'password' => Hash::make('password'),
                 'branch_id' => $mdo->id,
             ]
         );
 
-        $fcMdo->assignRole('koordinator');
+        $fcManado->syncRoles(['fc']);
 
-        $fcPriok = User::updateOrCreate(
-            ['email' => 'fc.jkt@jss.local'],
-            [
-                'name' => 'FC Tanjung Priok',
-                'password' => Hash::make('password'),
-                'branch_id' => $jkt->id,
-            ]
-        );
-
-        $fcPriok->assignRole('fc');
+        /*
+        |--------------------------------------------------------------------------
+        | Depots
+        |--------------------------------------------------------------------------
+        */
 
         Depot::updateOrCreate(
             ['code' => 'DPTJKT'],
             [
                 'name' => 'Depo Tanjung Priok',
                 'branch_id' => $jkt->id,
-                'coordinator_user_id' => $fcPriok->id,
+                'coordinator_user_id' => null,
             ]
         );
 
@@ -92,7 +114,7 @@ class InitialSetupSeeder extends Seeder
             [
                 'name' => 'Depo PDI Jakarta',
                 'branch_id' => $jkt->id,
-                'coordinator_user_id' => $fcJkt->id,
+                'coordinator_user_id' => null,
             ]
         );
 
@@ -101,7 +123,7 @@ class InitialSetupSeeder extends Seeder
             [
                 'name' => 'Depo Bitung',
                 'branch_id' => $mdo->id,
-                'coordinator_user_id' => $fcMdo->id,
+                'coordinator_user_id' => null,
             ]
         );
 

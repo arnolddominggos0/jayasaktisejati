@@ -10,8 +10,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             InitialSetupSeeder::class,
-            // May2026VesselPlanDraftSeeder::class,
-            May2026Seeder::class,
             TamMay2026Seeder::class,
         ]);
     }
