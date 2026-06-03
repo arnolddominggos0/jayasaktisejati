@@ -2,7 +2,7 @@
 
 return [
     'manado' => [
-        'customer_ids' => [31, 32],
+        'customer_ids' => [1],
         'thresholds' => [
             'dwelling_days' => 6,
             'sailing_days'  => 10,
