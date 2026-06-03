@@ -6,7 +6,7 @@
         $top        = $this->getTopCustomers();
         $lt         = $this->getLeadTimeSummary();
         $activities = $this->getRecentActivities();
-        
+
         $dashboardData = [
             'brandHex' => $this->brandHex,
             'spark'    => $kpi['sparkline'] ?? [],
@@ -15,42 +15,54 @@
         ];
         $cardClass = 'bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700';
 
-        $tamLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun'];
-
-        $tamTableData = [
-            ['month' => 'Januari',  'dw' => 4.88, 'sl' => 10.47, 'dr' => 1.00],
-            ['month' => 'Februari', 'dw' => 2.66, 'sl' => 10.34, 'dr' => 1.92],
-            ['month' => 'Maret',    'dw' => 2.97, 'sl' => 9.57,  'dr' => 1.20],
-            ['month' => 'April',    'dw' => 2.69, 'sl' => 11.15, 'dr' => 1.00],
-            ['month' => 'Mei',      'dw' => 2.38, 'sl' => 10.43, 'dr' => 2.09],
-            ['month' => 'Juni',     'dw' => 3.33, 'sl' => 11.16, 'dr' => 2.00],
-        ];
+        $tamLeadTime = $this->getTamLeadTimeSeries();
+        $tamEval = $this->getTamLeadTimeEvaluation();
+        $tamKpi = $this->getTamKpiSummary();
+        $tamPortStock = $this->getTamPortStockSummary();
+        $tamMonthly = $this->getTamMonthlyBreakdown();
 
         function getStatusColor($val, $threshold) {
-            return $val > $threshold 
-                ? 'text-red-600 font-bold bg-red-50 ring-1 ring-red-100 rounded' 
+            if ($val === null) return 'text-gray-400';
+            return $val > $threshold
+                ? 'text-red-600 font-bold bg-red-50 ring-1 ring-red-100 rounded'
                 : 'text-gray-600';
         }
+
+        $tamLabels = array_column($tamMonthly['rows'], 'month');
+        $tamTargets = $tamMonthly['targets'];
 
         $tamConfig = [
             'labels' => $tamLabels,
             'leadTime' => [
-                'dwelling' => array_column($tamTableData, 'dw'),
-                'sailing'  => array_column($tamTableData, 'sl'),
-                'dooring'  => array_column($tamTableData, 'dr'),
-                'standard' => [19, 19, 19, 19, 19, 19]
+                'dwelling' => array_column($tamMonthly['rows'], 'dw'),
+                'sailing'  => array_column($tamMonthly['rows'], 'sl'),
+                'dooring'  => array_column($tamMonthly['rows'], 'dr'),
+                'standard' => array_fill(0, count($tamLabels), $tamTargets['dwelling'] + $tamTargets['sailing'] + $tamTargets['dooring']),
             ],
-            'racking' => ['rack' => [88, 90, 85, 92, 80, 85], 'reg' => [12, 10, 15, 8, 20, 15]],
-            'achievement' => ['ok' => [95, 98, 90, 92, 95, 91], 'ng' => [5, 2, 10, 8, 5, 9]]
+            'achievement' => [
+                'labels' => ['Dwelling', 'Sailing', 'Dooring', 'Total'],
+                'ok' => [
+                    $tamEval['dwelling']['ok_pct'] ?? 0,
+                    $tamEval['sailing']['ok_pct'] ?? 0,
+                    $tamEval['dooring']['ok_pct'] ?? 0,
+                    $tamEval['total']['ok_pct'] ?? 0,
+                ],
+                'ng' => [
+                    $tamEval['dwelling']['ng_pct'] ?? 0,
+                    $tamEval['sailing']['ng_pct'] ?? 0,
+                    $tamEval['dooring']['ng_pct'] ?? 0,
+                    $tamEval['total']['ng_pct'] ?? 0,
+                ],
+            ],
         ];
 
         $ongoingMetrics = [
-            ['title' => 'Unit di Tj Priok', 'val' => '0',      'icon' => 'heroicon-o-map-pin', 'color' => 'text-blue-600', 'bg' => 'bg-blue-50'],
-            ['title' => 'Rata" Port',    'val' => '0',      'icon' => 'heroicon-o-clock',   'color' => 'text-orange-600', 'bg' => 'bg-orange-50'],
-            ['title' => 'Unit Sailing',     'val' => '52',     'icon' => 'heroicon-o-paper-airplane', 'color' => 'text-indigo-600', 'bg' => 'bg-indigo-50'],
-            ['title' => 'Max Sailing (D)',  'val' => '588,24', 'icon' => 'heroicon-o-chart-bar', 'color' => 'text-purple-600', 'bg' => 'bg-purple-50'],
-            ['title' => 'Remain Dooring',   'val' => '53',     'icon' => 'heroicon-o-truck',   'color' => 'text-emerald-600', 'bg' => 'bg-emerald-50'],
-            ['title' => 'Dwelling Bitung',  'val' => '26.4',   'icon' => 'heroicon-o-home-modern', 'color' => 'text-cyan-600', 'bg' => 'bg-cyan-50'],
+            ['title' => 'Unit di Port', 'val' => $tamPortStock['total'] ?? 0, 'icon' => 'heroicon-o-map-pin', 'color' => 'text-blue-600', 'bg' => 'bg-blue-50'],
+            ['title' => 'Rata-rata Port (Hari)', 'val' => number_format($tamPortStock['avg_age'] ?? 0, 1), 'icon' => 'heroicon-o-clock', 'color' => 'text-orange-600', 'bg' => 'bg-orange-50'],
+            ['title' => 'Total Delivered', 'val' => $tamKpi['total'] ?? 0, 'icon' => 'heroicon-o-paper-airplane', 'color' => 'text-indigo-600', 'bg' => 'bg-indigo-50'],
+            ['title' => 'On Time (%)', 'val' => number_format($tamKpi['on_time_pct'] ?? 0, 1) . '%', 'icon' => 'heroicon-o-check-circle', 'color' => 'text-emerald-600', 'bg' => 'bg-emerald-50'],
+            ['title' => 'Late', 'val' => $tamKpi['late'] ?? 0, 'icon' => 'heroicon-o-exclamation-circle', 'color' => 'text-red-600', 'bg' => 'bg-red-50'],
+            ['title' => 'Over 3 Hari di Port', 'val' => $tamPortStock['over_three'] ?? 0, 'icon' => 'heroicon-o-home-modern', 'color' => 'text-cyan-600', 'bg' => 'bg-cyan-50'],
         ];
     @endphp
 
@@ -257,7 +269,7 @@
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Dwelling</p>
-                                <p class="text-lg font-bold text-gray-900">Std: 6 Hari</p>
+                                <p class="text-lg font-bold text-gray-900">{{ number_format($tamLeadTime['avg_days']['dwelling'] ?? 0, 1) }} <span class="text-xs font-normal text-gray-500">/ {{ $tamTargets['dwelling'] }} Hari</span></p>
                             </div>
                         </div>
 
@@ -268,7 +280,7 @@
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Sailing</p>
-                                <p class="text-lg font-bold text-gray-900">Std: 10 Hari</p>
+                                <p class="text-lg font-bold text-gray-900">{{ number_format($tamLeadTime['avg_days']['sailing'] ?? 0, 1) }} <span class="text-xs font-normal text-gray-500">/ {{ $tamTargets['sailing'] }} Hari</span></p>
                             </div>
                         </div>
 
@@ -279,7 +291,7 @@
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Dooring</p>
-                                <p class="text-lg font-bold text-gray-900">Std: 3 Hari</p>
+                                <p class="text-lg font-bold text-gray-900">{{ number_format($tamLeadTime['avg_days']['dooring'] ?? 0, 1) }} <span class="text-xs font-normal text-gray-500">/ {{ $tamTargets['dooring'] }} Hari</span></p>
                             </div>
                         </div>
                     </div>
@@ -301,26 +313,40 @@
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100">
-                                    @foreach($tamTableData as $row)
+                                    @foreach($tamMonthly['rows'] as $row)
                                     <tr class="hover:bg-gray-50 transition">
                                         <td class="px-6 py-3 font-medium text-gray-900">{{ $row['month'] }}</td>
                                         <td class="px-6 py-3 text-center">
-                                            <span class="px-2 py-1 {{ getStatusColor($row['dw'], 6) }}">
+                                            @if($row['dw'] !== null)
+                                            <span class="px-2 py-1 {{ getStatusColor($row['dw'], $tamTargets['dwelling']) }}">
                                                 {{ number_format($row['dw'], 2) }}
                                             </span>
+                                            @else
+                                            <span class="text-gray-400">—</span>
+                                            @endif
                                         </td>
                                         <td class="px-6 py-3 text-center">
-                                            <span class="px-2 py-1 {{ getStatusColor($row['sl'], 10) }}">
+                                            @if($row['sl'] !== null)
+                                            <span class="px-2 py-1 {{ getStatusColor($row['sl'], $tamTargets['sailing']) }}">
                                                 {{ number_format($row['sl'], 2) }}
                                             </span>
+                                            @else
+                                            <span class="text-gray-400">—</span>
+                                            @endif
                                         </td>
                                         <td class="px-6 py-3 text-center">
-                                            <span class="px-2 py-1 {{ getStatusColor($row['dr'], 3) }}">
+                                            @if($row['dr'] !== null)
+                                            <span class="px-2 py-1 {{ getStatusColor($row['dr'], $tamTargets['dooring']) }}">
                                                 {{ number_format($row['dr'], 2) }}
                                             </span>
+                                            @else
+                                            <span class="text-gray-400">—</span>
+                                            @endif
                                         </td>
                                         <td class="px-6 py-3 text-right">
-                                            @if($row['sl'] > 10 || $row['dw'] > 6)
+                                            @if($row['dw'] === null && $row['sl'] === null && $row['dr'] === null)
+                                                <span class="text-xs text-gray-400">—</span>
+                                            @elseif(($row['sl'] ?? 0) > $tamTargets['sailing'] || ($row['dw'] ?? 0) > $tamTargets['dwelling'])
                                                 <span class="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
                                                     <span class="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span> Warning
                                                 </span>
@@ -341,7 +367,7 @@
                 <div class="xl:col-span-5 bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col">
                     <div class="mb-6">
                         <h3 class="font-bold text-gray-800">Lead Time</h3>
-                        <p class="text-sm text-gray-500">Test Lorem ipsum dolor sit amet.</p>
+                        <p class="text-sm text-gray-500">Rata-rata lead time per bulan (6 bulan terakhir)</p>
                     </div>
                     
                     <div class="flex flex-wrap gap-4 mb-4 text-xs font-medium text-gray-600">
@@ -369,8 +395,8 @@
                 
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-gray-800 text-sm">Rak Available</h3>
-                        <x-heroicon-o-square-3-stack-3d class="w-5 h-5 text-gray-400" />
+                        <h3 class="font-bold text-gray-800 text-sm">KPI On Time</h3>
+                        <x-heroicon-o-presentation-chart-line class="w-5 h-5 text-gray-400" />
                     </div>
                     <div class="h-40">
                         <canvas id="tamRackChart"></canvas>
@@ -422,7 +448,7 @@
                 document.addEventListener('livewire:initialized', () => {
                     const config = @json($tamConfig);
 
-                    // main chart
+                    // main chart - Lead Time per month
                     const ctxMain = document.getElementById('tamMainChart');
                     if (ctxMain) {
                         new Chart(ctxMain, {
@@ -442,43 +468,44 @@
                                 plugins: { legend: { display: false } },
                                 scales: {
                                     x: { grid: { display: false }, ticks: { font: {size: 11} } },
-                                    y: { grid: { borderDash: [2, 4], color: '#f3f4f6' }, beginAtZero: true, max: 20 }
+                                    y: { grid: { borderDash: [2, 4], color: '#f3f4f6' }, beginAtZero: true, max: 25 }
                                 }
                             }
                         });
                     }
 
-                    // racking chart
+                    // KPI Summary chart (replaces rack chart)
                     const ctxRack = document.getElementById('tamRackChart');
                     if (ctxRack) {
+                        const kpiData = @json($tamKpi);
                         new Chart(ctxRack, {
-                            type: 'bar',
+                            type: 'doughnut',
                             data: {
-                                labels: config.labels,
-                                datasets: [
-                                    { label: 'Regular', data: config.racking.reg, backgroundColor: '#E5E7EB', borderRadius: 2 },
-                                    { label: 'Rack', data: config.racking.rack, backgroundColor: '#3B82F6', borderRadius: 2 },
-                                ]
+                                labels: ['On Time', 'Late'],
+                                datasets: [{
+                                    data: [kpiData.on_time || 0, kpiData.late || 0],
+                                    backgroundColor: ['#10B981', '#EF4444'],
+                                    borderWidth: 0
+                                }]
                             },
                             options: {
                                 responsive: true,
                                 maintainAspectRatio: false,
-                                plugins: { legend: { display: false } },
-                                scales: {
-                                    x: { stacked: true, grid: { display: false }, ticks: { font: {size: 9} } },
-                                    y: { stacked: true, display: false, max: 100 }
+                                cutout: '65%',
+                                plugins: {
+                                    legend: { display: false }
                                 }
                             }
                         });
                     }
 
-                     // achievement chart
+                     // achievement chart - OK vs NG percentage per KPI
                      const ctxAch = document.getElementById('tamAchieveChart');
                      if (ctxAch) {
                          new Chart(ctxAch, {
                              type: 'bar',
                              data: {
-                                 labels: config.labels,
+                                 labels: config.achievement.labels,
                                  datasets: [
                                      { label: 'NG', data: config.achievement.ng, backgroundColor: '#FECACA', borderRadius: 2 },
                                      { label: 'OK', data: config.achievement.ok, backgroundColor: '#10B981', borderRadius: 2 },
@@ -495,7 +522,7 @@
                              }
                          });
                      }
-                });
+                 });
             </script>
         @endpush
     @endonce
