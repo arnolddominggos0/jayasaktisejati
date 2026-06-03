@@ -11,9 +11,14 @@
                     default   => 'bg-slate-100 text-slate-600',
                 };
             @endphp
-            <div class="rounded-xl border p-3 flex items-center justify-between">
+            <div class="rounded-xl border p-3 flex items-center justify-between {{ ($it['is_backup'] ?? false) ? 'bg-indigo-50/50' : '' }}">
                 <div>
-                    <div class="font-medium text-slate-800">{{ $it['name'] }}</div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-medium text-slate-800">{{ $it['name'] }}</span>
+                        @if($it['is_backup'] ?? false)
+                            <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded bg-indigo-100 text-indigo-700">Backup MP</span>
+                        @endif
+                    </div>
                     <div class="text-xs text-slate-500">{{ strtoupper($it['role']) }}</div>
                 </div>
                 <div class="flex items-center gap-3">

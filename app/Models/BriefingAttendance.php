@@ -16,10 +16,12 @@ class BriefingAttendance extends Model
         'session_id',
         'manpower_id',
 
+        // mp type
+        'mp_type',
+        'backup_name',
+
         // attendance
         'attendance_status',
-	'mp_type',
-	'backup_name',
 
         // health check
         'temperature',
@@ -90,6 +92,20 @@ class BriefingAttendance extends Model
     | ACCESSORS
     |--------------------------------------------------------------------------
     */
+
+    public function getDisplayNameAttribute(): string
+    {
+        if ($this->mp_type === 'backup' && $this->backup_name) {
+            return $this->backup_name;
+        }
+
+        return $this->manpower?->name ?? '-';
+    }
+
+    public function getIsBackupAttribute(): bool
+    {
+        return $this->mp_type === 'backup';
+    }
 
     public function getBpAttribute(): ?string
     {

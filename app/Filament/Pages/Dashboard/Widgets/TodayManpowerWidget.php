@@ -24,6 +24,8 @@ class TodayManpowerWidget extends Widget
             ->limit(8)
             ->get()
             ->map(function (BriefingAttendance $r) {
+                $isBackup = $r->is_backup;
+
                 $domain = $r->manpower?->domain;
                 $role = is_object($domain) && method_exists($domain, 'label')
                     ? $domain->label()
@@ -34,10 +36,11 @@ class TodayManpowerWidget extends Widget
                     : (string) $r->attendance_status;
 
                 return [
-                    'name'   => $r->manpower?->name ?? '—',
-                    'role'   => $role ?: '—',
-                    'status' => $status,
-                    'time'   => optional($r->created_at)->format('H:i'),
+                    'name'      => $r->display_name,
+                    'role'      => $isBackup ? 'Backup MP' : ($role ?: '—'),
+                    'status'    => $status,
+                    'is_backup' => $isBackup,
+                    'time'      => optional($r->created_at)->format('H:i'),
                 ];
             })
             ->toArray();

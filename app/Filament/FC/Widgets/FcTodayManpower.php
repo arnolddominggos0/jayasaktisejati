@@ -47,6 +47,8 @@ class FcTodayManpower extends Widget
                 default => 4,
             })
             ->map(function (BriefingAttendance $r) {
+                $isBackup = $r->is_backup;
+
                 $domain = $r->manpower?->domain;
                 $role = is_object($domain) && method_exists($domain, 'label')
                     ? $domain->label()
@@ -69,13 +71,14 @@ class FcTodayManpower extends Widget
                 };
 
                 return [
-                    'name'       => $r->manpower?->name ?? '—',
-                    'role'       => $role ?: '—',
+                    'name'       => $r->display_name,
+                    'role'       => $isBackup ? 'Backup MP' : ($role ?: '—'),
                     'status'     => $status,
                     'fit'        => $isFit,
                     'fit_status' => $fitStatus ?: null,
                     'recheck'    => $needsRecheck,
                     'priority'   => $priority,
+                    'is_backup'  => $isBackup,
                     'time'       => optional($r->created_at)->format('H:i'),
                 ];
             })

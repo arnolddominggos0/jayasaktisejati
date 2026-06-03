@@ -79,9 +79,14 @@
                     default   => $it['fit_status'] ?? '—',
                 };
             @endphp
-            <div class="rounded-lg border border-l-4 {{ $borderColor }} bg-white p-2.5 dark:bg-gray-900 dark:border-gray-700 flex items-center justify-between gap-3">
+            <div class="rounded-lg border border-l-4 {{ $borderColor }} {{ ($it['is_backup'] ?? false) ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : 'bg-white dark:bg-gray-900' }} p-2.5 dark:border-gray-700 flex items-center justify-between gap-3">
                 <div class="min-w-0">
-                    <div class="font-medium text-sm text-gray-900 dark:text-white truncate">{{ $it['name'] }}</div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-medium text-sm text-gray-900 dark:text-white truncate">{{ $it['name'] }}</span>
+                        @if($it['is_backup'] ?? false)
+                            <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-semibold rounded bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400">Backup MP</span>
+                        @endif
+                    </div>
                     <div class="text-xs text-gray-500 dark:text-gray-400">{{ strtoupper($it['role']) }}</div>
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
