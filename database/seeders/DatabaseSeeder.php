@@ -12,6 +12,7 @@ class DatabaseSeeder extends Seeder
             InitialSetupSeeder::class,
             // May2026VesselPlanDraftSeeder::class,
             May2026Seeder::class,
+            TamMay2026Seeder::class,
         ]);
     }
 }

@@ -1,0 +1,3 @@
+shipment_code,customer_name,vin,engine_no,model,destination,vessel,voyage,pickup_date,delivered_date,status
+SHP-TAM-001,Toyota Astra Motor,MHKAA1BY1TJ015475,1NR-G326045,AVANZA,Manado,KM Tanto Cahaya V.384,VOY151TSLMNDJSS,2026-05-05,2026-05-19,delivered
+SHP-TAM-002,Toyota Astra Motor,MHKA6GJ6JTJ226303,3NR-H993168,CALYA,Manado,KM Tanto Cahaya V.384,VOY151TSLMNDJSS,2026-05-05,2026-05-19,delivered

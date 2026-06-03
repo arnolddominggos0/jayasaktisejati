@@ -43,8 +43,8 @@ class TamMay2026Seeder extends Seeder
                 [
                     'model' => 'Fortuner 2.4 VRZ',
                     'color' => 'Hitam',
-                    'pickup' => '2026-05-05 10:00:00',
-                    'unit_loading' => '2026-05-09 16:00:00',
+                    'pickup' => '2026-05-04 10:00:00',
+                    'unit_loading' => '2026-05-11 16:00:00',
                     'vessel_arrival' => '2026-05-17 09:00:00',
                     'delivered' => '2026-05-19 14:00:00',
                 ],
@@ -65,16 +65,16 @@ class TamMay2026Seeder extends Seeder
                 [
                     'model' => 'Rush 1.5 TRD',
                     'color' => 'Merah',
-                    'pickup' => '2026-05-08 09:00:00',
+                    'pickup' => '2026-05-07 09:00:00',
                     'unit_loading' => '2026-05-12 15:00:00',
-                    'vessel_arrival' => '2026-05-20 08:00:00',
-                    'delivered' => '2026-05-22 15:00:00',
+                    'vessel_arrival' => '2026-05-25 08:00:00',
+                    'delivered' => '2026-05-28 15:00:00',
                 ],
                 [
                     'model' => 'Hilux 2.4 G',
                     'color' => 'Abu-Abu',
                     'pickup' => '2026-05-08 11:00:00',
-                    'unit_loading' => '2026-05-12 17:00:00',
+                    'unit_loading' => '2026-05-13 17:00:00',
                     'vessel_arrival' => '2026-05-20 08:00:00',
                     'delivered' => '2026-05-22 09:00:00',
                 ],
@@ -95,10 +95,10 @@ class TamMay2026Seeder extends Seeder
                 [
                     'model' => 'Calya 1.2 G',
                     'color' => 'Silver',
-                    'pickup' => '2026-05-12 10:00:00',
-                    'unit_loading' => '2026-05-16 16:00:00',
-                    'vessel_arrival' => '2026-05-24 10:00:00',
-                    'delivered' => '2026-05-26 16:00:00',
+                    'pickup' => '2026-05-09 10:00:00',
+                    'unit_loading' => '2026-05-18 16:00:00',
+                    'vessel_arrival' => '2026-05-26 10:00:00',
+                    'delivered' => '2026-05-30 16:00:00',
                 ],
             ],
         ],
@@ -112,7 +112,7 @@ class TamMay2026Seeder extends Seeder
                     'pickup' => '2026-05-15 07:00:00',
                     'unit_loading' => '2026-05-19 13:00:00',
                     'vessel_arrival' => '2026-05-27 08:00:00',
-                    'delivered' => '2026-05-29 10:00:00',
+                    'delivered' => '2026-05-31 10:00:00',
                 ],
                 [
                     'model' => 'Veloz 1.5',
@@ -131,10 +131,10 @@ class TamMay2026Seeder extends Seeder
                 [
                     'model' => 'Fortuner 2.8 GR',
                     'color' => 'Hitam',
-                    'pickup' => '2026-05-19 08:00:00',
-                    'unit_loading' => '2026-05-23 14:00:00',
-                    'vessel_arrival' => '2026-05-31 09:00:00',
-                    'delivered' => '2026-06-02 11:00:00',
+                    'pickup' => '2026-05-17 08:00:00',
+                    'unit_loading' => '2026-05-24 14:00:00',
+                    'vessel_arrival' => '2026-06-02 09:00:00',
+                    'delivered' => '2026-06-06 11:00:00',
                 ],
                 [
                     'model' => 'Innova 2.0 G',
@@ -175,10 +175,10 @@ class TamMay2026Seeder extends Seeder
 
     private function ensureCustomer(): Customer
     {
-        return Customer::firstOrCreate(
-            ['name' => self::CUSTOMER_NAME],
+        return Customer::updateOrCreate(
+            ['code' => 'TAM-0001'],
             [
-                'code' => 'TAM-0001',
+                'name' => self::CUSTOMER_NAME,
                 'email' => 'tam@toyota.astra.co.id',
                 'phone' => '02153665800',
                 'type' => 'company',
@@ -234,10 +234,15 @@ class TamMay2026Seeder extends Seeder
         $deliveredAt = Carbon::parse($unit['delivered']);
         $pickupAt = Carbon::parse($unit['pickup']);
 
+        $voyage = \App\Models\Voyage::where('voyage_no', $vesselData['voyage_no'])->first();
+        $voyageId = $voyage ? $voyage->id : null;
+        $polId = $voyage ? $voyage->pol_id : null;
+        $podId = $voyage ? $voyage->pod_id : null;
+
         $existing = Shipment::where('code', $code)->first();
 
         if ($existing) {
-            Shipment::withoutEvents(function () use ($existing, $customer, $branch, $vesselData, $unit, $deliveredAt) {
+            Shipment::withoutEvents(function () use ($existing, $customer, $branch, $vesselData, $unit, $deliveredAt, $voyageId, $polId, $podId) {
                 $existing->update([
                     'customer_id' => $customer->id,
                     'branch_id' => $branch->id,
@@ -249,6 +254,9 @@ class TamMay2026Seeder extends Seeder
                     'route_summary' => self::ROUTE_FROM.' → '.self::ROUTE_TO,
                     'vessel_name' => $vesselData['vessel'],
                     'voyage' => $vesselData['voyage_no'],
+                    'voyage_id' => $voyageId,
+                    'pol_id' => $polId,
+                    'pod_id' => $podId,
                     'pol' => self::POL,
                     'pod' => self::POD,
                     'etd' => Carbon::parse($unit['unit_loading'])->subDay(),
@@ -271,7 +279,7 @@ class TamMay2026Seeder extends Seeder
         }
 
         $shipment = null;
-        Shipment::withoutEvents(function () use (&$shipment, $code, $customer, $branch, $vesselData, $unit, $deliveredAt) {
+        Shipment::withoutEvents(function () use (&$shipment, $code, $customer, $branch, $vesselData, $unit, $deliveredAt, $voyageId, $polId, $podId) {
             $shipment = Shipment::create([
                 'code' => $code,
                 'customer_id' => $customer->id,
@@ -285,6 +293,9 @@ class TamMay2026Seeder extends Seeder
                 'route_summary' => self::ROUTE_FROM.' → '.self::ROUTE_TO,
                 'vessel_name' => $vesselData['vessel'],
                 'voyage' => $vesselData['voyage_no'],
+                'voyage_id' => $voyageId,
+                'pol_id' => $polId,
+                'pod_id' => $podId,
                 'pol' => self::POL,
                 'pod' => self::POD,
                 'etd' => Carbon::parse($unit['unit_loading'])->subDay(),

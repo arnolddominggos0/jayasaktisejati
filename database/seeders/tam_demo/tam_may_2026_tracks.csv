@@ -1,0 +1,10 @@
+shipment_code,status,tracked_at
+SHP-TAM-001,pickup,2026-05-05
+SHP-TAM-001,unit_loading,2026-05-09
+SHP-TAM-001,vessel_arrival,2026-05-17
+SHP-TAM-001,delivered,2026-05-19
+
+SHP-TAM-002,pickup,2026-05-05
+SHP-TAM-002,unit_loading,2026-05-09
+SHP-TAM-002,vessel_arrival,2026-05-17
+SHP-TAM-002,delivered,2026-05-19
