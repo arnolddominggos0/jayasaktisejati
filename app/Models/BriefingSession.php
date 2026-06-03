@@ -16,6 +16,7 @@ class BriefingSession extends Model
     protected $fillable = [
 
         // session
+	'appsheet_id',
         'date',
         'depot_id',
         'coordinator_user_id',

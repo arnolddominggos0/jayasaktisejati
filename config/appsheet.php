@@ -48,6 +48,8 @@ return [
 
             'fields' => [
 
+		'appsheet_id' => 'ID',
+
                 // session
                 'date' => 'Tanggal',
                 'depot_id' => 'Depot ID',
@@ -94,6 +96,8 @@ return [
 
                 // attendance
                 'attendance_status' => 'Status Kehadiran',
+		'mp_type' => 'Tipe MP',
+		'backup_name' => 'Nama Backup MP',
 
                 // health
                 'temperature' => 'Suhu',

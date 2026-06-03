@@ -18,6 +18,8 @@ class BriefingAttendance extends Model
 
         // attendance
         'attendance_status',
+	'mp_type',
+	'backup_name',
 
         // health check
         'temperature',

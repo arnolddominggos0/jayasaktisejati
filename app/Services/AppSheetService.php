@@ -190,40 +190,87 @@ class AppSheetService
         $sessionId = $mappedData['session_id'] ?? null;
         $manpowerId = $mappedData['manpower_id'] ?? null;
 
-        if (! $sessionId || ! $manpowerId) {
+	$session = BriefingSession::where(
+        'appsheet_id',
+    	$sessionId
+	)->first();
 
-            throw new Exception(
-                'Session ID dan Manpower ID wajib diisi untuk Briefing Attendance'
-            );
-        }
+	if (! $session) {
+    	throw new Exception(
+       	"Session AppSheet {$sessionId} tidak ditemukan"
+    	);
+	}
+
+	$sessionId = $session->id;
+	$mappedData['session_id'] = $session->id;
+
+	$mpType = strtolower(
+           $mappedData['mp_type'] ?? 'regular'
+
+	);
+
+	$backupName = $mappedData['backup_name'] ?? null;
+
+	if (! $sessionId) {
+    	   throw new Exception('Session ID wajib diisi');
+	}
+
+	if (
+   	    $mpType === 'regular'
+    	&& ! $manpowerId
+	) {
+    		throw new Exception(
+        	'MP ID wajib untuk MP reguler'
+    	   );
+	}
+
+        if (
+    	    $mpType === 'backup'
+   	    && blank($backupName)
+	) {
+    	   throw new Exception(
+           'Nama Backup MP wajib diisi'
+     	   );
+    	 }
 
 
         BriefingSession::where('id', $sessionId)->exists()
             || throw new Exception("Briefing Session ID {$sessionId} tidak ditemukan");
 
+	$uniqueKeys = $mpType === 'backup'
+    	? [
+          'session_id' => $sessionId,
+          'backup_name' => $backupName,
+        ]
+	: [
+        'session_id' => $sessionId,
+        'manpower_id' => $manpowerId,
+   	];
+
         $result = match ($operation) {
 
             'create' => BriefingAttendance::updateOrCreate(
-                [
-                    'session_id' => $sessionId,
-                    'manpower_id' => $manpowerId,
-                ],
+		$uniqueKeys,
                 $mappedData
             ),
 
             'update' => BriefingAttendance::updateOrCreate(
-                [
-                    'session_id' => $sessionId,
-                    'manpower_id' => $manpowerId,
-                ],
+		$uniqueKeys,
                 $mappedData
             ),
             'delete' => BriefingAttendance::where(
-                'session_id',
-                $sessionId
-            )
-                ->where('manpower_id', $manpowerId)
-                ->delete(),
+    	    'session_id',
+   	     $sessionId
+     )
+    ->where(
+        $mpType === 'backup'
+            ? 'backup_name'
+            : 'manpower_id',
+        $mpType === 'backup'
+            ? $backupName
+            : $manpowerId
+    )
+    	->delete(),
             default => throw new Exception("Unknown operation: {$operation}"),
         };
         if ($operation !== 'delete') {
