@@ -46,14 +46,21 @@ class AppSheetWebhookController extends Controller
             $data = $request->validate([
                 'table' => 'required|string',
                 'operation' => 'required|string|in:create,update,delete',
-                'data' => 'required|array',
+                'data' => 'nullable|array',
                 'submitted_by_user_id' => 'nullable|integer|exists:users,id',
             ]);
 
             $table = $data['table'];
             $operation = $data['operation'];
-            $recordData = $data['data'];
             $submittedByUserId = $data['submitted_by_user_id'] ?? null;
+
+            if (! empty($data['data'])) {
+                $recordData = $data['data'];
+            } else {
+                $recordData = collect($request->all())
+                    ->except(['table', 'operation', 'submitted_by_user_id'])
+                    ->toArray();
+            }
 
             $allowedTables = array_keys(config('appsheet.tables', []));
             if (! in_array($table, $allowedTables, true)) {

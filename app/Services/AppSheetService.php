@@ -2,13 +2,12 @@
 
 namespace App\Services;
 
-use App\Enums\ShipmentStatus;
 use App\Enums\MPCheckStatus;
+use App\Enums\ShipmentStatus;
 use App\Models\AppSheetSyncLog;
 use App\Models\BriefingAttendance;
 use App\Models\BriefingAttendancePpeItem;
 use App\Models\BriefingChecklist;
-use App\Models\StockApdCheck;
 use App\Models\BriefingSession;
 use App\Models\Depot;
 use App\Models\EquipmentCheck;
@@ -16,12 +15,14 @@ use App\Models\LoadingFinding;
 use App\Models\LoadingSession;
 use App\Models\RackContainerCheck;
 use App\Models\Shipment;
+use App\Models\StockApdCheck;
 use App\Models\UnitCheck;
 use App\Models\User;
+use Carbon\Carbon;
 use DomainException;
 use Exception;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -54,10 +55,10 @@ class AppSheetService
             $data = $data['data'];
         }
         $data = array_merge($data, [
-            'attendance_id' => $root['attendance_id'] ?? $data['attendance_id'] ?? null
+            'attendance_id' => $root['attendance_id'] ?? $data['attendance_id'] ?? null,
         ]);
 
-        $log = $this->createSyncLog('webhook', $tableName, $data['id'] ?? null, $operation, $data, $submittedByUserId);
+        $log = $this->createSyncLog('webhook', $tableName, $data['id'] ?? $data['ID'] ?? null, $operation, $data, $submittedByUserId);
 
         try {
 
@@ -136,7 +137,7 @@ class AppSheetService
         }
 
         // Normalize date
-        $date = \Carbon\Carbon::parse($date)->format('Y-m-d');
+        $date = Carbon::parse($date)->format('Y-m-d');
         $mappedData['date'] = $date;
 
         Depot::where('id', $depotId)->exists()
@@ -187,104 +188,150 @@ class AppSheetService
             $submittedByUserId
         );
 
+        $appsheetId = $mappedData['appsheet_id'] ?? null;
+
+        if ($operation === 'delete') {
+            return $this->deleteBriefingAttendance($mappedData, $appsheetId);
+        }
+
         $sessionId = $mappedData['session_id'] ?? null;
         $manpowerId = $mappedData['manpower_id'] ?? null;
 
-	$session = BriefingSession::where(
-        'appsheet_id',
-    	$sessionId
-	)->first();
+        $session = BriefingSession::where(
+            'appsheet_id',
+            $sessionId
+        )->first();
 
-	if (! $session) {
-    	throw new Exception(
-       	"Session AppSheet {$sessionId} tidak ditemukan"
-    	);
-	}
+        if (! $session) {
+            throw new Exception(
+                "Session AppSheet {$sessionId} tidak ditemukan"
+            );
+        }
 
-	$sessionId = $session->id;
-	$mappedData['session_id'] = $session->id;
+        $sessionId = $session->id;
+        $mappedData['session_id'] = $session->id;
 
-	$mpType = strtolower(
-           $mappedData['mp_type'] ?? 'regular'
+        $mpType = strtolower(
+            $mappedData['mp_type'] ?? 'regular'
+        );
 
-	);
+        $backupName = $mappedData['backup_name'] ?? null;
 
-	$backupName = $mappedData['backup_name'] ?? null;
-	Log::info('DEBUG MP CHECK', [
-    'mappedData' => $mappedData,
-    'mpType' => $mpType,
-    'backupName' => $backupName,
-    'manpowerId' => $manpowerId,
-]);
+        Log::info('DEBUG MP CHECK', [
+            'mappedData' => $mappedData,
+            'mpType' => $mpType,
+            'backupName' => $backupName,
+            'manpowerId' => $manpowerId,
+        ]);
 
-	if (! $sessionId) {
-    	   throw new Exception('Session ID wajib diisi');
-	}
-
-	if (
-   	    $mpType === 'regular'
-    	&& ! $manpowerId
-	) {
-    		throw new Exception(
-        	'MP ID wajib untuk MP reguler'
-    	   );
-	}
+        if (! $sessionId) {
+            throw new Exception('Session ID wajib diisi');
+        }
 
         if (
-    	    $mpType === 'backup'
-   	    && blank($backupName)
-	) {
-    	   throw new Exception(
-           'Nama Backup MP wajib diisi'
-     	   );
-    	 }
+            $mpType === 'regular'
+            && ! $manpowerId
+        ) {
+            throw new Exception(
+                'MP ID wajib untuk MP reguler'
+            );
+        }
 
+        if (
+            $mpType === 'backup'
+            && blank($backupName)
+        ) {
+            throw new Exception(
+                'Nama Backup MP wajib diisi'
+            );
+        }
 
         BriefingSession::where('id', $sessionId)->exists()
             || throw new Exception("Briefing Session ID {$sessionId} tidak ditemukan");
 
-	$uniqueKeys = $mpType === 'backup'
-    	? [
-          'session_id' => $sessionId,
-          'backup_name' => $backupName,
-        ]
-	: [
-        'session_id' => $sessionId,
-        'manpower_id' => $manpowerId,
-   	];
+        $uniqueKeys = $mpType === 'backup'
+            ? [
+                'session_id' => $sessionId,
+                'backup_name' => $backupName,
+            ]
+            : [
+                'session_id' => $sessionId,
+                'manpower_id' => $manpowerId,
+            ];
 
         $result = match ($operation) {
 
             'create' => BriefingAttendance::updateOrCreate(
-		$uniqueKeys,
+                $uniqueKeys,
                 $mappedData
             ),
 
             'update' => BriefingAttendance::updateOrCreate(
-		$uniqueKeys,
+                $uniqueKeys,
                 $mappedData
             ),
-            'delete' => BriefingAttendance::where(
-    	    'session_id',
-   	     $sessionId
-     )
-    ->where(
-        $mpType === 'backup'
-            ? 'backup_name'
-            : 'manpower_id',
-        $mpType === 'backup'
-            ? $backupName
-            : $manpowerId
-    )
-    	->delete(),
+
             default => throw new Exception("Unknown operation: {$operation}"),
         };
-        if ($operation !== 'delete') {
 
-            $this->evaluateBriefingSession($sessionId);
-        }
+        $this->evaluateBriefingSession($sessionId);
 
         return $result;
+    }
+
+    protected function deleteBriefingAttendance(array $mappedData, ?string $appsheetId): int
+    {
+        $resolvedSessionId = null;
+
+        if ($appsheetId) {
+            $record = BriefingAttendance::where('appsheet_id', $appsheetId)->first();
+
+            if ($record) {
+                $resolvedSessionId = $record->session_id;
+                $record->delete();
+
+                if ($resolvedSessionId) {
+                    $this->evaluateBriefingSession($resolvedSessionId);
+                }
+
+                return 1;
+            }
+        }
+
+        $rawSessionId = $mappedData['session_id'] ?? null;
+        $manpowerId = $mappedData['manpower_id'] ?? null;
+        $mpType = strtolower($mappedData['mp_type'] ?? 'regular');
+        $backupName = $mappedData['backup_name'] ?? null;
+
+        if ($rawSessionId) {
+            $session = BriefingSession::where('appsheet_id', $rawSessionId)->first();
+
+            if ($session) {
+                $resolvedSessionId = $session->id;
+            }
+        }
+
+        if (! $resolvedSessionId) {
+            throw new Exception(
+                "Delete gagal: record dengan appsheet_id {$appsheetId} tidak ditemukan"
+            );
+        }
+
+        if ($mpType === 'backup' && $backupName) {
+            $deleted = BriefingAttendance::where('session_id', $resolvedSessionId)
+                ->where('backup_name', $backupName)
+                ->delete();
+        } elseif ($manpowerId) {
+            $deleted = BriefingAttendance::where('session_id', $resolvedSessionId)
+                ->where('manpower_id', $manpowerId)
+                ->delete();
+        } else {
+            throw new Exception('Delete gagal: record tidak dapat diidentifikasi');
+        }
+
+        $this->evaluateBriefingSession($resolvedSessionId);
+
+        return $deleted;
     }
 
     protected function syncBriefingPpeItem(array $data, string $operation, ?int $submittedByUserId = null)
@@ -301,22 +348,22 @@ class AppSheetService
         $ppeType = $mappedData['ppe_type'] ?? null;
         $condition = $mappedData['condition'] ?? null;
 
-        if (!$attendanceId) {
+        if (! $attendanceId) {
             throw new Exception('DEBUG: attendance_id NULL');
         }
 
         $attendance = BriefingAttendance::find($attendanceId);
 
-        if (!$attendance) {
-            throw new \Exception("DEBUG: attendance {$attendanceId} NOT FOUND");
+        if (! $attendance) {
+            throw new Exception("DEBUG: attendance {$attendanceId} NOT FOUND");
         }
 
-        if (!$ppeType) {
-            throw new \Exception('DEBUG: ppe_type NULL');
+        if (! $ppeType) {
+            throw new Exception('DEBUG: ppe_type NULL');
         }
 
-        if (!$condition) {
-            throw new \Exception('DEBUG: condition NULL');
+        if (! $condition) {
+            throw new Exception('DEBUG: condition NULL');
         }
 
         return match ($operation) {
@@ -334,7 +381,7 @@ class AppSheetService
                 'ppe_type',
                 $ppeType
             )->delete(),
-            default => throw new \Exception("Unknown operation: {$operation}"),
+            default => throw new Exception("Unknown operation: {$operation}"),
         };
     }
 
@@ -342,8 +389,8 @@ class AppSheetService
     {
         $id = $mappedData['id'] ?? $data['id'] ?? null;
 
-        if (!$id) {
-            throw new \Exception('ID wajib diisi untuk delete PPE item');
+        if (! $id) {
+            throw new Exception('ID wajib diisi untuk delete PPE item');
         }
 
         return BriefingAttendancePpeItem::where('id', $id)->delete();
@@ -531,7 +578,7 @@ class AppSheetService
             throw new Exception("Table configuration not found: {$table}");
         }
 
-	        $mapped = [];
+        $mapped = [];
 
         foreach ($config['fields'] as $laravelField => $appSheetField) {
 
@@ -556,13 +603,13 @@ class AppSheetService
 
             $mapped['checked_by'] = $user;
         }
-       if (array_key_exists('has_ppe', $mapped)) {
-    	$mapped['has_ppe'] = $mapped['has_ppe'] ?? false;
-	}
+        if (array_key_exists('has_ppe', $mapped)) {
+            $mapped['has_ppe'] = $mapped['has_ppe'] ?? false;
+        }
 
-if (array_key_exists('recheck_required', $mapped)) {
-    $mapped['recheck_required'] = $mapped['recheck_required'] ?? false;
-}
+        if (array_key_exists('recheck_required', $mapped)) {
+            $mapped['recheck_required'] = $mapped['recheck_required'] ?? false;
+        }
 
         return $mapped;
     }
@@ -581,16 +628,16 @@ if (array_key_exists('recheck_required', $mapped)) {
             if ($fieldName === 'fit_status') {
                 return strtoupper(trim($value));
             }
-       	    if ($fieldName === 'attendance_status') {
+            if ($fieldName === 'attendance_status') {
                 return match (strtolower(trim($value))) {
                     'hadir' => 'present',
                     'tidak hadir' => 'absent',
                     'sakit' => 'sick',
                     'izin' => 'leave',
                     default => $value,
-                 };
-             }
-          }
+                };
+            }
+        }
 
         return $value;
     }
@@ -784,7 +831,7 @@ if (array_key_exists('recheck_required', $mapped)) {
         }
 
         if ($this->loggingEnabled) {
-            Log::channel('appsheet')->warning("[DEPRECATED] AppSheet payload accepted using legacy scope fallback", [
+            Log::channel('appsheet')->warning('[DEPRECATED] AppSheet payload accepted using legacy scope fallback', [
                 'user_id' => $user->id,
                 'table' => $tableName,
                 'branch_id' => $branchId,
@@ -825,7 +872,7 @@ if (array_key_exists('recheck_required', $mapped)) {
 
         if (! in_array($shipment->status, ShipmentStatus::inProgress(), true)) {
             throw new DomainException(
-                'Form tidak dapat disubmit untuk shipment dengan status "' . $shipment->status->label() . '".'
+                'Form tidak dapat disubmit untuk shipment dengan status "'.$shipment->status->label().'".'
             );
         }
     }
@@ -930,8 +977,8 @@ if (array_key_exists('recheck_required', $mapped)) {
                 $extension = $mimeMap[$contentType] ?? 'jpg';
             }
 
-            $filename = $folder . '/' . now()->format('Y/m') . '/'
-                . Str::uuid() . '.' . $extension;
+            $filename = $folder.'/'.now()->format('Y/m').'/'
+                .Str::uuid().'.'.$extension;
 
             Storage::disk('public')->put(
                 $filename,

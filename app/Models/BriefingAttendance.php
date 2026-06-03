@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AttendanceStatus;
+use App\Enums\PpeCondition;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -11,6 +12,8 @@ class BriefingAttendance extends Model
     protected $table = 'briefing_attendances';
 
     protected $fillable = [
+
+        'appsheet_id',
 
         // relations
         'session_id',
@@ -95,72 +98,72 @@ class BriefingAttendance extends Model
 
     public function getDisplayNameAttribute(): string
     {
-       if (
-        strtolower((string) $this->mp_type) === 'backup'
-        && filled($this->backup_name)
-    ) {
-        return $this->backup_name;
-    }
+        if (
+            strtolower((string) $this->mp_type) === 'backup'
+            && filled($this->backup_name)
+        ) {
+            return $this->backup_name;
+        }
 
         return $this->manpower?->name ?? '-';
     }
 
     public function getFinalMpStatusAttribute(): string
     {
-    $attendanceStatus =
-        $this->attendance_status?->value
-        ?? $this->attendance_status;
+        $attendanceStatus =
+            $this->attendance_status?->value
+            ?? $this->attendance_status;
 
-    // Tidak Hadir
-    if ($attendanceStatus !== 'present') {
-        return 'Tidak Hadir';
-    }
+        // Tidak Hadir
+        if ($attendanceStatus !== 'present') {
+            return 'Tidak Hadir';
+        }
 
-    // Siap Kerja (hasil pemeriksaan ulang FIT + APD lengkap)
-    if (
-        strtoupper((string) $this->recheck_result) === 'FIT'
-        && $this->has_ppe
-    ) {
-        return 'Siap Kerja';
-    }
+        // Siap Kerja (hasil pemeriksaan ulang FIT + APD lengkap)
+        if (
+            strtoupper((string) $this->recheck_result) === 'FIT'
+            && $this->has_ppe
+        ) {
+            return 'Siap Kerja';
+        }
 
-    // Siap Kerja (FIT awal + APD lengkap + belum recheck)
-    if (
-        strtoupper((string) $this->fit_status) === 'FIT'
-        && blank($this->recheck_result)
-        && $this->has_ppe
-    ) {
-        return 'Siap Kerja';
-    }
+        // Siap Kerja (FIT awal + APD lengkap + belum recheck)
+        if (
+            strtoupper((string) $this->fit_status) === 'FIT'
+            && blank($this->recheck_result)
+            && $this->has_ppe
+        ) {
+            return 'Siap Kerja';
+        }
 
-    // APD Tidak Lengkap
-    if ($this->has_ppe === false) {
-        return 'APD Tidak Lengkap';
-    }
+        // APD Tidak Lengkap
+        if ($this->has_ppe === false) {
+            return 'APD Tidak Lengkap';
+        }
 
-    // Istirahat 30 Menit
-    if (
-        $this->medical_action === 'Istirahat 30 menit'
-        && blank($this->recheck_result)
-    ) {
-        return 'Istirahat 30 Menit';
-    }
+        // Istirahat 30 Menit
+        if (
+            $this->medical_action === 'Istirahat 30 menit'
+            && blank($this->recheck_result)
+        ) {
+            return 'Istirahat 30 Menit';
+        }
 
-    // Tidak Fit (hasil recheck final)
-    if (
-        strtoupper((string) $this->recheck_result) === 'TIDAK FIT'
-    ) {
-        return 'Tidak Fit';
-    }
+        // Tidak Fit (hasil recheck final)
+        if (
+            strtoupper((string) $this->recheck_result) === 'TIDAK FIT'
+        ) {
+            return 'Tidak Fit';
+        }
 
-    // Perlu Pemeriksaan Ulang
-    if (
-        strtoupper((string) $this->fit_status) === 'TIDAK FIT'
-    ) {
-        return 'Perlu Pemeriksaan Ulang';
-    }
+        // Perlu Pemeriksaan Ulang
+        if (
+            strtoupper((string) $this->fit_status) === 'TIDAK FIT'
+        ) {
+            return 'Perlu Pemeriksaan Ulang';
+        }
 
-    return 'Belum Dinilai';
+        return 'Belum Dinilai';
     }
 
     public function getIsBackupAttribute(): bool
@@ -169,17 +172,17 @@ class BriefingAttendance extends Model
     }
 
     public function getBpAttribute(): ?string
-{
-    if ($this->bp_systolic && $this->bp_diastolic) {
-        return "{$this->bp_systolic}/{$this->bp_diastolic}";
-    }
+    {
+        if ($this->bp_systolic && $this->bp_diastolic) {
+            return "{$this->bp_systolic}/{$this->bp_diastolic}";
+        }
 
-    return null;
-}
+        return null;
+    }
 
     public function setBpAttribute(?string $value): void
     {
-        if (!$value) {
+        if (! $value) {
 
             $this->bp_systolic = null;
             $this->bp_diastolic = null;
@@ -207,7 +210,7 @@ class BriefingAttendance extends Model
 
         return $items->count() >= 4
             && $items->every(
-                fn($c) => $c === \App\Enums\PpeCondition::Baik
+                fn ($c) => $c === PpeCondition::Baik
             );
     }
 
@@ -223,7 +226,7 @@ class BriefingAttendance extends Model
 
             $session = $attendance->session;
 
-            if (!$session) {
+            if (! $session) {
                 return;
             }
 

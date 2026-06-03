@@ -2,7 +2,6 @@
 
 namespace App\Filament\FC\Widgets;
 
-use App\Enums\AttendanceStatus;
 use App\Models\BriefingAttendance;
 use Filament\Facades\Filament;
 use Filament\Widgets\Widget;
@@ -32,19 +31,22 @@ class FcTodayManpower extends Widget
 
         $totalPresent = $allAttendances->where('attendance_status', 'present')->count();
         $totalFit = $allAttendances->filter(fn ($a) => $a->final_mp_status === 'Siap Kerja')->count();
-        $totalUnfit = $allAttendances->filter(fn ($a) =>in_array($a->final_mp_status, ['Tidak Fit', 'Perlu Pemeriksaan Ulang'], true))->count();
-        $totalSick = $allAttendances->where('attendance_status', 'sick')->count();
-        $totalAbsent = $allAttendances->where('attendance_status', 'absent')->count();
+        $totalUnfit = $allAttendances->filter(fn ($a) => in_array($a->final_mp_status, ['Perlu Pemeriksaan Ulang', 'Tidak Fit'], true))->count();
+        $totalPending = $allAttendances->filter(fn ($a) => in_array($a->final_mp_status, ['Belum Dinilai', 'APD Tidak Lengkap', 'Istirahat 30 Menit'], true))->count();
+        $totalAbsent = $allAttendances->filter(fn ($a) => $a->final_mp_status === 'Tidak Hadir')->count();
 
         $attendances = (clone $countsQuery)->latest('created_at')->limit(20)->get();
 
         $items = $attendances
-            ->sortByDesc(fn ($a) => match (true) {
-                $a->attendance_status === 'present' && $a->fit_status === 'FIT' => 0,
-                $a->attendance_status === 'present' && $a->recheck_required => 1,
-                $a->attendance_status === 'present' => 2,
-                $a->attendance_status === 'sick' => 3,
-                default => 4,
+            ->sortBy(fn ($a) => match ($a->final_mp_status) {
+                'Perlu Pemeriksaan Ulang' => 0,
+                'Tidak Fit'               => 1,
+                'APD Tidak Lengkap'       => 2,
+                'Istirahat 30 Menit'      => 3,
+                'Belum Dinilai'           => 4,
+                'Siap Kerja'              => 5,
+                'Tidak Hadir'             => 6,
+                default                   => 7,
             })
             ->map(function (BriefingAttendance $r) {
                 $isBackup = $r->is_backup;
@@ -54,32 +56,12 @@ class FcTodayManpower extends Widget
                     ? $domain->label()
                     : (string) ($domain ?? '—');
 
-                $status = $r->attendance_status instanceof AttendanceStatus
-                    ? $r->attendance_status->label()
-                    : (string) $r->attendance_status;
-
-                $fitStatus = $r->fit_status;
-                $isFit = $fitStatus === 'FIT';
-                $needsRecheck = $r->recheck_required ?? false;
-
-                $priority = match (true) {
-                    $r->attendance_status === 'present' && $isFit => 'fit',
-                    $r->attendance_status === 'present' && $needsRecheck => 'recheck',
-                    $r->attendance_status === 'present' && !$isFit => 'unfit',
-                    $r->attendance_status === 'sick' => 'sick',
-                    default => 'absent',
-                };
-
                 return [
-                    'name'       => $r->display_name,
-                    'role'       => $isBackup ? 'Backup MP' : ($role ?: '—'),
-                    'status'     => $status,
-                    'fit'        => $isFit,
-                    'fit_status' => $fitStatus ?: null,
-                    'recheck'    => $needsRecheck,
-                    'priority'   => $priority,
-                    'is_backup'  => $isBackup,
-                    'time'       => optional($r->created_at)->format('H:i'),
+                    'name'            => $r->display_name,
+                    'role'            => $isBackup ? 'Backup MP' : ($role ?: '—'),
+                    'final_mp_status' => $r->final_mp_status,
+                    'is_backup'       => $isBackup,
+                    'time'            => optional($r->created_at)->format('H:i'),
                 ];
             })
             ->values()
@@ -90,7 +72,7 @@ class FcTodayManpower extends Widget
             'totalPresent' => $totalPresent,
             'totalFit' => $totalFit,
             'totalUnfit' => $totalUnfit,
-            'totalSick' => $totalSick,
+            'totalPending' => $totalPending,
             'totalAbsent' => $totalAbsent,
         ];
     }

@@ -3,6 +3,7 @@
 use App\Models\BriefingAttendance;
 use App\Models\BriefingAttendancePpeItem;
 use App\Models\BriefingChecklist;
+use App\Models\BriefingSession;
 use App\Models\EquipmentCheck;
 use App\Models\LoadingFinding;
 use App\Models\LoadingSession;
@@ -42,13 +43,13 @@ return [
         'mp_check' => [
             'appsheet_table' => 'mp_check',
 
-            'model' => \App\Models\BriefingSession::class,
+            'model' => BriefingSession::class,
 
             'primary_key' => ['date', 'depot_id'],
 
             'fields' => [
 
-		'appsheet_id' => 'ID',
+                'appsheet_id' => 'ID',
 
                 // session
                 'date' => 'Tanggal',
@@ -82,7 +83,7 @@ return [
 
             'appsheet_table' => 'detail_mp_check',
 
-            'model' => \App\Models\BriefingAttendance::class,
+            'model' => BriefingAttendance::class,
 
             'primary_key' => ['session_id', 'manpower_id'],
 
@@ -90,14 +91,16 @@ return [
 
             'fields' => [
 
+                'appsheet_id' => 'ID',
+
                 // relation
                 'session_id' => 'Sesi ID',
                 'manpower_id' => 'MP ID',
 
                 // attendance
                 'attendance_status' => 'Status Kehadiran',
-		'mp_type' => 'Tipe MP',
-		'backup_name' => 'Nama Backup MP',
+                'mp_type' => 'Tipe MP',
+                'backup_name' => 'Nama Backup MP',
 
                 // health
                 'temperature' => 'Suhu',
@@ -134,7 +137,7 @@ return [
 
             'appsheet_table' => 'stok_apd_check',
 
-            'model' => \App\Models\StockApdCheck::class,
+            'model' => StockApdCheck::class,
 
             'primary_key' => ['session_id', 'ppe_type'],
 
@@ -312,6 +315,5 @@ return [
 
     // Timeout untuk API calls (dalam detik)
     'timeout' => 30,
-    
-];
 
+];

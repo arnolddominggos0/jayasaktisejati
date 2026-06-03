@@ -4,7 +4,7 @@
     $totalPresent = $data['totalPresent'];
     $totalFit = $data['totalFit'];
     $totalUnfit = $data['totalUnfit'];
-    $totalSick = $data['totalSick'];
+    $totalPending = $data['totalPending'];
     $totalAbsent = $data['totalAbsent'];
 @endphp
 
@@ -21,7 +21,7 @@
             <div class="flex items-center gap-3 text-sm">
                 <span class="inline-flex items-center gap-1">
                     <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
-                    <span class="text-gray-600 dark:text-gray-400">FIT: <span class="font-semibold text-emerald-700 dark:text-emerald-400">{{ $totalFit }}</span></span>
+                    <span class="text-gray-600 dark:text-gray-400">Siap Kerja: <span class="font-semibold text-emerald-700 dark:text-emerald-400">{{ $totalFit }}</span></span>
                 </span>
                 @if($totalUnfit > 0)
                     <span class="inline-flex items-center gap-1">
@@ -29,16 +29,16 @@
                         <span class="text-red-700 dark:text-red-400">Tidak Fit: <span class="font-semibold">{{ $totalUnfit }}</span></span>
                     </span>
                 @endif
-                @if($totalSick > 0)
+                @if($totalPending > 0)
                     <span class="inline-flex items-center gap-1">
                         <span class="h-2 w-2 rounded-full bg-amber-500"></span>
-                        <span class="text-amber-700 dark:text-amber-400">Sakit: <span class="font-semibold">{{ $totalSick }}</span></span>
+                        <span class="text-amber-700 dark:text-amber-400">Belum Diperiksa: <span class="font-semibold">{{ $totalPending }}</span></span>
                     </span>
                 @endif
                 @if($totalAbsent > 0)
                     <span class="inline-flex items-center gap-1">
                         <span class="h-2 w-2 rounded-full bg-gray-400"></span>
-                        <span class="text-gray-500 dark:text-gray-400">Absen: <span class="font-semibold">{{ $totalAbsent }}</span></span>
+                        <span class="text-gray-500 dark:text-gray-400">Tidak Hadir: <span class="font-semibold">{{ $totalAbsent }}</span></span>
                     </span>
                 @endif
             </div>
@@ -48,35 +48,28 @@
     <div class="space-y-2">
         @forelse($items as $it)
             @php
-                $borderColor = match($it['priority']) {
-                    'fit'     => 'border-l-emerald-500',
-                    'recheck' => 'border-l-amber-500',
-                    'unfit'   => 'border-l-red-500',
-                    'sick'    => 'border-l-amber-400',
-                    default   => 'border-l-gray-300',
+                $fms = $it['final_mp_status'] ?? 'Belum Dinilai';
+
+                $borderColor = match($fms) {
+                    'Siap Kerja'              => 'border-l-emerald-500',
+                    'Perlu Pemeriksaan Ulang' => 'border-l-amber-500',
+                    'Tidak Fit'               => 'border-l-red-500',
+                    'APD Tidak Lengkap'       => 'border-l-orange-500',
+                    'Istirahat 30 Menit'      => 'border-l-blue-400',
+                    'Belum Dinilai'           => 'border-l-gray-300',
+                    'Tidak Hadir'             => 'border-l-gray-300',
+                    default                   => 'border-l-gray-300',
                 };
 
-                $fitBadge = match($it['priority']) {
-                    'fit'     => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
-                    'recheck' => 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
-                    'unfit'   => 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
-                    default   => 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
-                };
-
-                $statusBadge = match(strtolower($it['status'] ?? '')) {
-                    'present'  => 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-                    'leave'    => 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-                    'sick'     => 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-                    'absent'   => 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-                    default    => 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
-                };
-
-                $fitLabel = match($it['priority']) {
-                    'fit'     => 'FIT',
-                    'recheck' => 'RECHECK',
-                    'unfit'   => 'TIDAK FIT',
-                    'sick'    => '—',
-                    default   => $it['fit_status'] ?? '—',
+                $statusBadge = match($fms) {
+                    'Siap Kerja'              => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400',
+                    'Perlu Pemeriksaan Ulang' => 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400',
+                    'Tidak Fit'               => 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400',
+                    'APD Tidak Lengkap'       => 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400',
+                    'Istirahat 30 Menit'      => 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400',
+                    'Belum Dinilai'           => 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
+                    'Tidak Hadir'             => 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400',
+                    default                   => 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
                 };
             @endphp
             <div class="rounded-lg border border-l-4 {{ $borderColor }} {{ ($it['is_backup'] ?? false) ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : 'bg-white dark:bg-gray-900' }} p-2.5 dark:border-gray-700 flex items-center justify-between gap-3">
@@ -90,11 +83,8 @@
                     <div class="text-xs text-gray-500 dark:text-gray-400">{{ strtoupper($it['role']) }}</div>
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
-                    <span class="px-2 py-0.5 text-xs font-medium rounded-full {{ $fitBadge }}">
-                        {{ $fitLabel }}
-                    </span>
-                    <span class="px-2 py-0.5 text-xs rounded-full {{ $statusBadge }}">
-                        {{ ucfirst($it['status'] ?? '—') }}
+                    <span class="px-2 py-0.5 text-xs font-medium rounded-full {{ $statusBadge }}">
+                        {{ $fms }}
                     </span>
                     <span class="text-xs text-gray-400 tabular-nums">{{ $it['time'] ?? '-' }}</span>
                 </div>
