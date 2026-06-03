@@ -31,8 +31,8 @@ class FcTodayManpower extends Widget
         $allAttendances = $countsQuery->get();
 
         $totalPresent = $allAttendances->where('attendance_status', 'present')->count();
-        $totalFit = $allAttendances->filter(fn ($a) => $a->final_mp_status === 'Siap Kerja')->count();
-        $totalUnfit = $allAttendances->filter(fn ($a) =>in_array($a->final_mp_status, ['Tidak Fit', 'Perlu Pemeriksaan Ulang'], true))->count();
+        $totalFit = $allAttendances->where('fit_status', 'FIT')->count();
+        $totalUnfit = $allAttendances->filter(fn ($a) => $a->fit_status !== 'FIT' && $a->attendance_status === 'present')->count();
         $totalSick = $allAttendances->where('attendance_status', 'sick')->count();
         $totalAbsent = $allAttendances->where('attendance_status', 'absent')->count();
 

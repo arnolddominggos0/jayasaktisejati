@@ -210,12 +210,6 @@ class AppSheetService
 	);
 
 	$backupName = $mappedData['backup_name'] ?? null;
-	Log::info('DEBUG MP CHECK', [
-    'mappedData' => $mappedData,
-    'mpType' => $mpType,
-    'backupName' => $backupName,
-    'manpowerId' => $manpowerId,
-]);
 
 	if (! $sessionId) {
     	   throw new Exception('Session ID wajib diisi');
@@ -531,7 +525,7 @@ class AppSheetService
             throw new Exception("Table configuration not found: {$table}");
         }
 
-	        $mapped = [];
+        $mapped = [];
 
         foreach ($config['fields'] as $laravelField => $appSheetField) {
 
@@ -556,13 +550,6 @@ class AppSheetService
 
             $mapped['checked_by'] = $user;
         }
-       if (array_key_exists('has_ppe', $mapped)) {
-    	$mapped['has_ppe'] = $mapped['has_ppe'] ?? false;
-	}
-
-if (array_key_exists('recheck_required', $mapped)) {
-    $mapped['recheck_required'] = $mapped['recheck_required'] ?? false;
-}
 
         return $mapped;
     }

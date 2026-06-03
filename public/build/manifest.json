@@ -1,26 +1,26 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-DuqLPcks.css",
+    "file": "assets/app-DdCc4Pn5.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
   "resources/css/filament/admin/theme.css": {
-    "file": "assets/theme-fTppO6q6.css",
+    "file": "assets/theme-BrU6I4yI.css",
     "src": "resources/css/filament/admin/theme.css",
     "isEntry": true
   },
   "resources/css/filament/fc/theme.css": {
-    "file": "assets/theme-DVG2nDM5.css",
+    "file": "assets/theme-C3HTF8Wh.css",
     "src": "resources/css/filament/fc/theme.css",
     "isEntry": true
   },
   "resources/js/app.js": {
-    "file": "assets/app-BYDE2Bc9.js",
+    "file": "assets/app-CxR3H-nf.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "css": [
-      "assets/app-DuqLPcks.css"
+      "assets/app-DdCc4Pn5.css"
     ]
   }
 }
