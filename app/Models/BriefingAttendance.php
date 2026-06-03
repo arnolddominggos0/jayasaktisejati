@@ -95,26 +95,87 @@ class BriefingAttendance extends Model
 
     public function getDisplayNameAttribute(): string
     {
-        if ($this->mp_type === 'backup' && $this->backup_name) {
-            return $this->backup_name;
-        }
+       if (
+        strtolower((string) $this->mp_type) === 'backup'
+        && filled($this->backup_name)
+    ) {
+        return $this->backup_name;
+    }
 
         return $this->manpower?->name ?? '-';
     }
 
+    public function getFinalMpStatusAttribute(): string
+    {
+    $attendanceStatus =
+        $this->attendance_status?->value
+        ?? $this->attendance_status;
+
+    // Tidak Hadir
+    if ($attendanceStatus !== 'present') {
+        return 'Tidak Hadir';
+    }
+
+    // Siap Kerja (hasil pemeriksaan ulang FIT + APD lengkap)
+    if (
+        strtoupper((string) $this->recheck_result) === 'FIT'
+        && $this->has_ppe
+    ) {
+        return 'Siap Kerja';
+    }
+
+    // Siap Kerja (FIT awal + APD lengkap + belum recheck)
+    if (
+        strtoupper((string) $this->fit_status) === 'FIT'
+        && blank($this->recheck_result)
+        && $this->has_ppe
+    ) {
+        return 'Siap Kerja';
+    }
+
+    // APD Tidak Lengkap
+    if ($this->has_ppe === false) {
+        return 'APD Tidak Lengkap';
+    }
+
+    // Istirahat 30 Menit
+    if (
+        $this->medical_action === 'Istirahat 30 menit'
+        && blank($this->recheck_result)
+    ) {
+        return 'Istirahat 30 Menit';
+    }
+
+    // Tidak Fit (hasil recheck final)
+    if (
+        strtoupper((string) $this->recheck_result) === 'TIDAK FIT'
+    ) {
+        return 'Tidak Fit';
+    }
+
+    // Perlu Pemeriksaan Ulang
+    if (
+        strtoupper((string) $this->fit_status) === 'TIDAK FIT'
+    ) {
+        return 'Perlu Pemeriksaan Ulang';
+    }
+
+    return 'Belum Dinilai';
+    }
+
     public function getIsBackupAttribute(): bool
     {
-        return $this->mp_type === 'backup';
+        return strtolower((string) $this->mp_type) === 'backup';
     }
 
     public function getBpAttribute(): ?string
-    {
-        if ($this->bp_systolic && $this->bp_diastolic) {
-            return "{$this->bp_systolic}/{$this->bp_diastolic}";
-        }
-
-        return null;
+{
+    if ($this->bp_systolic && $this->bp_diastolic) {
+        return "{$this->bp_systolic}/{$this->bp_diastolic}";
     }
+
+    return null;
+}
 
     public function setBpAttribute(?string $value): void
     {

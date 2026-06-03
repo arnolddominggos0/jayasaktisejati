@@ -32,9 +32,21 @@ class FcOperationalReadiness extends Widget
 
         $attendances = $session->attendances;
         $hadir = $attendances->where('attendance_status', 'present')->count();
-        $fit = $attendances->where('fit_status', 'FIT')->count();
-        $unfit = $attendances->filter(fn ($a) => $a->fit_status !== 'FIT' && $a->attendance_status === 'present')->count();
-        $recheck = $attendances->where('recheck_required', true)->count();
+        $fit = $attendances->filter(function ($a) {
+    return ($a->attendance_status?->value ?? null) === 'present'
+        && strtoupper((string) $a->fit_status) === 'FIT'
+        && $a->has_ppe === true;
+})->count();
+
+$recheck = $attendances->filter(function ($a) {
+    return ($a->attendance_status?->value ?? null) === 'present'
+        && strtoupper((string) $a->fit_status) === 'TIDAK FIT'
+        && blank($a->recheck_result);
+})->count();
+
+$unfit = $attendances->filter(function ($a) {
+    return strtoupper((string) $a->recheck_result) === 'TIDAK FIT';
+})->count();
         $kebutuhan = (int) ($session->summary_headcount ?? 0);
 
         $apdChecks = $session->stockApdChecks;
