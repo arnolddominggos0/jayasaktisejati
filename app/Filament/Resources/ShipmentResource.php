@@ -947,13 +947,6 @@ class ShipmentResource extends Resource
                                     })
                                     ->columnSpan(12),
 
-                                Select::make('branch_id')
-                                    ->label('Cabang Operasional')
-                                    ->options(Branch::pluck('name', 'id'))
-                                    ->searchable()
-                                    ->visible(fn() => auth()->user()?->hasRole('super_admin'))
-                                    ->required(fn() => auth()->user()?->hasRole('super_admin')),
-
                                 Placeholder::make('assignment_hint')
                                     ->label('Status Penugasan Depo')
                                     ->content(function (?Shipment $record) {

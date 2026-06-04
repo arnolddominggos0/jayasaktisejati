@@ -22,7 +22,7 @@ class LeadTimeAnalysisService
         $customerIds = array_map('intval', $cfg['customer_ids'] ?? []);
 
         return Shipment::query()
-            ->when(! empty($customerIds), fn ($q) => $q->whereIn('customer_id', $customerIds))
+            ->when(! empty($customerIds), fn($q) => $q->whereIn('customer_id', $customerIds))
             ->whereNotNull('delivered_at')
             ->whereBetween('delivered_at', [$start, $end]);
     }
@@ -54,7 +54,7 @@ class LeadTimeAnalysisService
         }
 
         return $shipments
-            ->filter(fn ($s) => $s->voyage_id)
+            ->filter(fn($s) => $s->voyage_id)
             ->groupBy('voyage_id')
             ->map(function (Collection $group) {
                 $firstShipment = $group->first();
@@ -90,7 +90,9 @@ class LeadTimeAnalysisService
                     }
                 }
 
-                $qtyUnit = $group->sum(fn ($s) => max(1, $s->units->count() ?: 1));
+                $qtyUnit = $group->sum(function ($s) {
+                    return count($s->units ?? []);
+                });
 
                 return [
                     'voyage_id'    => $voyage?->id,
@@ -188,15 +190,16 @@ class LeadTimeAnalysisService
 
         if ($search) {
             $q = mb_strtolower($search);
-            $rows = $rows->filter(fn ($r) =>
+            $rows = $rows->filter(
+                fn($r) =>
                 str_contains(mb_strtolower($r['chassis_no']), $q) ||
-                str_contains(mb_strtolower($r['engine_no']), $q)
+                    str_contains(mb_strtolower($r['engine_no']), $q)
             );
         }
 
         if ($statusFilter && in_array($statusFilter, ['OK', 'NG'], true)) {
             $target = $statusFilter === 'OK' ? 'OK' : 'LATE';
-            $rows = $rows->filter(fn ($r) => $r['lt_status'] === $target);
+            $rows = $rows->filter(fn($r) => $r['lt_status'] === $target);
         }
 
         return $rows->values();

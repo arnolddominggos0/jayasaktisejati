@@ -32,21 +32,6 @@ class CreateShipment extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        if (empty($data['branch_id'])) {
-
-            // Temporary fallback ke Bitung untuk shipment laut
-            if (($data['mode'] ?? null) === 'sea') {
-                $data['branch_id'] = 3;
-            } else {
-                $data['branch_id'] = Auth::user()?->effectiveBranchId();
-            }
-        }
-
-        if (empty($data['branch_id'])) {
-            throw ValidationException::withMessages([
-                'branch_id' => 'Cabang tidak dapat ditentukan. Pilih cabang operasional terlebih dahulu.',
-            ]);
-        }
 
         if (empty($data['code'])) {
             $data['code'] = Shipment::generateCode($data['mode'] ?? null);
