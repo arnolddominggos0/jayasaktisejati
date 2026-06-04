@@ -66,6 +66,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->navigationGroups([
                 NavigationGroup::make('Operasional')->collapsible(),
+                NavigationGroup::make('Monitoring Pengiriman')->collapsible(),
                 NavigationGroup::make('Perencanaan')->collapsible(),
                 NavigationGroup::make('Eksekusi Pengiriman')->collapsible(),
                 NavigationGroup::make('Master Data')->collapsible(),

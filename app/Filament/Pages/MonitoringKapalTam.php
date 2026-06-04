@@ -77,6 +77,10 @@ class MonitoringKapalTam extends Page
      */
     public function hydrate(): void
     {
+        logger()->channel('single')->info('[TAM] hydrate() called', [
+            'period_in_snapshot' => $this->period,
+            'search'             => $this->search,
+        ]);
         $this->loadData();
     }
 
@@ -107,6 +111,9 @@ class MonitoringKapalTam extends Page
 
     public function updatedPeriod(): void
     {
+        logger()->channel('single')->info('[TAM] updatedPeriod() called', [
+            'new_period' => $this->period,
+        ]);
         $this->search = '';
         $this->loadData();
     }
@@ -139,6 +146,16 @@ class MonitoringKapalTam extends Page
         $this->inlineModalType = 'atd';
         $this->inlineModalVoyageId = $voyageId;
         $v = $this->resolveVoyage($voyageId);
+
+        logger()->channel('single')->info('[TAM] openAtdModal()', [
+            'voyage_id'       => $voyageId,
+            'resolved_from'   => $this->rows?->firstWhere('id', $voyageId) ? 'rows' : 'db',
+            'voyage_found'    => $v !== null,
+            'voyage_no'       => $v?->voyage_no,
+            'existing_atd_at' => $v?->atd_at?->toDateTimeString(),
+            'pre_fill'        => $v?->atd_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i'),
+        ]);
+
         $this->inlineModalVesselName = $v?->vessel?->name ?? '';
         $this->inlineModalVoyageNo   = $v?->voyage_no ?? '';
         $this->inlineModalPlanRef    = $v?->etd ? 'ETD ' . $v->etd->format('d M Y H:i') : '';
@@ -196,12 +213,21 @@ class MonitoringKapalTam extends Page
 
     public function saveInlineModal(): void
     {
+        logger()->channel('single')->info('[TAM] saveInlineModal() called', [
+            'modal_type'  => $this->inlineModalType,
+            'voyage_id'   => $this->inlineModalVoyageId,
+            'datetime'    => $this->inlineForm['datetime'],
+            'note'        => $this->inlineForm['note'],
+        ]);
+
         match ($this->inlineModalType) {
             'atb', 'atd', 'ata', 'closing' => $this->saveVoyageTimestamp(),
             'vessel_check' => $this->saveVesselCheck(),
             'delay_case' => $this->saveDelayCase(),
             default => null,
         };
+
+        logger()->channel('single')->info('[TAM] saveInlineModal() — after match, closing modal and reloading');
 
         $this->closeInlineModal();
         $this->loadData();
@@ -217,7 +243,14 @@ class MonitoringKapalTam extends Page
             default => null,
         };
 
+        logger()->channel('single')->info('[TAM] saveVoyageTimestamp() — start', [
+            'field'      => $field,
+            'voyage_id'  => $this->inlineModalVoyageId,
+            'datetime'   => $this->inlineForm['datetime'],
+        ]);
+
         if (!$field || !$this->inlineModalVoyageId) {
+            logger()->channel('single')->warning('[TAM] saveVoyageTimestamp() — early return: field or voyageId missing');
             return;
         }
 
@@ -226,8 +259,18 @@ class MonitoringKapalTam extends Page
             'inlineForm.note' => 'nullable|string|max:500',
         ]);
 
+        logger()->channel('single')->info('[TAM] saveVoyageTimestamp() — validation passed');
+
         $voyage = Voyage::find($this->inlineModalVoyageId);
+
+        logger()->channel('single')->info('[TAM] saveVoyageTimestamp() — voyage lookup', [
+            'found'      => $voyage !== null,
+            'voyage_no'  => $voyage?->voyage_no,
+            'current_atd_at' => $voyage?->atd_at?->toDateTimeString(),
+        ]);
+
         if (!$voyage) {
+            logger()->channel('single')->warning('[TAM] saveVoyageTimestamp() — early return: voyage not found');
             return;
         }
 
@@ -240,7 +283,15 @@ class MonitoringKapalTam extends Page
                 : $prefix . $this->inlineForm['note'];
         }
 
+        logger()->channel('single')->info('[TAM] saveVoyageTimestamp() — calling update()', [
+            'data' => $data,
+        ]);
+
         $voyage->update($data);
+
+        logger()->channel('single')->info('[TAM] saveVoyageTimestamp() — update() done', [
+            'fresh_' . $field => $voyage->fresh()->{$field}?->toDateTimeString(),
+        ]);
 
         $label = match ($this->inlineModalType) {
             'atb'     => 'ATB',
@@ -254,6 +305,8 @@ class MonitoringKapalTam extends Page
             ->title("Data {$label} berhasil disimpan")
             ->success()
             ->send();
+
+        logger()->channel('single')->info('[TAM] saveVoyageTimestamp() — notification sent');
     }
 
     protected function saveVesselCheck(): void
@@ -398,13 +451,35 @@ class MonitoringKapalTam extends Page
 
     protected function loadData(): void
     {
-        $dt = Carbon::createFromFormat('Y-m', $this->period)->startOfMonth();
+        $caller = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2)[1]['function'] ?? 'unknown';
+        $dt     = Carbon::createFromFormat('Y-m', $this->period)->startOfMonth();
 
-        $this->rows = $this->baseQuery($dt)
-            ->get()
+        logger()->channel('single')->info('[TAM] loadData() called', [
+            'caller'  => $caller,
+            'period'  => $this->period,
+            'dt'      => $dt->toDateString(),
+            'search'  => $this->search,
+            'route'   => config('tam.route.pol_code') . '->' . config('tam.route.pod_code'),
+            'force'   => config('tam.route.force'),
+        ]);
+
+        $query = $this->baseQuery($dt);
+
+        logger()->channel('single')->info('[TAM] SQL', [
+            'sql'      => $query->toSql(),
+            'bindings' => $query->getBindings(),
+        ]);
+
+        $rows = $query->get()
             ->sortByDesc(fn($v) => $v->operationalState->priorityWeight())
             ->values();
 
+        logger()->channel('single')->info('[TAM] ROWS', [
+            'count'   => $rows->count(),
+            'ids'     => $rows->pluck('id')->all(),
+        ]);
+
+        $this->rows = $rows;
         $this->buildSummary();
         $this->buildAchievement();
         $this->buildCalendar($dt);
