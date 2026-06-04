@@ -562,11 +562,11 @@
 
     </div>
 
+    <div id="tam-debug" data-kpi='@json($tamKpi)' data-config='@json($tamConfig)'
+        style="display:none">
+    </div>
     <!-- chart -->
     @push('scripts')
-        <div id="tam-debug" data-kpi='@json($tamKpi)' data-config='@json($tamConfig)'
-            style="display:none">
-        </div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
         <script>
@@ -598,6 +598,10 @@
                 const kpiData = JSON.parse(
                     debugEl.getAttribute('data-kpi')
                 );
+
+                console.log('DEBUG ELEMENT', debugEl);
+                console.log('DEBUG KPI', kpiData);
+                console.log('DEBUG CONFIG', config);
 
                 // Main Chart
                 const ctxMain = document.getElementById('tamMainChart');
@@ -662,7 +666,7 @@
                                 data: [
                                     Number(kpiData.on_time ?? 0),
                                     Number(kpiData.late ?? 0)
-                                ]
+                                ],
                                 backgroundColor: [
                                     '#10B981',
                                     '#EF4444'

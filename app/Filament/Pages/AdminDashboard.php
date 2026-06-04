@@ -70,7 +70,7 @@ class AdminDashboard extends Page implements HasForms
                     Forms\Components\ToggleButtons::make('dashboardView')
                         ->options(['all' => 'Dashboard Umum', 'tam' => 'Dashboard TAM'])
                         ->inline()->default('tam')->reactive()
-                        ->afterStateUpdated(fn ($state) => $this->dashboardView = $state ?: 'tam')
+                        ->afterStateUpdated(fn($state) => $this->dashboardView = $state ?: 'tam')
                         ->hiddenLabel()->columnSpan(['default' => 2, 'lg' => 1])
                         ->hidden(),
 
@@ -91,7 +91,7 @@ class AdminDashboard extends Page implements HasForms
                         ->options($this->getMonthOptions())
                         ->default(now()->format('Y-m'))
                         ->reactive()
-                        ->hidden(fn (Get $get) => $get('period') !== 'by_month')
+                        ->hidden(fn(Get $get) => $get('period') !== 'by_month')
                         ->afterStateUpdated(function ($state) {
                             $this->periodMonth = $state ?: now()->format('Y-m');
                             $this->period_month = $this->periodMonth;
@@ -114,7 +114,7 @@ class AdminDashboard extends Page implements HasForms
                         ->placeholder('Semua moda')
                         ->options([ShipmentMode::Sea->value => 'Laut', ShipmentMode::Land->value => 'Darat'])
                         ->reactive()
-                        ->afterStateUpdated(fn ($state) => $this->mode = $state ?: null)
+                        ->afterStateUpdated(fn($state) => $this->mode = $state ?: null)
                         ->columnSpan(1),
                 ]),
         ];
@@ -151,32 +151,40 @@ class AdminDashboard extends Page implements HasForms
 
     protected function getPeriodRange(): array
     {
-	logger()->info('PERIOD_STATE', [
-        'period' => $this->period,
-        'periodMonth' => $this->periodMonth,
-        'period_month' => $this->period_month,
+        $state = $this->form->getState();
 
-        'form_period' => data_get($this->form->getState(), 'period'),
-        'form_period_month' => data_get($this->form->getState(), 'period_month'),
-    ]);
-        if ($this->period === 'by_month' && $this->periodMonth) {
-            $base = Carbon::createFromFormat('Y-m', $this->periodMonth)->startOfMonth();
+        $period = $state['period'] ?? $this->period;
+        $periodMonth = $state['period_month']
+            ?? $this->periodMonth
+            ?? now()->format('Y-m');
 
-            return [$base->copy()->startOfMonth(), $base->copy()->endOfMonth()];
+        if ($period === 'by_month') {
+            $base = Carbon::createFromFormat('Y-m', $periodMonth);
+
+            return [
+                $base->copy()->startOfMonth(),
+                $base->copy()->endOfMonth(),
+            ];
         }
 
-        if ($this->period === 'this_year') {
-            return [now()->startOfYear(), now()->endOfYear()];
+        if ($period === 'this_year') {
+            return [
+                now()->startOfYear(),
+                now()->endOfYear(),
+            ];
         }
 
-        return [now()->startOfMonth(), now()->endOfMonth()];
+        return [
+            now()->startOfMonth(),
+            now()->endOfMonth(),
+        ];
     }
 
     protected function applyFilters(Builder $q): Builder
     {
         return $q
-            ->when($this->branchId, fn ($qq) => $qq->where('branch_id', $this->branchId))
-            ->when($this->mode, fn ($qq) => $qq->where('mode', $this->mode));
+            ->when($this->branchId, fn($qq) => $qq->where('branch_id', $this->branchId))
+            ->when($this->mode, fn($qq) => $qq->where('mode', $this->mode));
     }
 
     protected function baseShipmentQuery(): Builder
@@ -196,7 +204,7 @@ class AdminDashboard extends Page implements HasForms
         $customerIds = $this->getConfigCustomerIds();
 
         return $this->baseShipmentQuery()
-            ->when(! empty($customerIds), fn ($qq) => $qq->whereIn('customer_id', $customerIds))
+            ->when(! empty($customerIds), fn($qq) => $qq->whereIn('customer_id', $customerIds))
             ->whereNotNull('delivered_at');
     }
 
@@ -205,7 +213,7 @@ class AdminDashboard extends Page implements HasForms
         $customerIds = $this->getConfigCustomerIds();
 
         return $this->baseShipmentQuery()
-            ->when(! empty($customerIds), fn ($qq) => $qq->whereIn('customer_id', $customerIds))
+            ->when(! empty($customerIds), fn($qq) => $qq->whereIn('customer_id', $customerIds))
             ->whereNull('delivered_at');
     }
 
@@ -213,7 +221,7 @@ class AdminDashboard extends Page implements HasForms
     {
         [$start, $end] = $this->getPeriodRange();
 
-        $cacheKey = 'tam_port_stock_historical:'.md5(implode('|', [
+        $cacheKey = 'tam_port_stock_historical:' . md5(implode('|', [
             $start->toIso8601String(),
             $end->toIso8601String(),
             $this->branchId ?: 'all',
@@ -225,10 +233,10 @@ class AdminDashboard extends Page implements HasForms
             $shipments = $this->baseShipmentQuery()
                 ->whereHas(
                     'tracks',
-                    fn ($q) => $q->whereBetween('tracked_at', [$start, $end])
+                    fn($q) => $q->whereBetween('tracked_at', [$start, $end])
                 )
                 ->with([
-                    'tracks' => fn ($q) => $q->whereBetween('tracked_at', [$start, $end])
+                    'tracks' => fn($q) => $q->whereBetween('tracked_at', [$start, $end])
                         ->orderBy('tracked_at', 'asc'),
                 ])
                 ->get();
@@ -257,7 +265,7 @@ class AdminDashboard extends Page implements HasForms
                     continue;
                 }
 
-                $alreadyLoaded = $tracks->contains(fn ($t) => in_array(
+                $alreadyLoaded = $tracks->contains(fn($t) => in_array(
                     $t->status instanceof \BackedEnum ? $t->status->value : (string) $t->status,
                     [
                         TrackStatus::UnitLoading->value,
@@ -326,16 +334,16 @@ class AdminDashboard extends Page implements HasForms
         $aktivitasPeriode = ShipmentTrack::query()
             ->when(
                 $this->branchId,
-                fn ($qq) => $qq->whereHas(
+                fn($qq) => $qq->whereHas(
                     'shipment',
-                    fn ($s) => $s->where('branch_id', $this->branchId)
+                    fn($s) => $s->where('branch_id', $this->branchId)
                 )
             )
             ->when(
                 $this->mode,
-                fn ($qq) => $qq->whereHas(
+                fn($qq) => $qq->whereHas(
                     'shipment',
-                    fn ($s) => $s->where('mode', $this->mode)
+                    fn($s) => $s->where('mode', $this->mode)
                 )
             )
             ->whereBetween('tracked_at', [$start, $end])
@@ -359,16 +367,16 @@ class AdminDashboard extends Page implements HasForms
             $count = ShipmentTrack::query()
                 ->when(
                     $this->branchId,
-                    fn ($qq) => $qq->whereHas(
+                    fn($qq) => $qq->whereHas(
                         'shipment',
-                        fn ($s) => $s->where('branch_id', $this->branchId)
+                        fn($s) => $s->where('branch_id', $this->branchId)
                     )
                 )
                 ->when(
                     $this->mode,
-                    fn ($qq) => $qq->whereHas(
+                    fn($qq) => $qq->whereHas(
                         'shipment',
-                        fn ($s) => $s->where('mode', $this->mode)
+                        fn($s) => $s->where('mode', $this->mode)
                     )
                 )
                 ->whereDate('tracked_at', $day)
@@ -433,13 +441,13 @@ class AdminDashboard extends Page implements HasForms
             ->select(['customers.id', 'customers.name'])
             ->selectRaw('COUNT(shipments.id) as total')
             ->leftJoin('shipments', 'shipments.customer_id', '=', 'customers.id')
-            ->when($this->branchId, fn ($qq) => $qq->where('shipments.branch_id', $this->branchId))
-            ->when($this->mode, fn ($qq) => $qq->where('shipments.mode', $this->mode))
+            ->when($this->branchId, fn($qq) => $qq->where('shipments.branch_id', $this->branchId))
+            ->when($this->mode, fn($qq) => $qq->where('shipments.mode', $this->mode))
             ->whereBetween('shipments.created_at', [$start, $end])
             ->groupBy(['customers.id', 'customers.name'])
             ->orderByDesc('total')->limit(5)->get();
 
-        return $rows->map(fn ($r) => ['name' => $r->name, 'total' => (int) $r->total])->values()->all();
+        return $rows->map(fn($r) => ['name' => $r->name, 'total' => (int) $r->total])->values()->all();
     }
 
     public function getLeadTimeSummary(): array
@@ -470,11 +478,11 @@ class AdminDashboard extends Page implements HasForms
 
         return ShipmentTrack::query()
             ->with(['shipment:id,code', 'user:id,name'])
-            ->when($this->branchId, fn ($qq) => $qq->whereHas('shipment', fn ($s) => $s->where('branch_id', $this->branchId)))
-            ->when($this->mode, fn ($qq) => $qq->whereHas('shipment', fn ($s) => $s->where('mode', $this->mode)))
+            ->when($this->branchId, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('branch_id', $this->branchId)))
+            ->when($this->mode, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('mode', $this->mode)))
             ->whereBetween('tracked_at', [$start, $end])
             ->latest('tracked_at')->limit(12)->get()
-            ->map(fn ($t) => [
+            ->map(fn($t) => [
                 'shipment_code' => $t->shipment?->code ?? '-',
                 'status' => $t->status instanceof \BackedEnum
                     ? (method_exists($t->status, 'label')
@@ -490,69 +498,88 @@ class AdminDashboard extends Page implements HasForms
     public function getTamKpiSummary(): array
     {
         $cfg = config('jss_kpi.manado', []);
-        $thresholds = $cfg['thresholds'] ?? [];
-        $targetTotal = (int) ($thresholds['total_days']['normal'] ?? 19);
+
         [$start, $end] = $this->getPeriodRange();
-	logger()->info('KPI_PERIOD', [
-        'period' => $this->period,
-        'periodMonth' => $this->periodMonth,
-        'period_month' => $this->period_month,
-        'start' => $start->toDateTimeString(),
-        'end' => $end->toDateTimeString(),
-	]);
 
-        $cacheKey = 'tam_kpi_summary:'.md5(implode('|', [$start->toIso8601String(), $end->toIso8601String(), $this->branchId ?: 'all', $this->mode ?: 'all']));
+        $rows = $this->tamBaseQuery()
+            ->whereBetween('delivered_at', [$start, $end])
+            ->get();
 
-	Cache::forget($cacheKey);
+        $debug = [];
 
-        return Cache::remember($cacheKey, now()->addSeconds(30), function () use ($start, $end, $targetTotal) {
-            $rows = $this->tamBaseQuery()->whereBetween('delivered_at', [$start, $end])->with('tracks:id,shipment_id,status,tracked_at')->get();
-	   logger()->info('KPI_ROWS', [
-        'count' => $rows->count(),
-    ]);
-            $total = 0;
-            $onTime = 0;
-            $late = 0;
-            foreach ($rows as $s) {
-		if (! method_exists($s, 'evaluateKpiForManado')) {
-                    logger()->info('KPI_SKIP_NO_METHOD', [
-                        'shipment' => $s->code,
-                    ]);
-                    continue;
-                }
+        $total = 0;
+        $onTime = 0;
+        $late = 0;
 
-                if (! method_exists($s, 'evaluateKpiForManado')) {
-                    continue;
-                }
-                $ev = $s->evaluateKpiForManado();
-		logger()->info('KPI_EVAL', [
-                    'shipment' => $s->code,
-                    'applies' => $ev['applies'] ?? null,
-                    'badge' => $ev['badge'] ?? null,
-                ]);
+        foreach ($rows as $shipment) {
 
-                if (! ($ev['applies'] ?? false)) {
-                    continue;
-                }
-                $total++;
-                $badge = $ev['badge'] ?? null;
-                if ($badge === 'On Time' || $badge === 'Tepat Waktu') {
-                    $onTime++;
-                } elseif ($badge === 'Late' || $badge === 'Terlambat') {
-                    $late++;
-                }
+            if (! method_exists($shipment, 'evaluateKpiForManado')) {
+
+                $debug[] = [
+                    'shipment' => $shipment->code,
+                    'error' => 'method_missing',
+                ];
+
+                continue;
             }
-	    logger()->info('KPI_COMPUTED', [
-                'total' => $total,
-                'on_time' => $onTime,
-                'late' => $late,
-            ]);
 
-            $onPct = $total > 0 ? round(($onTime / $total) * 100, 1) : 0.0;
-            $latePct = $total > 0 ? round(($late / $total) * 100, 1) : 0.0;
+            $evaluation = $shipment->evaluateKpiForManado();
 
-            return ['total' => $total, 'on_time' => $onTime, 'late' => $late, 'on_time_pct' => $onPct, 'late_pct' => $latePct, 'target_total' => $targetTotal];
-        });
+            $debug[] = [
+                'shipment' => $shipment->code,
+                'applies' => $evaluation['applies'] ?? null,
+                'badge' => $evaluation['badge'] ?? null,
+            ];
+
+            if (! ($evaluation['applies'] ?? false)) {
+                continue;
+            }
+
+            $total++;
+
+            $badge = $evaluation['badge'] ?? null;
+
+            if (in_array($badge, ['On Time', 'Tepat Waktu'], true)) {
+                $onTime++;
+            }
+
+            if (in_array($badge, ['Late', 'Terlambat'], true)) {
+                $late++;
+            }
+        }
+
+        logger()->info('=== TAM KPI DEBUG ===', [
+            'period' => $this->period,
+            'periodMonth' => $this->periodMonth,
+            'branchId' => $this->branchId,
+            'mode' => $this->mode,
+
+            'start' => $start->toDateString(),
+            'end' => $end->toDateString(),
+
+            'customer_ids' => $cfg['customer_ids'] ?? [],
+
+            'rows_found' => $rows->count(),
+
+            'total' => $total,
+            'on_time' => $onTime,
+            'late' => $late,
+
+            'sample' => array_slice($debug, 0, 20),
+        ]);
+
+        return [
+            'total' => $total,
+            'on_time' => $onTime,
+            'late' => $late,
+            'on_time_pct' => $total > 0
+                ? round(($onTime / $total) * 100, 1)
+                : 0,
+            'late_pct' => $total > 0
+                ? round(($late / $total) * 100, 1)
+                : 0,
+            'target_total' => (int) ($cfg['thresholds']['total_days']['normal'] ?? 19),
+        ];
     }
 
     public function getTamLateShipments(): array
@@ -643,14 +670,7 @@ class AdminDashboard extends Page implements HasForms
     public function getTamLeadTimeEvaluation(): array
     {
         [$start, $end] = $this->getPeriodRange();
-	logger()->info('EVAL_DEBUG', [
-        'start' => $start,
-        'end' => $end,
-    ]);
         $rows = $this->tamBaseQuery()->whereBetween('delivered_at', [$start, $end])->with('tracks:id,shipment_id,status,tracked_at')->get();
-	logger()->info('EVAL_ROWS', [
-        'count' => $rows->count(),
-    ]);
 
         $metrics = ['dwelling' => ['ok' => 0, 'ng' => 0, 'pending' => 0], 'sailing' => ['ok' => 0, 'ng' => 0, 'pending' => 0], 'dooring' => ['ok' => 0, 'ng' => 0, 'pending' => 0], 'total' => ['ok' => 0, 'ng' => 0, 'pending' => 0]];
 
@@ -710,13 +730,13 @@ class AdminDashboard extends Page implements HasForms
 
     public function getTamMonthlyBreakdown(): array
     {
-	    [$start, $end] = $this->getPeriodRange();
-	logger()->info('MONTHLY_PERIOD', [
-    	  'period' => $this->period,
-          'periodMonth' => $this->periodMonth,
-          'period_month' => $this->period_month,
-	  'start' => $start->toDateString(),
-	  'end' => $end->toDateString(),
+        [$start, $end] = $this->getPeriodRange();
+        logger()->info('MONTHLY_PERIOD', [
+            'period' => $this->period,
+            'periodMonth' => $this->periodMonth,
+            'period_month' => $this->period_month,
+            'start' => $start->toDateString(),
+            'end' => $end->toDateString(),
         ]);
         $cfg = config('jss_kpi.manado', []);
         $thresholds = $cfg['thresholds'] ?? [];
