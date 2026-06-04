@@ -907,20 +907,33 @@ class ShipmentResource extends Resource
                                             foreach (['vessel_name', 'voyage', 'pol', 'pod', 'etd', 'eta'] as $f) {
                                                 $set($f, null);
                                             }
-                                        } else {
-                                            if ($v = Voyage::with(['vessel', 'pol', 'pod'])->find($state)) {
-                                                $set('vessel_name', $v->vessel?->name);
-                                                $set('voyage', $v->voyage_no);
-                                                $set('pol', $v->pol?->code ?: $v->pol?->name);
-                                                $set('pod', $v->pod?->code ?: $v->pod?->name);
-                                                $set('etd', optional($v->etd)->toDateTimeString());
-                                                $set('eta', optional($v->eta)->toDateTimeString());
-                                            }
+                                            $set('assigned_depot_id', null);
+                                            return;
                                         }
 
-                                        $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->effectiveBranchId());
-                                        $depotId = self::resolveDepotId($branchId, $get('mode'), $state);
-                                        $set('assigned_depot_id', $depotId);
+                                        $v = Voyage::with(['vessel', 'pol', 'pod'])->find($state);
+                                        if ($v) {
+                                            $set('vessel_name', $v->vessel?->name);
+                                            $set('voyage', $v->voyage_no);
+                                            $set('pol', $v->pol?->code ?: $v->pol?->name);
+                                            $set('pod', $v->pod?->code ?: $v->pod?->name);
+                                            $set('etd', optional($v->etd)->toDateTimeString());
+                                            $set('eta', optional($v->eta)->toDateTimeString());
+
+                                            // Resolve branch + depot dari POD (destination port)
+                                            $resolved = $v->pod_id
+                                                ? app(\App\Services\ShipmentService::class)->resolveByPod($v->pod_id)
+                                                : null;
+
+                                            if ($resolved) {
+                                                $set('branch_id', $resolved['branch_id']);
+                                                $set('assigned_depot_id', $resolved['depot_id']);
+                                            } else {
+                                                // Fallback: POD tidak punya depot, gunakan branch_id dari form
+                                                $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->effectiveBranchId());
+                                                $set('assigned_depot_id', self::resolveDepotId($branchId, $get('mode'), $state));
+                                            }
+                                        }
                                     })
                                     ->columnSpan(12),
 
@@ -936,16 +949,33 @@ class ShipmentResource extends Resource
                                 Placeholder::make('auto_depot_display')
                                     ->label('Depo Penugasan (otomatis)')
                                     ->content(function (Get $get) {
-                                        $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->effectiveBranchId());
-                                        $depotId = $get('assigned_depot_id') ?: self::resolveDepotId($branchId, $get('mode'), $get('voyage_id'));
+                                        $depotId = $get('assigned_depot_id');
 
                                         if ($depotId) {
                                             return Depot::whereKey($depotId)->value('name') ?: '—';
                                         }
 
-                                        return 'Belum ada depo untuk cabang & mode ini. Tambahkan depo di menu Depo.';
+                                        return 'Belum ada depo — pilih Voyage dengan POD yang sudah dikonfigurasi.';
                                     })
                                     ->columnSpan(12),
+
+                                Select::make('branch_id')
+                                    ->label('Cabang Operasional')
+                                    ->options(Branch::pluck('name', 'id'))
+                                    ->searchable()
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                        if ($state) {
+                                            $depotId = self::resolveDepotId(
+                                                (int) $state,
+                                                $get('mode'),
+                                                (int) ($get('voyage_id') ?: 0) ?: null
+                                            );
+                                            $set('assigned_depot_id', $depotId);
+                                        }
+                                    })
+                                    ->helperText('Terisi otomatis dari POD voyage. Override jika diperlukan.')
+                                    ->visible(fn () => auth()->user()?->hasRole('super_admin')),
 
                                 Placeholder::make('assignment_hint')
                                     ->label('Status Penugasan Depo')
@@ -1743,56 +1773,4 @@ class ShipmentResource extends Resource
         return $user?->hasRole('super_admin') ?? false;
     }
 
-    public static function mutateFormDataBeforeCreate(array $data): array
-    {
-        unset(
-            $data['pickup_contact_use_custom'],
-            $data['pickup_contact_name'],
-            $data['pickup_contact_phone'],
-            $data['pickup_contact_address'],
-            $data['delivery_contact_use_custom'],
-            $data['delivery_contact_name'],
-            $data['delivery_contact_phone'],
-            $data['delivery_contact_address'],
-            $data['edit_pickup_contact'],
-            $data['edit_delivery_contact'],
-        );
-
-        $branchId = self::currentBranchId();
-
-        $data['branch_id'] = $branchId;
-
-        $mode = $data['mode'] ?? null;
-        $cargo = $data['cargo_type'] ?? null;
-        $opt = $data['service_option'] ?? null;
-
-        if ($mode === ShipmentMode::Sea->value) {
-            $data['service_type'] = ServiceType::SeaFreight->value;
-
-            if (empty($data['assigned_depot_id'])) {
-                $data['assigned_depot_id'] = self::resolveDepotId(
-                    (int) $branchId,
-                    $mode,
-                    (int) ($data['voyage_id'] ?? 0) ?: null
-                );
-            }
-
-            if (empty($data['assigned_depot_id'])) {
-                throw ValidationException::withMessages([
-                    'assigned_depot_id' => 'Tidak ada Depo (mode laut) untuk cabang ini.',
-                ]);
-            }
-        } elseif ($mode === ShipmentMode::Land->value) {
-            $data['service_type'] = match ($opt) {
-                'car_carrier' => ServiceType::CarCarrier->value,
-                default => ServiceType::LandTrucking->value,
-            };
-        }
-
-        if (empty($data['status'])) {
-            $data['status'] = ShipmentStatus::Draft->value;
-        }
-
-        return $data;
-    }
 }

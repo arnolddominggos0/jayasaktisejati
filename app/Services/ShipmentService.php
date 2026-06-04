@@ -34,6 +34,35 @@ class ShipmentService
         return $q->orderBy('name')->value('id');
     }
 
+    /**
+     * Resolve branch_id and depot_id for a SEA shipment from the POD (Port of Discharge).
+     *
+     * The operational branch and depot for a sea shipment is determined by the
+     * destination port (POD), not by the logged-in user's branch.
+     * Returns ['branch_id' => int, 'depot_id' => int] or null if not found.
+     */
+    public function resolveByPod(?int $podId): ?array
+    {
+        if (! $podId) {
+            return null;
+        }
+
+        $depot = Depot::query()
+            ->where('port_id', $podId)
+            ->where('mode', ShipmentMode::Sea->value)
+            ->select(['id', 'branch_id'])
+            ->first();
+
+        if (! $depot) {
+            return null;
+        }
+
+        return [
+            'branch_id' => (int) $depot->branch_id,
+            'depot_id'  => (int) $depot->id,
+        ];
+    }
+
     public function resolveAutoContacts(int $sourceId, string $type = 'pickup'): array
     {
         $source = Customer::query()
