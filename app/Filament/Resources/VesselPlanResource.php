@@ -92,15 +92,23 @@ class VesselPlanResource extends Resource
                     ->visible(fn($record) => $record?->isEditable()),
 
                 Tables\Actions\Action::make('submitDraft')
-                    ->action(fn($record) => $record->submitDraft(auth()->id())),
+                    ->label('Kirim Draft')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->color('primary')
+                    ->requiresConfirmation()
+                    ->action(function ($record, $livewire) {
 
-                Tables\Actions\Action::make('whatsapp')
-                    ->label('WhatsApp')
-                    ->icon('heroicon-o-chat-bubble-left-right')
-                    ->color('success')
-                    ->url(fn($record) => $record->waUrl())
-                    ->openUrlInNewTab()
-                    ->visible(fn($record) => $record->hasWhatsappRecipient()),
+                        $record->submitDraft(auth()->id());
+
+                        $url = $record->fresh()->waUrl();
+
+                        if ($url) {
+                            $livewire->js(
+                                "window.open('{$url}', '_blank');"
+                            );
+                        }
+                    })
+                    ->visible(fn($record) => $record?->isDraft()),  
 
                 Tables\Actions\Action::make('finalize')
                     ->label('Finalisasi')

@@ -318,6 +318,14 @@ class MonitoringKapalTam extends Page
             ])
             ->whereYear('period_month', $dt->year)
             ->whereMonth('period_month', $dt->month)
+            ->when(
+                config('tam.route.force') && config('tam.route.pol_code') && config('tam.route.pod_code'),
+                function ($query) {
+                    $query
+                        ->whereHas('pol', fn($p) => $p->where('code', config('tam.route.pol_code')))
+                        ->whereHas('pod', fn($p) => $p->where('code', config('tam.route.pod_code')));
+                }
+            )
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('voyage_no', 'like', "%{$this->search}%")

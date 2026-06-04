@@ -39,6 +39,7 @@
 
                     <th class="px-3 py-3 text-center">ETD</th>
                     <th class="px-3 py-3 text-center">ETA</th>
+                    <th class="px-3 py-3 text-center">ETB</th>
 
                     <th class="px-3 py-3 text-center">ATD</th>
                     <th class="px-3 py-3 text-center">ATA</th>
@@ -106,6 +107,10 @@
 
                         if ($v->milestones->where('is_overdue', true)->count()) {
                             $infoIssues[] = 'Milestone Lewat';
+                        }
+
+                        if ($v->manual_delay_reason) {
+                            $infoIssues[] = $v->manual_delay_reason->label();
                         }
 
                         $hasIssues =
@@ -214,6 +219,10 @@
 
                         <td class="px-3 py-3 text-center text-gray-400">
                             {{ $dateFmt($v->eta) }}
+                        </td>
+
+                        <td class="px-3 py-3 text-center text-gray-400">
+                            {{ $dateFmt($v->etb) }}
                         </td>
 
                         <td class="px-3 py-3 text-center">
