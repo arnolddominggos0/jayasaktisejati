@@ -406,7 +406,7 @@
                     </div>
 
                     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1">
-                        <div <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                             <h3 class="font-bold text-gray-800">Rincian Kinerja Bulanan</h3>
                             <span class="text-xs text-gray-400 italic">*Cell yang berwarna merah berarti melebihi
                                 standar</span>
@@ -563,11 +563,10 @@
     </div>
 
     <!-- chart -->
-    <script>
-        window.tamConfigData = @json($tamConfig);
-        window.tamKpiData = @json($tamKpi);
-    </script>
     @push('scripts')
+        <div id="tam-debug" data-kpi='@json($tamKpi)' data-config='@json($tamConfig)'
+            style="display:none">
+        </div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
         <script>
@@ -586,12 +585,19 @@
             function renderTamCharts() {
 
                 destroyTamCharts();
+                const debugEl = document.getElementById('tam-debug');
 
-                const config = window.tamConfigData;
-                const kpiData = window.tamKpiData;
+                if (!debugEl) {
+                    return;
+                }
 
-                console.log('KPI DATA', kpiData);
-                console.log('CONFIG DATA', config);
+                const config = JSON.parse(
+                    debugEl.getAttribute('data-config')
+                );
+
+                const kpiData = JSON.parse(
+                    debugEl.getAttribute('data-kpi')
+                );
 
                 // Main Chart
                 const ctxMain = document.getElementById('tamMainChart');
@@ -654,9 +660,9 @@
                             labels: ['On Time', 'Late'],
                             datasets: [{
                                 data: [
-                                    kpiData.on_time || 0,
-                                    kpiData.late || 0
-                                ],
+                                    Number(kpiData.on_time ?? 0),
+                                    Number(kpiData.late ?? 0)
+                                ]
                                 backgroundColor: [
                                     '#10B981',
                                     '#EF4444'
