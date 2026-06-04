@@ -674,7 +674,7 @@
                             maintainAspectRatio: false
                         }
                     });
-                }
+                }   
 
                 // Achievement Chart
                 const ctxAch = document.getElementById('tamAchieveChart');
