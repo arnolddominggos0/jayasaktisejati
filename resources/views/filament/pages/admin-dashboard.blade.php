@@ -201,7 +201,8 @@
                         <div>
                             <p class="text-sm text-gray-600 dark:text-gray-400">Rata-rata Lead Time</p>
                             <p class="mt-1 text-4xl font-bold text-gray-900 dark:text-white">{{ $lt['avg_days'] ?? 0 }}
-                                <span class="text-xl">hari</span></p>
+                                <span class="text-xl">hari</span>
+                            </p>
                         </div>
                         <div class="text-right">
                             <p class="text-sm text-gray-600 dark:text-gray-400">Target</p>
@@ -295,7 +296,6 @@
                                         class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                                         Waktu</th>
                                 </tr>
-                                nano resources/views/filament/pages/admin-dashboard.blade.php
                             </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 @foreach ($activities as $activity)
@@ -406,8 +406,7 @@
                     </div>
 
                     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1">
-                        <div
-                            class="px-6 py-4 border-b bordernano resources/views/filament/pages/admin-dashboard.blade.php-gray-100 flex justify-between items-center">
+                        <div <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
                             <h3 class="font-bold text-gray-800">Rincian Kinerja Bulanan</h3>
                             <span class="text-xs text-gray-400 italic">*Cell yang berwarna merah berarti melebihi
                                 standar</span>
@@ -564,9 +563,10 @@
     </div>
 
     <!-- chart -->
-    <div id="tam-debug" data-kpi='@json($tamKpi)' data-config='@json($tamConfig)'
-        class="hidden">
-        {{ json_encode($tamKpi) }} </div>
+    <script>
+        window.tamConfigData = @json($tamConfig);
+        window.tamKpiData = @json($tamKpi);
+    </script>
     @push('scripts')
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -587,18 +587,11 @@
 
                 destroyTamCharts();
 
-                const debugEl = document.getElementById('tam-debug');
+                const config = window.tamConfigData;
+                const kpiData = window.tamKpiData;
 
-                if (!debugEl) {
-                    console.error('tam-debug element not found');
-                    return;
-                }
-
-                const config = JSON.parse(debugEl.dataset.config);
-                const kpiData = JSON.parse(debugEl.dataset.kpi);
-
-                console.log('DOM KPI', kpiData);
-                console.log('DOM CONFIG', config);
+                console.log('KPI DATA', kpiData);
+                console.log('CONFIG DATA', config);
 
                 // Main Chart
                 const ctxMain = document.getElementById('tamMainChart');
