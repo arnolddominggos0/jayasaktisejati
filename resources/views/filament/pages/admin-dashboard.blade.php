@@ -1,17 +1,17 @@
 <x-filament-panels::page>
     @php
-        $kpi        = $this->getKpis();
-        $trend      = $this->getTrendSeries();
-        $dist       = $this->getStatusDistribution();
-        $top        = $this->getTopCustomers();
-        $lt         = $this->getLeadTimeSummary();
+        $kpi = $this->getKpis();
+        $trend = $this->getTrendSeries();
+        $dist = $this->getStatusDistribution();
+        $top = $this->getTopCustomers();
+        $lt = $this->getLeadTimeSummary();
         $activities = $this->getRecentActivities();
 
         $dashboardData = [
             'brandHex' => $this->brandHex,
-            'spark'    => $kpi['sparkline'] ?? [],
-            'trend'    => $trend,
-            'dist'     => $dist,
+            'spark' => $kpi['sparkline'] ?? [],
+            'trend' => $trend,
+            'dist' => $dist,
         ];
 
         $cardClass = 'bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700';
@@ -19,15 +19,16 @@
         $tamLeadTime = $this->getTamLeadTimeSeries();
         $tamEval = $this->getTamLeadTimeEvaluation();
         $tamKpi = $this->getTamKpiSummary();
-	logger()->info('BLADE_TAM_KPI', $tamKpi);
+        logger()->info('BLADE_TAM_KPI', $tamKpi);
         $tamPortStock = $this->getTamPortStockSummary();
         $tamMonthly = $this->getTamMonthlyBreakdown();
 
-        function getStatusColor($val, $threshold) {
-            if ($val === null) return 'text-gray-400';
-            return $val > $threshold
-                ? 'text-red-600 font-bold bg-red-50 ring-1 ring-red-100 rounded'
-                : 'text-gray-600';
+        function getStatusColor($val, $threshold)
+        {
+            if ($val === null) {
+                return 'text-gray-400';
+            }
+            return $val > $threshold ? 'text-red-600 font-bold bg-red-50 ring-1 ring-red-100 rounded' : 'text-gray-600';
         }
 
         $tamLabels = array_column($tamMonthly['rows'], 'month');
@@ -37,9 +38,13 @@
             'labels' => $tamLabels,
             'leadTime' => [
                 'dwelling' => array_column($tamMonthly['rows'], 'dw'),
-                'sailing'  => array_column($tamMonthly['rows'], 'sl'),
-                'dooring'  => array_column($tamMonthly['rows'], 'dr'),
-                'standard' => array_fill(0, count($tamLabels), $tamTargets['dwelling'] + $tamTargets['sailing'] + $tamTargets['dooring']),
+                'sailing' => array_column($tamMonthly['rows'], 'sl'),
+                'dooring' => array_column($tamMonthly['rows'], 'dr'),
+                'standard' => array_fill(
+                    0,
+                    count($tamLabels),
+                    $tamTargets['dwelling'] + $tamTargets['sailing'] + $tamTargets['dooring'],
+                ),
             ],
             'achievement' => [
                 'labels' => ['Dwelling', 'Sailing', 'Dooring', 'Total'],
@@ -58,21 +63,57 @@
             ],
         ];
 
-	logger()->info('TAM_CHART_DEBUG', [
-    'leadtime' => $tamLeadTime,
-    'evaluation' => $tamEval,
-    'kpi' => $tamKpi,
-    'monthly_rows' => count($tamMonthly['rows'] ?? []),
-    'config' => $tamConfig,
-]);
+        logger()->info('TAM_CHART_DEBUG', [
+            'leadtime' => $tamLeadTime,
+            'evaluation' => $tamEval,
+            'kpi' => $tamKpi,
+            'monthly_rows' => count($tamMonthly['rows'] ?? []),
+            'config' => $tamConfig,
+        ]);
 
         $ongoingMetrics = [
-            ['title' => 'Unit di Port', 'val' => $tamPortStock['total'] ?? 0, 'icon' => 'heroicon-o-map-pin', 'color' => 'text-blue-600', 'bg' => 'bg-blue-50'],
-            ['title' => 'Rata-rata Port (Hari)', 'val' => number_format($tamPortStock['avg_age'] ?? 0, 1), 'icon' => 'heroicon-o-clock', 'color' => 'text-orange-600', 'bg' => 'bg-orange-50'],
-            ['title' => 'Total Delivered', 'val' => $tamKpi['total'] ?? 0, 'icon' => 'heroicon-o-paper-airplane', 'color' => 'text-indigo-600', 'bg' => 'bg-indigo-50'],
-            ['title' => 'On Time (%)', 'val' => number_format($tamKpi['on_time_pct'] ?? 0, 1) . '%', 'icon' => 'heroicon-o-check-circle', 'color' => 'text-emerald-600', 'bg' => 'bg-emerald-50'],
-            ['title' => 'Late', 'val' => $tamKpi['late'] ?? 0, 'icon' => 'heroicon-o-exclamation-circle', 'color' => 'text-red-600', 'bg' => 'bg-red-50'],
-            ['title' => 'Over 3 Hari di Port', 'val' => $tamPortStock['over_three'] ?? 0, 'icon' => 'heroicon-o-home-modern', 'color' => 'text-cyan-600', 'bg' => 'bg-cyan-50'],
+            [
+                'title' => 'Unit di Port',
+                'val' => $tamPortStock['total'] ?? 0,
+                'icon' => 'heroicon-o-map-pin',
+                'color' => 'text-blue-600',
+                'bg' => 'bg-blue-50',
+            ],
+            [
+                'title' => 'Rata-rata Port (Hari)',
+                'val' => number_format($tamPortStock['avg_age'] ?? 0, 1),
+                'icon' => 'heroicon-o-clock',
+                'color' => 'text-orange-600',
+                'bg' => 'bg-orange-50',
+            ],
+            [
+                'title' => 'Total Delivered',
+                'val' => $tamKpi['total'] ?? 0,
+                'icon' => 'heroicon-o-paper-airplane',
+                'color' => 'text-indigo-600',
+                'bg' => 'bg-indigo-50',
+            ],
+            [
+                'title' => 'On Time (%)',
+                'val' => number_format($tamKpi['on_time_pct'] ?? 0, 1) . '%',
+                'icon' => 'heroicon-o-check-circle',
+                'color' => 'text-emerald-600',
+                'bg' => 'bg-emerald-50',
+            ],
+            [
+                'title' => 'Late',
+                'val' => $tamKpi['late'] ?? 0,
+                'icon' => 'heroicon-o-exclamation-circle',
+                'color' => 'text-red-600',
+                'bg' => 'bg-red-50',
+            ],
+            [
+                'title' => 'Over 3 Hari di Port',
+                'val' => $tamPortStock['over_three'] ?? 0,
+                'icon' => 'heroicon-o-home-modern',
+                'color' => 'text-cyan-600',
+                'bg' => 'bg-cyan-50',
+            ],
         ];
     @endphp
 
@@ -85,7 +126,8 @@
         <div class="{{ $cardClass }} p-6" id="filter-section">
             <div class="mb-4">
                 <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Filter Operasional</h2>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Pilih cabang, moda, dan periode untuk melihat data spesifik</p>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Pilih cabang, moda, dan periode untuk melihat
+                    data spesifik</p>
             </div>
             {{ $this->form }}
         </div>
@@ -108,7 +150,8 @@
 
                 <div class="p-6 rounded-xl shadow-sm border bg-white">
                     <p class="text-sm font-medium text-gray-600">Aktivitas Tracking Hari Ini</p>
-                    <p class="mt-2 text-4xl font-bold text-gray-900">{{ number_format($kpi['aktivitasHariIni'] ?? 0) }}</p>
+                    <p class="mt-2 text-4xl font-bold text-gray-900">{{ number_format($kpi['aktivitasHariIni'] ?? 0) }}
+                    </p>
                     <p class="text-xs mt-1 text-gray-500">Update tracking terbaru</p>
                 </div>
             </div>
@@ -120,10 +163,14 @@
                             <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Tren Shipment</h3>
                             <p class="text-sm text-gray-500">Pergerakan shipment berdasarkan periode</p>
                         </div>
-                        <span class="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900 px-3 py-1 text-xs font-medium text-blue-800 dark:text-blue-200">
-                            @if ($this->period === 'this_month') Bulan Ini
-                            @elseif ($this->period === 'this_year') Tahun Ini
-                            @else {{ \Carbon\Carbon::createFromFormat('Y-m', $this->periodMonth)->translatedFormat('F Y') }}
+                        <span
+                            class="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900 px-3 py-1 text-xs font-medium text-blue-800 dark:text-blue-200">
+                            @if ($this->period === 'this_month')
+                                Bulan Ini
+                            @elseif ($this->period === 'this_year')
+                                Tahun Ini
+                            @else
+                                {{ \Carbon\Carbon::createFromFormat('Y-m', $this->periodMonth)->translatedFormat('F Y') }}
                             @endif
                         </span>
                     </div>
@@ -153,16 +200,19 @@
                     <div class="flex items-end justify-between mb-4">
                         <div>
                             <p class="text-sm text-gray-600 dark:text-gray-400">Rata-rata Lead Time</p>
-                            <p class="mt-1 text-4xl font-bold text-gray-900 dark:text-white">{{ $lt['avg_days'] ?? 0 }} <span class="text-xl">hari</span></p>
+                            <p class="mt-1 text-4xl font-bold text-gray-900 dark:text-white">{{ $lt['avg_days'] ?? 0 }}
+                                <span class="text-xl">hari</span></p>
                         </div>
                         <div class="text-right">
                             <p class="text-sm text-gray-600 dark:text-gray-400">Target</p>
-                            <p class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">{{ $lt['target'] ?? 0 }} hari</p>
+                            <p class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                                {{ $lt['target'] ?? 0 }} hari</p>
                         </div>
                     </div>
 
                     <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                        <div class="h-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-600" style="width: {{ $lt['progress'] ?? 0 }}%"></div>
+                        <div class="h-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
+                            style="width: {{ $lt['progress'] ?? 0 }}%"></div>
                     </div>
                     <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Progress terhadap target lead time</p>
                 </div>
@@ -178,21 +228,28 @@
                             <x-heroicon-o-chart-pie class="w-12 h-12 opacity-60" />
                             <p class="mt-3 text-sm">Belum ada data customer untuk periode ini</p>
                             @if ($this->period !== 'this_month')
-                                <button wire:click="$set('period', 'this_month')" class="mt-4 px-4 py-1.5 rounded-md bg-blue-600 text-white text-sm shadow">Tampilkan Bulan Ini</button>
+                                <button wire:click="$set('period', 'this_month')"
+                                    class="mt-4 px-4 py-1.5 rounded-md bg-blue-600 text-white text-sm shadow">Tampilkan
+                                    Bulan Ini</button>
                             @endif
                         </div>
                     @else
                         <div class="space-y-3">
                             @foreach ($top as $index => $customer)
                                 <div class="flex items-center gap-3">
-                                    <div class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                                        <span class="text-sm font-bold text-blue-600 dark:text-blue-400">{{ $index + 1 }}</span>
+                                    <div
+                                        class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                                        <span
+                                            class="text-sm font-bold text-blue-600 dark:text-blue-400">{{ $index + 1 }}</span>
                                     </div>
                                     <div class="flex-1 min-w-0">
-                                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate">{{ $customer['name'] }}</p>
+                                        <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                            {{ $customer['name'] }}</p>
                                     </div>
                                     <div class="flex-shrink-0">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">{{ $customer['total'] }} shipment</span>
+                                        <span
+                                            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">{{ $customer['total'] }}
+                                            shipment</span>
                                     </div>
                                 </div>
                             @endforeach
@@ -212,7 +269,9 @@
                         <x-heroicon-o-clipboard class="w-12 h-12 opacity-60" />
                         <p class="mt-3 text-sm">Belum ada aktivitas</p>
                         @if ($this->period !== 'this_month')
-                            <button wire:click="$set('period', 'this_month')" class="mt-4 px-4 py-1.5 rounded-md bg-blue-600 text-white text-sm shadow">Tampilkan Bulan Ini</button>
+                            <button wire:click="$set('period', 'this_month')"
+                                class="mt-4 px-4 py-1.5 rounded-md bg-blue-600 text-white text-sm shadow">Tampilkan
+                                Bulan Ini</button>
                         @endif
                     </div>
                 @else
@@ -220,25 +279,44 @@
                         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                             <thead class="bg-gray-50 dark:bg-gray-900">
                                 <tr>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Shipment</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Catatan</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
-                                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Waktu</th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Shipment</th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Status</th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Catatan</th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        User</th>
+                                    <th
+                                        class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                                        Waktu</th>
                                 </tr>
-nano resources/views/filament/pages/admin-dashboard.blade.php                            </thead>
+                                nano resources/views/filament/pages/admin-dashboard.blade.php
+                            </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 @foreach ($activities as $activity)
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{{ $activity['shipment_code'] }}</td>
+                                        <td
+                                            class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                                            {{ $activity['shipment_code'] }}</td>
                                         <td class="px-4 py-3 whitespace-nowrap">
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                                            <span
+                                                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
                                                 {{ strtoupper($activity['status']) }}
                                             </span>
                                         </td>
-                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ $activity['note'] ?? '-' }}</td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">{{ $activity['who'] }}</td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{{ $activity['when'] }}</td>
+                                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                                            {{ $activity['note'] ?? '-' }}</td>
+                                        <td
+                                            class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                                            {{ $activity['who'] }}</td>
+                                        <td
+                                            class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                            {{ $activity['when'] }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -249,8 +327,9 @@ nano resources/views/filament/pages/admin-dashboard.blade.php                   
         </div>
 
         <div class="space-y-6"> {{-- Dashboard TAM: always visible --}}
-            
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+
+            <div
+                class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
                 <div>
                     <div class="flex items-center gap-3">
                         <div class="h-10 w-1 bg-red-600 rounded-full"></div>
@@ -261,55 +340,77 @@ nano resources/views/filament/pages/admin-dashboard.blade.php                   
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
-                     <span class="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full border border-gray-200">
+                    <span
+                        class="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full border border-gray-200">
                         Waktu Update: {{ now()->format('H:i') }}
                     </span>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
-                
+
                 <div class="xl:col-span-7 flex flex-col gap-6">
-                    
+
                     <div class="grid grid-cols-3 gap-4">
-                        <div class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4 relative overflow-hidden group hover:border-blue-200 transition">
-                            <div class="absolute right-0 top-0 w-24 h-full bg-gradient-to-l from-blue-50 to-transparent opacity-50"></div>
+                        <div
+                            class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4 relative overflow-hidden group hover:border-blue-200 transition">
+                            <div
+                                class="absolute right-0 top-0 w-24 h-full bg-gradient-to-l from-blue-50 to-transparent opacity-50">
+                            </div>
                             <div class="p-3 bg-blue-100 text-blue-600 rounded-lg group-hover:scale-110 transition">
                                 <x-heroicon-o-cube class="w-6 h-6" />
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Dwelling</p>
-                                <p class="text-lg font-bold text-gray-900">{{ number_format($tamLeadTime['avg_days']['dwelling'] ?? 0, 1) }} <span class="text-xs font-normal text-gray-500">/ {{ $tamTargets['dwelling'] }} Hari</span></p>
+                                <p class="text-lg font-bold text-gray-900">
+                                    {{ number_format($tamLeadTime['avg_days']['dwelling'] ?? 0, 1) }} <span
+                                        class="text-xs font-normal text-gray-500">/ {{ $tamTargets['dwelling'] }}
+                                        Hari</span></p>
                             </div>
                         </div>
 
-                        <div class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4 relative overflow-hidden group hover:border-indigo-200 transition">
-                            <div class="absolute right-0 top-0 w-24 h-full bg-gradient-to-l from-indigo-50 to-transparent opacity-50"></div>
+                        <div
+                            class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4 relative overflow-hidden group hover:border-indigo-200 transition">
+                            <div
+                                class="absolute right-0 top-0 w-24 h-full bg-gradient-to-l from-indigo-50 to-transparent opacity-50">
+                            </div>
                             <div class="p-3 bg-indigo-100 text-indigo-600 rounded-lg group-hover:scale-110 transition">
                                 <x-heroicon-o-lifebuoy class="w-6 h-6" />
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Sailing</p>
-                                <p class="text-lg font-bold text-gray-900">{{ number_format($tamLeadTime['avg_days']['sailing'] ?? 0, 1) }} <span class="text-xs font-normal text-gray-500">/ {{ $tamTargets['sailing'] }} Hari</span></p>
+                                <p class="text-lg font-bold text-gray-900">
+                                    {{ number_format($tamLeadTime['avg_days']['sailing'] ?? 0, 1) }} <span
+                                        class="text-xs font-normal text-gray-500">/ {{ $tamTargets['sailing'] }}
+                                        Hari</span></p>
                             </div>
                         </div>
 
-                        <div class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4 relative overflow-hidden group hover:border-emerald-200 transition">
-                            <div class="absolute right-0 top-0 w-24 h-full bg-gradient-to-l from-emerald-50 to-transparent opacity-50"></div>
-                            <div class="p-3 bg-emerald-100 text-emerald-600 rounded-lg group-hover:scale-110 transition">
+                        <div
+                            class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4 relative overflow-hidden group hover:border-emerald-200 transition">
+                            <div
+                                class="absolute right-0 top-0 w-24 h-full bg-gradient-to-l from-emerald-50 to-transparent opacity-50">
+                            </div>
+                            <div
+                                class="p-3 bg-emerald-100 text-emerald-600 rounded-lg group-hover:scale-110 transition">
                                 <x-heroicon-o-truck class="w-6 h-6" />
                             </div>
                             <div>
                                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Dooring</p>
-                                <p class="text-lg font-bold text-gray-900">{{ number_format($tamLeadTime['avg_days']['dooring'] ?? 0, 1) }} <span class="text-xs font-normal text-gray-500">/ {{ $tamTargets['dooring'] }} Hari</span></p>
+                                <p class="text-lg font-bold text-gray-900">
+                                    {{ number_format($tamLeadTime['avg_days']['dooring'] ?? 0, 1) }} <span
+                                        class="text-xs font-normal text-gray-500">/ {{ $tamTargets['dooring'] }}
+                                        Hari</span></p>
                             </div>
                         </div>
                     </div>
 
                     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1">
-                        <div class="px-6 py-4 border-b bordernano resources/views/filament/pages/admin-dashboard.blade.php-gray-100 flex justify-between items-center">
+                        <div
+                            class="px-6 py-4 border-b bordernano resources/views/filament/pages/admin-dashboard.blade.php-gray-100 flex justify-between items-center">
                             <h3 class="font-bold text-gray-800">Rincian Kinerja Bulanan</h3>
-                            <span class="text-xs text-gray-400 italic">*Cell yang berwarna merah berarti melebihi standar</span>
+                            <span class="text-xs text-gray-400 italic">*Cell yang berwarna merah berarti melebihi
+                                standar</span>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm text-left">
@@ -323,50 +424,58 @@ nano resources/views/filament/pages/admin-dashboard.blade.php                   
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100">
-                                    @foreach($tamMonthly['rows'] as $row)
-                                    <tr class="hover:bg-gray-50 transition">
-                                        <td class="px-6 py-3 font-medium text-gray-900">{{ $row['month'] }}</td>
-                                        <td class="px-6 py-3 text-center">
-                                            @if($row['dw'] !== null)
-                                            <span class="px-2 py-1 {{ getStatusColor($row['dw'], $tamTargets['dwelling']) }}">
-                                                {{ number_format($row['dw'], 2) }}
-                                            </span>
-                                            @else
-                                            <span class="text-gray-400">—</span>
-                                            @endif
-                                        </td>
-                                        <td class="px-6 py-3 text-center">
-                                            @if($row['sl'] !== null)
-                                            <span class="px-2 py-1 {{ getStatusColor($row['sl'], $tamTargets['sailing']) }}">
-                                                {{ number_format($row['sl'], 2) }}
-                                            </span>
-                                            @else
-                                            <span class="text-gray-400">—</span>
-                                            @endif
-                                        </td>
-                                        <td class="px-6 py-3 text-center">
-                                            @if($row['dr'] !== null)
-                                            <span class="px-2 py-1 {{ getStatusColor($row['dr'], $tamTargets['dooring']) }}">
-                                                {{ number_format($row['dr'], 2) }}
-                                            </span>
-                                            @else
-                                            <span class="text-gray-400">—</span>
-                                            @endif
-                                        </td>
-                                        <td class="px-6 py-3 text-right">
-                                            @if($row['dw'] === null && $row['sl'] === null && $row['dr'] === null)
-                                                <span class="text-xs text-gray-400">—</span>
-                                            @elseif(($row['sl'] ?? 0) > $tamTargets['sailing'] || ($row['dw'] ?? 0) > $tamTargets['dwelling'])
-                                                <span class="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
-                                                    <span class="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span> Warning
-                                                </span>
-                                            @else
-                                                <span class="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                                                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span> Sesuai Std
-                                                </span>
-                                            @endif
-                                        </td>
-                                    </tr>
+                                    @foreach ($tamMonthly['rows'] as $row)
+                                        <tr class="hover:bg-gray-50 transition">
+                                            <td class="px-6 py-3 font-medium text-gray-900">{{ $row['month'] }}</td>
+                                            <td class="px-6 py-3 text-center">
+                                                @if ($row['dw'] !== null)
+                                                    <span
+                                                        class="px-2 py-1 {{ getStatusColor($row['dw'], $tamTargets['dwelling']) }}">
+                                                        {{ number_format($row['dw'], 2) }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-gray-400">—</span>
+                                                @endif
+                                            </td>
+                                            <td class="px-6 py-3 text-center">
+                                                @if ($row['sl'] !== null)
+                                                    <span
+                                                        class="px-2 py-1 {{ getStatusColor($row['sl'], $tamTargets['sailing']) }}">
+                                                        {{ number_format($row['sl'], 2) }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-gray-400">—</span>
+                                                @endif
+                                            </td>
+                                            <td class="px-6 py-3 text-center">
+                                                @if ($row['dr'] !== null)
+                                                    <span
+                                                        class="px-2 py-1 {{ getStatusColor($row['dr'], $tamTargets['dooring']) }}">
+                                                        {{ number_format($row['dr'], 2) }}
+                                                    </span>
+                                                @else
+                                                    <span class="text-gray-400">—</span>
+                                                @endif
+                                            </td>
+                                            <td class="px-6 py-3 text-right">
+                                                @if ($row['dw'] === null && $row['sl'] === null && $row['dr'] === null)
+                                                    <span class="text-xs text-gray-400">—</span>
+                                                @elseif(($row['sl'] ?? 0) > $tamTargets['sailing'] || ($row['dw'] ?? 0) > $tamTargets['dwelling'])
+                                                    <span
+                                                        class="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
+                                                        <span
+                                                            class="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
+                                                        Warning
+                                                    </span>
+                                                @else
+                                                    <span
+                                                        class="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                                                        <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                                                        Sesuai Std
+                                                    </span>
+                                                @endif
+                                            </td>
+                                        </tr>
                                     @endforeach
                                 </tbody>
                             </table>
@@ -379,7 +488,7 @@ nano resources/views/filament/pages/admin-dashboard.blade.php                   
                         <h3 class="font-bold text-gray-800">Lead Time</h3>
                         <p class="text-sm text-gray-500">Rata-rata lead time per bulan (6 bulan terakhir)</p>
                     </div>
-                    
+
                     <div class="flex flex-wrap gap-4 mb-4 text-xs font-medium text-gray-600">
                         <div class="flex items-center gap-2">
                             <span class="w-3 h-3 rounded-full bg-blue-400"></span> Dwelling
@@ -402,7 +511,7 @@ nano resources/views/filament/pages/admin-dashboard.blade.php                   
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                
+
                 <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="font-bold text-gray-800 text-sm">KPI On Time</h3>
@@ -424,24 +533,28 @@ nano resources/views/filament/pages/admin-dashboard.blade.php                   
                 </div>
 
                 <div class="xl:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
-                    @foreach($ongoingMetrics as $metric)
-                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between hover:shadow-md transition group">
-                        <div class="flex justify-between items-start">
-                            <div class="p-2 rounded-lg {{ $metric['bg'] }} {{ $metric['color'] }} group-hover:scale-110 transition">
-                                @svg($metric['icon'], 'w-5 h-5')
+                    @foreach ($ongoingMetrics as $metric)
+                        <div
+                            class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between hover:shadow-md transition group">
+                            <div class="flex justify-between items-start">
+                                <div
+                                    class="p-2 rounded-lg {{ $metric['bg'] }} {{ $metric['color'] }} group-hover:scale-110 transition">
+                                    @svg($metric['icon'], 'w-5 h-5')
+                                </div>
+                                @if ($loop->index == 3)
+                                    <span class="flex h-2 w-2 relative">
+                                        <span
+                                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                        <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                    </span>
+                                @endif
                             </div>
-                            @if($loop->index == 3)
-                                <span class="flex h-2 w-2 relative">
-                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                                </span>
-                            @endif
+                            <div class="mt-3">
+                                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                                    {{ $metric['title'] }}</p>
+                                <p class="text-2xl font-bold text-gray-900 mt-1">{{ $metric['val'] }}</p>
+                            </div>
                         </div>
-                        <div class="mt-3">
-                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ $metric['title'] }}</p>
-                            <p class="text-2xl font-bold text-gray-900 mt-1">{{ $metric['val'] }}</p>
-                        </div>
-                    </div>
                     @endforeach
                 </div>
             </div>
@@ -451,183 +564,165 @@ nano resources/views/filament/pages/admin-dashboard.blade.php                   
     </div>
 
     <!-- chart -->
-	<div id="tam-debug"
-     data-kpi='@json($tamKpi)'
-     data-config='@json($tamConfig)'
-     class="hidden">
-    {{ json_encode($tamKpi) }} </div>
-        @push('scripts')
-            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <div id="tam-debug" data-kpi='@json($tamKpi)' data-config='@json($tamConfig)'
+        class="hidden">
+        {{ json_encode($tamKpi) }} </div>
+    @push('scripts')
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-            <script>
+        <script>
+            window.tamCharts = {};
+
+            function destroyTamCharts() {
+                Object.values(window.tamCharts).forEach(chart => {
+                    if (chart) {
+                        chart.destroy();
+                    }
+                });
+
                 window.tamCharts = {};
+            }
 
-                function destroyTamCharts() {
+            function renderTamCharts() {
 
-                    Object.values(window.tamCharts).forEach(chart => {
+                destroyTamCharts();
 
-                        if (chart) {
-                            chart.destroy();
+                const debugEl = document.getElementById('tam-debug');
+
+                if (!debugEl) {
+                    console.error('tam-debug element not found');
+                    return;
+                }
+
+                const config = JSON.parse(debugEl.dataset.config);
+                const kpiData = JSON.parse(debugEl.dataset.kpi);
+
+                console.log('DOM KPI', kpiData);
+                console.log('DOM CONFIG', config);
+
+                // Main Chart
+                const ctxMain = document.getElementById('tamMainChart');
+
+                if (ctxMain) {
+                    window.tamCharts.main = new Chart(ctxMain, {
+                        type: 'bar',
+                        data: {
+                            labels: config.labels,
+                            datasets: [{
+                                    type: 'line',
+                                    label: 'Standard',
+                                    data: config.leadTime.standard,
+                                    borderColor: '#FB923C',
+                                    borderWidth: 2,
+                                    borderDash: [5, 5],
+                                    pointRadius: 0,
+                                    fill: false,
+                                },
+                                {
+                                    label: 'Dooring',
+                                    data: config.leadTime.dooring,
+                                    backgroundColor: '#34D399',
+                                    stack: 'lead',
+                                },
+                                {
+                                    label: 'Sailing',
+                                    data: config.leadTime.sailing,
+                                    backgroundColor: '#6366F1',
+                                    stack: 'lead',
+                                },
+                                {
+                                    label: 'Dwelling',
+                                    data: config.leadTime.dwelling,
+                                    backgroundColor: '#60A5FA',
+                                    stack: 'lead',
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false
                         }
-		 const kpiData = JSON.parse(
-                   debugEl.dataset.kpi
-                   );
+                    });
+                }
 
-                    console.log('DOM KPI', kpiData);
-                    console.log('DOM CONFIG', config);
-                    console.log('BLADE KPI RAW', @json($tamKpi));
-                    console.log('tamConfig', config);
-                    console.log('tamKpi', kpiData);
+                // KPI Doughnut
+                const ctxRack = document.getElementById('tamRackChart');
 
-                    const ctxMain = document.getElementById('tamMainChart');
+                console.log('RACK_CTX', ctxRack);
+                console.log('RACK_DATA', [
+                    kpiData.on_time || 0,
+                    kpiData.late || 0
+                ]);
 
-                    if (ctxMain) {
-                        window.tamCharts.main = new Chart(ctxMain, {
-                            type: 'bar',
-                            data: {
-                                labels: config.labels,
+                if (ctxRack) {
+                    window.tamCharts.rack = new Chart(ctxRack, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['On Time', 'Late'],
+                            datasets: [{
+                                data: [
+                                    kpiData.on_time || 0,
+                                    kpiData.late || 0
+                                ],
+                                backgroundColor: [
+                                    '#10B981',
+                                    '#EF4444'
+                                ]
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false
+                        }
                     });
 
-                    window.tamCharts = {};
+                    console.log('RACK_CHART', window.tamCharts.rack);
                 }
 
-                function renderTamCharts() {
+                // Achievement Chart
+                const ctxAch = document.getElementById('tamAchieveChart');
 
-                    destroyTamCharts();
-
-                    const debugEl = document.getElementById('tam-debug');
-
-		   const config = JSON.parse(
-   		    debugEl.dataset.config
-		    );
-
-		   const kpiData = JSON.parse(
-   		   debugEl.dataset.kpi
-		   );
-	       	    console.log('tamConfig', config);
-		    console.log('tamKpi', kpiData);
-
-                    const ctxMain = document.getElementById('tamMainChart');
-
-                    if (ctxMain) {
-                        window.tamCharts.main = new Chart(ctxMain, {
-                            type: 'bar',
-                            data: {
-                                labels: config.labels,
-                                datasets: [{
-                                        type: 'line',
-                                        label: 'Standard',
-                                        data: config.leadTime.standard,
-                                        borderColor: '#FB923C',
-                                        borderWidth: 2,
-                                        borderDash: [5, 5],
-                                        pointRadius: 0,
-                                        fill: false,
-                                    },
-                                    {
-                                        label: 'Dooring',
-                                        data: config.leadTime.dooring,
-                                        backgroundColor: '#34D399',
-                                        stack: 'lead',
-                                    },
-                                    {
-                                        label: 'Sailing',
-                                        data: config.leadTime.sailing,
-                                        backgroundColor: '#6366F1',
-                                        stack: 'lead',
-                                    },
-                                    {
-                                        label: 'Dwelling',
-                                        data: config.leadTime.dwelling,
-                                        backgroundColor: '#60A5FA',
-                                        stack: 'lead',
-                                    }
-                                ]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false
-                            }
-                        });
-			console.log('RACK_CHART', window.tamCharts.rack);
-
-                    }
-
-                    const ctxRack = document.getElementById('tamRackChart');
-		    console.log('RACK_CTX', ctxRack);
-		    console.log('RACK_DATA', [
-   		    kpiData.on_time || 0,
-   		    kpiData.late || 0
-		   ]);
-                    if (ctxRack) {
-
-                        window.tamCharts.rack = new Chart(ctxRack, {
-                            type: 'doughnut',
-                            data: {
-                                labels: ['On Time', 'Late'],
-                                datasets: [{
-                                    data: [
-                                        kpiData.on_time || 0,
-                                        kpiData.late || 0
-                                    ],
-                                    backgroundColor: [
-                                        '#10B981',
-                                        '#EF4444'
-                                    ]
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false
-                            }
-                        });
-	      		console.log('RACK_CHART', window.tamCharts.rack);
-                    }
-
-                    const ctxAch = document.getElementById('tamAchieveChart');
-
-                    if (ctxAch) {
-
-                        window.tamCharts.achieve = new Chart(ctxAch, {
-                            type: 'bar',
-                            data: {
-                                labels: config.achievement.labels,
-                                datasets: [{
-                                        label: 'NG',
-                                        data: config.achievement.ng,
-                                        backgroundColor: '#FECACA'
-                                    },
-                                    {
-                                        label: 'OK',
-                                        data: config.achievement.ok,
-                                        backgroundColor: '#10B981'
-                                    }
-                                ]
-                            },
-                            options: {
-                                responsive: true,
-                                maintainAspectRatio: false
-                            }
-                        });
-
-                    }
-
-                    console.log('TAM charts rendered');
+                if (ctxAch) {
+                    window.tamCharts.achieve = new Chart(ctxAch, {
+                        type: 'bar',
+                        data: {
+                            labels: config.achievement.labels,
+                            datasets: [{
+                                    label: 'NG',
+                                    data: config.achievement.ng,
+                                    backgroundColor: '#FECACA'
+                                },
+                                {
+                                    label: 'OK',
+                                    data: config.achievement.ok,
+                                    backgroundColor: '#10B981'
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false
+                        }
+                    });
                 }
-		document.addEventListener('livewire:initialized', () => {
-   		 Livewire.hook('commit', () => {
-        	console.log('LIVEWIRE COMMIT');
-        	setTimeout(renderTamCharts, 100);
-    		});
-		});
 
-                document.addEventListener('DOMContentLoaded', renderTamCharts);
+                console.log('TAM charts rendered');
+            }
 
-                document.addEventListener('livewire:navigated', () => {
+            document.addEventListener('DOMContentLoaded', () => {
+                renderTamCharts();
+            });
 
+            document.addEventListener('livewire:initialized', () => {
+                Livewire.hook('commit', () => {
+                    console.log('LIVEWIRE COMMIT');
                     setTimeout(renderTamCharts, 100);
-
                 });
-            </script>
-        @endpush
+            });
+
+            document.addEventListener('livewire:navigated', () => {
+                setTimeout(renderTamCharts, 100);
+            });
+        </script>
+    @endpush
 </x-filament-panels::page>
