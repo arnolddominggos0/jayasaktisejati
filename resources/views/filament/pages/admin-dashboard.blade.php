@@ -517,7 +517,7 @@
                         <x-heroicon-o-presentation-chart-line class="w-5 h-5 text-gray-400" />
                     </div>
                     <div class="h-40">
-                        <canvas id="tamRackChart"></canvas>
+                        <canvas id="tamRackChart" data-kpi='@json($tamKpi)'></canvas>
                     </div>
                 </div>
 
@@ -562,10 +562,9 @@
 
     </div>
 
-    <div id="tam-debug" data-kpi='@json($tamKpi)' data-config='@json($tamConfig)'
-        style="display:none">
-    </div>
     <!-- chart -->
+    <div id="tam-chart-data" data-config='@json($tamConfig)' style="display:none">
+    </div>
     @push('scripts')
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -585,22 +584,18 @@
             function renderTamCharts() {
 
                 destroyTamCharts();
-                const debugEl = document.getElementById('tam-debug');
 
-                if (!debugEl) {
+                const configEl = document.getElementById('tam-chart-data');
+
+                if (!configEl) {
+                    console.log('tam-chart-data not found');
                     return;
                 }
 
                 const config = JSON.parse(
-                    debugEl.getAttribute('data-config')
+                    configEl.dataset.config
                 );
 
-                const kpiData = JSON.parse(
-                    debugEl.getAttribute('data-kpi')
-                );
-
-                console.log('DEBUG ELEMENT', debugEl);
-                console.log('DEBUG KPI', kpiData);
                 console.log('DEBUG CONFIG', config);
 
                 // Main Chart
@@ -651,13 +646,14 @@
                 // KPI Doughnut
                 const ctxRack = document.getElementById('tamRackChart');
 
-                console.log('RACK_CTX', ctxRack);
-                console.log('RACK_DATA', [
-                    kpiData.on_time || 0,
-                    kpiData.late || 0
-                ]);
-
                 if (ctxRack) {
+
+                    const kpiData = JSON.parse(
+                        ctxRack.dataset.kpi
+                    );
+
+                    console.log('RACK_DATA', kpiData);
+
                     window.tamCharts.rack = new Chart(ctxRack, {
                         type: 'doughnut',
                         data: {
@@ -678,8 +674,6 @@
                             maintainAspectRatio: false
                         }
                     });
-
-                    console.log('RACK_CHART', window.tamCharts.rack);
                 }
 
                 // Achievement Chart
