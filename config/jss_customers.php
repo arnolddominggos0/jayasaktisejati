@@ -1,5 +1,5 @@
 <?php
 
 return [
-    'tam_id' =>  (int) env('CUST_TAM_ID', 0),
+    'tam_id' =>  (int) env('CUST_TAM_ID', 1),
 ];

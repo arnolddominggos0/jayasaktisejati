@@ -169,7 +169,9 @@ final class VoyageOperationalSnapshot
         $completedCount = 0;
         $scheduledCount = 0;
         $otdOk = 0;
+        $otdTotal = 0;  // voyages with ATD recorded
         $otaOk = 0;
+        $otaTotal = 0;  // voyages with ATA recorded
         $overdueCount = 0;
 
         foreach ($voyages as $voyage) {
@@ -180,8 +182,15 @@ final class VoyageOperationalSnapshot
             elseif ($state->isCompleted()) { $completedCount++; }
             elseif ($state->isScheduled()) { $scheduledCount++; }
 
-            if ($state->kpiOk('otd')) { $otdOk++; }
-            if ($state->kpiOk('ota')) { $otaOk++; }
+            if ($state->otd !== null) {
+                $otdTotal++;
+                if ($state->kpiOk('otd')) { $otdOk++; }
+            }
+
+            if ($state->ota !== null) {
+                $otaTotal++;
+                if ($state->kpiOk('ota')) { $otaOk++; }
+            }
 
             $overdueCount += $state->milestoneOverdueCount;
         }
@@ -193,9 +202,11 @@ final class VoyageOperationalSnapshot
             'completed_count'   => $completedCount,
             'scheduled_count'   => $scheduledCount,
             'otd_ok'            => $otdOk,
+            'otd_total'         => $otdTotal,
             'ota_ok'            => $otaOk,
-            'otd_percent'       => $total > 0 ? (int) round(($otdOk / $total) * 100) : 0,
-            'ota_percent'       => $total > 0 ? (int) round(($otaOk / $total) * 100) : 0,
+            'ota_total'         => $otaTotal,
+            'otd_percent'       => $otdTotal > 0 ? (int) round(($otdOk / $otdTotal) * 100) : 0,
+            'ota_percent'       => $otaTotal > 0 ? (int) round(($otaOk / $otaTotal) * 100) : 0,
             'overdue_count'     => $overdueCount,
         ];
     }

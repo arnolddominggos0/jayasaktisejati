@@ -4,13 +4,13 @@ namespace App\Filament\Pages;
 
 use App\Enums\VesselCheckLogStatus;
 use App\Enums\VesselCheckStatus;
-use App\Enums\VoyageDelayReason;
 use App\Enums\VoyageOperationalStatus;
 use App\Models\ShippingSchedule;
 use App\Models\VesselCheck;
 use App\Models\VesselCheckCase;
 use App\Models\Voyage;
 use App\Models\VoyageMilestone;
+use App\Services\Monitoring\ShippingAchievementService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Carbon;
@@ -368,54 +368,10 @@ class MonitoringKapalTam extends Page
 
     protected function buildAchievement(): void
     {
-        $total = $this->rows->count();
+        $dt = Carbon::createFromFormat('Y-m', $this->period);
 
-        $calc = function ($collection) use ($total) {
-            $ok = $collection->filter(
-                fn($v) => $v !== null && $v->value === 'ontime'
-            )->count();
-
-            $ng = $collection->filter(
-                fn($v) => $v !== null && $v->value === 'late'
-            )->count();
-
-            return [
-                'total' => $total,
-                'ok' => $ok,
-                'ng' => $ng,
-                'ok_percent' => $total > 0
-                    ? round(($ok / $total) * 100)
-                    : 0,
-                'ng_percent' => $total > 0
-                    ? round(($ng / $total) * 100)
-                    : 0,
-            ];
-        };
-
-        $reasons = $this->rows
-            ->whereNotNull('delay_reason')
-            ->groupBy('delay_reason')
-            ->map->count()
-            ->sortDesc();
-
-        $topReason = $reasons->keys()->first();
-
-        $avgDelay = $this->rows
-            ->pluck('departure_delay_days')
-            ->filter(fn($v) => $v > 0)
-            ->avg();
-
-        $this->achievement = [
-            'otd' => $calc($this->rows->pluck('otd_status')),
-            'ota' => $calc($this->rows->pluck('ota_status')),
-            'otb' => $calc($this->rows->pluck('otb_status')),
-            'penyebab_terbanyak' => $topReason
-                ? VoyageDelayReason::from($topReason)->label()
-                : null,
-            'rata_rata_delay_berangkat' => $avgDelay
-                ? (int) round($avgDelay)
-                : 0,
-        ];
+        $this->achievement = app(ShippingAchievementService::class)
+            ->summary((int) $dt->year, (int) $dt->month);
     }
 
     protected function buildCalendar(Carbon $dt): void
