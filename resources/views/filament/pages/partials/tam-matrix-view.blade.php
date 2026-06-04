@@ -166,7 +166,7 @@
                         };
                     @endphp
 
-                    <tr class="{{ $rowClass }} hover:bg-slate-50 transition">
+                    <tr wire:key="voyage-{{ $v->id }}" class="{{ $rowClass }} hover:bg-slate-50 transition">
                         <td class="sticky left-0 z-10 px-4 py-3 border-r border-gray-100 bg-white">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="min-w-0">
@@ -282,21 +282,21 @@
                         <td class="px-3 py-3">
                             @if ($hasIssues)
                                 <div class="flex flex-col gap-1">
-                                    @foreach ($criticalIssues as $issue)
-                                        <div
+                                    @foreach ($criticalIssues as $i => $issue)
+                                        <div wire:key="voyage-{{ $v->id }}-ci-{{ $i }}"
                                             class="inline-flex items-center px-2 py-1 rounded-md bg-red-100 text-red-700 border border-red-200 text-[11px] font-bold">
                                             {{ $issue }}
                                         </div>
                                     @endforeach
 
-                                    @foreach ($warningIssues as $issue)
-                                        <div class="text-[11px] text-orange-700 font-medium">
+                                    @foreach ($warningIssues as $i => $issue)
+                                        <div wire:key="voyage-{{ $v->id }}-wi-{{ $i }}" class="text-[11px] text-orange-700 font-medium">
                                             ↳ {{ $issue }}
                                         </div>
                                     @endforeach
 
-                                    @foreach ($infoIssues as $issue)
-                                        <div class="text-[11px] text-gray-500">
+                                    @foreach ($infoIssues as $i => $issue)
+                                        <div wire:key="voyage-{{ $v->id }}-ii-{{ $i }}" class="text-[11px] text-gray-500">
                                             ↳ {{ $issue }}
                                         </div>
                                     @endforeach
@@ -355,7 +355,7 @@
                         @foreach (['d2', 'd4', 'd6'] as $code)
                             @php $m = $mMap->get($code); @endphp
 
-                            <td class="px-2 py-3 text-center">
+                            <td wire:key="voyage-{{ $v->id }}-m-{{ $code }}" class="px-2 py-3 text-center">
                                 @if ($m)
                                     <div
                                         class="inline-flex items-center justify-center w-7 h-7 rounded-full
