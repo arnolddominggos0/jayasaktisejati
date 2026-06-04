@@ -71,6 +71,27 @@ class MonitoringKapalTam extends Page
         $this->loadData();
     }
 
+    /**
+     * Runs after every subsequent request — restore computed data from DB
+     * so it is never stored in wire:snapshot.
+     */
+    public function hydrate(): void
+    {
+        $this->loadData();
+    }
+
+    /**
+     * Runs before every snapshot serialization — strip computed data so
+     * wire:snapshot stays small and its HMAC never fails on truncation.
+     */
+    public function dehydrate(): void
+    {
+        $this->rows      = null;
+        $this->summary   = [];
+        $this->achievement = [];
+        $this->calendar  = [];
+    }
+
     public function acknowledgeVoyage(int $voyageId): void
     {
         if (!in_array($voyageId, $this->acknowledged, true)) {
