@@ -13,11 +13,13 @@
             'trend'    => $trend,
             'dist'     => $dist,
         ];
+
         $cardClass = 'bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700';
 
         $tamLeadTime = $this->getTamLeadTimeSeries();
         $tamEval = $this->getTamLeadTimeEvaluation();
         $tamKpi = $this->getTamKpiSummary();
+	logger()->info('BLADE_TAM_KPI', $tamKpi);
         $tamPortStock = $this->getTamPortStockSummary();
         $tamMonthly = $this->getTamMonthlyBreakdown();
 
@@ -55,6 +57,14 @@
                 ],
             ],
         ];
+
+	logger()->info('TAM_CHART_DEBUG', [
+    'leadtime' => $tamLeadTime,
+    'evaluation' => $tamEval,
+    'kpi' => $tamKpi,
+    'monthly_rows' => count($tamMonthly['rows'] ?? []),
+    'config' => $tamConfig,
+]);
 
         $ongoingMetrics = [
             ['title' => 'Unit di Port', 'val' => $tamPortStock['total'] ?? 0, 'icon' => 'heroicon-o-map-pin', 'color' => 'text-blue-600', 'bg' => 'bg-blue-50'],
@@ -216,7 +226,7 @@
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
                                     <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Waktu</th>
                                 </tr>
-                            </thead>
+nano resources/views/filament/pages/admin-dashboard.blade.php                            </thead>
                             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                                 @foreach ($activities as $activity)
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
@@ -297,7 +307,7 @@
                     </div>
 
                     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1">
-                        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                        <div class="px-6 py-4 border-b bordernano resources/views/filament/pages/admin-dashboard.blade.php-gray-100 flex justify-between items-center">
                             <h3 class="font-bold text-gray-800">Rincian Kinerja Bulanan</h3>
                             <span class="text-xs text-gray-400 italic">*Cell yang berwarna merah berarti melebihi standar</span>
                         </div>
@@ -441,89 +451,183 @@
     </div>
 
     <!-- chart -->
-    @once
+	<div id="tam-debug"
+     data-kpi='@json($tamKpi)'
+     data-config='@json($tamConfig)'
+     class="hidden">
+    {{ json_encode($tamKpi) }} </div>
         @push('scripts')
             <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-            <script>
-                document.addEventListener('livewire:initialized', () => {
-                    const config = @json($tamConfig);
 
-                    // main chart - Lead Time per month
+            <script>
+                window.tamCharts = {};
+
+                function destroyTamCharts() {
+
+                    Object.values(window.tamCharts).forEach(chart => {
+
+                        if (chart) {
+                            chart.destroy();
+                        }
+		 const kpiData = JSON.parse(
+                   debugEl.dataset.kpi
+                   );
+
+                    console.log('DOM KPI', kpiData);
+                    console.log('DOM CONFIG', config);
+                    console.log('BLADE KPI RAW', @json($tamKpi));
+                    console.log('tamConfig', config);
+                    console.log('tamKpi', kpiData);
+
                     const ctxMain = document.getElementById('tamMainChart');
+
                     if (ctxMain) {
-                        new Chart(ctxMain, {
+                        window.tamCharts.main = new Chart(ctxMain, {
                             type: 'bar',
                             data: {
                                 labels: config.labels,
-                                datasets: [
-                                    { type: 'line', label: 'Standard', data: config.leadTime.standard, borderColor: '#FB923C', borderWidth: 2, borderDash: [5, 5], pointRadius: 0, fill: false, order: 0 },
-                                    { label: 'Dooring', data: config.leadTime.dooring, backgroundColor: '#34D399', borderRadius: 4, stack: 'Stack 0', order: 1 },
-                                    { label: 'Sailing', data: config.leadTime.sailing, backgroundColor: '#6366F1', borderRadius: 4, stack: 'Stack 0', order: 2 },
-                                    { label: 'Dwelling', data: config.leadTime.dwelling, backgroundColor: '#60A5FA', borderRadius: 4, stack: 'Stack 0', order: 3 },
+                    });
+
+                    window.tamCharts = {};
+                }
+
+                function renderTamCharts() {
+
+                    destroyTamCharts();
+
+                    const debugEl = document.getElementById('tam-debug');
+
+		   const config = JSON.parse(
+   		    debugEl.dataset.config
+		    );
+
+		   const kpiData = JSON.parse(
+   		   debugEl.dataset.kpi
+		   );
+	       	    console.log('tamConfig', config);
+		    console.log('tamKpi', kpiData);
+
+                    const ctxMain = document.getElementById('tamMainChart');
+
+                    if (ctxMain) {
+                        window.tamCharts.main = new Chart(ctxMain, {
+                            type: 'bar',
+                            data: {
+                                labels: config.labels,
+                                datasets: [{
+                                        type: 'line',
+                                        label: 'Standard',
+                                        data: config.leadTime.standard,
+                                        borderColor: '#FB923C',
+                                        borderWidth: 2,
+                                        borderDash: [5, 5],
+                                        pointRadius: 0,
+                                        fill: false,
+                                    },
+                                    {
+                                        label: 'Dooring',
+                                        data: config.leadTime.dooring,
+                                        backgroundColor: '#34D399',
+                                        stack: 'lead',
+                                    },
+                                    {
+                                        label: 'Sailing',
+                                        data: config.leadTime.sailing,
+                                        backgroundColor: '#6366F1',
+                                        stack: 'lead',
+                                    },
+                                    {
+                                        label: 'Dwelling',
+                                        data: config.leadTime.dwelling,
+                                        backgroundColor: '#60A5FA',
+                                        stack: 'lead',
+                                    }
                                 ]
                             },
                             options: {
                                 responsive: true,
-                                maintainAspectRatio: false,
-                                plugins: { legend: { display: false } },
-                                scales: {
-                                    x: { grid: { display: false }, ticks: { font: {size: 11} } },
-                                    y: { grid: { borderDash: [2, 4], color: '#f3f4f6' }, beginAtZero: true, max: 25 }
-                                }
+                                maintainAspectRatio: false
                             }
                         });
+			console.log('RACK_CHART', window.tamCharts.rack);
+
                     }
 
-                    // KPI Summary chart (replaces rack chart)
                     const ctxRack = document.getElementById('tamRackChart');
+		    console.log('RACK_CTX', ctxRack);
+		    console.log('RACK_DATA', [
+   		    kpiData.on_time || 0,
+   		    kpiData.late || 0
+		   ]);
                     if (ctxRack) {
-                        const kpiData = @json($tamKpi);
-                        new Chart(ctxRack, {
+
+                        window.tamCharts.rack = new Chart(ctxRack, {
                             type: 'doughnut',
                             data: {
                                 labels: ['On Time', 'Late'],
                                 datasets: [{
-                                    data: [kpiData.on_time || 0, kpiData.late || 0],
-                                    backgroundColor: ['#10B981', '#EF4444'],
-                                    borderWidth: 0
+                                    data: [
+                                        kpiData.on_time || 0,
+                                        kpiData.late || 0
+                                    ],
+                                    backgroundColor: [
+                                        '#10B981',
+                                        '#EF4444'
+                                    ]
                                 }]
                             },
                             options: {
                                 responsive: true,
-                                maintainAspectRatio: false,
-                                cutout: '65%',
-                                plugins: {
-                                    legend: { display: false }
-                                }
+                                maintainAspectRatio: false
                             }
                         });
+	      		console.log('RACK_CHART', window.tamCharts.rack);
                     }
 
-                     // achievement chart - OK vs NG percentage per KPI
-                     const ctxAch = document.getElementById('tamAchieveChart');
-                     if (ctxAch) {
-                         new Chart(ctxAch, {
-                             type: 'bar',
-                             data: {
-                                 labels: config.achievement.labels,
-                                 datasets: [
-                                     { label: 'NG', data: config.achievement.ng, backgroundColor: '#FECACA', borderRadius: 2 },
-                                     { label: 'OK', data: config.achievement.ok, backgroundColor: '#10B981', borderRadius: 2 },
-                                 ]
-                             },
-                             options: {
-                                 responsive: true,
-                                 maintainAspectRatio: false,
-                                 plugins: { legend: { display: false } },
-                                 scales: {
-                                     x: { stacked: true, grid: { display: false }, ticks: { font: {size: 9} } },
-                                     y: { stacked: true, display: false, max: 100 }
-                                 }
-                             }
-                         });
-                     }
-                 });
+                    const ctxAch = document.getElementById('tamAchieveChart');
+
+                    if (ctxAch) {
+
+                        window.tamCharts.achieve = new Chart(ctxAch, {
+                            type: 'bar',
+                            data: {
+                                labels: config.achievement.labels,
+                                datasets: [{
+                                        label: 'NG',
+                                        data: config.achievement.ng,
+                                        backgroundColor: '#FECACA'
+                                    },
+                                    {
+                                        label: 'OK',
+                                        data: config.achievement.ok,
+                                        backgroundColor: '#10B981'
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false
+                            }
+                        });
+
+                    }
+
+                    console.log('TAM charts rendered');
+                }
+		document.addEventListener('livewire:initialized', () => {
+   		 Livewire.hook('commit', () => {
+        	console.log('LIVEWIRE COMMIT');
+        	setTimeout(renderTamCharts, 100);
+    		});
+		});
+
+                document.addEventListener('DOMContentLoaded', renderTamCharts);
+
+                document.addEventListener('livewire:navigated', () => {
+
+                    setTimeout(renderTamCharts, 100);
+
+                });
             </script>
         @endpush
-    @endonce
 </x-filament-panels::page>

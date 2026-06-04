@@ -151,6 +151,14 @@ class AdminDashboard extends Page implements HasForms
 
     protected function getPeriodRange(): array
     {
+	logger()->info('PERIOD_STATE', [
+        'period' => $this->period,
+        'periodMonth' => $this->periodMonth,
+        'period_month' => $this->period_month,
+
+        'form_period' => data_get($this->form->getState(), 'period'),
+        'form_period_month' => data_get($this->form->getState(), 'period_month'),
+    ]);
         if ($this->period === 'by_month' && $this->periodMonth) {
             $base = Carbon::createFromFormat('Y-m', $this->periodMonth)->startOfMonth();
 
@@ -485,20 +493,44 @@ class AdminDashboard extends Page implements HasForms
         $thresholds = $cfg['thresholds'] ?? [];
         $targetTotal = (int) ($thresholds['total_days']['normal'] ?? 19);
         [$start, $end] = $this->getPeriodRange();
+	logger()->info('KPI_PERIOD', [
+        'period' => $this->period,
+        'periodMonth' => $this->periodMonth,
+        'period_month' => $this->period_month,
+        'start' => $start->toDateTimeString(),
+        'end' => $end->toDateTimeString(),
+	]);
 
         $cacheKey = 'tam_kpi_summary:'.md5(implode('|', [$start->toIso8601String(), $end->toIso8601String(), $this->branchId ?: 'all', $this->mode ?: 'all']));
 
+	Cache::forget($cacheKey);
+
         return Cache::remember($cacheKey, now()->addSeconds(30), function () use ($start, $end, $targetTotal) {
             $rows = $this->tamBaseQuery()->whereBetween('delivered_at', [$start, $end])->with('tracks:id,shipment_id,status,tracked_at')->get();
-
+	   logger()->info('KPI_ROWS', [
+        'count' => $rows->count(),
+    ]);
             $total = 0;
             $onTime = 0;
             $late = 0;
             foreach ($rows as $s) {
+		if (! method_exists($s, 'evaluateKpiForManado')) {
+                    logger()->info('KPI_SKIP_NO_METHOD', [
+                        'shipment' => $s->code,
+                    ]);
+                    continue;
+                }
+
                 if (! method_exists($s, 'evaluateKpiForManado')) {
                     continue;
                 }
                 $ev = $s->evaluateKpiForManado();
+		logger()->info('KPI_EVAL', [
+                    'shipment' => $s->code,
+                    'applies' => $ev['applies'] ?? null,
+                    'badge' => $ev['badge'] ?? null,
+                ]);
+
                 if (! ($ev['applies'] ?? false)) {
                     continue;
                 }
@@ -510,6 +542,11 @@ class AdminDashboard extends Page implements HasForms
                     $late++;
                 }
             }
+	    logger()->info('KPI_COMPUTED', [
+                'total' => $total,
+                'on_time' => $onTime,
+                'late' => $late,
+            ]);
 
             $onPct = $total > 0 ? round(($onTime / $total) * 100, 1) : 0.0;
             $latePct = $total > 0 ? round(($late / $total) * 100, 1) : 0.0;
@@ -606,7 +643,14 @@ class AdminDashboard extends Page implements HasForms
     public function getTamLeadTimeEvaluation(): array
     {
         [$start, $end] = $this->getPeriodRange();
+	logger()->info('EVAL_DEBUG', [
+        'start' => $start,
+        'end' => $end,
+    ]);
         $rows = $this->tamBaseQuery()->whereBetween('delivered_at', [$start, $end])->with('tracks:id,shipment_id,status,tracked_at')->get();
+	logger()->info('EVAL_ROWS', [
+        'count' => $rows->count(),
+    ]);
 
         $metrics = ['dwelling' => ['ok' => 0, 'ng' => 0, 'pending' => 0], 'sailing' => ['ok' => 0, 'ng' => 0, 'pending' => 0], 'dooring' => ['ok' => 0, 'ng' => 0, 'pending' => 0], 'total' => ['ok' => 0, 'ng' => 0, 'pending' => 0]];
 
@@ -666,6 +710,14 @@ class AdminDashboard extends Page implements HasForms
 
     public function getTamMonthlyBreakdown(): array
     {
+	    [$start, $end] = $this->getPeriodRange();
+	logger()->info('MONTHLY_PERIOD', [
+    	  'period' => $this->period,
+          'periodMonth' => $this->periodMonth,
+          'period_month' => $this->period_month,
+	  'start' => $start->toDateString(),
+	  'end' => $end->toDateString(),
+        ]);
         $cfg = config('jss_kpi.manado', []);
         $thresholds = $cfg['thresholds'] ?? [];
         $targetDw = (float) ($thresholds['dwelling_days'] ?? 6);
