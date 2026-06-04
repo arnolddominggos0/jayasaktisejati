@@ -16,7 +16,7 @@
                 <select wire:model.live="period"
                     class="rounded border-gray-200 text-xs font-medium focus:ring-0 focus:border-gray-300 py-1.5 pl-2 pr-6 bg-white">
                     @foreach ($monthOptions as $value => $label)
-                        <option value="{{ $value }}">{{ $label }}</option>
+                        <option value="{{ $value }}" @selected($value === $period)>{{ $label }}</option>
                     @endforeach
                 </select>
 
