@@ -16,6 +16,7 @@ use App\Filament\Resources\ShipmentResource\Pages\ListShipments;
 use App\Filament\Resources\ShipmentResource\Pages\ViewShipment;
 use App\Filament\Resources\ShipmentResource\RelationManagers\LoadingSessionsRelationManager;
 use App\Models\Armada;
+use App\Models\Branch;
 use App\Models\Customer;
 use App\Models\Depot;
 use App\Models\Driver;
@@ -968,8 +969,8 @@ class ShipmentResource extends Resource
                                             return 'Non-SEA: tidak memakai penugasan depo.';
                                         }
 
-                                        return $record->assigned_depot?->name
-                                            ? ('Assigned ke: ' . $record->assigned_depot->name)
+                                        return $record->assignedDepot?->name
+                                            ? ('Assigned ke: ' . $record->assignedDepot->name)
                                             : 'Belum ter-assign.';
                                     })
                                     ->columnSpan(12),
@@ -1547,7 +1548,7 @@ class ShipmentResource extends Resource
 
                 \Filament\Tables\Actions\Action::make('sendToFc')
                     ->label('Kirim ke FC')
-                    ->icon('hemutateFormDataBeforeCreateroicon-m-paper-airplane')
+                    ->icon('heroicon-m-paper-airplane')
                     ->visible(fn(Shipment $r) => $r->status === ShipmentStatus::Draft)
                     ->requiresConfirmation()
                     ->action(fn(Shipment $r) => $r->sendToFc()),
