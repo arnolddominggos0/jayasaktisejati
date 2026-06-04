@@ -20,7 +20,7 @@
                     @endforeach
                 </select>
 
-                <input wire:model.live="search" placeholder="Cari kapal / voyage"
+                <input wire:model.live.debounce.400ms="search" placeholder="Cari kapal / voyage"
                     class="rounded border-gray-200 text-xs w-44 focus:ring-0 focus:border-gray-300 py-1.5 px-2.5 bg-white">
             </div>
         </div>
@@ -189,13 +189,8 @@
                                 @endphp
                                 {{ $modalTitle }}
                             </h3>
-                            @php
-                                $modalVessel = $inlineModalVoyageId
-                                    ? \App\Models\Voyage::find($inlineModalVoyageId)?->vessel?->name
-                                    : null;
-                            @endphp
-                            @if ($modalVessel)
-                                <p class="text-[10px] text-gray-400">{{ $modalVessel }}</p>
+                            @if ($inlineModalVesselName)
+                                <p class="text-[10px] text-gray-400">{{ $inlineModalVesselName }}</p>
                             @endif
                         </div>
                         <button wire:click="closeInlineModal"
@@ -204,6 +199,15 @@
 
                     {{-- Body --}}
                     <div class="space-y-3">
+
+                        {{-- Plan reference: ETB / ETD / ETA --}}
+                        @if ($inlineModalPlanRef)
+                            <div class="bg-gray-50 rounded px-2.5 py-1.5 text-[10px] text-gray-500">
+                                <span class="font-semibold uppercase tracking-wider">Plan</span>
+                                <span class="ml-1.5 text-gray-700 font-medium">{{ $inlineModalPlanRef }}</span>
+                            </div>
+                        @endif
+
                         @if (in_array($inlineModalType, ['atb', 'atd', 'ata', 'closing']))
                             <div>
                                 <label
@@ -211,6 +215,9 @@
                                     & Waktu</label>
                                 <input type="datetime-local" wire:model="inlineForm.datetime"
                                     class="w-full rounded border-gray-200 text-xs py-1.5 px-2 focus:ring-0 focus:border-gray-300">
+                                @error('inlineForm.datetime')
+                                    <p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
                         @endif
 
@@ -239,6 +246,9 @@
                                 <textarea wire:model="inlineForm.note" rows="2"
                                     class="w-full rounded border-gray-200 text-xs py-1.5 px-2 focus:ring-0 focus:border-gray-300 resize-none"
                                     placeholder="Catatan operasional opsional..."></textarea>
+                                @error('inlineForm.note')
+                                    <p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
                         @endif
                     </div>

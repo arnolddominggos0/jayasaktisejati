@@ -4,8 +4,6 @@
 
     $events = collect();
 
-    $events = collect();
-
     foreach ($voyage->checkpoints ?? [] as $cp) {
         $events->push((object)[
             'ts' => $cp->scheduled_at?->timestamp ?? PHP_INT_MAX,

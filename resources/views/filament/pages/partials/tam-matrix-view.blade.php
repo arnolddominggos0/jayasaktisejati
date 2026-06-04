@@ -4,21 +4,6 @@
     $dateFmt = fn($dt) => $dt ? $dt->format('d M') : '·';
     $timeFmt = fn($dt) => $dt ? $dt->format('H:i') : null;
 
-    $sorted = $rows
-        ->sortByDesc(function ($v) {
-            return match (true) {
-                $v->operational_status_enum === VoyageOperationalStatus::DELAYED => 100,
-                $v->eta_overdue => 90,
-                $v->sailing_risk => 80,
-                $v->operational_status_enum === VoyageOperationalStatus::SAILING => 70,
-                $v->checkpoints->contains(fn($cp) => !$cp->is_completed && $cp->scheduled_at?->isPast()) => 60,
-                $v->vesselChecks->contains(fn($vc) => $vc->status?->value === 'potential_delay') => 50,
-                $v->operational_status_enum === VoyageOperationalStatus::COMPLETED => 30,
-                $v->operational_status_enum === VoyageOperationalStatus::SCHEDULED => 20,
-                default => 10,
-            };
-        })
-        ->values();
     $sorted = $rows->sortByDesc(fn($v) => $v->operationalState->priorityWeight())->values();
 @endphp
 
@@ -90,7 +75,7 @@
                         $infoIssues = [];
 
                         if ($v->overdue_days > 0) {
-                            $criticalIssues[] = 'Delay ' . $v->overdue_days . 'h';
+                            $criticalIssues[] = 'Delay ' . $v->overdue_days . ' hari';
                         }
 
                         if ($v->eta_overdue) {
@@ -155,7 +140,8 @@
                             !$v->atd_at => 'Input ATD',
                             !$v->ata_at && $v->operational_status_enum === VoyageOperationalStatus::SAILING
                                 => 'Monitor ATA',
-                            !$h1 => 'Lengkapi H-1',
+                            !$h1 && $v->operational_status_enum === VoyageOperationalStatus::SAILING
+                                => 'Lengkapi H-1',
                             $h1 && $h1->status?->value === 'potential_delay'
                                 => 'Review Risiko H-1',
                             $v->eta_overdue => 'Buat Investigasi Delay',

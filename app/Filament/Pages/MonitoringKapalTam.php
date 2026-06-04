@@ -53,6 +53,8 @@ class MonitoringKapalTam extends Page
     public ?int $inlineModalVoyageId = null;
     public ?int $inlineModalVesselCheckId = null;
     public ?int $inlineModalCaseId = null;
+    public string $inlineModalVesselName = '';
+    public string $inlineModalPlanRef = '';
 
     public array $inlineForm = [
         'datetime' => '',
@@ -83,6 +85,7 @@ class MonitoringKapalTam extends Page
 
     public function updatedPeriod(): void
     {
+        $this->search = '';
         $this->loadData();
     }
 
@@ -100,7 +103,9 @@ class MonitoringKapalTam extends Page
         $this->resetInlineModal();
         $this->inlineModalType = 'atb';
         $this->inlineModalVoyageId = $voyageId;
-        $v = Voyage::find($voyageId);
+        $v = $this->resolveVoyage($voyageId);
+        $this->inlineModalVesselName = $v?->vessel?->name ?? '';
+        $this->inlineModalPlanRef = $v?->etb ? 'ETB ' . $v->etb->format('d M Y H:i') : '';
         $this->inlineForm['datetime'] = $v?->atb_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i');
         $this->showInlineModal = true;
     }
@@ -110,7 +115,9 @@ class MonitoringKapalTam extends Page
         $this->resetInlineModal();
         $this->inlineModalType = 'atd';
         $this->inlineModalVoyageId = $voyageId;
-        $v = Voyage::find($voyageId);
+        $v = $this->resolveVoyage($voyageId);
+        $this->inlineModalVesselName = $v?->vessel?->name ?? '';
+        $this->inlineModalPlanRef = $v?->etd ? 'ETD ' . $v->etd->format('d M Y H:i') : '';
         $this->inlineForm['datetime'] = $v?->atd_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i');
         $this->showInlineModal = true;
     }
@@ -120,7 +127,9 @@ class MonitoringKapalTam extends Page
         $this->resetInlineModal();
         $this->inlineModalType = 'ata';
         $this->inlineModalVoyageId = $voyageId;
-        $v = Voyage::find($voyageId);
+        $v = $this->resolveVoyage($voyageId);
+        $this->inlineModalVesselName = $v?->vessel?->name ?? '';
+        $this->inlineModalPlanRef = $v?->eta ? 'ETA ' . $v->eta->format('d M Y H:i') : '';
         $this->inlineForm['datetime'] = $v?->ata_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i');
         $this->showInlineModal = true;
     }
@@ -130,7 +139,9 @@ class MonitoringKapalTam extends Page
         $this->resetInlineModal();
         $this->inlineModalType = 'closing';
         $this->inlineModalVoyageId = $voyageId;
-        $v = Voyage::find($voyageId);
+        $v = $this->resolveVoyage($voyageId);
+        $this->inlineModalVesselName = $v?->vessel?->name ?? '';
+        $this->inlineModalPlanRef = '';
         $this->inlineForm['datetime'] = $v?->closing_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i');
         $this->showInlineModal = true;
     }
@@ -151,6 +162,8 @@ class MonitoringKapalTam extends Page
         $this->resetInlineModal();
         $this->inlineModalType = 'delay_case';
         $this->inlineModalVoyageId = $voyageId;
+        $v = $this->resolveVoyage($voyageId);
+        $this->inlineModalVesselName = $v?->vessel?->name ?? '';
         $this->showInlineModal = true;
     }
 
@@ -279,6 +292,8 @@ class MonitoringKapalTam extends Page
         $this->inlineModalVoyageId = null;
         $this->inlineModalVesselCheckId = null;
         $this->inlineModalCaseId = null;
+        $this->inlineModalVesselName = '';
+        $this->inlineModalPlanRef = '';
         $this->inlineForm = ['datetime' => '', 'status' => '', 'note' => ''];
     }
 
@@ -288,9 +303,16 @@ class MonitoringKapalTam extends Page
         $this->inlineModalVoyageId = null;
         $this->inlineModalVesselCheckId = null;
         $this->inlineModalCaseId = null;
+        $this->inlineModalVesselName = '';
+        $this->inlineModalPlanRef = '';
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+
+    protected function resolveVoyage(int $voyageId): ?Voyage
+    {
+        return $this->rows?->firstWhere('id', $voyageId) ?? Voyage::find($voyageId);
+    }
 
     protected function generateMonthOptions(): void
     {
