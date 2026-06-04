@@ -294,7 +294,7 @@ class VesselPlan extends Model
         $normalizedPhone = preg_replace('/\D+/', '', $this->whatsapp_phone);
 
         if (str_starts_with($normalizedPhone, '0')) {
-            $normalizedPhone = '6281265559397' . substr($normalizedPhone, 1);
+            $normalizedPhone = '62' . substr($normalizedPhone, 1);
         }
         return 'https://wa.me/' . $normalizedPhone . '?text=' . rawurlencode($message);
     }
