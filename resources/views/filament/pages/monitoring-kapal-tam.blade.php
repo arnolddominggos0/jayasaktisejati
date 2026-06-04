@@ -140,23 +140,39 @@
                             <div class="text-gray-500">Tanggal Dilaporkan</div>
                             <input type="date" wire:model="milestoneForm.actual_date"
                                 class="w-full rounded-lg border-gray-300 text-sm">
+                            @error('milestoneForm.actual_date')
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
                         <div>
                             <div class="text-gray-500">Kecepatan Kapal</div>
                             <input type="number" step="0.1" wire:model="milestoneForm.speed_knots"
                                 class="w-full rounded-lg border-gray-300 text-sm">
+                            @error('milestoneForm.speed_knots')
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
                         <div>
                             <div class="text-gray-500">Catatan Monitoring</div>
                             <textarea wire:model="milestoneForm.note" rows="3" class="w-full rounded-lg border-gray-300 text-sm"></textarea>
+                            @error('milestoneForm.note')
+                                <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                            @enderror
                         </div>
                     </div>
 
                     <div class="mt-6 flex justify-end gap-2">
                         <button wire:click="$set('showMilestoneModal', false)"
-                            class="px-4 py-2 border rounded-lg text-sm">Batal</button>
+                            wire:loading.attr="disabled"
+                            class="px-4 py-2 border rounded-lg text-sm disabled:opacity-50">Batal</button>
                         <button wire:click="saveMilestone"
-                            class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm">Simpan</button>
+                            wire:loading.attr="disabled"
+                            wire:target="saveMilestone"
+                            class="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm disabled:opacity-60 flex items-center gap-2">
+                            <span wire:loading wire:target="saveMilestone"
+                                class="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                            Simpan
+                        </button>
                     </div>
 
                 </div>
@@ -190,7 +206,10 @@
                                 {{ $modalTitle }}
                             </h3>
                             @if ($inlineModalVesselName)
-                                <p class="text-[10px] text-gray-400">{{ $inlineModalVesselName }}</p>
+                                <p class="text-[10px] text-gray-500 font-medium">{{ $inlineModalVesselName }}</p>
+                            @endif
+                            @if ($inlineModalVoyageNo)
+                                <p class="text-[10px] text-gray-400 font-mono">{{ $inlineModalVoyageNo }}</p>
                             @endif
                         </div>
                         <button wire:click="closeInlineModal"
@@ -256,13 +275,20 @@
                     {{-- Footer --}}
                     <div class="mt-4 flex justify-end gap-2">
                         <button wire:click="closeInlineModal"
-                            class="px-3 py-1.5 border border-gray-200 rounded text-[11px] text-gray-600 hover:bg-gray-50 transition">Batal</button>
+                            wire:loading.attr="disabled"
+                            class="px-3 py-1.5 border border-gray-200 rounded text-[11px] text-gray-600 hover:bg-gray-50 transition disabled:opacity-50">
+                            Batal
+                        </button>
                         <button wire:click="saveInlineModal"
-                            class="px-3 py-1.5 bg-gray-900 text-white rounded text-[11px] hover:bg-gray-800 transition">
+                            wire:loading.attr="disabled"
+                            wire:target="saveInlineModal"
+                            class="px-3 py-1.5 bg-gray-900 text-white rounded text-[11px] hover:bg-gray-800 transition disabled:opacity-60 flex items-center gap-1.5">
+                            <span wire:loading wire:target="saveInlineModal"
+                                class="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                             @if ($inlineModalType === 'delay_case')
-                                Create Case
+                                Buat Kasus
                             @else
-                                Save
+                                Simpan
                             @endif
                         </button>
                     </div>

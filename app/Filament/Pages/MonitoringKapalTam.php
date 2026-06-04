@@ -54,6 +54,7 @@ class MonitoringKapalTam extends Page
     public ?int $inlineModalVesselCheckId = null;
     public ?int $inlineModalCaseId = null;
     public string $inlineModalVesselName = '';
+    public string $inlineModalVoyageNo = '';
     public string $inlineModalPlanRef = '';
 
     public array $inlineForm = [
@@ -105,7 +106,8 @@ class MonitoringKapalTam extends Page
         $this->inlineModalVoyageId = $voyageId;
         $v = $this->resolveVoyage($voyageId);
         $this->inlineModalVesselName = $v?->vessel?->name ?? '';
-        $this->inlineModalPlanRef = $v?->etb ? 'ETB ' . $v->etb->format('d M Y H:i') : '';
+        $this->inlineModalVoyageNo   = $v?->voyage_no ?? '';
+        $this->inlineModalPlanRef    = $v?->etb ? 'ETB ' . $v->etb->format('d M Y H:i') : '';
         $this->inlineForm['datetime'] = $v?->atb_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i');
         $this->showInlineModal = true;
     }
@@ -117,7 +119,8 @@ class MonitoringKapalTam extends Page
         $this->inlineModalVoyageId = $voyageId;
         $v = $this->resolveVoyage($voyageId);
         $this->inlineModalVesselName = $v?->vessel?->name ?? '';
-        $this->inlineModalPlanRef = $v?->etd ? 'ETD ' . $v->etd->format('d M Y H:i') : '';
+        $this->inlineModalVoyageNo   = $v?->voyage_no ?? '';
+        $this->inlineModalPlanRef    = $v?->etd ? 'ETD ' . $v->etd->format('d M Y H:i') : '';
         $this->inlineForm['datetime'] = $v?->atd_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i');
         $this->showInlineModal = true;
     }
@@ -129,7 +132,8 @@ class MonitoringKapalTam extends Page
         $this->inlineModalVoyageId = $voyageId;
         $v = $this->resolveVoyage($voyageId);
         $this->inlineModalVesselName = $v?->vessel?->name ?? '';
-        $this->inlineModalPlanRef = $v?->eta ? 'ETA ' . $v->eta->format('d M Y H:i') : '';
+        $this->inlineModalVoyageNo   = $v?->voyage_no ?? '';
+        $this->inlineModalPlanRef    = $v?->eta ? 'ETA ' . $v->eta->format('d M Y H:i') : '';
         $this->inlineForm['datetime'] = $v?->ata_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i');
         $this->showInlineModal = true;
     }
@@ -141,7 +145,8 @@ class MonitoringKapalTam extends Page
         $this->inlineModalVoyageId = $voyageId;
         $v = $this->resolveVoyage($voyageId);
         $this->inlineModalVesselName = $v?->vessel?->name ?? '';
-        $this->inlineModalPlanRef = '';
+        $this->inlineModalVoyageNo   = $v?->voyage_no ?? '';
+        $this->inlineModalPlanRef    = '';
         $this->inlineForm['datetime'] = $v?->closing_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i');
         $this->showInlineModal = true;
     }
@@ -164,6 +169,7 @@ class MonitoringKapalTam extends Page
         $this->inlineModalVoyageId = $voyageId;
         $v = $this->resolveVoyage($voyageId);
         $this->inlineModalVesselName = $v?->vessel?->name ?? '';
+        $this->inlineModalVoyageNo   = $v?->voyage_no ?? '';
         $this->showInlineModal = true;
     }
 
@@ -215,8 +221,16 @@ class MonitoringKapalTam extends Page
 
         $voyage->update($data);
 
+        $label = match ($this->inlineModalType) {
+            'atb'     => 'ATB',
+            'atd'     => 'ATD',
+            'ata'     => 'ATA',
+            'closing' => 'Closing',
+            default   => strtoupper($this->inlineModalType),
+        };
+
         Notification::make()
-            ->title(strtoupper($this->inlineModalType) . ' updated')
+            ->title("Data {$label} berhasil disimpan")
             ->success()
             ->send();
     }
@@ -293,6 +307,7 @@ class MonitoringKapalTam extends Page
         $this->inlineModalVesselCheckId = null;
         $this->inlineModalCaseId = null;
         $this->inlineModalVesselName = '';
+        $this->inlineModalVoyageNo = '';
         $this->inlineModalPlanRef = '';
         $this->inlineForm = ['datetime' => '', 'status' => '', 'note' => ''];
     }
@@ -304,6 +319,7 @@ class MonitoringKapalTam extends Page
         $this->inlineModalVesselCheckId = null;
         $this->inlineModalCaseId = null;
         $this->inlineModalVesselName = '';
+        $this->inlineModalVoyageNo = '';
         $this->inlineModalPlanRef = '';
     }
 
@@ -518,6 +534,11 @@ class MonitoringKapalTam extends Page
             'speed_knots' => $this->milestoneForm['speed_knots'],
             'note' => $this->milestoneForm['note'],
         ]);
+
+        Notification::make()
+            ->title('Milestone disimpan')
+            ->success()
+            ->send();
 
         $this->showMilestoneModal = false;
         $this->loadData();

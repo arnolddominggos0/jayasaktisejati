@@ -191,7 +191,12 @@
                                         </span>
 
                                         <span class="text-[10px] {{ $lastUpdateClass }}">
-                                            Update {{ optional($lastUpdate)->format('H:i') }}
+                                            @if ($lastUpdate)
+                                                Update
+                                                {{ $lastUpdate->isToday()
+                                                    ? $lastUpdate->format('H:i')
+                                                    : $lastUpdate->format('d M H:i') }}
+                                            @endif
                                         </span>
                                     </div>
                                 </div>
