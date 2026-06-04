@@ -32,15 +32,11 @@ class AdminDashboard extends Page implements HasForms
 
     public ?int $branchId = null;
 
-    public ?int $branch_id = null;
-
     public ?string $mode = null;
 
     public string $period = 'this_month';
 
     public ?string $periodMonth = null;
-
-    public ?string $period_month = null;
 
     public string $brandHex = '#0137A1';
 
@@ -49,15 +45,13 @@ class AdminDashboard extends Page implements HasForms
     public function mount(): void
     {
         $this->periodMonth = now()->format('Y-m');
-        $this->period_month = $this->periodMonth;
-        $this->branch_id = $this->branchId;
 
         $this->form->fill([
             'dashboardView' => 'tam',
-            'branch_id' => $this->branch_id,
+            'branch_id' => null,
             'mode' => null,
             'period' => 'this_month',
-            'period_month' => $this->period_month,
+            'period_month' => $this->periodMonth,
         ]);
     }
 
@@ -82,8 +76,8 @@ class AdminDashboard extends Page implements HasForms
                             $this->period = $state ?: 'this_month';
                             if ($this->period === 'by_month' && ! $this->periodMonth) {
                                 $this->periodMonth = now()->format('Y-m');
-                                $this->period_month = $this->periodMonth;
                             }
+                            $this->dispatch('charts-ready');
                         })->columnSpan(1),
 
                     Forms\Components\Select::make('period_month')
@@ -94,7 +88,7 @@ class AdminDashboard extends Page implements HasForms
                         ->hidden(fn(Get $get) => $get('period') !== 'by_month')
                         ->afterStateUpdated(function ($state) {
                             $this->periodMonth = $state ?: now()->format('Y-m');
-                            $this->period_month = $this->periodMonth;
+                            $this->dispatch('charts-ready');
                         })
                         ->columnSpan(1),
 
@@ -105,7 +99,7 @@ class AdminDashboard extends Page implements HasForms
                         ->reactive()
                         ->afterStateUpdated(function ($state) {
                             $this->branchId = $state ?: null;
-                            $this->branch_id = $this->branchId;
+                            $this->dispatch('charts-ready');
                         })
                         ->columnSpan(1),
 
@@ -114,7 +108,10 @@ class AdminDashboard extends Page implements HasForms
                         ->placeholder('Semua moda')
                         ->options([ShipmentMode::Sea->value => 'Laut', ShipmentMode::Land->value => 'Darat'])
                         ->reactive()
-                        ->afterStateUpdated(fn($state) => $this->mode = $state ?: null)
+                        ->afterStateUpdated(function ($state) {
+                            $this->mode = $state ?: null;
+                            $this->dispatch('charts-ready');
+                        })
                         ->columnSpan(1),
                 ]),
         ];
@@ -505,38 +502,22 @@ class AdminDashboard extends Page implements HasForms
             ->whereBetween('delivered_at', [$start, $end])
             ->get();
 
-        $debug = [];
-
         $total = 0;
         $onTime = 0;
         $late = 0;
 
         foreach ($rows as $shipment) {
-
             if (! method_exists($shipment, 'evaluateKpiForManado')) {
-
-                $debug[] = [
-                    'shipment' => $shipment->code,
-                    'error' => 'method_missing',
-                ];
-
                 continue;
             }
 
             $evaluation = $shipment->evaluateKpiForManado();
-
-            $debug[] = [
-                'shipment' => $shipment->code,
-                'applies' => $evaluation['applies'] ?? null,
-                'badge' => $evaluation['badge'] ?? null,
-            ];
 
             if (! ($evaluation['applies'] ?? false)) {
                 continue;
             }
 
             $total++;
-
             $badge = $evaluation['badge'] ?? null;
 
             if (in_array($badge, ['On Time', 'Tepat Waktu'], true)) {
@@ -547,26 +528,6 @@ class AdminDashboard extends Page implements HasForms
                 $late++;
             }
         }
-
-        logger()->info('=== TAM KPI DEBUG ===', [
-            'period' => $this->period,
-            'periodMonth' => $this->periodMonth,
-            'branchId' => $this->branchId,
-            'mode' => $this->mode,
-
-            'start' => $start->toDateString(),
-            'end' => $end->toDateString(),
-
-            'customer_ids' => $cfg['customer_ids'] ?? [],
-
-            'rows_found' => $rows->count(),
-
-            'total' => $total,
-            'on_time' => $onTime,
-            'late' => $late,
-
-            'sample' => array_slice($debug, 0, 20),
-        ]);
 
         return [
             'total' => $total,
@@ -731,13 +692,6 @@ class AdminDashboard extends Page implements HasForms
     public function getTamMonthlyBreakdown(): array
     {
         [$start, $end] = $this->getPeriodRange();
-        logger()->info('MONTHLY_PERIOD', [
-            'period' => $this->period,
-            'periodMonth' => $this->periodMonth,
-            'period_month' => $this->period_month,
-            'start' => $start->toDateString(),
-            'end' => $end->toDateString(),
-        ]);
         $cfg = config('jss_kpi.manado', []);
         $thresholds = $cfg['thresholds'] ?? [];
         $targetDw = (float) ($thresholds['dwelling_days'] ?? 6);
