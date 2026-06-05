@@ -30,13 +30,13 @@ class AdminDashboard extends Page implements HasForms
 
     protected static ?string $title = 'Dashboard';
 
-    public ?int $branchId = null;
+    public ?int $branch_id = null;
 
     public ?string $mode = null;
 
     public string $period = 'this_month';
 
-    public ?string $periodMonth = null;
+    public ?string $period_month = null;
 
     public string $brandHex = '#0137A1';
 
@@ -44,14 +44,14 @@ class AdminDashboard extends Page implements HasForms
 
     public function mount(): void
     {
-        $this->periodMonth = now()->format('Y-m');
+        $this->period_month = now()->format('Y-m');
 
         $this->form->fill([
             'dashboardView' => 'tam',
             'branch_id' => null,
             'mode' => null,
             'period' => 'this_month',
-            'period_month' => $this->periodMonth,
+            'period_month' => $this->period_month,
         ]);
     }
 
@@ -74,8 +74,8 @@ class AdminDashboard extends Page implements HasForms
                         ->default('this_month')->reactive()
                         ->afterStateUpdated(function ($state) {
                             $this->period = $state ?: 'this_month';
-                            if ($this->period === 'by_month' && ! $this->periodMonth) {
-                                $this->periodMonth = now()->format('Y-m');
+                            if ($this->period === 'by_month' && ! $this->period_month) {
+                                $this->period_month = now()->format('Y-m');
                             }
                             $this->dispatch('charts-ready');
                         })->columnSpan(1),
@@ -87,7 +87,7 @@ class AdminDashboard extends Page implements HasForms
                         ->reactive()
                         ->hidden(fn(Get $get) => $get('period') !== 'by_month')
                         ->afterStateUpdated(function ($state) {
-                            $this->periodMonth = $state ?: now()->format('Y-m');
+                            $this->period_month = $state ?: now()->format('Y-m');
                             $this->dispatch('charts-ready');
                         })
                         ->columnSpan(1),
@@ -98,7 +98,7 @@ class AdminDashboard extends Page implements HasForms
                         ->options($this->getBranchOptions())
                         ->reactive()
                         ->afterStateUpdated(function ($state) {
-                            $this->branchId = $state ?: null;
+                            $this->branch_id = $state ?: null;
                             $this->dispatch('charts-ready');
                         })
                         ->columnSpan(1),
@@ -135,9 +135,9 @@ class AdminDashboard extends Page implements HasForms
 
     protected function parsePeriodMonth(): Carbon
     {
-        if ($this->period === 'by_month' && $this->periodMonth) {
+        if ($this->period === 'by_month' && $this->period_month) {
             try {
-                return Carbon::createFromFormat('Y-m', $this->periodMonth)->startOfMonth();
+                return Carbon::createFromFormat('Y-m', $this->period_month)->startOfMonth();
             } catch (\Throwable $e) {
                 return now()->startOfMonth();
             }
@@ -152,7 +152,7 @@ class AdminDashboard extends Page implements HasForms
 
         $period = $state['period'] ?? $this->period;
         $periodMonth = $state['period_month']
-            ?? $this->periodMonth
+            ?? $this->period_month
             ?? now()->format('Y-m');
 
         if ($period === 'by_month') {
@@ -180,7 +180,7 @@ class AdminDashboard extends Page implements HasForms
     protected function applyFilters(Builder $q): Builder
     {
         return $q
-            ->when($this->branchId, fn($qq) => $qq->where('branch_id', $this->branchId))
+            ->when($this->branch_id, fn($qq) => $qq->where('branch_id', $this->branch_id))
             ->when($this->mode, fn($qq) => $qq->where('mode', $this->mode));
     }
 
@@ -221,7 +221,7 @@ class AdminDashboard extends Page implements HasForms
         $cacheKey = 'tam_port_stock_historical:' . md5(implode('|', [
             $start->toIso8601String(),
             $end->toIso8601String(),
-            $this->branchId ?: 'all',
+            $this->branch_id ?: 'all',
             $this->mode ?: 'all',
         ]));
 
@@ -330,10 +330,10 @@ class AdminDashboard extends Page implements HasForms
 
         $aktivitasPeriode = ShipmentTrack::query()
             ->when(
-                $this->branchId,
+                $this->branch_id,
                 fn($qq) => $qq->whereHas(
                     'shipment',
-                    fn($s) => $s->where('branch_id', $this->branchId)
+                    fn($s) => $s->where('branch_id', $this->branch_id)
                 )
             )
             ->when(
@@ -363,10 +363,10 @@ class AdminDashboard extends Page implements HasForms
 
             $count = ShipmentTrack::query()
                 ->when(
-                    $this->branchId,
+                    $this->branch_id,
                     fn($qq) => $qq->whereHas(
                         'shipment',
-                        fn($s) => $s->where('branch_id', $this->branchId)
+                        fn($s) => $s->where('branch_id', $this->branch_id)
                     )
                 )
                 ->when(
@@ -438,7 +438,7 @@ class AdminDashboard extends Page implements HasForms
             ->select(['customers.id', 'customers.name'])
             ->selectRaw('COUNT(shipments.id) as total')
             ->leftJoin('shipments', 'shipments.customer_id', '=', 'customers.id')
-            ->when($this->branchId, fn($qq) => $qq->where('shipments.branch_id', $this->branchId))
+            ->when($this->branch_id, fn($qq) => $qq->where('shipments.branch_id', $this->branch_id))
             ->when($this->mode, fn($qq) => $qq->where('shipments.mode', $this->mode))
             ->whereBetween('shipments.created_at', [$start, $end])
             ->groupBy(['customers.id', 'customers.name'])
@@ -475,7 +475,7 @@ class AdminDashboard extends Page implements HasForms
 
         return ShipmentTrack::query()
             ->with(['shipment:id,code', 'user:id,name'])
-            ->when($this->branchId, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('branch_id', $this->branchId)))
+            ->when($this->branch_id, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('branch_id', $this->branch_id)))
             ->when($this->mode, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('mode', $this->mode)))
             ->whereBetween('tracked_at', [$start, $end])
             ->latest('tracked_at')->limit(12)->get()

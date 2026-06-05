@@ -161,7 +161,7 @@
                             @elseif ($this->period === 'this_year')
                             Tahun Ini
                             @else
-                            {{ \Carbon\Carbon::createFromFormat('Y-m', $this->periodMonth)->translatedFormat('F Y') }}
+                            {{ \Carbon\Carbon::createFromFormat('Y-m', $this->period_month)->translatedFormat('F Y') }}
                             @endif
                         </span>
                     </div>
