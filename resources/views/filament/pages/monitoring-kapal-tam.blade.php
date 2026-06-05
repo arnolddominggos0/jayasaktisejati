@@ -31,7 +31,7 @@
         {{-- Critical dominant, informational secondary, KPI tertiary      --}}
         {{-- ═══════════════════════════════════════════════════════════════ --}}
         @php
-            $kpi = \App\Services\Operational\VoyageOperationalSnapshot::kpiSummary($rows);
+            $kpi = \App\Services\Operational\VoyageOperationalSnapshot::kpiSummary($rows ?? collect());
         @endphp
 
         <div class="flex items-center gap-2 flex-wrap">

@@ -439,12 +439,14 @@ class MonitoringKapalTam extends Page
                 }
             )
             ->when($this->search, function ($query) {
-                $query->where(function ($q) {
-                    $q->where('voyage_no', 'like', "%{$this->search}%")
-                        ->orWhereHas(
-                            'vessel',
-                            fn($v) => $v->where('name', 'like', "%{$this->search}%")
-                        );
+                $s = $this->search;
+                $query->where(function ($q) use ($s) {
+                    $q->where('voyage_no', 'like', "%{$s}%")
+                        ->orWhereHas('vessel', fn($v) => $v->where('name', 'like', "%{$s}%"))
+                        ->orWhereHas('pol', fn($p) => $p->where('code', 'like', "%{$s}%")
+                            ->orWhere('name', 'like', "%{$s}%"))
+                        ->orWhereHas('pod', fn($p) => $p->where('code', 'like', "%{$s}%")
+                            ->orWhere('name', 'like', "%{$s}%"));
                 });
             });
     }
