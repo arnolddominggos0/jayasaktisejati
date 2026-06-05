@@ -20,7 +20,7 @@
                     @endforeach
                 </select>
 
-                <input wire:model.live.debounce.400ms="search" placeholder="Cari kapal / voyage"
+                <input wire:model.live.debounce.400ms="search" wire:key="search-input-{{ $period }}" placeholder="Cari kapal / voyage"
                     class="rounded border-gray-200 text-xs w-44 focus:ring-0 focus:border-gray-300 py-1.5 px-2.5 bg-white">
             </div>
         </div>
@@ -31,33 +31,33 @@
         {{-- Critical dominant, informational secondary, KPI tertiary      --}}
         {{-- ═══════════════════════════════════════════════════════════════ --}}
         @php
-            $kpi = \App\Services\Operational\VoyageOperationalSnapshot::kpiSummary($rows);
+            $kpi = \App\Services\Operational\VoyageOperationalSnapshot::kpiSummary($rows ?? collect());
         @endphp
 
         <div class="flex items-center gap-2 flex-wrap">
             @if ($kpi['delayed_count'])
-                <div class="bg-red-50 border border-red-200 rounded px-2.5 py-1.5 shadow-sm">
+                <div wire:key="kpi-delayed" class="bg-red-50 border border-red-200 rounded px-2.5 py-1.5 shadow-sm">
                     <span class="text-[10px] text-red-700 font-bold uppercase tracking-wider">Delay</span>
                     <span class="ml-1.5 text-base font-bold text-red-800">{{ $kpi['delayed_count'] }}</span>
                 </div>
             @endif
 
             @if ($kpi['sailing_count'])
-                <div class="bg-blue-50/50 border border-blue-200/50 rounded px-2.5 py-1.5">
+                <div wire:key="kpi-sailing" class="bg-blue-50/50 border border-blue-200/50 rounded px-2.5 py-1.5">
                     <span class="text-[10px] text-blue-700 font-semibold uppercase tracking-wider">Berlayar</span>
                     <span class="ml-1.5 text-base font-bold text-blue-800">{{ $kpi['sailing_count'] }}</span>
                 </div>
             @endif
 
             @if ($kpi['completed_count'])
-                <div class="bg-gray-50/60 border border-gray-200/60 rounded px-2.5 py-1.5">
+                <div wire:key="kpi-completed" class="bg-gray-50/60 border border-gray-200/60 rounded px-2.5 py-1.5">
                     <span class="text-[10px] text-gray-600 font-semibold uppercase tracking-wider">Selesai</span>
                     <span class="ml-1.5 text-base font-bold text-gray-700">{{ $kpi['completed_count'] }}</span>
                 </div>
             @endif
 
             @if ($kpi['scheduled_count'])
-                <div class="bg-white border border-gray-200/50 rounded px-2.5 py-1.5">
+                <div wire:key="kpi-scheduled" class="bg-white border border-gray-200/50 rounded px-2.5 py-1.5">
                     <span class="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Terjadwal</span>
                     <span class="ml-1.5 text-base font-bold text-gray-600">{{ $kpi['scheduled_count'] }}</span>
                 </div>
@@ -89,14 +89,18 @@
         {{-- ═══════════════════════════════════════════════════════════════ --}}
         {{-- OPERATIONAL MONITORING MATRIX (primary workspace)             --}}
         {{-- ═══════════════════════════════════════════════════════════════ --}}
-        @include('filament.pages.partials.tam-matrix-view')
+        <div wire:key="tam-matrix">
+            @include('filament.pages.partials.tam-matrix-view')
+        </div>
 
 
         {{-- ═══════════════════════════════════════════════════════════════ --}}
         {{-- OPERATIONAL CALENDAR (below matrix)                           --}}
         {{-- ═══════════════════════════════════════════════════════════════ --}}
         @if (count($calendar))
-            @include('filament.pages.partials.tam-calendar')
+            <div wire:key="tam-calendar">
+                @include('filament.pages.partials.tam-calendar')
+            </div>
         @endif
 
 

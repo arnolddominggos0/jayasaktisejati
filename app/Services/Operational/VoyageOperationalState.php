@@ -54,6 +54,8 @@ final class VoyageOperationalState
     public bool $canInputAtd = false;
     public bool $canInputAta = false;
     public bool $canMonitorAta = false;
+    public bool $canInputAtb = false;
+    public bool $canInputClosing = false;
     public bool $canAcknowledge = false;
     public bool $canShowMilestone = false;
 
@@ -107,8 +109,10 @@ final class VoyageOperationalState
         $this->hasCheckpointOverdue = collect($this->voyage->checkpoints ?? [])
             ->contains(fn(VoyageCheckpoint $cp) => !$cp->is_completed && $cp->scheduled_at?->isPast());
 
+        // Use getRawOriginal() to bypass the enum cast — avoids ValueError if
+        // the DB contains a status string that is not a valid enum case.
         $this->hasPotentialDelay = collect($this->voyage->vesselChecks ?? [])
-            ->contains(fn($vc) => $vc->status?->isPotentialDelay());
+            ->contains(fn($vc) => $vc->getRawOriginal('status') === 'potential_delay');
 
         $this->hasReadinessIssue = $this->hasCheckpointOverdue || $this->hasPotentialDelay;
     }
@@ -168,7 +172,11 @@ final class VoyageOperationalState
         $this->otb = $this->voyage->otb_status;
         $this->otd = $this->voyage->otd_status;
         $this->ota = $this->voyage->ota_status;
-        $this->sla = $this->voyage->sla_status;
+        try {
+            $this->sla = $this->voyage->sla_status;
+        } catch (\ValueError $e) {
+            $this->sla = null;
+        }
     }
 
     private function evaluateActions(): void
@@ -184,19 +192,27 @@ final class VoyageOperationalState
         // Monitor ATA: currently sailing without ATA
         $this->canMonitorAta = $this->status === VoyageOperationalStatus::SAILING && is_null($v->ata_at);
 
+        // Input ATB: has ATA but no ATB
+        $this->canInputAtb = !is_null($v->ata_at) && is_null($v->atb_at);
+
+        // Input Closing: has ATB but no closing timestamp
+        $this->canInputClosing = !is_null($v->atb_at) && is_null($v->closing_at);
+
         // Acknowledge: has issues and not normal
         $this->canAcknowledge = $this->severity !== 'normal';
 
         // Milestone: has milestones
         $this->canShowMilestone = $this->milestoneTotalCount > 0;
 
-        // Next action label
+        // Next action label — full ATD → ATA → ATB → Closing workflow
         $this->nextActionLabel = match (true) {
-            $this->canInputAtd => 'Input ATD',
-            $this->canMonitorAta => 'Monitor ATA',
+            $this->canInputAtd      => 'Input ATD',
+            $this->canMonitorAta    => 'Monitor ATA',
+            $this->canInputAtb      => 'Input ATB',
+            $this->canInputClosing  => 'Input Closing',
             $this->hasPotentialDelay => 'Review Risiko',
-            $this->hasEtaOverdue => 'Investigasi Terlambat',
-            default => 'Monitoring',
+            $this->hasEtaOverdue    => 'Investigasi Terlambat',
+            default                 => 'Monitoring',
         };
 
         // Sailing days

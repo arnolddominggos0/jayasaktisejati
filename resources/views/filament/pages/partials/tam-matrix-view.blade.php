@@ -4,7 +4,8 @@
     $dateFmt = fn($dt) => $dt ? $dt->format('d M') : '·';
     $timeFmt = fn($dt) => $dt ? $dt->format('H:i') : null;
 
-    $sorted = $rows->sortByDesc(fn($v) => $v->operationalState->priorityWeight())->values();
+    // $rows is already sorted by priority in loadData() — no re-sort needed.
+    $sorted = ($rows ?? collect())->values();
 @endphp
 
 @if ($sorted->isEmpty())
@@ -136,22 +137,16 @@
                             ],
                         };
 
-                        $nextAction = match (true) {
-                            !$v->atd_at => 'Input ATD',
-                            !$v->ata_at && $v->operational_status_enum === VoyageOperationalStatus::SAILING
-                                => 'Monitor ATA',
-                            !$h1 && $v->operational_status_enum === VoyageOperationalStatus::SAILING
-                                => 'Lengkapi H-1',
-                            $h1 && $h1->status?->value === 'potential_delay'
-                                => 'Review Risiko H-1',
-                            $v->eta_overdue => 'Buat Investigasi Delay',
-                            default => 'Monitoring Normal',
-                        };
+                        $state = $v->operationalState;
+                        $nextAction = $state->nextActionLabel;
 
                         $nextActionClass = match (true) {
-                            str_contains($nextAction, 'Delay') => 'text-red-700 bg-red-50 border-red-200',
-                            str_contains($nextAction, 'Risiko') => 'text-orange-700 bg-orange-50 border-orange-200',
-                            str_contains($nextAction, 'Input') => 'text-blue-700 bg-blue-50 border-blue-200',
+                            str_contains($nextAction, 'Terlambat') || str_contains($nextAction, 'Investigasi')
+                                => 'text-red-700 bg-red-50 border-red-200',
+                            str_contains($nextAction, 'Risiko')
+                                => 'text-orange-700 bg-orange-50 border-orange-200',
+                            str_contains($nextAction, 'Input')
+                                => 'text-blue-700 bg-blue-50 border-blue-200',
                             default => 'text-gray-600 bg-gray-50 border-gray-200',
                         };
 

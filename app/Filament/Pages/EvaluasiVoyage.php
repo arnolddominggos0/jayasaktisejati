@@ -89,7 +89,7 @@ class EvaluasiVoyage extends Page
         $sorted = match ($this->sortBy) {
             'voyage'      => $rows->sortBy('voyage_label', SORT_STRING),
             'qty_unit'    => $rows->sortBy('qty_unit'),
-            'avg_dwelling'=> $rows->sortBy('avg_dwelling'),
+            'avg_dwelling' => $rows->sortBy('avg_dwelling'),
             'avg_sailing' => $rows->sortBy('avg_sailing'),
             'avg_dooring' => $rows->sortBy('avg_dooring'),
             'avg_lt'      => $rows->sortBy('avg_lt'),
@@ -100,7 +100,7 @@ class EvaluasiVoyage extends Page
 
         $this->voyageSummaries = ($this->sortDir === 'asc'
             ? $sorted
-            : $sorted->sortByDesc(fn ($r) => $r[$this->sortBy] ?? $r['etd'])
+            : $sorted->sortByDesc(fn($r) => $r[$this->sortBy] ?? $r['etd'])
         )->values()->all();
     }
 
@@ -256,7 +256,7 @@ class EvaluasiVoyage extends Page
             'applies'       => $detail['applies'],
             'badge'         => $detail['badge'],
             'dwelling'      => $s['dwelling']['actual'] ?? null,
-            'dwelling_limit'=> $t['dwelling_days'] ?? null,
+            'dwelling_limit' => $t['dwelling_days'] ?? null,
             'dwelling_st'   => $s['dwelling']['status'] ?? 'PENDING',
             'sailing'       => $s['sailing']['actual'] ?? null,
             'sailing_limit' => $t['sailing_days'] ?? null,
@@ -267,12 +267,14 @@ class EvaluasiVoyage extends Page
             'lt_total'      => $s['total']['actual'] ?? null,
             'lt_limit'      => $s['total']['limit'] ?? null,
             'lt_status'     => $s['total']['status'] ?? 'PENDING',
-            'units'         => $shipment->units->map(fn ($u) => [
-                'chassis_no' => $u->chassis_no ?? '-',
-                'engine_no'  => $u->engine_no  ?? '-',
-                'model'      => $u->model_no   ?? '-',
-                'color'      => $u->color       ?? '-',
-            ])->all(),
+            'units' => ($shipment->getRelation('units') ?? collect())
+                ->map(fn($u) => [
+                    'chassis_no' => $u->chassis_no ?? '-',
+                    'engine_no'  => $u->engine_no ?? '-',
+                    'model'      => $u->model_no ?? '-',
+                    'color'      => $u->color ?? '-',
+                ])
+                ->all(),
             'timeline'      => $detail['timeline'],
             'milestones'    => $detail['milestones'],
         ];

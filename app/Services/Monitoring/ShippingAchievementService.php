@@ -20,21 +20,21 @@ class ShippingAchievementService
         $departedTotal = $departed->count();
 
         $otdOk = $departed
-            ->filter(fn ($v) => $v->otd_status === 'ontime')
+            ->filter(fn ($v) => $v->otd_status?->value === 'ontime')
             ->count();
 
         $arrived = $voyages->filter(fn ($v) => $v->ata_at !== null);
         $arrivedTotal = $arrived->count();
 
         $otaOk = $arrived
-            ->filter(fn ($v) => $v->ota_status === 'ontime')
+            ->filter(fn ($v) => $v->ota_status?->value === 'ontime')
             ->count();
 
         $berthed = $voyages->filter(fn ($v) => $v->atb_at !== null);
         $berthedTotal = $berthed->count();
 
         $otbOk = $berthed
-            ->filter(fn ($v) => $v->otb_status === 'ontime')
+            ->filter(fn ($v) => $v->otb_status?->value === 'ontime')
             ->count();
 
         $slaResults = SlaResult::query()
@@ -47,7 +47,7 @@ class ShippingAchievementService
 
         $slaTotal = $slaResults->count();
         $slaOk = $slaResults
-            ->whereIn('status', ['ontime', 'risk'])
+            ->filter(fn($r) => in_array($r->getRawOriginal('status'), ['ontime', 'risk'], true))
             ->count();
 
         $avgDepartureDelay = $departed
@@ -60,7 +60,7 @@ class ShippingAchievementService
 
         $delayReasonCounts = $voyages
             ->where('is_delayed', true)
-            ->pluck('delay_reason')
+            ->pluck('manual_delay_reason')
             ->filter()
             ->map(fn($r) => $r->label())
             ->countBy()
