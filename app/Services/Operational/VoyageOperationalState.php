@@ -109,8 +109,10 @@ final class VoyageOperationalState
         $this->hasCheckpointOverdue = collect($this->voyage->checkpoints ?? [])
             ->contains(fn(VoyageCheckpoint $cp) => !$cp->is_completed && $cp->scheduled_at?->isPast());
 
+        // Use getRawOriginal() to bypass the enum cast — avoids ValueError if
+        // the DB contains a status string that is not a valid enum case.
         $this->hasPotentialDelay = collect($this->voyage->vesselChecks ?? [])
-            ->contains(fn($vc) => $vc->status?->isPotentialDelay());
+            ->contains(fn($vc) => $vc->getRawOriginal('status') === 'potential_delay');
 
         $this->hasReadinessIssue = $this->hasCheckpointOverdue || $this->hasPotentialDelay;
     }
@@ -170,7 +172,11 @@ final class VoyageOperationalState
         $this->otb = $this->voyage->otb_status;
         $this->otd = $this->voyage->otd_status;
         $this->ota = $this->voyage->ota_status;
-        $this->sla = $this->voyage->sla_status;
+        try {
+            $this->sla = $this->voyage->sla_status;
+        } catch (\ValueError $e) {
+            $this->sla = null;
+        }
     }
 
     private function evaluateActions(): void

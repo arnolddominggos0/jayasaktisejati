@@ -42,19 +42,17 @@
                             <td wire:key="cal-{{ $laneKey }}-{{ $i }}" class="border-r border-gray-100/20 p-0.5 h-12 align-top">
                                 @foreach ($calendar['bucket'][$laneKey][$i] as $chipIdx => $chip)
                                     @php
-                                        $status = $chip['status'];
                                         $severity = $chip['severity'] ?? null;
-
                                         $severityBorder = match ($severity) {
-                                            'minor' => 'ring-1 ring-yellow-400/60',
+                                            'minor'    => 'ring-1 ring-yellow-400/60',
                                             'moderate' => 'ring-1 ring-orange-400/60',
-                                            'major' => 'ring-1 ring-red-500/60',
-                                            default => '',
+                                            'major'    => 'ring-1 ring-red-500/60',
+                                            default    => '',
                                         };
                                     @endphp
 
-                                    <div wire:key="cal-chip-{{ $laneKey }}-{{ $i }}-{{ $chip['voyage_no'] }}"
-                                        class="mb-0.5 rounded-sm px-1 py-0.5 text-[9px] font-medium shadow-sm {{ $status->color() }} {{ $severityBorder }}">
+                                    <div wire:key="cal-chip-{{ $laneKey }}-{{ $i }}-{{ $chip['voyage_id'] }}"
+                                        class="mb-0.5 rounded-sm px-1 py-0.5 text-[9px] font-medium shadow-sm {{ $chip['status_color'] }} {{ $severityBorder }}">
                                         <div class="truncate text-[9px] font-semibold">{{ $chip['vessel'] }}</div>
                                         <div class="text-[8px] opacity-80">{{ $chip['voyage_no'] }}</div>
                                         @if ($chip['delay_label'])

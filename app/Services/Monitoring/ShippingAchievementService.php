@@ -47,7 +47,7 @@ class ShippingAchievementService
 
         $slaTotal = $slaResults->count();
         $slaOk = $slaResults
-            ->whereIn('status', ['ontime', 'risk'])
+            ->filter(fn($r) => in_array($r->getRawOriginal('status'), ['ontime', 'risk'], true))
             ->count();
 
         $avgDepartureDelay = $departed

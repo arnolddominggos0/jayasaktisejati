@@ -58,7 +58,9 @@ class LeadTimeAnalysisService
             ->groupBy('voyage_id')
             ->map(function (Collection $group) {
                 $firstShipment = $group->first();
-                $voyage = $firstShipment->voyage;
+                $voyage = $firstShipment->relationLoaded('voyage')
+                    ? $firstShipment->getRelation('voyage')
+                    : null;
 
                 $sumDw = $sumSa = $sumDo = $sumTt = 0.0;
                 $nKpi = $ok = $ng = 0;
@@ -147,7 +149,9 @@ class LeadTimeAnalysisService
             $doSt = $applies ? ($s['dooring']['status'] ?? 'PENDING') : 'PENDING';
             $ttSt = $applies ? ($s['total']['status'] ?? 'PENDING') : 'PENDING';
 
-            $units = $shipment->units;
+            $units = $shipment->relationLoaded('units')
+                ? $shipment->getRelation('units')
+                : collect();
 
             if ($units->isEmpty()) {
                 $rows->push([
@@ -233,7 +237,9 @@ class LeadTimeAnalysisService
 
         return [
             'shipment'   => $shipment,
-            'voyage'     => $shipment->voyage,
+            'voyage'     => $shipment->relationLoaded('voyage')
+                ? $shipment->getRelation('voyage')
+                : null,
             'applies'    => $applies,
             'summary'    => $s,
             'thresholds' => $t,
