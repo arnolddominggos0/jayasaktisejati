@@ -32,8 +32,6 @@ class AdminDashboard extends Page implements HasForms
 
     public ?int $branch_id = null;
 
-   public ?int $branch_id = null;
-
     public ?string $mode = null;
 
     public string $period = 'this_month';
