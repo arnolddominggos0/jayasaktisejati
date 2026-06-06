@@ -52,12 +52,14 @@ class MonitoringKapalTam extends Page
     public string $actionModalType    = ''; // atb | atd | ata | closing | delay | readiness
     public ?int   $actionVoyageId     = null;
     public array  $actionForm         = [
-        'datetime'     => '',
-        'note'         => '',
-        'delay_reason' => '',
-        'delay_note'   => '',
-        'readiness'    => '',
+        'datetime'       => '',
+        'note'           => '',
+        'delay_reason'   => '',
+        'delay_note'     => '',
+        'readiness'      => '',
         'readiness_note' => '',
+        'cargo'          => '',
+        'cargo_note'     => '',
     ];
 
     // ── Voyage Drawer ───────────────────────────────────────────────────
@@ -92,6 +94,8 @@ class MonitoringKapalTam extends Page
             'delay_note'     => '',
             'readiness'      => VesselCheckLogStatus::ON_SCHEDULE->value,
             'readiness_note' => '',
+            'cargo'          => '',
+            'cargo_note'     => '',
         ];
 
         match ($type) {
@@ -102,6 +106,7 @@ class MonitoringKapalTam extends Page
             'readiness'=> $this->actionForm['readiness'] = $v?->vesselChecks
                 ->sortByDesc('check_date')
                 ->first()?->status?->value ?? VesselCheckLogStatus::ON_SCHEDULE->value,
+            'cargo'    => $this->actionForm['cargo'] = $v?->cargo_actual !== null ? (string) $v->cargo_actual : '',
             default    => null,
         };
 
@@ -121,6 +126,7 @@ class MonitoringKapalTam extends Page
             'atb', 'atd', 'ata', 'closing' => $this->saveTimestamp(),
             'delay'     => $this->saveDelay(),
             'readiness' => $this->saveReadiness(),
+            'cargo'     => $this->saveCargoActual(),
             default     => null,
         };
 
@@ -187,6 +193,34 @@ class MonitoringKapalTam extends Page
         $voyage->update($data);
 
         Notification::make()->title('Penyebab delay disimpan')->success()->send();
+    }
+
+    protected function saveCargoActual(): void
+    {
+        if (!$this->actionVoyageId) return;
+
+        $this->validate([
+            'actionForm.cargo'      => 'nullable|numeric|min:0',
+            'actionForm.cargo_note' => 'nullable|string|max:500',
+        ]);
+
+        $voyage = Voyage::find($this->actionVoyageId);
+        if (!$voyage) return;
+
+        $data = [
+            'cargo_actual' => $this->actionForm['cargo'] !== '' ? (int) $this->actionForm['cargo'] : null,
+        ];
+
+        if ($this->actionForm['cargo_note']) {
+            $prefix = now()->format('d M H:i') . ' [CARGO]: ';
+            $data['final_note'] = $voyage->final_note
+                ? $voyage->final_note . "\n" . $prefix . $this->actionForm['cargo_note']
+                : $prefix . $this->actionForm['cargo_note'];
+        }
+
+        $voyage->update($data);
+
+        Notification::make()->title('Cargo actual berhasil disimpan')->success()->send();
     }
 
     protected function saveReadiness(): void

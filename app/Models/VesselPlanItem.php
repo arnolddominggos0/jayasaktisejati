@@ -13,14 +13,19 @@ class VesselPlanItem extends Model
         'vessel_plan_id',
         'shipping_line_id',
         'vessel_id',
+        'voyage_no',
         'planned_etd',
+        'planned_etb',
         'planned_eta',
+        'cargo_plan',
         'note',
     ];
 
     protected $casts = [
         'planned_etd' => 'datetime',
+        'planned_etb' => 'datetime',
         'planned_eta' => 'datetime',
+        'cargo_plan'  => 'integer',
     ];
 
     protected static function booted(): void

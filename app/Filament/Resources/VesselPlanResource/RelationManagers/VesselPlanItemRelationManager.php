@@ -5,6 +5,7 @@ namespace App\Filament\Resources\VesselPlanResource\RelationManagers;
 use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -49,12 +50,32 @@ class VesselPlanItemRelationManager extends RelationManager
                         ->required()
                         ->native(false),
 
+                    DateTimePicker::make('planned_etb')
+                        ->label('ETB (Rencana Sandar)')
+                        ->native(false)
+                        ->helperText('Opsional. Waktu estimasi kapal sandar.'),
+
                     DateTimePicker::make('planned_eta')
                         ->label('ETA (Rencana)')
                         ->required()
                         ->native(false),
+
+                    TextInput::make('cargo_plan')
+                        ->label('Rencana Muatan (unit)')
+                        ->numeric()
+                        ->minValue(0)
+                        ->helperText('Opsional. Jumlah unit yang direncanakan.'),
                 ])
                 ->columns(2),
+
+            Forms\Components\Section::make('Informasi Voyage')
+                ->schema([
+                    TextInput::make('voyage_no')
+                        ->label('No Voyage')
+                        ->maxLength(50)
+                        ->helperText('Nomor voyage dari shipping line. Kosongkan untuk auto-generate saat finalisasi.'),
+                ])
+                ->columns(1),
         ]);
     }
 
@@ -68,13 +89,27 @@ class VesselPlanItemRelationManager extends RelationManager
                 TextColumn::make('vessel.name')
                     ->label('Kapal'),
 
+                TextColumn::make('voyage_no')
+                    ->label('No Voyage')
+                    ->placeholder('—')
+                    ->copyable(),
+
                 TextColumn::make('planned_etd')
                     ->label('ETD')
                     ->dateTime(),
 
+                TextColumn::make('planned_etb')
+                    ->label('ETB')
+                    ->dateTime()
+                    ->placeholder('—'),
+
                 TextColumn::make('planned_eta')
                     ->label('ETA')
                     ->dateTime(),
+
+                TextColumn::make('cargo_plan')
+                    ->label('Muatan (unit)')
+                    ->placeholder('—'),
 
                 TextColumn::make('planned_sailing')
                     ->label('Sailing (hari)')

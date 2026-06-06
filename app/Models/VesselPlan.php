@@ -46,6 +46,16 @@ class VesselPlan extends Model
         'feedback_at'  => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (VesselPlan $plan) {
+
+            if (! $plan->customer_id) {
+                $plan->customer_id = static::resolveTamCustomer()?->id;
+            }
+        });
+    }
+
     public function items(): HasMany
     {
         return $this->hasMany(VesselPlanItem::class);
@@ -305,25 +315,34 @@ class VesselPlan extends Model
 
         if (($analysis['schedule_count'] ?? 0) === 0) {
             return [
-                'label' => 'BELUM ADA DATA',
-                'color' => 'gray',
+                'label'  => 'BELUM ADA DATA',
+                'color'  => 'gray',
                 'reason' => 'Belum ada jadwal kapal.',
             ];
         }
 
-        if ($analysis['ok'] ?? false) {
-            return [
-                'label' => 'SESUAI SOP',
-                'color' => 'success',
-                'reason' => 'Jadwal dan ETD gap masih dalam batas SOP.',
-            ];
-        }
-
-        return [
-            'label' => 'PERLU REVISI',
-            'color' => 'danger',
-            'reason' => implode(' ', $analysis['violations'] ?? []),
-        ];
+        return match ($analysis['risk_level'] ?? 'valid') {
+            'valid' => [
+                'label'  => 'VALID',
+                'color'  => 'success',
+                'reason' => 'ETD gap dalam batas SOP. Tidak ada risiko dwelling time.',
+            ],
+            'warning' => [
+                'label'  => 'PERINGATAN',
+                'color'  => 'warning',
+                'reason' => implode(' ', $analysis['violations'] ?? []),
+            ],
+            'critical' => [
+                'label'  => 'KRITIS',
+                'color'  => 'danger',
+                'reason' => implode(' ', $analysis['violations'] ?? []),
+            ],
+            default => [
+                'label'  => 'VALID',
+                'color'  => 'success',
+                'reason' => '',
+            ],
+        };
     }
 
     public function hasWhatsappRecipient(): bool
@@ -342,13 +361,7 @@ class VesselPlan extends Model
             return false;
         }
 
-        if (! $this->hasWhatsappRecipient()) {
-            return false;
-        }
-
-        $analysis = $this->analyze();
-
-        return $analysis['ok'] ?? false;
+        return $this->hasWhatsappRecipient();
     }
 
     public function maxEtdGap(): ?int

@@ -1,3 +1,11 @@
+@props([
+    'total'       => 0,
+    'maxGap'      => 0,
+    'idealGap'    => 6,
+    'statusLabel' => '—',
+    'statusColor' => 'text-gray-600',
+])
+
 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
 
     <div class="rounded-xl border bg-white p-4">
@@ -12,16 +20,15 @@
     </div>
 
     <div class="rounded-xl border bg-white p-4">
-        <div class="text-xs uppercase tracking-wide text-gray-500">Batas SOP</div>
+        <div class="text-xs uppercase tracking-wide text-gray-500">Target Operasional</div>
         <div class="mt-1 text-2xl font-semibold">{{ $idealGap }} hari</div>
     </div>
 
     <div class="rounded-xl border bg-white p-4">
-        <div class="text-xs uppercase tracking-wide text-gray-500">Status Analisa</div>
+        <div class="text-xs uppercase tracking-wide text-gray-500">Risiko Jadwal</div>
         <div class="mt-1 text-2xl font-semibold {{ $statusColor }}">
             {{ $statusLabel }}
         </div>
     </div>
 
 </div>
-    

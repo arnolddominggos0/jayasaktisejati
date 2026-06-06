@@ -66,17 +66,21 @@ class VesselPlanFinalizationService
     {
         $voyage = $item->voyage()->first();
 
+        $autoVoyageNo = 'VOY-' . $item->planned_etd->format('Ym') . '-' . $item->id;
+
         $payload = [
-            'vessel_plan_id' => $plan->id,
+            'vessel_plan_id'      => $plan->id,
             'vessel_plan_item_id' => $item->id,
-            'shipping_line_id' => $item->shipping_line_id,
-            'vessel_id' => $item->vessel_id,
-            'pol_id' => $plan->pol_id,
-            'pod_id' => $plan->pod_id,
-            'voyage_no' => $voyage?->voyage_no ?: 'VY-' . $item->planned_etd->format('Ym') . '-' . $item->id,
-            'etd' => $item->planned_etd,
-            'eta' => $item->planned_eta,
-            'period_month' => $plan->period_month,
+            'shipping_line_id'    => $item->shipping_line_id,
+            'vessel_id'           => $item->vessel_id,
+            'pol_id'              => $plan->pol_id,
+            'pod_id'              => $plan->pod_id,
+            'voyage_no'           => $item->voyage_no ?: ($voyage?->voyage_no ?: $autoVoyageNo),
+            'etd'                 => $item->planned_etd,
+            'etb'                 => $item->planned_etb,
+            'eta'                 => $item->planned_eta,
+            'cargo_plan'          => $item->cargo_plan,
+            'period_month'        => $plan->period_month,
         ];
 
         if ($voyage) {

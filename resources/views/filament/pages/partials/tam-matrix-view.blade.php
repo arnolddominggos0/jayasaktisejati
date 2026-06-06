@@ -38,6 +38,7 @@
                     {{-- Actual dates --}}
                     <th class="px-3 py-1.5 text-center">ATD</th>
                     <th class="px-3 py-1.5 text-center">ATA</th>
+                    <th class="px-3 py-1.5 text-center min-w-[80px]">Muatan</th>
 
                     {{-- Issue: moved closer to ATA --}}
                     <th class="px-3 py-1.5 text-center">Issue</th>
@@ -135,6 +136,27 @@
                         {{-- Actual dates: bolder to indicate active --}}
                         <td class="px-3 py-1.5 text-center text-gray-800 whitespace-nowrap font-medium">{{ $dateFmt($v->atd_at) }}</td>
                         <td class="px-3 py-1.5 text-center text-gray-800 whitespace-nowrap font-medium">{{ $dateFmt($v->ata_at) }}</td>
+
+                        {{-- Muatan: cargo plan vs actual --}}
+                        <td class="px-3 py-1.5 text-center">
+                            @if ($v->cargo_actual !== null)
+                                <div class="text-[11px] font-semibold text-gray-800 leading-tight">{{ $v->cargo_actual }}</div>
+                                @if ($v->cargo_plan !== null)
+                                    @php $variance = $v->cargo_actual - $v->cargo_plan; @endphp
+                                    <div class="text-[9px] {{ $variance < 0 ? 'text-red-500' : ($variance > 0 ? 'text-green-600' : 'text-gray-400') }}">
+                                        {{ $variance >= 0 ? '+' : '' }}{{ $variance }}
+                                    </div>
+                                @endif
+                            @else
+                                @if ($v->cargo_plan !== null)
+                                    <div class="text-[9px] text-gray-400 mb-0.5">{{ $v->cargo_plan }}</div>
+                                @endif
+                                <button wire:click="openOpModal({{ $v->id }}, 'cargo')"
+                                    class="px-1.5 py-0.5 rounded border border-gray-200 text-[9px] text-gray-500 hover:border-blue-300 hover:text-blue-700 transition">
+                                    Input
+                                </button>
+                            @endif
+                        </td>
 
                         {{-- Issue: critical = pill, secondary = plain amber text --}}
                         <td class="px-3 py-1.5 text-center">

@@ -211,6 +211,7 @@
                                     'closing'   => 'Closing Voyage',
                                     'delay'     => 'Catat Penyebab Delay',
                                     'readiness' => 'Readiness Check',
+                                    'cargo'     => 'Input Cargo Actual',
                                 ];
                                 $modalTitle = $modalTitles[$actionModalType] ?? 'Aksi Operasional';
 
@@ -332,6 +333,38 @@
                                 <textarea wire:model="actionForm.readiness_note" rows="2"
                                     class="w-full rounded border-gray-200 text-xs py-1.5 px-2 focus:ring-0 focus:border-gray-400 resize-none"
                                     placeholder="Opsional..."></textarea>
+                            </div>
+                        @endif
+
+                        {{-- Cargo Actual --}}
+                        @if ($actionModalType === 'cargo')
+                            @php $cv = $rows?->firstWhere('id', $actionVoyageId); @endphp
+                            @if ($cv?->cargo_plan !== null)
+                                <div class="bg-gray-50 rounded px-2.5 py-1.5 text-[10px] text-gray-500 font-medium">
+                                    Rencana: {{ $cv->cargo_plan }} unit
+                                </div>
+                            @endif
+                            <div>
+                                <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                                    Jumlah Aktual (unit)
+                                </label>
+                                <input type="number" min="0" wire:model="actionForm.cargo"
+                                    class="w-full rounded border-gray-200 text-xs py-1.5 px-2 focus:ring-0 focus:border-gray-400"
+                                    placeholder="0">
+                                @error('actionForm.cargo')
+                                    <p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            <div>
+                                <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                                    Catatan
+                                </label>
+                                <textarea wire:model="actionForm.cargo_note" rows="2"
+                                    class="w-full rounded border-gray-200 text-xs py-1.5 px-2 focus:ring-0 focus:border-gray-400 resize-none"
+                                    placeholder="Opsional..."></textarea>
+                                @error('actionForm.cargo_note')
+                                    <p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>
+                                @enderror
                             </div>
                         @endif
 

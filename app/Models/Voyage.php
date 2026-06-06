@@ -215,6 +215,15 @@ class Voyage extends Model
         return $this->vesselPlanItem?->planned_sailing_days;
     }
 
+    public function getCargoVarianceAttribute(): ?int
+    {
+        if ($this->cargo_actual === null || $this->cargo_plan === null) {
+            return null;
+        }
+
+        return $this->cargo_actual - $this->cargo_plan;
+    }
+
     public function getDepartureDelayDaysAttribute(): ?int
     {
         return OperationalDaysHelper::delayDays($this->etd, $this->atd_at);

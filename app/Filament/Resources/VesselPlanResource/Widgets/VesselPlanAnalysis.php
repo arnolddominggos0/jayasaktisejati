@@ -43,18 +43,29 @@ class VesselPlanAnalysis extends Widget
             'finalPanelTitle' => $finalPanel['title'],
             'finalPanelCaption' => $finalPanel['caption'],
 
-            'statusLabel' => $sop['label'],
-            'statusReason' => $sop['reason'] ?? '',
+            'statusLabel'    => $sop['label'],
+            'statusReason'   => $sop['reason'] ?? '',
+            'riskLevel'      => $analysis['risk_level'] ?? 'valid',
+            'violationCount' => count($analysis['violations'] ?? []),
             'statusColor' => match ($sop['color']) {
                 'success' => 'text-green-600',
+                'warning' => 'text-amber-600',
                 'danger'  => 'text-red-600',
                 default   => 'text-gray-600',
             },
 
             'statusBg' => match ($sop['color']) {
                 'success' => 'bg-green-50',
+                'warning' => 'bg-amber-50',
                 'danger'  => 'bg-red-50',
                 default   => 'bg-gray-50',
+            },
+
+            'statusBorder' => match ($sop['color']) {
+                'success' => 'border-green-200',
+                'warning' => 'border-amber-200',
+                'danger'  => 'border-red-200',
+                default   => 'border-gray-200',
             },
         ];
     }

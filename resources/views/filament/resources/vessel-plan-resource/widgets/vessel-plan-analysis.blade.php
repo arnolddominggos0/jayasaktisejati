@@ -1,49 +1,68 @@
 <div class="rounded-xl border bg-white px-6 py-5 mb-6">
 
     <h3 class="text-base font-semibold mb-1">
-        Validasi Jadwal Kapal (SOP)
+        Evaluasi Risiko Jadwal
     </h3>
 
     <p class="text-sm text-gray-500 mb-4">
-        Evaluasi otomatis continuity jadwal kapal berdasarkan SOP.
+        Indikator risiko operasional berdasarkan ETD gap antar kapal.
+        Status ini tidak memblokir save, pengiriman ke TAM, maupun finalisasi.
     </p>
 
     <div class="grid grid-cols-1 sm:grid-cols-4 gap-4">
 
         <div class="rounded-lg border p-4">
-            <div class="text-xs text-gray-500 uppercase">Jumlah Jadwal</div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Jumlah Jadwal</div>
             <div class="text-2xl font-semibold">{{ $total }}</div>
         </div>
 
         <div class="rounded-lg border p-4">
-            <div class="text-xs text-gray-500 uppercase">Avg Sailing</div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Avg Sailing</div>
             <div class="text-2xl font-semibold">{{ $sailingAvg }} hari</div>
         </div>
 
         <div class="rounded-lg border p-4">
-            <div class="text-xs text-gray-500 uppercase">Max Gap ETD</div>
-            <div class="text-2xl font-semibold {{ $gapOk ? 'text-green-600' : 'text-red-600' }}">{{ $maxGap }} hari</div>
-            <div class="text-sm mt-1 text-gray-600">Batas SOP: {{ $idealGap }} hari</div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Max ETD Gap</div>
+            <div class="text-2xl font-semibold {{ $gapOk ? 'text-green-600' : ($maxGap <= 10 ? 'text-amber-600' : 'text-red-600') }}">
+                {{ $maxGap }} hari
+            </div>
+            <div class="text-sm mt-1 text-gray-500">Target SOP: {{ $idealGap }} hari</div>
         </div>
 
-        <div class="rounded-lg border p-4 {{ $statusBg }}">
-            <div class="text-xs text-gray-500 uppercase">Status SOP</div>
-            <div class="text-2xl font-bold {{ $statusColor }}">
+        <div class="rounded-lg border {{ $statusBorder }} p-4 {{ $statusBg }}">
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Risiko Operasional</div>
+            <div class="text-xl font-bold {{ $statusColor }} mt-1">
                 {{ $statusLabel }}
             </div>
-            @if (!empty($statusReason))
-                <div class="text-sm text-gray-600 mt-2">{{ $statusReason }}</div>
-            @endif
+            <div class="text-xs text-gray-500 mt-2">
+                Max Gap: {{ $maxGap }} hari
+                &nbsp;·&nbsp;
+                Pelanggaran: {{ $violationCount }}
+            </div>
         </div>
 
     </div>
 
     @if (!empty($violations))
-        <div class="rounded-lg border border-red-200 bg-red-50 p-4 mt-4">
-            <div class="text-xs text-red-700 uppercase mb-2">Pelanggaran SOP</div>
+        @php
+            $isWarning = $riskLevel === 'warning';
+            $isCritical = $riskLevel === 'critical';
+            $alertBorder = $isCritical ? 'border-red-200' : 'border-amber-200';
+            $alertBg     = $isCritical ? 'bg-red-50'     : 'bg-amber-50';
+            $alertTitle  = $isCritical ? 'text-red-700'  : 'text-amber-700';
+            $alertText   = $isCritical ? 'text-red-700'  : 'text-amber-700';
+            $alertLabel  = $isCritical ? 'Risiko Tinggi' : 'Peringatan Risiko';
+        @endphp
+        <div class="rounded-lg border {{ $alertBorder }} {{ $alertBg }} p-4 mt-4">
+            <div class="text-xs {{ $alertTitle }} uppercase font-semibold mb-2 tracking-wide">
+                {{ $alertLabel }}
+            </div>
             @foreach ($violations as $violation)
-                <div class="text-sm text-red-700">{{ $violation }}</div>
+                <div class="text-sm {{ $alertText }}">{{ $violation }}</div>
             @endforeach
+            <div class="mt-2 text-xs text-gray-500 italic">
+                Jadwal tetap dapat diproses. Pertimbangkan risiko ini dalam koordinasi dengan TAM.
+            </div>
         </div>
     @endif
 

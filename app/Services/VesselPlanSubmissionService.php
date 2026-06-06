@@ -26,10 +26,6 @@ class VesselPlanSubmissionService
 
         $analysis = $plan->analyze();
 
-        if (! ($analysis['ok'] ?? false)) {
-            throw new DomainException('Jadwal tidak memenuhi validasi SOP.');
-        }
-
         return DB::transaction(function () use ($plan, $userId, $analysis) {
             $snapshot = $plan->snapshots()->create([
                 'stage' => VesselPlan::SNAPSHOT_STAGE_DRAFT,

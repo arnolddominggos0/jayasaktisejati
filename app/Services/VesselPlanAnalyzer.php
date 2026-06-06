@@ -12,14 +12,15 @@ class VesselPlanAnalyzer
 
         if ($items->isEmpty()) {
             return [
-                'sailing_avg' => 0,
-                'max_gap' => 0,
-                'gaps' => [],
+                'sailing_avg'    => 0,
+                'max_gap'        => 0,
+                'gaps'           => [],
                 'schedule_count' => 0,
-                'gap_ok' => false,
-                'gap_limit' => 6,
-                'violations' => ['Belum ada jadwal kapal.'],
-                'ok' => false,
+                'gap_ok'         => true,
+                'gap_limit'      => config('jss_kpi.manado.thresholds.etd_gap_max', 6),
+                'risk_level'     => 'valid',
+                'violations'     => [],
+                'ok'             => true,
             ];
         }
 
@@ -33,20 +34,29 @@ class VesselPlanAnalyzer
         $gapLimit = config('jss_kpi.manado.thresholds.etd_gap_max', 6);
         $gapOk = $maxGap <= $gapLimit;
 
+        $riskLevel = match (true) {
+            $maxGap <= $gapLimit => 'valid',
+            $maxGap <= 10        => 'warning',
+            default              => 'critical',
+        };
+
         $violations = [];
-        if (! $gapOk) {
-            $violations[] = 'Max ETD Gap ' . $maxGap . ' hari melebihi batas ' . $gapLimit . ' hari.';
+        if ($riskLevel === 'warning') {
+            $violations[] = 'Max ETD Gap ' . $maxGap . ' hari melebihi target SOP ' . $gapLimit . ' hari. Potensi peningkatan dwelling time.';
+        } elseif ($riskLevel === 'critical') {
+            $violations[] = 'ETD Gap sangat tinggi (' . $maxGap . ' hari). Berpotensi mempengaruhi siklus kapal berikutnya.';
         }
 
         return [
-            'sailing_avg' => round($avgSailing, 2),
-            'max_gap' => $maxGap,
-            'gaps' => $gapData['gaps'],
+            'sailing_avg'    => round($avgSailing, 2),
+            'max_gap'        => $maxGap,
+            'gaps'           => $gapData['gaps'],
             'schedule_count' => $items->count(),
-            'gap_ok' => $gapOk,
-            'gap_limit' => $gapLimit,
-            'violations' => $violations,
-            'ok' => $gapOk,
+            'gap_ok'         => $gapOk,
+            'gap_limit'      => $gapLimit,
+            'risk_level'     => $riskLevel,
+            'violations'     => $violations,
+            'ok'             => $gapOk,
         ];
     }
 

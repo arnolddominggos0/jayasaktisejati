@@ -68,7 +68,9 @@ class VoyageResource extends Resource
                         ->label('No Voyage')
                         ->maxLength(50)
                         ->nullable()
-                        ->required(fn($livewire) => $livewire instanceof EditRecord),
+                        ->disabled(fn($livewire) => $livewire instanceof EditRecord)
+                        ->dehydrated(fn($livewire) => ! ($livewire instanceof EditRecord))
+                        ->helperText(fn($livewire) => $livewire instanceof EditRecord ? 'Diset dari Vessel Plan' : null),
 
                     Select::make('pol_id')
                         ->relationship('pol', 'code')
@@ -93,26 +95,35 @@ class VoyageResource extends Resource
                 ])
                 ->columns(2),
 
-            // ── 2. Planning Schedule ─────────────────────────────
+            // ── 2. Planning Schedule (from Vessel Plan — read-only in edit) ──
             Section::make('Jadwal Perencanaan (Planning)')
+                ->description(fn($livewire) => $livewire instanceof EditRecord
+                    ? 'Field berikut diset dari Vessel Plan dan tidak dapat diedit langsung.'
+                    : null)
                 ->schema([
                     DateTimePicker::make('etb')
                         ->label('ETB (Estimasi Sandar)')
-                        ->native(false),
+                        ->native(false)
+                        ->disabled(fn($livewire) => $livewire instanceof EditRecord)
+                        ->dehydrated(fn($livewire) => ! ($livewire instanceof EditRecord)),
 
                     DateTimePicker::make('etd')
                         ->label('ETD (Plan)')
                         ->required()
                         ->live()
-                        ->afterStateUpdated(function ($state, callable $set) {
-                            if ($state) {
+                        ->disabled(fn($livewire) => $livewire instanceof EditRecord)
+                        ->dehydrated(fn($livewire) => ! ($livewire instanceof EditRecord))
+                        ->afterStateUpdated(function ($state, callable $set, $livewire) {
+                            if ($state && ! ($livewire instanceof EditRecord)) {
                                 $set('period_month', Carbon::parse($state)->startOfMonth()->toDateString());
                             }
                         }),
 
                     DateTimePicker::make('eta')
                         ->label('ETA (Plan)')
-                        ->required(),
+                        ->required()
+                        ->disabled(fn($livewire) => $livewire instanceof EditRecord)
+                        ->dehydrated(fn($livewire) => ! ($livewire instanceof EditRecord)),
 
                     TextInput::make('cargo_plan')
                         ->label('Rencana Muatan (unit)')

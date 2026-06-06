@@ -1,23 +1,30 @@
 <x-filament-panels::page>
     @php
-        $analysis = $record->analyze();
-        $items = $record->items->sortBy('planned_etd');
-        $total = $items->count();
-        $idealGap = 6;
+        $analysis  = $record->analyze();
+        $items     = $record->items->sortBy('planned_etd');
+        $total     = $items->count();
+        $riskLevel = $analysis['risk_level'] ?? 'valid';
 
-        $statusLabel =
-            $total < 2
-                ? 'Data Belum Cukup'
-                : ($analysis['ok']
-                    ? 'Sesuai SOP (ETD ≤ 6 hari)'
-                    : 'Melanggar SOP (ETD > 6 hari)');
+        $statusLabel = match (true) {
+            $total < 2              => 'Data Belum Cukup',
+            $riskLevel === 'warning'  => 'PERINGATAN',
+            $riskLevel === 'critical' => 'KRITIS',
+            default                 => 'VALID',
+        };
+
+        $statusColor = match ($riskLevel) {
+            'warning'  => 'text-amber-600',
+            'critical' => 'text-red-600',
+            default    => 'text-green-600',
+        };
     @endphp
 
     <x-vessel-plan.summary
         :total="$total"
         :maxGap="$analysis['max_gap'] ?? 0"
-        :idealGap="$idealGap"
+        :idealGap="6"
         :statusLabel="$statusLabel"
+        :statusColor="$statusColor"
     />
 
     <div class="overflow-hidden rounded-xl border bg-white">

@@ -62,12 +62,17 @@ class VesselPlanResource extends Resource
 
                         return $gap . ' hari';
                     })
-                    ->color(
-                        fn($record) => ($record?->analyze()['max_gap'] ?? 0) > 6 ? 'danger' : 'success'
-                    ),
+                    ->color(function ($record) {
+                        $gap = $record?->analyze()['max_gap'] ?? 0;
+                        return match (true) {
+                            $gap > 10 => 'danger',
+                            $gap > 6  => 'warning',
+                            default   => 'success',
+                        };
+                    }),
 
                 TextColumn::make('status_sop')
-                    ->label('Status SOP')
+                    ->label('Risiko Jadwal')
                     ->badge()
                     ->getStateUsing(
                         fn($record) =>

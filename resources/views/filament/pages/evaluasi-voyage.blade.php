@@ -204,7 +204,7 @@
     {{-- Voyage header card --}}
     <div class="mb-4 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">
         <div class="flex flex-wrap justify-between items-start gap-4">
-            <div>
+            <div class="flex-1 min-w-0">
                 <h2 class="text-lg font-bold text-gray-900 dark:text-white">{{ $voyageInfo['label'] ?? '–' }}</h2>
                 <div class="flex flex-wrap gap-4 mt-1 text-sm text-gray-500 dark:text-gray-400">
                     @if(!empty($voyageInfo['period']))
@@ -218,6 +218,37 @@
                     @endif
                     <span class="font-medium text-gray-700 dark:text-gray-300">{{ count($voyageUnits) }} unit</span>
                 </div>
+
+                {{-- Cargo summary (read-only) --}}
+                @php
+                    $cPlan     = $voyageInfo['cargo_plan']     ?? null;
+                    $cActual   = $voyageInfo['cargo_actual']   ?? null;
+                    $cVariance = $voyageInfo['cargo_variance'] ?? null;
+                @endphp
+                @if ($cPlan !== null || $cActual !== null)
+                    <div class="mt-3 flex flex-wrap gap-4 text-xs">
+                        @if ($cPlan !== null)
+                            <div class="flex items-center gap-1 text-gray-500">
+                                <span class="uppercase tracking-wide font-semibold">Plan</span>
+                                <span class="font-semibold text-gray-700">{{ number_format($cPlan) }} unit</span>
+                            </div>
+                        @endif
+                        @if ($cActual !== null)
+                            <div class="flex items-center gap-1 text-gray-500">
+                                <span class="uppercase tracking-wide font-semibold">Aktual</span>
+                                <span class="font-semibold text-gray-700">{{ number_format($cActual) }} unit</span>
+                            </div>
+                        @endif
+                        @if ($cVariance !== null)
+                            <div class="flex items-center gap-1">
+                                <span class="uppercase tracking-wide font-semibold text-gray-500">Variance</span>
+                                <span class="font-semibold {{ $cVariance < 0 ? 'text-red-600' : ($cVariance > 0 ? 'text-green-600' : 'text-gray-500') }}">
+                                    {{ $cVariance >= 0 ? '+' : '' }}{{ number_format($cVariance) }}
+                                </span>
+                            </div>
+                        @endif
+                    </div>
+                @endif
             </div>
             <button wire:click="exportVoyageDetail"
                     class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition">

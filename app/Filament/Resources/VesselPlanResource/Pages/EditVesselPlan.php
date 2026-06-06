@@ -135,12 +135,6 @@ class EditVesselPlan extends EditRecord
             return 'Nomor WhatsApp customer TAM belum tersedia.';
         }
 
-        $analysis = $this->record->analyze();
-
-        if (! ($analysis['ok'] ?? false)) {
-            return 'Jadwal melanggar SOP (jarak ETD terlalu jauh).';
-        }
-
         return '';
     }
 

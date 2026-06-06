@@ -295,13 +295,16 @@ class LeadTimeAnalysisService
         }
 
         return [
-            'id'     => $voyage->id,
-            'label'  => trim(($voyage->vessel?->name ?? '-') . ' ' . ($voyage->voyage_no ?? '')),
-            'etd'    => $voyage->etd?->format('d M Y'),
-            'ata'    => $voyage->ata_at?->format('d M Y'),
-            'period' => $voyage->period_month
+            'id'              => $voyage->id,
+            'label'           => trim(($voyage->vessel?->name ?? '-') . ' ' . ($voyage->voyage_no ?? '')),
+            'etd'             => $voyage->etd?->format('d M Y'),
+            'ata'             => $voyage->ata_at?->format('d M Y'),
+            'period'          => $voyage->period_month
                 ? Carbon::parse($voyage->period_month)->translatedFormat('F Y')
                 : null,
+            'cargo_plan'      => $voyage->cargo_plan,
+            'cargo_actual'    => $voyage->cargo_actual,
+            'cargo_variance'  => $voyage->cargo_variance,
         ];
     }
 }

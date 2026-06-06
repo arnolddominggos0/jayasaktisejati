@@ -16,8 +16,8 @@ class VesselPlanGenerator
 
         $nextMonth = $latest
             ? Carbon::parse($latest->period_month)
-                ->addMonth()
-                ->startOfMonth()
+            ->addMonth()
+            ->startOfMonth()
             : now()->startOfMonth();
 
         $existing = VesselPlan::query()
@@ -33,6 +33,8 @@ class VesselPlanGenerator
             ->resolveRoutePortIds();
 
         $plan = VesselPlan::create([
+            'customer_id'  => VesselPlan::resolveTamCustomer()?->id,
+
             'period_month' => $nextMonth->toDateString(),
 
             'route_code'   => $latest?->route_code ?? 'JKT-BTG',
@@ -64,13 +66,15 @@ class VesselPlanGenerator
         if ($existing) {
             return $existing;
         }
-
         $plan = VesselPlan::create([
+            'customer_id' => VesselPlan::resolveTamCustomer()?->id,
             'period_month' => $period->toDateString(),
+            'route_code' => 'JKT-BTG',
 
-            'route_code'   => 'JKT-BTG',
+            'pol_id' => Port::where('code', config('tam.route.pol_code'))->value('id'),
+            'pod_id' => Port::where('code', config('tam.route.pod_code'))->value('id'),
 
-            'status'       => VesselPlanStatus::Draft,
+            'status' => VesselPlanStatus::Draft,
         ]);
 
         $plan->syncRoutePorts();
