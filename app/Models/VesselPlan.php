@@ -126,10 +126,27 @@ class VesselPlan extends Model
             return ['pol_id' => $polId, 'pod_id' => $podId];
         }
 
-        $resolvedPolId = $polId ?: Port::query()->where('code', strtoupper($polCode))->value('id');
-        $resolvedPodId = $podId ?: Port::query()->where('code', strtoupper($podCode))->value('id');
+        $resolvedPolId = $polId ?: $this->resolvePortCode($polCode);
+        $resolvedPodId = $podId ?: $this->resolvePortCode($podCode);
 
         return ['pol_id' => $resolvedPolId, 'pod_id' => $resolvedPodId];
+    }
+
+    private function resolvePortCode(string $code): ?int
+    {
+        $upper = strtoupper($code);
+
+        $id = Port::query()->where('code', $upper)->value('id');
+        if ($id) {
+            return $id;
+        }
+
+        // Short codes (≤4 chars) have no country prefix — try prepending 'ID'
+        if (strlen($upper) <= 4) {
+            $id = Port::query()->where('code', 'ID' . $upper)->value('id');
+        }
+
+        return $id ?: null;
     }
 
     public function syncRoutePorts(): bool

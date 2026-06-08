@@ -91,11 +91,11 @@ final class VoyageWorkflowPolicy
         return $this->state->status === VoyageOperationalStatus::SCHEDULED;
     }
 
-    public function isVesselCheckPotentialDelay(): bool
+    public function isVesselCheckLate(): bool
     {
         return collect($this->voyage->vesselChecks ?? [])
             ->contains(
-                fn($vc) => $vc->status?->value === VesselCheckLogStatus::POTENTIAL_DELAY->value
+                fn($vc) => $vc->status?->value === VesselCheckLogStatus::LATE->value
             );
     }
 }

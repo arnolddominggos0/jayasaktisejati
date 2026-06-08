@@ -40,7 +40,7 @@ class DepotResolver
             ? Depot::find($s->assigned_depot_id)
             : $this->resolveOutbound($s->branch_id, $mode);
 
-        $podId = $s->voyage?->pod_id; // pastikan relasi voyage sudah eager loaded bila perlu
+        $podId = $s->voyageRecord?->pod_id;
         $in  = $this->resolveInboundByPOD($podId, $mode);
 
         return [

@@ -12,6 +12,7 @@ class ShippingAchievementService
         $voyages = Voyage::query()
             ->whereYear('period_month', $year)
             ->whereMonth('period_month', $month)
+            ->whereHas('shipments', fn($q) => $q->where('status', '!=', 'cancelled'))
             ->get();
 
         $totalVoyage = $voyages->count();

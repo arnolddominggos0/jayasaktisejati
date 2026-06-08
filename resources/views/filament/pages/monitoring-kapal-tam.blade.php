@@ -107,7 +107,122 @@
 
 
         {{-- ═══════════════════════════════════════════════════════════════ --}}
+        {{-- CARRIER READINESS WIDGET                                      --}}
+        {{-- Scope: SEMUA voyage H-2/H-1 — TANPA filter shipment          --}}
+        {{-- Boundary: berbeda dari cargo monitoring grid di bawah         --}}
+        {{-- ═══════════════════════════════════════════════════════════════ --}}
+        @if (count($carrierReadiness))
+        @php
+            $crPending = collect($carrierReadiness)->where('status', 'pending')->count();
+            $crOk      = collect($carrierReadiness)->where('status', 'ok')->count();
+            $crLate    = collect($carrierReadiness)->where('status', 'late')->count();
+        @endphp
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+            {{-- Header --}}
+            <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
+                <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                    <h3 class="text-[11px] font-bold uppercase tracking-wider text-gray-600">
+                        Carrier Readiness
+                    </h3>
+                    <span class="text-[9px] text-gray-400 font-medium">H-2 / H-1</span>
+                </div>
+                {{-- Summary badges --}}
+                <div class="flex items-center gap-1.5">
+                    @if ($crPending)
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                            Pending {{ $crPending }}
+                        </span>
+                    @endif
+                    @if ($crOk)
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            OK {{ $crOk }}
+                        </span>
+                    @endif
+                    @if ($crLate)
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-50 text-red-700 border border-red-200">
+                            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                            Late {{ $crLate }}
+                        </span>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Table --}}
+            <table class="min-w-full text-[11px]">
+                <thead class="bg-gray-50/30 text-gray-400 font-medium text-[10px] border-b border-gray-100">
+                    <tr>
+                        <th class="px-4 py-1.5 text-left w-12">H</th>
+                        <th class="px-4 py-1.5 text-left">Kapal</th>
+                        <th class="px-4 py-1.5 text-left">Voyage</th>
+                        <th class="px-4 py-1.5 text-left">ETD</th>
+                        <th class="px-4 py-1.5 text-center w-24">Status</th>
+                        <th class="px-4 py-1.5 text-left">Alasan / Catatan</th>
+                        <th class="px-4 py-1.5 text-center w-28">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    @foreach ($carrierReadiness as $cr)
+                    <tr class="{{ $cr['status'] === 'late' ? 'bg-red-50/30' : '' }}">
+                        {{-- H badge --}}
+                        <td class="px-4 py-2">
+                            <span class="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded
+                                {{ $cr['day_code'] === 'H-1' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">
+                                {{ $cr['day_code'] }}
+                            </span>
+                        </td>
+                        {{-- Vessel --}}
+                        <td class="px-4 py-2 font-medium text-gray-800">{{ $cr['vessel_name'] }}</td>
+                        {{-- Voyage no --}}
+                        <td class="px-4 py-2 text-gray-500 font-mono">{{ $cr['voyage_no'] }}</td>
+                        {{-- ETD --}}
+                        <td class="px-4 py-2 text-gray-500">{{ $cr['etd'] }}</td>
+                        {{-- Status --}}
+                        <td class="px-4 py-2 text-center">
+                            @if ($cr['status'] === 'ok')
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-700">✓ OK</span>
+                            @elseif ($cr['status'] === 'late')
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-100 text-red-700">! LATE</span>
+                            @else
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold bg-gray-100 text-gray-500">— Pending</span>
+                            @endif
+                        </td>
+                        {{-- Reason / Note --}}
+                        <td class="px-4 py-2 text-gray-500 italic">
+                            @if ($cr['delay_reason'])
+                                <span class="text-red-600 not-italic font-medium">{{ $cr['delay_reason'] }}</span>
+                                @if ($cr['note'])
+                                    <span class="ml-1 text-gray-400">— {{ $cr['note'] }}</span>
+                                @endif
+                            @elseif ($cr['note'])
+                                {{ $cr['note'] }}
+                            @else
+                                —
+                            @endif
+                        </td>
+                        {{-- Action --}}
+                        <td class="px-4 py-2 text-center">
+                            <button wire:click="openOpModal({{ $cr['voyage_id'] }}, 'readiness')"
+                                class="px-2.5 py-1 rounded border text-[10px] font-medium transition
+                                    {{ $cr['status'] === 'pending'
+                                        ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                                        : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100' }}">
+                                {{ $cr['status'] === 'pending' ? 'Input' : 'Update' }}
+                            </button>
+                        </td>
+                    </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        @endif
+
+
+        {{-- ═══════════════════════════════════════════════════════════════ --}}
         {{-- OPERATIONAL MONITORING MATRIX (primary workspace)             --}}
+        {{-- Scope: voyage dengan shipment aktif (cargo monitoring)        --}}
         {{-- ═══════════════════════════════════════════════════════════════ --}}
         @include('filament.pages.partials.tam-matrix-view')
 
@@ -308,24 +423,38 @@
                                 <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">
                                     Status Kesiapan
                                 </label>
-                                <div class="flex gap-2">
+                                <div class="flex gap-3">
                                     <label class="flex items-center gap-1.5 cursor-pointer">
-                                        <input type="radio" wire:model="actionForm.readiness"
-                                            value="{{ \App\Enums\VesselCheckLogStatus::ON_SCHEDULE->value }}"
+                                        <input type="radio" wire:model.live="actionForm.readiness"
+                                            value="{{ \App\Enums\VesselCheckLogStatus::OK->value }}"
                                             class="text-green-600 focus:ring-green-500">
-                                        <span class="text-xs text-gray-700">Sesuai Jadwal</span>
+                                        <span class="text-xs font-medium text-green-700">OK</span>
                                     </label>
                                     <label class="flex items-center gap-1.5 cursor-pointer">
-                                        <input type="radio" wire:model="actionForm.readiness"
-                                            value="{{ \App\Enums\VesselCheckLogStatus::POTENTIAL_DELAY->value }}"
-                                            class="text-orange-500 focus:ring-orange-400">
-                                        <span class="text-xs text-gray-700">Potensi Delay</span>
+                                        <input type="radio" wire:model.live="actionForm.readiness"
+                                            value="{{ \App\Enums\VesselCheckLogStatus::LATE->value }}"
+                                            class="text-red-500 focus:ring-red-400">
+                                        <span class="text-xs font-medium text-red-700">Late</span>
                                     </label>
                                 </div>
                                 @error('actionForm.readiness')
                                     <p class="mt-1 text-[10px] text-red-600">{{ $message }}</p>
                                 @enderror
                             </div>
+                            @if ($actionForm['readiness'] === \App\Enums\VesselCheckLogStatus::LATE->value)
+                            <div>
+                                <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
+                                    Alasan Keterlambatan
+                                </label>
+                                <select wire:model="actionForm.readiness_delay_reason"
+                                    class="w-full rounded border-gray-200 text-xs py-1.5 px-2 focus:ring-0 focus:border-gray-400">
+                                    <option value="">-- Pilih Alasan --</option>
+                                    @foreach (\App\Enums\VesselCheckDelayReason::cases() as $reason)
+                                        <option value="{{ $reason->value }}">{{ $reason->label() }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            @endif
                             <div>
                                 <label class="block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1">
                                     Catatan

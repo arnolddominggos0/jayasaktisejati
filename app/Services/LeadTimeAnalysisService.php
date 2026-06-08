@@ -36,8 +36,8 @@ class LeadTimeAnalysisService
         $shipments = $this->tamQuery($start, $end)
             ->whereNotNull('voyage_id')
             ->with([
-                'voyage.vessel',
-                'voyage',
+                'voyageRecord.vessel',
+                'voyageRecord',
                 'tracks:id,shipment_id,status,tracked_at',
                 'units:id,shipment_id,chassis_no,engine_no',
             ])
@@ -47,7 +47,7 @@ class LeadTimeAnalysisService
             $search = mb_strtolower($voyageSearch);
             $shipments = $shipments->filter(function ($s) use ($search) {
                 $label = mb_strtolower(
-                    ($s->voyage?->vessel?->name ?? '') . ' ' . ($s->voyage?->voyage_no ?? '')
+                    ($s->voyageRecord?->vessel?->name ?? '') . ' ' . ($s->voyageRecord?->voyage_no ?? '')
                 );
                 return str_contains($label, $search);
             });
@@ -58,8 +58,8 @@ class LeadTimeAnalysisService
             ->groupBy('voyage_id')
             ->map(function (Collection $group) {
                 $firstShipment = $group->first();
-                $voyage = $firstShipment->relationLoaded('voyage')
-                    ? $firstShipment->getRelation('voyage')
+                $voyage = $firstShipment->relationLoaded('voyageRecord')
+                    ? $firstShipment->getRelation('voyageRecord')
                     : null;
 
                 $sumDw = $sumSa = $sumDo = $sumTt = 0.0;
@@ -215,8 +215,8 @@ class LeadTimeAnalysisService
     public function getShipmentDetail(int $shipmentId): ?array
     {
         $shipment = Shipment::with([
-            'voyage.vessel',
-            'voyage',
+            'voyageRecord.vessel',
+            'voyageRecord',
             'tracks:id,shipment_id,status,tracked_at,note',
             'units',
             'customer:id,name',
@@ -237,8 +237,8 @@ class LeadTimeAnalysisService
 
         return [
             'shipment'   => $shipment,
-            'voyage'     => $shipment->relationLoaded('voyage')
-                ? $shipment->getRelation('voyage')
+            'voyage'     => $shipment->relationLoaded('voyageRecord')
+                ? $shipment->getRelation('voyageRecord')
                 : null,
             'applies'    => $applies,
             'summary'    => $s,

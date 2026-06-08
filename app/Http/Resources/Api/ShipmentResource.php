@@ -78,7 +78,10 @@ class ShipmentResource extends JsonResource
                 'delivery_date' => $this->delivery_date?->toISOString(),
                 'eta' => $this->eta?->toISOString(),
             ],
-            'voyage' => $this->whenLoaded('voyage', fn () => new VoyageResource($this->voyage)),
+            // JSON key intentionally kept as 'voyage' to preserve API response shape.
+            // Loading must use ->with('voyageRecord') — not 'voyage' — to avoid the
+            // shipments.voyage string column shadowing the Eloquent relation.
+            'voyage' => $this->whenLoaded('voyageRecord', fn () => new VoyageResource($this->voyageRecord)),
             'branch' => $this->whenLoaded('branch', fn () => new BranchResource($this->branch)),
             'cargo' => [
                 'total_colli' => $this->total_colli,

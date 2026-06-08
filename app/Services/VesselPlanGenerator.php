@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\VesselPlanStatus;
+use App\Models\Port;
 use App\Models\VesselPlan;
 use Illuminate\Support\Carbon;
 

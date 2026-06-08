@@ -26,7 +26,7 @@ class ViewShipmentStatus extends Command
     {
         $code = $this->argument('code');
 
-        $shipment = Shipment::with(['customer', 'originCity', 'destinationCity', 'assignedDepot', 'voyage.vessel'])
+        $shipment = Shipment::with(['customer', 'originCity', 'destinationCity', 'assignedDepot', 'voyageRecord.vessel'])
             ->where('code', $code)
             ->first();
 

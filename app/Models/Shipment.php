@@ -864,6 +864,15 @@ class Shipment extends Model
         return $this->belongsTo(Voyage::class, 'voyage_id');
     }
 
+    // voyageRecord() resolves the BelongsTo relation unambiguously.
+    // Use this everywhere you expect a Voyage model — never use ->voyage
+    // on a Shipment to access the model, because shipments.voyage is a
+    // string snapshot column that shadows this relation in getAttribute().
+    public function voyageRecord()
+    {
+        return $this->belongsTo(Voyage::class, 'voyage_id');
+    }
+
     public function armada()
     {
         return $this->belongsTo(Armada::class, 'armada_id');

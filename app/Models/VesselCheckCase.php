@@ -7,10 +7,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @deprecated Vessel Check simplified to OK/Late checklist. Case escalation workflow
+ *             not used operationally. Will be removed after one full operational cycle.
+ */
 class VesselCheckCase extends Model
 {
     protected $fillable = [
-        'shipping_schedule_id',
         'voyage_id',
         'case_status',
         'delay_flag',
@@ -24,11 +27,6 @@ class VesselCheckCase extends Model
         'delay_flag'  => 'boolean',
         'case_status' => VesselCheckStatus::class,
     ];
-
-    public function shippingSchedule(): BelongsTo
-    {
-        return $this->belongsTo(ShippingSchedule::class);
-    }
 
     public function voyage(): BelongsTo
     {

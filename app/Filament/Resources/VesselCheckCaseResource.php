@@ -10,9 +10,14 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 
+/**
+ * @deprecated VesselCheckCase workflow deprecated. Navigation hidden.
+ */
 class VesselCheckCaseResource extends Resource
 {
     protected static ?string $model = VesselCheckCase::class;
+
+    protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationLabel = 'Kasus Delay';
     protected static ?string $navigationGroup = 'Operasional';
@@ -28,7 +33,7 @@ class VesselCheckCaseResource extends Resource
                     ->label('ID Tindak Lanjut')
                     ->sortable(),
 
-                TextColumn::make('shippingSchedule.voyage.voyage_no')
+                TextColumn::make('voyage.voyage_no')
                     ->label('Voyage')
                     ->searchable(),
 

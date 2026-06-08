@@ -5,6 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @deprecated Voyage-centric architecture. TamShipment menggunakan shipping_schedule_id
+ *             yang sudah tidak aktif. Gunakan Shipment dengan voyage_id langsung.
+ */
 class TamShipment extends Model
 {
     protected $fillable = [

@@ -135,7 +135,7 @@ $headerBorder = OperationalUi::severityBorder($state->severity);
                 @forelse ($v->vesselChecks as $vc)
                 @php
                 $vcDisplay = OperationalUi::vesselCheckStatusLabel($vc);
-                $ok = data_get($vc, 'status.value') === 'on_schedule';  
+                $ok = data_get($vc, 'status.value') === 'ok';
                 @endphp
 
                 <div class="rounded-xl border border-gray-100 px-3 py-2">

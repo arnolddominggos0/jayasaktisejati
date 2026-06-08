@@ -25,6 +25,9 @@
         @if ($h1)
             @php $cell = OperationalUi::vesselCheckCell($h1); @endphp
             <x-operational.badge :label="$cell['label']" :color="OperationalUi::indicatorClasses($cell['state'])" size="xs" />
+            @if ($h1->status?->value === 'late' && $h1->delay_reason)
+                <span class="text-[10px] text-red-600 italic">{{ $h1->delay_reason }}</span>
+            @endif
         @endif
     </div>
 @else

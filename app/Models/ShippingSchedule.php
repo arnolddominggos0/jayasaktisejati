@@ -6,6 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @deprecated Voyage-centric architecture. ShippingSchedule tidak lagi dipakai
+ *             sebagai layer operasional. Akan dihapus setelah satu siklus operasional
+ *             berjalan menggunakan Voyage langsung.
+ */
 class ShippingSchedule extends Model
 {
     protected $fillable = [

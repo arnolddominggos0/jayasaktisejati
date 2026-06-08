@@ -36,7 +36,7 @@ class TrackingController extends Controller
         $trackingNumber = $request->input('tracking_number');
 
         // Search shipment with relations
-        $shipment = Shipment::with(['customer', 'receiver', 'tracks', 'voyage.vessel'])
+        $shipment = Shipment::with(['customer', 'receiver', 'tracks', 'voyageRecord.vessel'])
             ->where('code', $trackingNumber)
             ->first();
 
@@ -66,8 +66,8 @@ class TrackingController extends Controller
                 'origin' => $shipment->origin_city ?? 'N/A',
                 'eta' => $shipment->eta?->format('d M Y') ?? null,
                 'pickup_date' => $shipment->pickup_date?->format('d M Y') ?? null,
-                'vessel' => $shipment->voyage?->vessel?->name ?? null,
-                'voyage_number' => $shipment->voyage?->voyage_number ?? null,
+                'vessel' => $shipment->voyageRecord?->vessel?->name ?? null,
+                'voyage_number' => $shipment->voyageRecord?->voyage_no ?? null,
                 'total_colli' => $shipment->total_colli,
                 'weight_total' => $shipment->weight_total,
                 'tracks' => $shipment->tracks->sortByDesc('occurred_at')->map(function ($track) {

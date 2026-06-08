@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use Filament\Widgets\Widget;
 use App\Supports\ShippingCalendar\MonthlyCalendarBuilder;
 
+/** @deprecated ShippingSchedule tidak lagi dipakai. Widget ini tidak menampilkan data. */
 class ShippingScheduleCalendar extends Widget
 {
     protected static string $view = 'filament.widgets.shipping-schedule-calendar';

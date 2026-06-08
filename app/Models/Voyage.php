@@ -210,6 +210,11 @@ class Voyage extends Model
         return $this->hasMany(VesselCheckCase::class);
     }
 
+    public function shipments(): HasMany
+    {
+        return $this->hasMany(Shipment::class, 'voyage_id');
+    }
+
     public function getPlannedSailingDaysAttribute(): ?float
     {
         return $this->vesselPlanItem?->planned_sailing_days;

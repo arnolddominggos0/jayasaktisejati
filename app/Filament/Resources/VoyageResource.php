@@ -27,11 +27,24 @@ use Filament\Tables\Filters\TernaryFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
+/**
+ * Voyage Registry — Master Data & Audit Layer
+ *
+ * Ownership: Voyage Lifecycle, Delay Audit Trail, Milestone Monitoring,
+ *            Manifest Voyage, Administrative Override, Historical Audit.
+ *
+ * THIS IS NOT an operational dashboard. Responsibilities per module:
+ *   - Monitoring Kapal TAM  → operational daily, cargo, achievement, KPI, delay analysis
+ *   - Evaluasi Voyage       → lead time, dwelling, sailing, SLA, NG analysis
+ *   - Voyage Registry       → master voyage data, lifecycle state, audit trail
+ *
+ * Do not add real-time operational widgets here. Use Monitoring Kapal TAM instead.
+ */
 class VoyageResource extends Resource
 {
     protected static ?string $model = Voyage::class;
 
-    protected static ?string $navigationGroup = 'Operasional';
+    protected static ?string $navigationGroup = 'Master Data';
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
     protected static ?string $navigationLabel = 'Registry Voyage';

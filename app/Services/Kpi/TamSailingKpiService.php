@@ -13,6 +13,7 @@ class TamSailingKpiService
         $rows = Voyage::query()
             ->whereYear('etd', $year)
             ->whereMonth('etd', $month)
+            ->whereHas('shipments', fn($q) => $q->where('status', '!=', 'cancelled'))
             ->with(['pol', 'pod'])
             ->get()
             ->map(fn ($v) => $this->evaluateVoyage($v))

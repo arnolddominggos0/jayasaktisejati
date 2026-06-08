@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VesselCheckResource\Pages;
 
+use App\Enums\VesselCheckLogStatus;
 use App\Filament\Resources\VesselCheckResource;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists\Infolist;
@@ -17,10 +18,10 @@ class ViewVesselCheck extends ViewRecord
         return $infolist->schema([
 
             Section::make('Ringkasan Kesiapan Kapal')
-                ->description('Pemeriksaan kesiapan sebelum keberangkatan (D-3 s.d. D-1)')
+                ->description('Pemeriksaan kesiapan carrier sebelum keberangkatan (H-2 / H-1)')
                 ->schema([
 
-                    TextEntry::make('shippingSchedule.voyage.voyage_no')
+                    TextEntry::make('voyage.voyage_no')
                         ->label('Voyage')
                         ->weight('bold'),
 
@@ -40,92 +41,32 @@ class ViewVesselCheck extends ViewRecord
                 ])
                 ->columns(3),
 
-            Section::make('Kondisi Jadwal Keberangkatan (ETD)')
+            Section::make('Hasil Pemeriksaan')
                 ->schema([
 
-                    TextEntry::make('etd_plan')
-                        ->label('ETD Rencana')
-                        ->dateTime(),
-
-                    TextEntry::make('etd_current')
-                        ->label('ETD Terakhir')
-                        ->dateTime(),
-
-                    TextEntry::make('status_etd')
-                        ->label('Status ETD')
+                    TextEntry::make('status')
+                        ->label('Status')
                         ->badge()
-                        ->getStateUsing(
-                            fn($record) =>
-                            \App\Filament\Resources\VesselCheckResource::etdIsOnSchedule($record)
-                                ? 'Sesuai Jadwal'
-                                : 'Terjadi Perubahan'
-                        )
-                        ->color(
-                            fn($record) =>
-                            \App\Filament\Resources\VesselCheckResource::etdIsOnSchedule($record)
-                                ? 'success'
-                                : 'warning'
-                        ),
-                ])
-                ->columns(3),
+                        ->formatStateUsing(fn($state) => $state instanceof VesselCheckLogStatus
+                            ? $state->label()
+                            : strtoupper((string) $state))
+                        ->color(fn($state) => $state instanceof VesselCheckLogStatus
+                            ? $state->color()
+                            : 'gray'),
 
-
-            Section::make('Hasil Evaluasi')
-                ->schema([
-
-                    TextEntry::make('hasil_monitoring')
-                        ->label('Kesimpulan Pemeriksaan')
-                        ->badge()
-                        ->getStateUsing(function ($record) {
-                            if (\App\Filament\Resources\VesselCheckResource::hasOpenCase($record)) {
-                                return 'Perlu Tindak Lanjut';
-                            }
-
-                            if (! \App\Filament\Resources\VesselCheckResource::etdIsOnSchedule($record)) {
-                                return 'Perlu Perhatian';
-                            }
-
-                            return 'Aman';
-                        })
-                        ->color(function ($record) {
-                            if (\App\Filament\Resources\VesselCheckResource::hasOpenCase($record)) {
-                                return 'danger';
-                            }
-
-                            if (! \App\Filament\Resources\VesselCheckResource::etdIsOnSchedule($record)) {
-                                return 'warning';
-                            }
-
-                            return 'success';
-                        }),
-
-                    TextEntry::make('shippingSchedule.vesselCheckCase.case_status')
-                        ->label('Status Tindak Lanjut')
-                        ->badge()
-                        ->visible(
-                            fn($record) =>
-                            \App\Filament\Resources\VesselCheckResource::hasOpenCase($record)
-                        )
-                        ->formatStateUsing(fn($state) => $state->label())
-                        ->color(fn($state) => $state->color()),
-
-                ])
-                ->columns(2),
-
-
-            Section::make('Informasi Tambahan')
-                ->schema([
-
-                    TextEntry::make('source')
-                        ->label('Sumber Informasi')
-                        ->placeholder('—'),
+                    TextEntry::make('delay_reason')
+                        ->label('Alasan Keterlambatan')
+                        ->placeholder('—')
+                        ->visible(fn($record) => $record->getRawOriginal('status') === 'late'),
 
                     TextEntry::make('note')
                         ->label('Catatan')
-                        ->placeholder('Tidak ada catatan'),
+                        ->placeholder('—')
+                        ->columnSpanFull(),
 
                 ])
                 ->columns(2),
+
         ]);
     }
 }

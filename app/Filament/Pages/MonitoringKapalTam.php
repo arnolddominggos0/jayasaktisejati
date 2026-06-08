@@ -2,13 +2,12 @@
 
 namespace App\Filament\Pages;
 
+use App\Enums\ShipmentStatus;
+use App\Enums\VesselCheckDelayReason;
 use App\Enums\VesselCheckLogStatus;
-use App\Enums\VesselCheckStatus;
 use App\Enums\VoyageDelayReason;
 use App\Enums\VoyageOperationalStatus;
-use App\Models\ShippingSchedule;
 use App\Models\VesselCheck;
-use App\Models\VesselCheckCase;
 use App\Models\Voyage;
 use App\Models\VoyageMilestone;
 use Filament\Notifications\Notification;
@@ -16,6 +15,26 @@ use Filament\Pages\Page;
 use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * Monitoring Kapal TAM — Cargo Monitoring Scope
+ *
+ * Menjawab pertanyaan: "Apakah cargo TAM berjalan sesuai target?"
+ *
+ * Source of truth: Voyage::whereHas('shipments')
+ * Hanya voyage yang memiliki shipment aktif yang masuk ke:
+ *   - Monitoring dashboard
+ *   - Summary / Achievement / KPI
+ *   - Delay Analysis
+ *   - Calendar
+ *
+ * PERBEDAAN DENGAN VESSEL CHECK:
+ *   Vessel Check menjawab: "Apakah carrier siap berangkat sesuai jadwal?"
+ *   Source: Voyage::whereBetween('etd', H-2/H-1)  — TANPA filter shipment
+ *   Scope: semua voyage yang akan berangkat
+ *
+ *   JANGAN mengubah baseQuery() agar menggunakan seluruh voyage.
+ *   Kedua modul memiliki scope berbeda secara disengaja.
+ */
 class MonitoringKapalTam extends Page
 {
     protected static string $view = 'filament.pages.monitoring-kapal-tam';
@@ -52,14 +71,15 @@ class MonitoringKapalTam extends Page
     public string $actionModalType    = ''; // atb | atd | ata | closing | delay | readiness
     public ?int   $actionVoyageId     = null;
     public array  $actionForm         = [
-        'datetime'       => '',
-        'note'           => '',
-        'delay_reason'   => '',
-        'delay_note'     => '',
-        'readiness'      => '',
-        'readiness_note' => '',
-        'cargo'          => '',
-        'cargo_note'     => '',
+        'datetime'               => '',
+        'note'                   => '',
+        'delay_reason'           => '',
+        'delay_note'             => '',
+        'readiness'              => '',
+        'readiness_note'         => '',
+        'readiness_delay_reason' => '',
+        'cargo'                  => '',
+        'cargo_note'             => '',
     ];
 
     // ── Voyage Drawer ───────────────────────────────────────────────────
@@ -69,12 +89,16 @@ class MonitoringKapalTam extends Page
     // ── Evaluation ──────────────────────────────────────────────────────
     public array $evaluation = [];
 
+    // ── Carrier Readiness (scope: all voyages H-2/H-1, no shipment filter) ──
+    public array $carrierReadiness = [];
+
     public function mount(): void
     {
         $this->period = now()->format('Y-m');
         $this->acknowledged = session()->get('monitoring_acknowledged', []);
         $this->generateMonthOptions();
         $this->loadData();
+        $this->loadCarrierReadiness();
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -92,8 +116,9 @@ class MonitoringKapalTam extends Page
             'note'           => '',
             'delay_reason'   => '',
             'delay_note'     => '',
-            'readiness'      => VesselCheckLogStatus::ON_SCHEDULE->value,
-            'readiness_note' => '',
+            'readiness'              => VesselCheckLogStatus::OK->value,
+            'readiness_note'         => '',
+            'readiness_delay_reason' => '',
             'cargo'          => '',
             'cargo_note'     => '',
         ];
@@ -104,8 +129,9 @@ class MonitoringKapalTam extends Page
             'ata'      => $this->actionForm['datetime'] = $v?->ata_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i'),
             'closing'  => $this->actionForm['datetime'] = $v?->closing_at?->format('Y-m-d\TH:i') ?? now()->format('Y-m-d\TH:i'),
             'readiness'=> $this->actionForm['readiness'] = $v?->vesselChecks
-                ->sortByDesc('check_date')
-                ->first()?->status?->value ?? VesselCheckLogStatus::ON_SCHEDULE->value,
+                ->whereIn('day_code', ['H-1', 'H-2'])
+                ->sortBy(fn($vc) => $vc->day_code === 'H-1' ? 1 : 2)
+                ->first()?->status?->value ?? VesselCheckLogStatus::OK->value,
             'cargo'    => $this->actionForm['cargo'] = $v?->cargo_actual !== null ? (string) $v->cargo_actual : '',
             default    => null,
         };
@@ -132,6 +158,7 @@ class MonitoringKapalTam extends Page
 
         $this->closeOpModal();
         $this->loadData();
+        $this->loadCarrierReadiness();
     }
 
     protected function saveTimestamp(): void
@@ -225,26 +252,64 @@ class MonitoringKapalTam extends Page
 
     protected function saveReadiness(): void
     {
-        if (!$this->actionVoyageId) return;
+        if (! $this->actionVoyageId) return;
 
         $this->validate([
-            'actionForm.readiness'      => 'required|string',
-            'actionForm.readiness_note' => 'nullable|string|max:500',
+            'actionForm.readiness'              => 'required|string',
+            'actionForm.readiness_note'         => 'nullable|string|max:500',
+            'actionForm.readiness_delay_reason' => 'nullable|string|max:255',
         ]);
 
         $voyage = Voyage::find($this->actionVoyageId);
-        if (!$voyage) return;
+        if (! $voyage || ! $voyage->etd) return;
 
-        VesselCheck::create([
-            'voyage_id'  => $voyage->id,
-            'check_date' => now()->toDateString(),
-            'day_code'   => 'manual',
-            'status'     => $this->actionForm['readiness'],
-            'note'       => $this->actionForm['readiness_note'] ?: null,
-            'source'     => 'monitoring',
+        // Determine which checklist day is active today.
+        // Only the current operational day may be updated — operator cannot modify another day's checklist.
+        $daysToEtd = (int) now()->startOfDay()->diffInDays(
+            $voyage->etd->copy()->startOfDay(),
+            false
+        );
+
+        if (! in_array($daysToEtd, [1, 2], true)) {
+            Notification::make()
+                ->title('Di luar window Vessel Check')
+                ->body('Readiness hanya dapat diisi pada H-2 atau H-1 sebelum ETD.')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $dayCode = match ($daysToEtd) {
+            2 => 'H-2',
+            1 => 'H-1',
+        };
+
+        // GenerateDailyVesselChecks is the sole creator — only update, never create.
+        $check = VesselCheck::where('voyage_id', $voyage->id)
+            ->where('day_code', $dayCode)
+            ->first();
+
+        if (! $check) {
+            Notification::make()
+                ->title("Checklist {$dayCode} belum tersedia")
+                ->body('Sistem akan membuatnya secara otomatis pada H-2 sebelum keberangkatan.')
+                ->danger()
+                ->send();
+            return;
+        }
+
+        $check->update([
+            'status'       => $this->actionForm['readiness'],
+            'delay_reason' => $this->actionForm['readiness'] === 'late'
+                ? ($this->actionForm['readiness_delay_reason'] ?: null)
+                : null,
+            'note'         => $this->actionForm['readiness_note'] ?: null,
         ]);
 
-        Notification::make()->title('Readiness check disimpan')->success()->send();
+        Notification::make()
+            ->title("{$dayCode} — Readiness diperbarui")
+            ->success()
+            ->send();
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -311,6 +376,7 @@ class MonitoringKapalTam extends Page
             ->with(['vessel', 'pol', 'pod', 'milestones', 'checkpoints', 'vesselChecks'])
             ->whereYear('period_month', $dt->year)
             ->whereMonth('period_month', $dt->month)
+            ->whereHas('shipments', fn($q) => $q->where('status', '!=', ShipmentStatus::Cancelled->value))
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('voyage_no', 'like', "%{$this->search}%")
@@ -335,6 +401,45 @@ class MonitoringKapalTam extends Page
         $this->buildAchievement();
         $this->buildCalendar($dt);
         $this->buildEvaluation();
+    }
+
+    // ── Carrier Readiness — Carrier Readiness Scope ──────────────────────
+    // Query: ALL voyages H-2/H-1, regardless of shipments.
+    // Scope is intentionally different from baseQuery (cargo monitoring scope).
+    // See class PHPDoc for boundary explanation.
+    protected function loadCarrierReadiness(): void
+    {
+        $voyages = Voyage::query()
+            ->whereNull('atd_at')
+            ->whereBetween('etd', [
+                now()->addDay()->startOfDay(),
+                now()->addDays(2)->endOfDay(),
+            ])
+            ->with(['vessel', 'vesselChecks'])
+            ->orderBy('etd')
+            ->get();
+
+        $this->carrierReadiness = $voyages->map(function (Voyage $voyage) {
+            $diff = (int) now()->startOfDay()->diffInDays(
+                Carbon::parse($voyage->etd)->startOfDay(),
+                false
+            );
+
+            $latestCheck = $voyage->vesselChecks
+                ->sortByDesc('check_date')
+                ->first();
+
+            return [
+                'voyage_id'    => $voyage->id,
+                'vessel_name'  => $voyage->vessel?->name ?? '-',
+                'voyage_no'    => $voyage->voyage_no ?? '-',
+                'etd'          => $voyage->etd?->format('d M Y H:i'),
+                'day_code'     => 'H-' . $diff,
+                'status'       => $latestCheck?->getRawOriginal('status') ?? 'pending',
+                'delay_reason' => $latestCheck?->delay_reason,
+                'note'         => $latestCheck?->note,
+            ];
+        })->values()->toArray();
     }
 
     protected function buildSummary(): void

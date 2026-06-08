@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ShipmentHistoryResource\Pages;
 
 use App\Filament\Resources\ShipmentHistoryResource;
+use App\Models\Voyage;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists\Infolist;
@@ -13,6 +14,45 @@ use Illuminate\Support\Facades\Storage;
 class ViewShipmentHistory extends ViewRecord
 {
     protected static string $resource = ShipmentHistoryResource::class;
+
+    // ── Voyage relation loader ────────────────────────────────────────────
+    // Called in mount() AND in the Livewire hydrate hook so relations survive
+    // every re-render, not just the initial page load.
+    private function loadVoyageRelations(): void
+    {
+        if (! $this->record->voyage_id) {
+            return;
+        }
+
+        // Use load() with a nested constraint — NOT loadMissing(['voyage.xxx']).
+        // loadMissing on a dot-path calls Collection::pluck('voyage') internally,
+        // which hits getAttribute('voyage') and returns the string snapshot column
+        // instead of the Voyage model, causing "relationLoaded() on string".
+        // load() with a closure constraint loads the relation and all its children
+        // in a single step, bypassing pluck() entirely.
+        $this->record->load([
+            'voyage' => fn ($q) => $q->with([
+                'vessel',
+                'delayLogs',
+                'milestones',
+                'vesselChecks',
+                'sailingSla',
+            ]),
+        ]);
+    }
+
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+        $this->loadVoyageRelations();
+    }
+
+    // Filament/Livewire re-hydrates the model on every request without calling
+    // mount() again. Ensure voyage relations are always available.
+    public function hydrate(): void
+    {
+        $this->loadVoyageRelations();
+    }
 
     protected function getHeaderActions(): array
     {
@@ -58,6 +98,19 @@ class ViewShipmentHistory extends ViewRecord
 
     public function infolist(Infolist $infolist): Infolist
     {
+        // ── Safe voyage accessor ──────────────────────────────────────────
+        // Always use this helper — NEVER use $record->voyage directly.
+        // $record->voyage is an ambiguous property: it resolves to either the
+        // booking-snapshot string column OR the Voyage Eloquent relation,
+        // depending on whether the relation is loaded. Using relationLoaded()
+        // first eliminates the collision entirely.
+        $voyage = static function ($record): ?Voyage {
+            return $record->relationLoaded('voyage')
+                ? $record->getRelation('voyage')
+                : null;
+        };
+
+        // ── Shipment track time helper ────────────────────────────────────
         $trackTime = function ($record, array $statuses, string $direction = 'asc') {
             $q = null;
             if (method_exists($record, 'tracks')) {
@@ -75,12 +128,15 @@ class ViewShipmentHistory extends ViewRecord
         };
 
         return $infolist->schema([
+
+            // ── Identitas ─────────────────────────────────────────────────
             Section::make('Identitas')->columns(3)->schema([
                 TextEntry::make('code')->label('Kode')->copyable()->extraAttributes(['class' => 'font-mono']),
                 TextEntry::make('customer.name')->label('Pengirim'),
                 TextEntry::make('receiver.name')->label('Penerima'),
             ]),
 
+            // ── Rute & Moda ───────────────────────────────────────────────
             Section::make('Rute & Moda')->columns(4)->schema([
                 TextEntry::make('originCity.name')->label('Asal'),
                 TextEntry::make('destinationCity.name')->label('Tujuan'),
@@ -92,6 +148,7 @@ class ViewShipmentHistory extends ViewRecord
                     ->color(fn($state) => ($state?->value ?? $state) === 'sea' ? 'primary' : 'warning'),
             ]),
 
+            // ── Layanan ───────────────────────────────────────────────────
             Section::make('Layanan')->columns(4)->schema([
                 TextEntry::make('service_type')->label('Jenis')
                     ->formatStateUsing(fn($state) => $state?->label() ?? (string)$state)->badge(),
@@ -114,17 +171,22 @@ class ViewShipmentHistory extends ViewRecord
                     ->formatStateUsing(fn($state) => $state?->label() ?? (string)$state)->badge(),
             ]),
 
+            // ── Sea Info ──────────────────────────────────────────────────
+            // NOTE: TextEntry::make('voyage') reads the RAW COLUMN (booking snapshot string).
+            // It must use getAttributes() to bypass the Eloquent relation lookup.
             Section::make('Sea Info')->columns(4)
                 ->visible(fn($record) => ($record->mode?->value ?? $record->mode) === 'sea')
                 ->schema([
                     TextEntry::make('vessel_name')->label('Vessel'),
-                    TextEntry::make('voyage')->label('Voyage'),
+                    TextEntry::make('voyage')->label('Voyage No (Booking)')
+                        ->state(fn($record) => data_get($record->getAttributes(), 'voyage') ?? '—'),
                     TextEntry::make('pol')->label('POL'),
                     TextEntry::make('pod')->label('POD'),
                     TextEntry::make('etd')->label('ETD')->dateTime('d M Y H:i'),
                     TextEntry::make('eta')->label('ETA')->dateTime('d M Y H:i'),
                 ]),
 
+            // ── Land Info ─────────────────────────────────────────────────
             Section::make('Land Info')->columns(3)
                 ->visible(fn($record) => ($record->mode?->value ?? $record->mode) === 'land')
                 ->schema([
@@ -134,7 +196,7 @@ class ViewShipmentHistory extends ViewRecord
                         ->suffix(fn($record) => $record->driver_phone ? " • {$record->driver_phone}" : null),
                 ]),
 
-            // Sea Timeline: Vessel milestones
+            // ── Timeline Kapal (Sea) ──────────────────────────────────────
             Section::make('Timeline Kapal (Sea)')
                 ->visible(fn($record) => ($record->mode?->value ?? $record->mode) === 'sea')
                 ->columns(4)
@@ -164,6 +226,215 @@ class ViewShipmentHistory extends ViewRecord
                         ->placeholder('—'),
                 ]),
 
+            // ── Informasi Voyage (live dari Voyage model) ─────────────────
+            Section::make('Informasi Voyage')
+                ->description('Data live dari voyage aktual — mungkin berbeda dari snapshot saat booking.')
+                ->visible(fn($record) => $voyage($record) !== null)
+                ->columns(4)
+                ->schema([
+                    TextEntry::make('voy_voyage_no')
+                        ->label('Voyage No')
+                        ->state(fn($record) => $voyage($record)?->voyage_no ?? '—'),
+
+                    TextEntry::make('voy_vessel')
+                        ->label('Kapal (Live)')
+                        ->state(fn($record) => $voyage($record)?->vessel?->name ?? '—'),
+
+                    TextEntry::make('voy_etd')
+                        ->label('ETD (Live)')
+                        ->state(fn($record) => $voyage($record)?->etd?->format('d M Y H:i') ?? '—'),
+
+                    TextEntry::make('voy_eta')
+                        ->label('ETA (Live)')
+                        ->state(fn($record) => $voyage($record)?->eta?->format('d M Y H:i') ?? '—'),
+
+                    TextEntry::make('voy_atd')
+                        ->label('ATD (Aktual)')
+                        ->state(fn($record) => $voyage($record)?->atd_at?->format('d M Y H:i') ?? '—'),
+
+                    TextEntry::make('voy_ata')
+                        ->label('ATA (Aktual)')
+                        ->state(fn($record) => $voyage($record)?->ata_at?->format('d M Y H:i') ?? '—'),
+
+                    TextEntry::make('voy_delay_reason')
+                        ->label('Alasan Delay')
+                        ->state(fn($record) => $voyage($record)?->manual_delay_reason?->label() ?? '—'),
+
+                    TextEntry::make('voy_cargo_actual')
+                        ->label('Cargo Aktual')
+                        ->state(function ($record) use ($voyage) {
+                            $v = $voyage($record);
+                            return $v?->cargo_actual !== null
+                                ? number_format($v->cargo_actual) . ' unit'
+                                : '—';
+                        }),
+                ]),
+
+            // ── Voyage Performance (KPI + SLA) ────────────────────────────
+            Section::make('Voyage Performance')
+                ->description('Hasil KPI dan SLA berdasarkan data aktual voyage.')
+                ->visible(fn($record) => $voyage($record) !== null)
+                ->columns(4)
+                ->schema([
+                    TextEntry::make('voy_otb')
+                        ->label('OTB (On-Time Berthing)')
+                        ->state(fn($record) => match ($voyage($record)?->otb_status?->value) {
+                            'ontime' => 'OK',
+                            'late'   => 'NG',
+                            default  => '—',
+                        })
+                        ->badge()
+                        ->color(fn($state) => match ($state) {
+                            'OK'    => 'success',
+                            'NG'    => 'danger',
+                            default => 'gray',
+                        }),
+
+                    TextEntry::make('voy_otd')
+                        ->label('OTD (On-Time Departure)')
+                        ->state(fn($record) => match ($voyage($record)?->otd_status?->value) {
+                            'ontime' => 'OK',
+                            'late'   => 'NG',
+                            default  => '—',
+                        })
+                        ->badge()
+                        ->color(fn($state) => match ($state) {
+                            'OK'    => 'success',
+                            'NG'    => 'danger',
+                            default => 'gray',
+                        }),
+
+                    TextEntry::make('voy_ota')
+                        ->label('OTA (On-Time Arrival)')
+                        ->state(fn($record) => match ($voyage($record)?->ota_status?->value) {
+                            'ontime' => 'OK',
+                            'late'   => 'NG',
+                            default  => '—',
+                        })
+                        ->badge()
+                        ->color(fn($state) => match ($state) {
+                            'OK'    => 'success',
+                            'NG'    => 'danger',
+                            default => 'gray',
+                        }),
+
+                    TextEntry::make('voy_sla')
+                        ->label('Voyage SLA')
+                        ->state(fn($record) => $voyage($record)?->sla_status?->label() ?? '—')
+                        ->badge()
+                        ->color(fn($record) => match ($voyage($record)?->sla_status?->value) {
+                            'ontime' => 'success',
+                            'late'   => 'danger',
+                            'risk'   => 'warning',
+                            default  => 'gray',
+                        }),
+
+                    TextEntry::make('voy_sailing_plan')
+                        ->label('Sailing Plan')
+                        ->state(function ($record) use ($voyage) {
+                            $days = $voyage($record)?->planned_sailing_days;
+                            return $days !== null ? $days . ' hari' : '—';
+                        }),
+
+                    TextEntry::make('voy_sailing_actual')
+                        ->label('Sailing Aktual')
+                        ->state(function ($record) use ($voyage) {
+                            $days = $voyage($record)?->actual_sailing_days;
+                            return $days !== null ? $days . ' hari' : '—';
+                        }),
+
+                    TextEntry::make('voy_sla_target')
+                        ->label('SLA Target')
+                        ->state(function ($record) use ($voyage) {
+                            $days = $voyage($record)?->sailingSla?->target_days;
+                            return $days !== null ? $days . ' hari' : '—';
+                        }),
+
+                    TextEntry::make('voy_departure_delay')
+                        ->label('Delay Keberangkatan')
+                        ->state(function ($record) use ($voyage) {
+                            $days = $voyage($record)?->departure_delay_days;
+                            if ($days === null) return '—';
+                            return $days > 0 ? '+' . $days . ' hari' : 'Tepat Waktu';
+                        })
+                        ->color(fn($record) => (($voyage($record)?->departure_delay_days) ?? 0) > 0
+                            ? 'danger'
+                            : 'success'),
+                ]),
+
+            // ── Carrier Readiness Snapshot ────────────────────────────────
+            Section::make('Carrier Readiness')
+                ->description('Hasil pemeriksaan kesiapan vessel sebelum keberangkatan.')
+                ->visible(fn($record) => ($voyage($record)?->vesselChecks?->isNotEmpty()) === true)
+                ->schema([
+                    ViewEntry::make('carrier_readiness')
+                        ->view('filament.infolists.voyage-readiness-snapshot')
+                        ->state(fn($record) => $voyage($record)?->vesselChecks ?? collect())
+                        ->columnSpanFull(),
+                ]),
+
+            // ── Voyage Milestones ─────────────────────────────────────────
+            Section::make('Voyage Milestones')
+                ->description('Progress milestone pelayaran (D+2 hingga D+12).')
+                ->visible(fn($record) => ($voyage($record)?->milestones?->isNotEmpty()) === true)
+                ->schema([
+                    ViewEntry::make('voyage_milestones')
+                        ->view('filament.infolists.voyage-milestone-progress')
+                        ->state(fn($record) => $voyage($record)?->milestones
+                            ?->sortBy(fn($m) => (int) str_replace('d', '', $m->code ?? '0'))
+                            ?? collect())
+                        ->columnSpanFull(),
+                ]),
+
+            // ── Voyage Delay History ──────────────────────────────────────
+            Section::make('Voyage Delay History')
+                ->description('Riwayat perubahan jadwal ETD/ETA.')
+                ->visible(fn($record) => ($voyage($record)?->delayLogs?->isNotEmpty()) === true)
+                ->schema([
+                    ViewEntry::make('voyage_delay_history')
+                        ->view('filament.infolists.voyage-delay-history')
+                        ->state(fn($record) => $voyage($record)?->delayLogs
+                            ?->sortByDesc('created_at')
+                            ?? collect())
+                        ->columnSpanFull(),
+                ]),
+
+            // ── Lead Time Breakdown ───────────────────────────────────────
+            Section::make('Lead Time Breakdown')
+                ->description('Breakdown waktu berdasarkan milestone shipment (Dwelling → Sailing → Dooring).')
+                ->visible(fn($record) => ($record->mode?->value ?? $record->mode) === 'sea'
+                    && $voyage($record) !== null)
+                ->columns(4)
+                ->schema([
+                    TextEntry::make('lt_dwelling')
+                        ->label('Dwelling')
+                        ->state(fn($record) => $record->dwelling_days !== null
+                            ? $record->dwelling_days . ' hari'
+                            : '—')
+                        ->tooltip('Pickup → Onboard'),
+
+                    TextEntry::make('lt_sailing')
+                        ->label('Sailing')
+                        ->state(fn($record) => $record->sailing_days !== null
+                            ? $record->sailing_days . ' hari'
+                            : '—')
+                        ->tooltip('Onboard → Arrived'),
+
+                    TextEntry::make('lt_dooring')
+                        ->label('Dooring')
+                        ->state(fn($record) => $record->dooring_days !== null
+                            ? $record->dooring_days . ' hari'
+                            : '—')
+                        ->tooltip('Arrived → Delivered'),
+
+                    TextEntry::make('lt_total')
+                        ->label('Total Lead Time')
+                        ->state(fn($record) => $record->lead_time_days !== null
+                            ? $record->lead_time_days . ' hari'
+                            : '—'),
+                ]),
+
+            // ── Status & Tanggal ──────────────────────────────────────────
             Section::make('Status & Tanggal')->columns(4)->schema([
                 TextEntry::make('status')->label('Status Akhir')->badge()
                     ->color(fn($state) => ($state?->label() ?? $state) === 'Terkirim' ? 'success' : 'danger')
@@ -200,6 +471,7 @@ class ViewShipmentHistory extends ViewRecord
                     ->placeholder('—'),
             ]),
 
+            // ── Permintaan & Dokumen ──────────────────────────────────────
             Section::make('Permintaan & Dokumen')->columns(4)->schema([
                 TextEntry::make('request_type')->label('Tipe')
                     ->formatStateUsing(fn($state) => $state?->label() ?? (string)$state)->badge(),
@@ -210,6 +482,7 @@ class ViewShipmentHistory extends ViewRecord
                 TextEntry::make('requested_at')->label('Tgl Permintaan')->dateTime('d M Y H:i'),
             ]),
 
+            // ── Kuantitas ─────────────────────────────────────────────────
             Section::make('Kuantitas')->columns(3)->schema([
                 TextEntry::make('container_summary')->label('Kontainer')
                     ->state(function ($record) {
@@ -258,6 +531,7 @@ class ViewShipmentHistory extends ViewRecord
                     ->placeholder('—'),
             ]),
 
+            // ── Lampiran ──────────────────────────────────────────────────
             Section::make('Lampiran')->schema([
                 ViewEntry::make('attachments_view')
                     ->view('filament.infolists.attachments')

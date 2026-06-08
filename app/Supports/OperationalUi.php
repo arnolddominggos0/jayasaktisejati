@@ -179,9 +179,9 @@ final class OperationalUi
         $code = strtoupper($vc->day_code ?? 'H-1');
 
         return match ($vc->status?->value) {
-            'on_schedule'     => ['label' => $code . ' OK',      'state' => 'success'],
-            'potential_delay' => ['label' => $code . ' RISIKO',  'state' => 'danger'],
-            default           => ['label' => $code . ' —',       'state' => 'default'],
+            'ok'   => ['label' => $code . ' OK',    'state' => 'success'],
+            'late' => ['label' => $code . ' LATE',  'state' => 'danger'],
+            default => ['label' => $code . ' —',    'state' => 'default'],
         };
     }
 
@@ -213,8 +213,8 @@ final class OperationalUi
         $h1State = 'neutral';
         if ($h1) {
             $h1State = match ($h1->status?->value) {
-                'on_schedule' => 'done',
-                'potential_delay' => 'overdue',
+                'ok'   => 'done',
+                'late' => 'overdue',
                 default => 'pending',
             };
         }
@@ -293,9 +293,9 @@ final class OperationalUi
         $status = $vc->status ?? null;
 
         if ($status instanceof \App\Enums\VesselCheckLogStatus) {
-            $ok = $status->isOnSchedule();
+            $ok = $status->isOk();
         } else {
-            $ok = $status?->value === 'on_schedule';
+            $ok = $status?->value === 'ok';
         }
 
         return [
@@ -330,15 +330,15 @@ final class OperationalUi
         $status = $vc->status ?? null;
 
         if ($status instanceof \App\Enums\VesselCheckLogStatus) {
-            $st = $status->isOnSchedule()
+            $st = $status->isOk()
                 ? ['✓', 'text-green-600', 1]
                 : ['!', 'text-orange-600', 3];
         } else {
             $value = $status?->value;
             $st = match ($value) {
-                'on_schedule'     => ['✓', 'text-green-600', 1],
-                'potential_delay' => ['!', 'text-orange-600', 3],
-                default           => ['·', 'text-gray-400', 2],
+                'ok'   => ['✓', 'text-green-600', 1],
+                'late' => ['!', 'text-orange-600', 3],
+                default => ['·', 'text-gray-400', 2],
             };
         }
 

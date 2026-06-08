@@ -4,17 +4,22 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
-use App\Models\ShippingSchedule;
+use App\Models\Voyage;
 use App\Models\VesselCheck;
 use App\Models\VesselCheckCase;
 use App\Enums\VesselCheckLogStatus;
 use App\Enums\VesselCheckStatus;
 use Carbon\Carbon;
 
+/**
+ * @deprecated ETD drift detection engine removed as part of Vessel Check simplification.
+ *             VesselCheck is now a simple OK/Late checklist filled by operators.
+ *             This command is no longer scheduled and should not be called.
+ */
 class SyncVesselChecks extends Command
 {
     protected $signature = 'vessel-check:sync';
-    protected $description = 'Sinkronisasi vessel check H-3 s.d. H-1 dan auto buka tindak lanjut jika ETD berubah';
+    protected $description = '[DEPRECATED] ETD drift detection — no longer in use';
 
     public function handle(): int
     {
@@ -22,14 +27,13 @@ class SyncVesselChecks extends Command
 
         $today = Carbon::today();
 
-        ShippingSchedule::query()
-            ->whereHas('voyage', fn($q) => $q->whereNull('atd_at'))
-            ->with(['voyage', 'vesselCheckCase'])
+        Voyage::query()
+            ->whereNull('atd_at')
             ->get()
-            ->each(function ($schedule) use ($today) {
+            ->each(function (Voyage $voyage) use ($today) {
 
-                $etd = Carbon::parse($schedule->voyage->etd);
-                $diff = $today->diffInDays($etd, false);
+                $etd  = Carbon::parse($voyage->etd);
+                $diff = (int) $today->diffInDays($etd, false);
 
                 if (! in_array($diff, [1, 2, 3], true)) {
                     return;
@@ -37,29 +41,31 @@ class SyncVesselChecks extends Command
 
                 $dayCode = 'D-' . $diff;
 
-                $check = VesselCheck::updateOrCreate(
+                // firstOrCreate preserves etd_plan on subsequent syncs
+                $check = VesselCheck::firstOrCreate(
                     [
-                        'shipping_schedule_id' => $schedule->id,
+                        'voyage_id'  => $voyage->id,
                         'check_date' => $today->toDateString(),
                     ],
                     [
-                        'voyage_id'   => $schedule->voyage->id,
                         'day_code'    => $dayCode,
-                        'etd_plan'    => $schedule->etd_plan ?? $etd,
-                        'etd_current' => $etd,
+                        'etd_plan'    => $voyage->etd,
+                        'etd_current' => $voyage->etd,
                         'status'      => VesselCheckLogStatus::ON_SCHEDULE,
                         'source'      => 'SYSTEM',
                     ]
                 );
 
-                if (! $check->etd_plan->equalTo($check->etd_current)) {
-                    $check->update([
-                        'status' => VesselCheckLogStatus::POTENTIAL_DELAY,
-                    ]);
+                // Always refresh etd_current to latest voyage ETD
+                $check->update(['etd_current' => $voyage->etd]);
 
-                    if (! $schedule->vesselCheckCase) {
+                // Detect ETD shift and escalate
+                if ($check->etd_plan && ! $check->etd_plan->equalTo($check->etd_current)) {
+                    $check->update(['status' => VesselCheckLogStatus::POTENTIAL_DELAY]);
+
+                    if (! VesselCheckCase::where('voyage_id', $voyage->id)->exists()) {
                         VesselCheckCase::create([
-                            'shipping_schedule_id' => $schedule->id,
+                            'voyage_id'   => $voyage->id,
                             'case_status' => VesselCheckStatus::ETD_DELAY,
                             'delay_flag'  => true,
                             'opened_at'   => now(),

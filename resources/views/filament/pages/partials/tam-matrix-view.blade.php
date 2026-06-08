@@ -11,7 +11,7 @@
             $v->sailing_risk => 80,
             $v->operational_status_enum === VoyageOperationalStatus::SAILING => 70,
             $v->checkpoints->contains(fn($cp) => !$cp->is_completed && $cp->scheduled_at?->isPast()) => 60,
-            $v->vesselChecks->contains(fn($vc) => $vc->status?->value === 'potential_delay') => 50,
+            $v->vesselChecks->contains(fn($vc) => $vc->status?->value === 'late') => 50,
             $v->operational_status_enum === VoyageOperationalStatus::COMPLETED => 30,
             $v->operational_status_enum === VoyageOperationalStatus::SCHEDULED => 20,
             default => 10,
@@ -80,7 +80,7 @@
                         if ($v->sailing_risk) $secondaryIssues[] = 'ETA Risk';
                         if ($v->milestones->where('is_overdue', true)->count()) $secondaryIssues[] = 'Overdue';
                         if ($d1 && !$d1->is_completed && $d1->scheduled_at?->isPast()) $secondaryIssues[] = 'D-1 Late';
-                        if ($h1 && $h1->status?->value === 'potential_delay') $secondaryIssues[] = 'H-1 Risk';
+                        if ($h1 && $h1->status?->value === 'late') $secondaryIssues[] = 'H-1 Late';
 
                         $hasIssues = count($criticalIssues) > 0 || count($secondaryIssues) > 0;
                         $isAnomaly = $v->operational_status_enum === VoyageOperationalStatus::DELAYED || $v->eta_overdue || $v->sailing_risk || $hasIssues;
@@ -194,9 +194,9 @@
                         </td>
                         <td class="px-2 py-1.5 text-center">
                             @if ($h1)
-                                @if ($h1->status?->value === 'on_schedule')
+                                @if ($h1->status?->value === 'ok')
                                     <span class="text-green-600 text-[10px] font-medium">✓</span>
-                                @elseif ($h1->status?->value === 'potential_delay')
+                                @elseif ($h1->status?->value === 'late')
                                     <span class="text-red-600 text-[10px] font-semibold">!</span>
                                 @else
                                     <span class="text-gray-400 text-[10px]">{{ strtoupper($h1->day_code ?? 'H-1') }}</span>

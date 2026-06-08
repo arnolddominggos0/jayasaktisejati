@@ -21,7 +21,7 @@ class InitialSetupSeeder extends Seeder
         */
 
         Role::firstOrCreate(['name' => 'super_admin']);
-        Role::firstOrCreate(['name' => 'fc']);
+        Role::firstOrCreate(['name' => 'field_coordinator']);
 
         /*
         |--------------------------------------------------------------------------
@@ -67,7 +67,7 @@ class InitialSetupSeeder extends Seeder
         */
 
         $fcJakarta = User::updateOrCreate(
-            ['email' => 'fc.jkt@jss.local'],
+            ['email' => 'koor.jkt@jss.local'],
             [
                 'name' => 'FC Jakarta',
                 'password' => Hash::make('password'),
@@ -75,7 +75,7 @@ class InitialSetupSeeder extends Seeder
             ]
         );
 
-        $fcJakarta->syncRoles(['fc']);
+        $fcJakarta->syncRoles(['field_coordinator']);
 
         /*
         |--------------------------------------------------------------------------
@@ -84,7 +84,7 @@ class InitialSetupSeeder extends Seeder
         */
 
         $fcManado = User::updateOrCreate(
-            ['email' => 'fc.mdo@jss.local'],
+            ['email' => 'koor.mdo@jss.local'],
             [
                 'name' => 'FC Manado',
                 'password' => Hash::make('password'),
@@ -92,7 +92,7 @@ class InitialSetupSeeder extends Seeder
             ]
         );
 
-        $fcManado->syncRoles(['fc']);
+        $fcManado->syncRoles(['field_coordinator']);
 
         /*
         |--------------------------------------------------------------------------
@@ -101,16 +101,7 @@ class InitialSetupSeeder extends Seeder
         */
 
         Depot::updateOrCreate(
-            ['code' => 'DPTJKT'],
-            [
-                'name' => 'Depo Tanjung Priok',
-                'branch_id' => $jkt->id,
-                'coordinator_user_id' => null,
-            ]
-        );
-
-        Depot::updateOrCreate(
-            ['code' => 'DPDJKT'],
+            ['code' => 'DEPOPDIJKT'],
             [
                 'name' => 'Depo PDI Jakarta',
                 'branch_id' => $jkt->id,
@@ -119,18 +110,9 @@ class InitialSetupSeeder extends Seeder
         );
 
         Depot::updateOrCreate(
-            ['code' => 'DPBTG'],
+            ['code' => 'DEPOBTG'],
             [
                 'name' => 'Depo Bitung',
-                'branch_id' => $mdo->id,
-                'coordinator_user_id' => null,
-            ]
-        );
-
-        Depot::updateOrCreate(
-            ['code' => 'DPBTGMDO'],
-            [
-                'name' => 'Depo Bitung Manado',
                 'branch_id' => $mdo->id,
                 'coordinator_user_id' => null,
             ]

@@ -29,7 +29,7 @@ class ShipmentController extends Controller
         $validated = $request->validated();
         
         $query = Shipment::query()
-            ->with(['customer', 'receiver', 'voyage.vessel', 'branch', 'tracks']);
+            ->with(['customer', 'receiver', 'voyageRecord.vessel', 'branch', 'tracks']);
 
         // Apply branch scoping for non-super-admins
         if (!$request->user()->hasRole('super_admin')) {
@@ -104,7 +104,7 @@ class ShipmentController extends Controller
             });
 
             return $this->createdResponse(
-                new ShipmentResource($shipment->load(['customer', 'receiver', 'voyage.vessel', 'branch'])),
+                new ShipmentResource($shipment->load(['customer', 'receiver', 'voyageRecord.vessel', 'branch'])),
                 'Shipment created successfully'
             );
         } catch (\Exception $e) {
@@ -124,7 +124,7 @@ class ShipmentController extends Controller
         $shipment = Shipment::with([
             'customer', 
             'receiver', 
-            'voyage.vessel', 
+            'voyageRecord.vessel', 
             'branch', 
             'tracks'
         ])->find($id);
@@ -154,7 +154,7 @@ class ShipmentController extends Controller
             $shipment->update($request->validated());
 
             return $this->successResponse(
-                new ShipmentResource($shipment->fresh()->load(['customer', 'receiver', 'voyage.vessel', 'branch'])),
+                new ShipmentResource($shipment->fresh()->load(['customer', 'receiver', 'voyageRecord.vessel', 'branch'])),
                 'Shipment updated successfully'
             );
         } catch (\Exception $e) {

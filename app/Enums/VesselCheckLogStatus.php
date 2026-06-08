@@ -4,32 +4,32 @@ namespace App\Enums;
 
 enum VesselCheckLogStatus: string
 {
-    case ON_SCHEDULE     = 'on_schedule';
-    case POTENTIAL_DELAY = 'potential_delay';
+    case OK   = 'ok';
+    case LATE = 'late';
 
     public function label(): string
     {
         return match ($this) {
-            self::ON_SCHEDULE     => 'Sesuai Jadwal',
-            self::POTENTIAL_DELAY => 'Potensi Delay',
+            self::OK   => 'OK',
+            self::LATE => 'Late',
         };
     }
 
     public function color(): string
     {
         return match ($this) {
-            self::ON_SCHEDULE     => 'success',
-            self::POTENTIAL_DELAY => 'warning',
+            self::OK   => 'success',
+            self::LATE => 'danger',
         };
     }
 
-    public function isPotentialDelay(): bool
+    public function isLate(): bool
     {
-        return $this === self::POTENTIAL_DELAY;
+        return $this === self::LATE;
     }
 
-    public function isOnSchedule(): bool
+    public function isOk(): bool
     {
-        return $this === self::ON_SCHEDULE;
+        return $this === self::OK;
     }
 }

@@ -16,6 +16,22 @@ use App\Models\VoyageMilestone;
  * Computes severity, readiness, KPI, issues, and available actions
  * in one pass.  Blade / Resource / Widget code should delegate here
  * instead of duplicating business rules.
+ *
+ * ── Scope Architecture ─────────────────────────────────────────────
+ *
+ * Instance ini hanya dibuat untuk voyage yang SUDAH melewati filter
+ * Monitoring TAM (Voyage::whereHas('shipments')).
+ * Artinya: $voyage selalu merupakan voyage dengan shipment aktif.
+ *
+ * hasPotentialDelay — dibaca dari VesselCheck.status = 'late'.
+ * VesselCheck sendiri di-generate untuk SEMUA voyage (bukan hanya
+ * yang memiliki shipment). Namun karena VoyageOperationalState
+ * hanya diinstansiasi untuk voyage dalam Monitoring TAM, sinyal
+ * hasPotentialDelay di sini selalu kontekstual ke cargo TAM.
+ *
+ * VESSEL CHECK (carrier readiness scope — semua voyage H-2/H-1)
+ * ≠
+ * MONITORING TAM (cargo monitoring scope — voyage dengan shipment)
  */
 final class VoyageOperationalState
 {
@@ -112,7 +128,7 @@ final class VoyageOperationalState
         // Use getRawOriginal() to bypass the enum cast — avoids ValueError if
         // the DB contains a status string that is not a valid enum case.
         $this->hasPotentialDelay = collect($this->voyage->vesselChecks ?? [])
-            ->contains(fn($vc) => $vc->getRawOriginal('status') === 'potential_delay');
+            ->contains(fn($vc) => $vc->getRawOriginal('status') === 'late');
 
         $this->hasReadinessIssue = $this->hasCheckpointOverdue || $this->hasPotentialDelay;
     }

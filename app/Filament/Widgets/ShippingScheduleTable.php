@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 use Dom\Text;
 
+/** @deprecated ShippingSchedule tidak lagi dipakai. Widget ini tidak menampilkan data. */
 class ShippingScheduleTable extends TableWidget
 {
     protected int|string|array $columnSpan = 'full';

@@ -5,6 +5,10 @@ namespace App\Services\Monitoring;
 use App\Models\ShippingSchedule;
 use Illuminate\Support\Carbon;
 
+/**
+ * @deprecated Voyage-centric architecture. MonitoringKapalTam kini menggunakan
+ *             Voyage::whereHas('shipments') langsung. Service ini tidak dipanggil.
+ */
 class TamMonitoringQueryService
 {
     public function getRows(string $period, string $filter)
