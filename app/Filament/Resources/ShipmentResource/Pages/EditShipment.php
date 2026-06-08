@@ -103,6 +103,32 @@ class EditShipment extends EditRecord
         }
     }
 
+    protected function mutateFormDataBeforeFill(array $data): array
+    {
+        // Load unit records from the `units()` hasMany relation using the
+        // relation METHOD (not property) to bypass the 'units' => 'array'
+        // cast in Shipment::$casts, which intercepts property access and
+        // returns null instead of the relation collection.
+        $data['units'] = $this->record->units()
+            ->orderBy('id')
+            ->get()
+            ->map(fn ($u) => [
+                'id'                => $u->id,
+                'model_no'          => $u->model_no,
+                'reg_no'            => $u->reg_no,
+                'chassis_no'        => $u->chassis_no,
+                'engine_no'         => $u->engine_no,
+                'color'             => $u->color,
+                'do_number'         => $u->do_number,
+                'container_display' => $u->container_display,
+                'qty'               => $u->qty ?? 1,
+                'notes'             => $u->notes,
+            ])
+            ->toArray();
+
+        return $data;
+    }
+
     public function afterSave(): void
     {
         $shipment = $this->record;

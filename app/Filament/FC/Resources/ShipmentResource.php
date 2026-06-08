@@ -67,14 +67,14 @@ class ShipmentResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $q = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery();
 
         $u = Filament::auth()->user();
         if (! $u) {
-            return $q->whereRaw('1=0');
+            return $query->whereRaw('1=0');
         }
 
-        $q->where('mode', ShipmentMode::Sea->value);
+        $query->where('mode', ShipmentMode::Sea->value);
 
         $branchId = app()->bound('scope.branch_id')
             ? app('scope.branch_id')
@@ -85,17 +85,17 @@ class ShipmentResource extends Resource
             : null;
 
         if (! $branchId || ! $depotId) {
-            return $q->whereRaw('1=0');
+            return $query->whereRaw('1=0');
         }
 
-        $q->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id'));
+        $query->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id'));
 
-        $q->where(function ($w) use ($depotId, $u) {
+        $query->where(function ($w) use ($depotId, $u) {
             $w->where('assigned_depot_id', $depotId)
                 ->orWhere('coordinator_id', $u->id);
         });
 
-        return $q->with([
+        return $query->with([
             'customer:id,name',
             'receiver:id,name',
             'originCity:id,name',
@@ -441,11 +441,11 @@ class ShipmentResource extends Resource
                     ->options(collect(ShipmentStatus::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()])),
                 Tables\Filters\SelectFilter::make('origin_city_id')
                     ->label('Asal')
-                    ->options(fn() => City::query()->orderBy('name')->pluck('name', 'id')->toArray())
+                    ->options(fn() => City::active()->orderBy('name')->pluck('name', 'id')->toArray())
                     ->searchable(),
                 Tables\Filters\SelectFilter::make('destination_city_id')
                     ->label('Tujuan')
-                    ->options(fn() => City::query()->orderBy('name')->pluck('name', 'id')->toArray())
+                    ->options(fn() => City::active()->orderBy('name')->pluck('name', 'id')->toArray())
                     ->searchable(),
             ])
             ->actions([

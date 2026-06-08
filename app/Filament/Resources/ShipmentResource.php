@@ -91,15 +91,15 @@ class ShipmentResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $q = parent::getEloquentQuery();
+        $query = parent::getEloquentQuery();
 
         $branchId = self::currentBranchId();
 
         if ($branchId) {
-            $q->where(fn($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id'));
+            $query->where(fn($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id'));
         }
 
-        return $q;
+        return $query;
     }
 
     protected static function resolveTimelineMask(Shipment $m): array
@@ -494,7 +494,7 @@ class ShipmentResource extends Resource
                         Select::make('origin_city_id')
                             ->label('Asal (Kota Asal) *')
                             ->placeholder('Pilih Kota Asal')
-                            ->relationship('originCity', 'name')
+                            ->relationship('originCity', 'name', fn ($query) => $query->active()->orderBy('name'))
                             ->searchable()
                             ->preload()
                             ->required()
@@ -505,7 +505,7 @@ class ShipmentResource extends Resource
                         Select::make('destination_city_id')
                             ->label('Tujuan (Kota Tujuan) *')
                             ->placeholder('Pilih Kota Tujuan')
-                            ->relationship('destinationCity', 'name')
+                            ->relationship('destinationCity', 'name', fn ($query) => $query->active()->orderBy('name'))
                             ->searchable()
                             ->preload()
                             ->required()
@@ -700,9 +700,9 @@ class ShipmentResource extends Resource
                                             $p = (float) ($r['length_cm'] ?? 0);
                                             $l = (float) ($r['width_cm'] ?? 0);
                                             $t = (float) ($r['height_cm'] ?? 0);
-                                            $q = (int) ($r['qty'] ?? 0);
+                                            $query = (int) ($r['qty'] ?? 0);
 
-                                            $cbm = ($p * $l * $t * $q) / 1_000_000;
+                                            $cbm = ($p * $l * $t * $query) / 1_000_000;
                                             $items[$i]['cbm_item'] = $cbm > 0 ? number_format(round($cbm, 3), 3, '.', '') : null;
                                             $items[$i]['container_display'] = $r['container_display'] ?? $label;
                                         }
@@ -866,11 +866,11 @@ class ShipmentResource extends Resource
                                     ->getSearchResultsUsing(function (string $search) {
                                         return Voyage::with(['vessel', 'pol', 'pod'])
                                             ->where('voyage_no', 'ilike', "%{$search}%")
-                                            ->orWhereHas('vessel', fn($q) => $q->where('name', 'ilike', "%{$search}%"))
-                                            ->orWhereHas('pol', fn($q) => $q
+                                            ->orWhereHas('vessel', fn($query) => $query->where('name', 'ilike', "%{$search}%"))
+                                            ->orWhereHas('pol', fn($query) => $query
                                                 ->where('code', 'ilike', "%{$search}%")
                                                 ->orWhere('name', 'ilike', "%{$search}%"))
-                                            ->orWhereHas('pod', fn($q) => $q
+                                            ->orWhereHas('pod', fn($query) => $query
                                                 ->where('code', 'ilike', "%{$search}%")
                                                 ->orWhere('name', 'ilike', "%{$search}%"))
                                             ->orderByDesc('etd')
@@ -1503,7 +1503,7 @@ class ShipmentResource extends Resource
 
                 Filter::make('in_progress')
                     ->label('Sedang Berjalan')
-                    ->query(fn(Builder $q) => $q->whereIn('status', array_map(fn($e) => $e->value, ShipmentStatus::inProgress())))
+                    ->query(fn(Builder $query) => $query->whereIn('status', array_map(fn($e) => $e->value, ShipmentStatus::inProgress())))
                     ->toggle(),
 
                 SelectFilter::make('service_type')

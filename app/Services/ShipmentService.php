@@ -156,56 +156,74 @@ class ShipmentService
     public function syncUnits(Shipment $shipment, array $units): array
     {
         $existing = $shipment->units()->get()->keyBy('id');
-        $keepIds = [];
-        $created = 0;
-        $updated = 0;
-        $deleted = 0;
+        $keepIds  = [];
+        $created  = 0;
+        $updated  = 0;
+        $deleted  = 0;
+
+        // Track whether at least one valid unit row was processed.
+        // Guards against blank-row-only submissions (e.g. the Repeater's
+        // afterStateHydrated default of [['qty'=>1]]) from nuking all
+        // existing units via the diff-delete logic below.
+        $hasAnyValidUnit = false;
 
         foreach ($units as $u) {
-            if (empty($u['model_no']) && empty($u['reg_no']) && empty($u['chassis_no'])
-                && empty($u['engine_no']) && empty($u['color']) && empty($u['do_number'])
-                && empty($u['notes']) && empty($u['qty'])
-            ) {
+            // Require at least one identifying field to treat the row as a real
+            // unit. Previously only `qty` was checked, and a blank row with
+            // qty=1 (the afterStateHydrated default) would pass the check and
+            // delete all existing units as a side-effect.
+            $hasIdentifier = ! empty($u['chassis_no'])
+                || ! empty($u['engine_no'])
+                || ! empty($u['model_no'])
+                || ! empty($u['reg_no']);
+
+            if (! $hasIdentifier) {
                 continue;
             }
 
+            $hasAnyValidUnit = true;
             $id = $u['id'] ?? null;
 
             if ($id && $existing->has($id)) {
                 $shipment->units()->whereKey($id)->update([
-                    'model_no' => $u['model_no'] ?? null,
-                    'reg_no' => $u['reg_no'] ?? null,
-                    'chassis_no' => $u['chassis_no'] ?? null,
-                    'engine_no' => $u['engine_no'] ?? null,
-                    'color' => $u['color'] ?? null,
-                    'do_number' => $u['do_number'] ?? null,
-                    'qty' => isset($u['qty']) ? (int) $u['qty'] : 1,
+                    'model_no'          => $u['model_no'] ?? null,
+                    'reg_no'            => $u['reg_no'] ?? null,
+                    'chassis_no'        => $u['chassis_no'] ?? null,
+                    'engine_no'         => $u['engine_no'] ?? null,
+                    'color'             => $u['color'] ?? null,
+                    'do_number'         => $u['do_number'] ?? null,
+                    'qty'               => isset($u['qty']) ? (int) $u['qty'] : 1,
                     'container_display' => $u['container_display'] ?? null,
-                    'notes' => $u['notes'] ?? null,
+                    'notes'             => $u['notes'] ?? null,
                 ]);
                 $keepIds[] = $id;
                 $updated++;
             } else {
                 $new = $shipment->units()->create([
-                    'model_no' => $u['model_no'] ?? null,
-                    'reg_no' => $u['reg_no'] ?? null,
-                    'chassis_no' => $u['chassis_no'] ?? null,
-                    'engine_no' => $u['engine_no'] ?? null,
-                    'color' => $u['color'] ?? null,
-                    'do_number' => $u['do_number'] ?? null,
-                    'qty' => isset($u['qty']) ? (int) $u['qty'] : 1,
+                    'model_no'          => $u['model_no'] ?? null,
+                    'reg_no'            => $u['reg_no'] ?? null,
+                    'chassis_no'        => $u['chassis_no'] ?? null,
+                    'engine_no'         => $u['engine_no'] ?? null,
+                    'color'             => $u['color'] ?? null,
+                    'do_number'         => $u['do_number'] ?? null,
+                    'qty'               => isset($u['qty']) ? (int) $u['qty'] : 1,
                     'container_display' => $u['container_display'] ?? null,
-                    'notes' => $u['notes'] ?? null,
+                    'notes'             => $u['notes'] ?? null,
                 ]);
                 $keepIds[] = $new->id;
                 $created++;
             }
         }
 
-        $deleteIds = $existing->keys()->diff($keepIds)->toArray();
-        if (! empty($deleteIds)) {
-            $shipment->units()->whereKey($deleteIds)->delete();
-            $deleted = count($deleteIds);
+        // Only run the delete diff if at least one valid unit was processed.
+        // If every submitted row was blank (no identifier), preserve the
+        // existing units untouched — do not destroy them.
+        if ($hasAnyValidUnit) {
+            $deleteIds = $existing->keys()->diff($keepIds)->toArray();
+            if (! empty($deleteIds)) {
+                $shipment->units()->whereKey($deleteIds)->delete();
+                $deleted = count($deleteIds);
+            }
         }
 
         return ['created' => $created, 'updated' => $updated, 'deleted' => $deleted];
