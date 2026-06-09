@@ -33,19 +33,23 @@ class FcKpiStats extends Widget
     {
         $base = $this->getSeaBaseQuery();
 
-        $assigned = (clone $base)->count();
+        // Aktif = pending, transit, hold only — delivered/cancelled excluded
+        $activeStatuses = [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value];
+
+        $aktif      = (clone $base)->whereNotIn('status', $activeStatuses)->count();
         $inProgress = (clone $base)->where('status', ShipmentStatus::Transit->value)->count();
-        $onHold = (clone $base)->where('status', ShipmentStatus::Hold->value)->count();
-        $urgent = (clone $base)
+        $onHold     = (clone $base)->where('status', ShipmentStatus::Hold->value)->count();
+        $urgent     = (clone $base)
             ->where('priority', 'urgent')
-            ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value])
+            ->whereNotIn('status', $activeStatuses)
             ->count();
+
+        // ETA Dekat: shipment dengan ETA yang terdefinisi (non-NULL) dan ≤ 24 jam ke depan
+        // Shipment tanpa ETA tidak dianggap ETA dekat
         $nearEta = (clone $base)
-            ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value])
-            ->where(function (Builder $q) {
-                $q->whereNull('eta')
-                    ->orWhere('eta', '<=', now()->addDay());
-            })
+            ->whereNotIn('status', $activeStatuses)
+            ->whereNotNull('eta')
+            ->where('eta', '<=', now()->addDay())
             ->count();
 
         return [
@@ -69,10 +73,10 @@ class FcKpiStats extends Widget
                 ->descriptionIcon('heroicon-m-truck')
                 ->color('info'),
 
-            Stat::make('Ditugaskan', $assigned)
-                ->description('Total shipment laut')
+            Stat::make('Aktif', $aktif)
+                ->description('Pending / transit / hold')
                 ->descriptionIcon('heroicon-m-clipboard-document-check')
-                ->color('gray'),
+                ->color($aktif > 0 ? 'primary' : 'gray'),
         ];
     }
 

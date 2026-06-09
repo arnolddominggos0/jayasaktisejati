@@ -11,30 +11,36 @@ class BackfillVoyage154Cities extends Command
                             {--dry-run : Tampilkan perubahan tanpa menyimpan ke database}
                             {--force  : Jalankan tanpa konfirmasi interaktif}';
 
-    protected $description = 'Backfill origin_city_id dan destination_city_id untuk 17 shipment Voyage 154 berdasarkan CSV tam_v154.csv';
+    protected $description = '[COMPLETED — one-time historical import, do not re-run] '
+        . 'Backfill origin_city_id dan destination_city_id untuk 17 unit Voyage 154 berdasarkan CSV tam_v154.csv. '
+        . 'Shipment codes were subsequently refactored from VOY154TTSTJKTMND-XXX to JSS0526SH-series (Part J).';
 
     /**
      * Chassis → Destination City (dari kolom "Destination City" CSV tam_v154.csv).
      * Source of truth: storage/imports/tam/may2026/tam_v154.csv
+     *
+     * NOTE: Shipment codes originally generated as VOY154TTSTJKTMND-XXX have been
+     * refactored to JSS0526SH0001–JSS0526SH0009 (9 shipments, 17 units, voyage_id=1).
+     * The sequence numbers below (No.1–No.17) are CSV row numbers, not shipment codes.
      */
     private const CHASSIS_TO_DEST_CITY = [
-        'MHKA6GJ6JTJ225699' => 'Manado',    // No.1  – VOY154TTSTJKTMND-001
-        'MHKAB1BA0TJ164766' => 'Manado',    // No.2  – VOY154TTSTJKTMND-002
-        'MHFA71BY8T0006467' => 'Bitung',    // No.3  – VOY154TTSTJKTMND-003
-        'MHFA71BY7T0006492' => 'Tomohon',   // No.4  – VOY154TTSTJKTMND-004
-        'MR0DB8CD4T0136453' => 'Lolak',     // No.5  – VOY154TTSTJKTMND-005
-        'MHKA6GJ6JTJ225706' => 'Bitung',    // No.6  – VOY154TTSTJKTMND-006
-        'MHFA71BY3T0006442' => 'Airmadidi', // No.7  – VOY154TTSTJKTMND-007
-        'MHFA71BY1T0006522' => 'Dumoga',    // No.8  – VOY154TTSTJKTMND-008
-        'MHKAB1BC9TJ084125' => 'Tendean',   // No.9  – VOY154TTSTJKTMND-009
-        'MHKAB1BC0TJ084126' => 'Tendean',   // No.10 – VOY154TTSTJKTMND-010
-        'MHKA6GK6JTJ090667' => 'Tendean',   // No.11 – VOY154TTSTJKTMND-011
-        'MHKA6GJ6JTJ226233' => 'Tendean',   // No.12 – VOY154TTSTJKTMND-012
-        'MHKE8FB3JTK120422' => 'Tendean',   // No.13 – VOY154TTSTJKTMND-013
-        'MHFA71BY8T0005772' => 'Tendean',   // No.14 – VOY154TTSTJKTMND-014
-        'MHFA71BYXT0006034' => 'Tendean',   // No.15 – VOY154TTSTJKTMND-015
-        'MHKA6GJ6JTJ226238' => 'Bitung',    // No.16 – VOY154TTSTJKTMND-016
-        'MR0AW9AA4T0344192' => 'Bitung',    // No.17 – VOY154TTSTJKTMND-017
+        'MHKA6GJ6JTJ225699' => 'Manado',    // CSV No.1  (Voyage 154, JSS0526SH-series)
+        'MHKAB1BA0TJ164766' => 'Manado',    // CSV No.2
+        'MHFA71BY8T0006467' => 'Bitung',    // CSV No.3
+        'MHFA71BY7T0006492' => 'Tomohon',   // CSV No.4
+        'MR0DB8CD4T0136453' => 'Lolak',     // CSV No.5
+        'MHKA6GJ6JTJ225706' => 'Bitung',    // CSV No.6
+        'MHFA71BY3T0006442' => 'Airmadidi', // CSV No.7
+        'MHFA71BY1T0006522' => 'Dumoga',    // CSV No.8
+        'MHKAB1BC9TJ084125' => 'Tendean',   // CSV No.9
+        'MHKAB1BC0TJ084126' => 'Tendean',   // CSV No.10
+        'MHKA6GK6JTJ090667' => 'Tendean',   // CSV No.11
+        'MHKA6GJ6JTJ226233' => 'Tendean',   // CSV No.12
+        'MHKE8FB3JTK120422' => 'Tendean',   // CSV No.13
+        'MHFA71BY8T0005772' => 'Tendean',   // CSV No.14
+        'MHFA71BYXT0006034' => 'Tendean',   // CSV No.15
+        'MHKA6GJ6JTJ226238' => 'Bitung',    // CSV No.16
+        'MR0AW9AA4T0344192' => 'Bitung',    // CSV No.17
     ];
 
     public function handle(): int
@@ -85,7 +91,7 @@ class BackfillVoyage154Cities extends Command
         // ─── Step 3: Load shipments V154 + units ───
         $shipmentRows = DB::table('shipments as s')
             ->join('units as u', 'u.shipment_id', '=', 's.id')
-            ->where('s.code', 'like', 'VOY154%')
+            ->where('s.voyage_id', 1)   // Voyage 154 (codes refactored to JSS0526SH-series)
             ->select(
                 's.id as shipment_id',
                 's.code',
@@ -249,7 +255,7 @@ class BackfillVoyage154Cities extends Command
         $this->newLine();
 
         $remaining = DB::table('shipments')
-            ->where('code', 'like', 'VOY154%')
+            ->where('voyage_id', 1)   // Voyage 154 (codes refactored to JSS0526SH-series)
             ->where(function ($q) {
                 $q->whereNull('origin_city_id')->orWhereNull('destination_city_id');
             })
@@ -257,7 +263,7 @@ class BackfillVoyage154Cities extends Command
 
         $cityDist = DB::table('shipments as s')
             ->join('cities as c', 'c.id', '=', 's.destination_city_id')
-            ->where('s.code', 'like', 'VOY154%')
+            ->where('s.voyage_id', 1)   // Voyage 154 (codes refactored to JSS0526SH-series)
             ->selectRaw('c.name as city_name, COUNT(*) as cnt')
             ->groupBy('c.name')
             ->orderByDesc('cnt')
@@ -269,7 +275,7 @@ class BackfillVoyage154Cities extends Command
         );
         $this->newLine();
 
-        $this->line(sprintf('  Total V154 shipment     : %d', DB::table('shipments')->where('code', 'like', 'VOY154%')->count()));
+        $this->line(sprintf('  Total V154 shipment     : %d', DB::table('shipments')->where('voyage_id', 1)->count()));
         $this->line(sprintf('  Berhasil di-update      : %d', $updated));
         $this->line(sprintf('  Remaining NULL city_id  : %d', $remaining));
         $this->newLine();

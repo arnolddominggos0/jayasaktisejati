@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ShipmentHistoryResource\Pages;
 
 use App\Enums\ShipmentStatus;
 use App\Filament\Resources\ShipmentHistoryResource;
+use App\Filament\Resources\ShipmentHistoryResource\Widgets\HistoryStatsWidget;
 use Filament\Actions;
 use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
@@ -18,6 +19,13 @@ class ListShipmentHistories extends ListRecords
         return [];
     }
 
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            HistoryStatsWidget::class,
+        ];
+    }
+
     public function getTitle(): string
     {
         return 'Riwayat Pengiriman';
@@ -25,6 +33,6 @@ class ListShipmentHistories extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Pengiriman yang sudah Terkirim atau Dibatalkan.';
+        return 'Arsip pengiriman yang sudah Terkirim atau Dibatalkan.';
     }
 }

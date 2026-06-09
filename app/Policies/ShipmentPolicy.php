@@ -2,89 +2,98 @@
 
 namespace App\Policies;
 
-use App\Models\Depot;
 use App\Models\Shipment;
 use App\Models\User;
+use App\Services\ShipmentOwnership;
 
 class ShipmentPolicy
 {
-
+    /**
+     * super_admin bypasses all checks.
+     */
     public function before(User $user, $ability)
     {
         if ($user->hasRole('super_admin')) {
             return true;
         }
+
         return null;
     }
 
+    /**
+     * Any user who can list shipments at all.
+     */
     public function viewAny(User $user): bool
     {
         return $user->hasAnyRole(['office_admin', 'field_coordinator']);
     }
 
+    /**
+     * View a single shipment.
+     *
+     * office_admin : same branch (unchanged)
+     * field_coordinator : Origin FC OR Destination FC, any phase, mode = sea
+     *
+     * Decoupled from update() — read-only access is now independent.
+     */
     public function view(User $user, Shipment $shipment): bool
     {
-        return $this->update($user, $shipment);
-    }
-
-    /**
-     * Print policy: FC may only print sea shipment documents.
-     * Other roles follow view/update scoping.
-     */
-    public function print(User $user, Shipment $shipment): bool
-    {
-        if ($user->hasRole('field_coordinator')) {
-            $mode = $shipment->mode?->value ?? (string) $shipment->mode;
-            if ($mode !== 'sea') {
-                return false;
-            }
-        }
-
-        return $this->view($user, $shipment);
-    }
-
-    public function create(User $user): bool
-    {
-        return $user->hasAnyRole(['super_admin', 'office_admin']);
-    }
-
-    public function update(User $user, Shipment $shipment): bool
-    {
         if ($user->hasRole('office_admin')) {
-            return is_null($shipment->branch_id) || $shipment->branch_id === $user->effectiveBranchId();
+            return is_null($shipment->branch_id)
+                || $shipment->branch_id === $user->effectiveBranchId();
         }
 
         if ($user->hasRole('field_coordinator')) {
-            $mode = $shipment->mode?->value ?? (string) $shipment->mode;
-            if ($mode !== 'sea') {
-                return false;
-            }
-
-            if ($shipment->branch_id !== $user->effectiveBranchId()) {
-                return false;
-            }
-
-            // Canonical scope check first
-            if ($user->scope_unit_type === 'depot' && $user->scope_unit_id && $shipment->assigned_depot_id === $user->scope_unit_id) {
-                return true;
-            }
-
-            // Fallback to legacy depot lookup or direct coordinator_id
-            $depotId = app()->bound('scope.depot_id')
-                ? app('scope.depot_id')
-                : Depot::where('coordinator_user_id', $user->id)->value('id');
-
-            if ($depotId && $shipment->assigned_depot_id === $depotId) {
-                return true;
-            }
-
-            return $shipment->coordinator_id === $user->id;
+            return ShipmentOwnership::canView($user, $shipment);
         }
 
         return false;
     }
 
+    /**
+     * Edit / track a shipment.
+     *
+     * office_admin : same branch (unchanged)
+     * field_coordinator : phase-gated ownership
+     *   pre_transfer  → Origin FC only  (Pickup … VesselDepart)
+     *   post_transfer → Destination FC only  (VesselArrival … Delivered)
+     */
+    public function update(User $user, Shipment $shipment): bool
+    {
+        if ($user->hasRole('office_admin')) {
+            return is_null($shipment->branch_id)
+                || $shipment->branch_id === $user->effectiveBranchId();
+        }
 
+        if ($user->hasRole('field_coordinator')) {
+            return ShipmentOwnership::canEdit($user, $shipment);
+        }
+
+        return false;
+    }
+
+    /**
+     * Print documents (waybill, packing list, resi).
+     *
+     * Delegates to view() — any FC who can see the shipment can print its documents.
+     * Previously delegated through view() → update(), which blocked read-only observers.
+     */
+    public function print(User $user, Shipment $shipment): bool
+    {
+        return $this->view($user, $shipment);
+    }
+
+    /**
+     * Create is admin-only.
+     */
+    public function create(User $user): bool
+    {
+        return $user->hasAnyRole(['super_admin', 'office_admin']);
+    }
+
+    /**
+     * Delete follows update rules.
+     */
     public function delete(User $user, Shipment $shipment): bool
     {
         return $this->update($user, $shipment);

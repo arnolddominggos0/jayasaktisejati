@@ -7,6 +7,7 @@ use App\Models\Voyage;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists\Infolist;
+use App\Enums\CargoType;
 use Filament\Infolists\Components\{Section, TextEntry, IconEntry, ViewEntry};
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -59,26 +60,41 @@ class ViewShipmentHistory extends ViewRecord
         $record = $this->record;
 
         return [
+            // ── Print documents ───────────────────────────────────────────
             Action::make('print_resi')
                 ->label('Cetak Resi')
-                ->icon('heroicon-o-printer')
+                ->icon('heroicon-o-document-text')
+                ->color('gray')
                 ->url(route('shipments.resi', ['shipment' => $record->id]) . '?download=1')
                 ->openUrlInNewTab(),
 
-            Action::make('timeline')
-                ->label('Kelola Timeline')
-                ->icon('heroicon-o-sparkles')
-                ->color('primary')
-                ->url(\App\Filament\Resources\ShipmentTrackingResource::getUrl('manage', ['record' => $record]))
-                ->visible(fn() => auth_user()?->hasRole('super_admin') === true),
+            Action::make('print_waybill')
+                ->label('Cetak Waybill')
+                ->icon('heroicon-o-printer')
+                ->color('gray')
+                ->url(route('shipments.print.waybill', $record))
+                ->openUrlInNewTab(),
 
-            Action::make('edit')
-                ->label('Edit')
+            Action::make('print_packing')
+                ->label('Packing List')
+                ->icon('heroicon-o-clipboard-document-list')
+                ->color('gray')
+                ->url(route('shipments.print.packing', $record))
+                ->openUrlInNewTab(),
+
+            // ── Super Admin ───────────────────────────────────────────────
+            // Note: ShipmentTrackingResource scopes out delivered/cancelled records,
+            // so "manage" route returns 404 for historical shipments.
+            // Tracking timeline is available inline on this page.
+            // Super Admin can still edit tracks via "Koreksi Data" → ShipmentResource edit.
+            Action::make('correction')
+                ->label('Koreksi Data')
                 ->icon('heroicon-o-pencil-square')
                 ->color('warning')
                 ->url(\App\Filament\Resources\ShipmentResource::getUrl('edit', ['record' => $record]))
                 ->visible(fn() => auth_user()?->hasRole('super_admin') === true),
 
+            // ── Utility ───────────────────────────────────────────────────
             Action::make('copy_link')
                 ->label('Salin Link')
                 ->icon('heroicon-o-link')
@@ -129,11 +145,50 @@ class ViewShipmentHistory extends ViewRecord
 
         return $infolist->schema([
 
-            // ── Identitas ─────────────────────────────────────────────────
-            Section::make('Identitas')->columns(3)->schema([
-                TextEntry::make('code')->label('Kode')->copyable()->extraAttributes(['class' => 'font-mono']),
-                TextEntry::make('customer.name')->label('Pengirim'),
-                TextEntry::make('receiver.name')->label('Penerima'),
+            // ── Ringkasan Arsip ───────────────────────────────────────────
+            Section::make('Ringkasan Arsip')->columns(4)->schema([
+                TextEntry::make('code')
+                    ->label('No. Pengiriman')
+                    ->copyable()
+                    ->badge()
+                    ->extraAttributes(['class' => 'font-mono'])
+                    ->columnSpan(2),
+
+                TextEntry::make('status')
+                    ->label('Status Akhir')
+                    ->badge()
+                    ->color(fn($state) => ($state?->label() ?? $state) === 'Terkirim' ? 'success' : 'danger')
+                    ->formatStateUsing(fn($state) => $state?->label() ?? (string)$state),
+
+                TextEntry::make('completed_at_display')
+                    ->label('Tanggal Selesai')
+                    ->state(function ($record) use ($trackTime) {
+                        if ($record->status?->value === 'delivered') {
+                            return $record->delivered_at ?: $trackTime($record, ['delivered'], 'desc');
+                        }
+                        if ($record->status?->value === 'cancelled') {
+                            return $record->cancelled_at ?: $trackTime($record, ['cancelled'], 'desc');
+                        }
+                        return null;
+                    })
+                    ->dateTime('d M Y H:i')
+                    ->placeholder('—'),
+
+                TextEntry::make('customer.name')->label('Pengirim')->columnSpan(2),
+                TextEntry::make('receiver.name')->label('Penerima')->columnSpan(2),
+
+                TextEntry::make('voyage_archive')
+                    ->label('Voyage (Booking)')
+                    ->state(fn($record) => data_get($record->getAttributes(), 'voyage') ?? '—')
+                    ->placeholder('—')
+                    ->columnSpan(2),
+
+                TextEntry::make('route_archive')
+                    ->label('Rute')
+                    ->state(fn($record) =>
+                        ($record->originCity?->name ?? '—') . ' → ' . ($record->destinationCity?->name ?? '—')
+                    )
+                    ->columnSpan(2),
             ]),
 
             // ── Rute & Moda ───────────────────────────────────────────────
@@ -530,6 +585,36 @@ class ViewShipmentHistory extends ViewRecord
                     )
                     ->placeholder('—'),
             ]),
+
+            // ── Unit Kendaraan ────────────────────────────────────────────
+            Section::make('Unit Kendaraan')
+                ->description('Daftar unit yang dikirim dalam SPPB ini. Read-only arsip.')
+                ->icon('heroicon-m-truck')
+                ->visible(fn($record) =>
+                    ($record->cargo_type?->value ?? $record->cargo_type) === CargoType::Vehicle->value
+                    && $record->units()->exists()
+                )
+                ->schema([
+                    ViewEntry::make('vehicle_units')
+                        ->label('')
+                        ->view('filament.infolists.history-units')
+                        ->state(fn($record) => $record->units()->orderBy('id')->get())
+                        ->columnSpanFull(),
+                ]),
+
+            // ── Tracking Timeline ─────────────────────────────────────────
+            Section::make('Tracking Timeline')
+                ->description('Kronologi status pengiriman dari awal hingga selesai.')
+                ->icon('heroicon-m-map-pin')
+                ->collapsible()
+                ->collapsed(false)
+                ->schema([
+                    ViewEntry::make('tracking_events')
+                        ->label('')
+                        ->view('filament.infolists.history-timeline')
+                        ->state(fn($record) => $record->tracks()->orderBy('tracked_at')->get())
+                        ->columnSpanFull(),
+                ]),
 
             // ── Lampiran ──────────────────────────────────────────────────
             Section::make('Lampiran')->schema([

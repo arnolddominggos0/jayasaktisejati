@@ -39,7 +39,7 @@ class MonitoringKapalTam extends Page
 {
     protected static string $view = 'filament.pages.monitoring-kapal-tam';
     protected static ?string $navigationIcon = 'heroicon-o-globe-alt';
-    protected static ?string $navigationGroup = 'Monitoring Vessel';
+    protected static ?string $navigationGroup = 'Manajemen Kapal';
     protected static ?int $navigationSort = 1;
 
     public string $period;

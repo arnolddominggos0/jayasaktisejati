@@ -24,7 +24,7 @@ class ShipmentTrackingResource extends Resource
 {
     protected static ?string $model = Shipment::class;
 
-    protected static ?string $navigationGroup = 'Transaksi';
+    protected static ?string $navigationGroup = 'Pengiriman';
 
     protected static ?string $navigationLabel = 'Pelacakan & Monitoring';
 

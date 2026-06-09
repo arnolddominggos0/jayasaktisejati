@@ -360,7 +360,7 @@
                             <div>
                                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Dwelling</p>
                                 <p class="text-lg font-bold text-gray-900">
-                                    {{ number_format($tamLeadTime['avg_days']['dwelling'] ?? 0, 1) }} <span
+                                    {{ $tamLeadTime['avg_days']['dwelling'] ?? 0 }} <span
                                         class="text-xs font-normal text-gray-500">/ {{ $tamTargets['dwelling'] }}
                                         Hari</span>
                                 </p>
@@ -378,7 +378,7 @@
                             <div>
                                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Sailing</p>
                                 <p class="text-lg font-bold text-gray-900">
-                                    {{ number_format($tamLeadTime['avg_days']['sailing'] ?? 0, 1) }} <span
+                                    {{ $tamLeadTime['avg_days']['sailing'] ?? 0 }} <span
                                         class="text-xs font-normal text-gray-500">/ {{ $tamTargets['sailing'] }}
                                         Hari</span>
                                 </p>
@@ -397,7 +397,7 @@
                             <div>
                                 <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Dooring</p>
                                 <p class="text-lg font-bold text-gray-900">
-                                    {{ number_format($tamLeadTime['avg_days']['dooring'] ?? 0, 1) }} <span
+                                    {{ $tamLeadTime['avg_days']['dooring'] ?? 0 }} <span
                                         class="text-xs font-normal text-gray-500">/ {{ $tamTargets['dooring'] }}
                                         Hari</span>
                                 </p>
@@ -430,7 +430,7 @@
                                             @if ($row['dw'] !== null)
                                             <span
                                                 class="px-2 py-1 {{ getStatusColor($row['dw'], $tamTargets['dwelling']) }}">
-                                                {{ number_format($row['dw'], 2) }}
+                                                {{ $row['dw'] }}
                                             </span>
                                             @else
                                             <span class="text-gray-400">—</span>
@@ -440,7 +440,7 @@
                                             @if ($row['sl'] !== null)
                                             <span
                                                 class="px-2 py-1 {{ getStatusColor($row['sl'], $tamTargets['sailing']) }}">
-                                                {{ number_format($row['sl'], 2) }}
+                                                {{ $row['sl'] }}
                                             </span>
                                             @else
                                             <span class="text-gray-400">—</span>
@@ -450,7 +450,7 @@
                                             @if ($row['dr'] !== null)
                                             <span
                                                 class="px-2 py-1 {{ getStatusColor($row['dr'], $tamTargets['dooring']) }}">
-                                                {{ number_format($row['dr'], 2) }}
+                                                {{ $row['dr'] }}
                                             </span>
                                             @else
                                             <span class="text-gray-400">—</span>

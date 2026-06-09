@@ -46,33 +46,11 @@
         </div>
     </div>
 
-    {{-- SECTION 1: Operational Readiness --}}
-    <div class="mb-6">
-        <x-filament-widgets::widgets
-            :widgets="[\App\Filament\FC\Widgets\FcOperationalReadiness::class]"
-            :columns="1"
-        />
-    </div>
-
-    {{-- SECTION 2: MP Roster --}}
-    <div class="mb-6">
-        <div class="mb-2 flex items-center gap-2 px-1">
-            <x-heroicon-o-user-group class="h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <span
-                class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Manpower</span>
-        </div>
-        <x-filament-widgets::widgets
-            :widgets="[\App\Filament\FC\Widgets\FcTodayManpower::class]"
-            :columns="1"
-        />
-    </div>
-
-    {{-- SECTION 3: Shipment Monitoring --}}
+    {{-- SECTION 1: Shipment Monitoring --}}
     <div class="mb-6">
         <div class="mb-2 flex items-center gap-2 px-1">
             <x-heroicon-o-truck class="h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <span
-                class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Pengiriman</span>
+            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Pengiriman</span>
         </div>
         <div class="space-y-4">
             <x-filament-widgets::widgets
@@ -85,12 +63,11 @@
         </div>
     </div>
 
-    {{-- SECTION 4: Activity & Trends --}}
+    {{-- SECTION 2: Activity & Trends --}}
     <div class="space-y-4">
         <div class="mb-2 flex items-center gap-2 px-1">
             <x-heroicon-o-chart-bar class="h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <span
-                class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Aktivitas</span>
+            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Aktivitas</span>
         </div>
         <x-filament-widgets::widgets
             :widgets="[

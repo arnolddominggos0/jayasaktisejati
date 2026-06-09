@@ -57,6 +57,8 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 Widgets\AccountWidget::class,
                 Widgets\FilamentInfoWidget::class,
+                // Resource-scoped widgets (outside auto-discovery path)
+                \App\Filament\Resources\ShipmentHistoryResource\Widgets\HistoryStatsWidget::class,
             ])
             ->navigationGroups([
                 NavigationGroup::make('Operasional')->collapsible(),
