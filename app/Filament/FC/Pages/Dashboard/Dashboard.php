@@ -155,7 +155,7 @@ class Dashboard extends Page
         }
 
         $status = $session->mp_check_status;
-        $isReady = in_array($status?->value, ['cleared', 'approved'], true);
+        $isReady = $status?->value === 'cleared';
 
         return [
             'label' => $isReady ? 'Operasional: SIAP' : 'Operasional: BELUM SIAP',

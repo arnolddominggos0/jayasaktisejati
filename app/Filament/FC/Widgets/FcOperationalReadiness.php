@@ -3,6 +3,7 @@
 namespace App\Filament\FC\Widgets;
 
 use App\Enums\MPCheckStatus;
+use App\Filament\FC\Resources\BriefingSessionResource;
 use App\Models\BriefingSession;
 use Filament\Facades\Filament;
 use Filament\Widgets\Widget;
@@ -45,7 +46,7 @@ class FcOperationalReadiness extends Widget
         $statusLabel = $status instanceof MPCheckStatus ? $status->label() : ucfirst((string) $status);
         $statusColor = $status instanceof MPCheckStatus ? $status->color() : 'gray';
 
-        $isReady = in_array($status?->value, ['cleared', 'approved'], true);
+        $isReady = $status?->value === 'cleared';
 
         $state = $isReady ? 'ready' : 'not_ready';
 
@@ -74,20 +75,21 @@ class FcOperationalReadiness extends Widget
             $issues[] = 'Status pemeriksaan: ' . $statusLabel;
         }
         return [
-            'session' => $session,
-            'state' => $state,
-            'statusLabel' => $statusLabel,
-            'statusColor' => $statusColor,
-            'isReady' => $isReady,
-            'kebutuhan' => $kebutuhan,
-            'hadir' => $hadir,
-            'fit' => $fit,
-            'unfit' => $unfit,
-            'recheck' => $recheck,
-            'apdTotal' => $apdTotal,
-            'apdKurang' => $apdKurang,
-            'issues' => $issues,
-            'mpPercent' => $kebutuhan > 0 ? min(100, (int) round(($hadir / $kebutuhan) * 100)) : 0,
+            'session'           => $session,
+            'state'             => $state,
+            'statusLabel'       => $statusLabel,
+            'statusColor'       => $statusColor,
+            'isReady'           => $isReady,
+            'kebutuhan'         => $kebutuhan,
+            'hadir'             => $hadir,
+            'fit'               => $fit,
+            'unfit'             => $unfit,
+            'recheck'           => $recheck,
+            'apdTotal'          => $apdTotal,
+            'apdKurang'         => $apdKurang,
+            'issues'            => $issues,
+            'mpPercent'         => $kebutuhan > 0 ? min(100, (int) round(($hadir / $kebutuhan) * 100)) : 0,
+            'createBriefingUrl' => BriefingSessionResource::getUrl('create'),
         ];
     }
 
@@ -118,20 +120,21 @@ class FcOperationalReadiness extends Widget
     protected function emptyData(): array
     {
         return [
-            'session' => null,
-            'state' => 'no_session',
-            'statusLabel' => 'Belum Ada Briefing',
-            'statusColor' => 'gray',
-            'isReady' => false,
-            'kebutuhan' => 0,
-            'hadir' => 0,
-            'fit' => 0,
-            'unfit' => 0,
-            'recheck' => 0,
-            'apdTotal' => 0,
-            'apdKurang' => 0,
-            'issues' => ['Belum ada sesi briefing hari ini'],
-            'mpPercent' => 0,
+            'session'           => null,
+            'state'             => 'no_session',
+            'statusLabel'       => 'Belum Ada Briefing',
+            'statusColor'       => 'gray',
+            'isReady'           => false,
+            'kebutuhan'         => 0,
+            'hadir'             => 0,
+            'fit'               => 0,
+            'unfit'             => 0,
+            'recheck'           => 0,
+            'apdTotal'          => 0,
+            'apdKurang'         => 0,
+            'issues'            => ['Belum ada sesi briefing hari ini'],
+            'mpPercent'         => 0,
+            'createBriefingUrl' => BriefingSessionResource::getUrl('create'),
         ];
     }
 }

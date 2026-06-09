@@ -169,9 +169,25 @@ class AppSheetService
                 $mappedData
             ),
 
-            'delete' => BriefingSession::where('date', $date)
-                ->where('depot_id', $depotId)
-                ->delete(),
+            'delete' => (function () use ($date, $depotId) {
+                $session = BriefingSession::where('date', $date)
+                    ->where('depot_id', $depotId)
+                    ->first();
+
+                if (! $session) {
+                    return 0;
+                }
+
+                // Cleared sessions represent completed MP checks — guard against
+                // accidental deletion via AppSheet webhook after operations start.
+                if ($session->mp_check_status === MPCheckStatus::Cleared) {
+                    throw new Exception(
+                        "Briefing {$date} di depot {$depotId} sudah berstatus Cleared dan tidak dapat dihapus melalui AppSheet."
+                    );
+                }
+
+                return $session->delete();
+            })(),
 
             default => throw new Exception("Unknown operation: {$operation}"),
         };
@@ -656,26 +672,21 @@ class AppSheetService
 
         $required = (int) $session->summary_headcount;
 
-        $session->summary_sufficient =
-            $fitCount >= $required;
+        // Refresh factual headcount flag.
+        $session->summary_sufficient = $fitCount >= $required;
 
+        // Recalculate operational status based on live data.
         // pending operational
         if ($session->pending_activity) {
+            $session->mp_check_status = MPCheckStatus::WaitingAction;
 
-            $session->mp_check_status =
-                MPCheckStatus::WaitingAction;
-
-            // manpower kurang
+        // manpower kurang
         } elseif ($fitCount < $required) {
+            $session->mp_check_status = MPCheckStatus::OnCheck;
 
-            $session->mp_check_status =
-                MPCheckStatus::OnCheck;
-
-            // siap operasional
+        // siap operasional
         } else {
-
-            $session->mp_check_status =
-                MPCheckStatus::Cleared;
+            $session->mp_check_status = MPCheckStatus::Cleared;
         }
 
         $session->saveQuietly();
