@@ -18,17 +18,49 @@
 
 use Carbon\Carbon;
 
-// ── Build draft index dari snapshot ────────────────────────────────────────
-$draftSnapshot   = $record->draftSnapshot();
-$finalSnapshot   = $record->finalSnapshot();
-$hasDraftSnapshot = $draftSnapshot !== null;
+$historyRows = $items->map(function ($item) {
 
-$draftMap = [];
-if ($draftSnapshot) {
-    foreach ($draftSnapshot->schedule_payload ?? [] as $row) {
-        $draftMap[$row['item_id']] = $row;
-    }
-}
+    $voyage = $item->voyage;
+
+    $histories = $voyage?->scheduleHistories ?? collect();
+
+    $draft  = $histories->firstWhere('schedule_type', 'draft');
+    $final  = $histories->firstWhere('schedule_type', 'final');
+    $actual = $histories->firstWhere('schedule_type', 'actual');
+
+    return [
+        'vessel' => $item->vessel?->name,
+        'voyage_no' => $item->voyage_no,
+
+        'draft_etd' => $draft?->etd?->format('d M Y'),
+        'draft_eta' => $draft?->eta?->format('d M Y'),
+
+        'final_etd' => $final?->etd?->format('d M Y'),
+        'final_eta' => $final?->eta?->format('d M Y'),
+
+        'actual_atd' => $actual?->etd?->format('d M Y'),
+        'actual_ata' => $actual?->eta?->format('d M Y'),
+
+        'draft_sailing' => $draft?->sailing_days,
+        'final_sailing' => $final?->sailing_days,
+        'actual_sailing' => $actual?->sailing_days,
+
+        'delta_df' => \App\Models\VoyageScheduleHistory::sailingVariance(
+            $draft,
+            $final
+        ),
+
+        'delta_fa' => \App\Models\VoyageScheduleHistory::sailingVariance(
+            $final,
+            $actual
+        ),
+
+        'delta_da' => \App\Models\VoyageScheduleHistory::sailingVariance(
+            $draft,
+            $actual
+        ),
+    ];
+});
 
 // ── Build history rows ──────────────────────────────────────────────────────
 $historyRows = $items->map(function ($item) use ($draftMap) {
@@ -150,14 +182,6 @@ $deltaLabel = function (?int $d, bool $short = false): array {
             @endif
         </div>
     </div>
-
-    @if (! $hasDraftSnapshot)
-    <div class="rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-        <span class="font-semibold">Draft snapshot belum tersedia.</span>
-        Kolom Draft akan kosong. Data akan terisi ketika draft vessel plan dikirim ke customer.
-        Untuk backfill data historis, jalankan seeder yang sesuai.
-    </div>
-    @endif
 
     {{-- History Table --}}
     @if (count($historyRows) === 0)
