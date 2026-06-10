@@ -5,6 +5,7 @@ namespace App\Filament\Resources\VesselPlanResource\Pages;
 use App\Enums\VesselPlanStatus;
 use App\Filament\Resources\VesselPlanResource;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanAnalysis;
+use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanScheduleAnalysis;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanReviewHistory;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
@@ -15,9 +16,10 @@ class EditVesselPlan extends EditRecord
 {
     protected static string $resource = VesselPlanResource::class;
 
+    // 1. Evaluasi Risiko Jadwal — above the form
     protected function getHeaderWidgets(): array
     {
-        return [VesselPlanAnalysis::class, VesselPlanReviewHistory::class];
+        return [VesselPlanAnalysis::class];
     }
 
     public function getHeaderWidgetsColumns(): int
@@ -25,6 +27,16 @@ class EditVesselPlan extends EditRecord
         return 1;
     }
 
+    // 3. Analisa Jadwal Kapal  4. Riwayat Review — below the form
+    protected function getFooterWidgets(): array
+    {
+        return [VesselPlanScheduleAnalysis::class, VesselPlanReviewHistory::class];
+    }
+
+    public function getFooterWidgetsColumns(): int
+    {
+        return 1;
+    }
 
     protected function getHeaderActions(): array
     {
@@ -33,18 +45,11 @@ class EditVesselPlan extends EditRecord
                 ->label('Kirim ke TAM (WhatsApp)')
                 ->icon('heroicon-o-paper-airplane')
                 ->color('primary')
-                ->visible(
-                    fn() =>
-                    $this->record->isEditable()
-                )
-                ->disabled(
-                    fn() =>
-                    ! $this->record->canSubmitDraft()
-                )
+                ->visible(fn() => $this->record->isEditable())
+                ->disabled(fn() => ! $this->record->canSubmitDraft())
                 ->tooltip(fn() => $this->submitDraftDisabledReason())
                 ->requiresConfirmation()
                 ->action(function () {
-
                     $this->record->submitDraft(auth()->id());
 
                     Notification::make()
@@ -54,7 +59,6 @@ class EditVesselPlan extends EditRecord
                         ->send();
 
                     $waUrl = $this->record->waUrl();
-
                     if ($waUrl) {
                         $this->redirect($waUrl);
                     }
@@ -64,13 +68,9 @@ class EditVesselPlan extends EditRecord
                 ->label('Setujui & Finalisasi')
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
-                ->visible(
-                    fn() =>
-                    $this->record->isSent()
-                )
+                ->visible(fn() => $this->record->isSent())
                 ->requiresConfirmation()
                 ->action(function () {
-
                     $count = $this->record->finalizeSchedule(auth()->id());
 
                     Notification::make()
@@ -84,10 +84,7 @@ class EditVesselPlan extends EditRecord
                 ->label('Tolak / Kembalikan')
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
-                ->visible(
-                    fn() =>
-                    $this->record->isSent()
-                )
+                ->visible(fn() => $this->record->isSent())
                 ->form([
                     Textarea::make('reason')
                         ->label('Alasan Penolakan')
@@ -96,11 +93,7 @@ class EditVesselPlan extends EditRecord
                 ])
                 ->requiresConfirmation()
                 ->action(function ($record, array $data) {
-
-                    $record->reject(
-                        $data['reason'],
-                        auth()->id()
-                    );
+                    $record->reject($data['reason'], auth()->id());
 
                     Notification::make()
                         ->title('Vessel Plan Ditolak')
@@ -111,15 +104,11 @@ class EditVesselPlan extends EditRecord
             Action::make('hapus')
                 ->label('Hapus Vessel Plan')
                 ->color('danger')
-                ->visible(
-                    fn() =>
-                    $this->record->isDraft()
-                )
+                ->visible(fn() => $this->record->isDraft())
                 ->requiresConfirmation()
                 ->action(fn() => $this->record->delete()),
         ];
     }
-
 
     protected function submitDraftDisabledReason(): string
     {
@@ -141,10 +130,10 @@ class EditVesselPlan extends EditRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         if ($this->record->isRevision()) {
-            $data['status'] = VesselPlanStatus::Draft;
+            $data['status']          = VesselPlanStatus::Draft;
             $data['feedback_reason'] = null;
-            $data['feedback_by'] = null;
-            $data['feedback_at'] = null;
+            $data['feedback_by']     = null;
+            $data['feedback_at']     = null;
         }
 
         return $data;
