@@ -279,42 +279,6 @@
         </div>
     </div>
 
-    {{-- ══════════════════════════════════════════════════════════════════════
-         SECTION 4 — Pengiriman Harian
-    ══════════════════════════════════════════════════════════════════════ --}}
-    <div class="mb-6">
-        <div class="mb-2 flex items-center gap-2 px-1">
-            <x-heroicon-o-truck class="h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                Pengiriman
-            </span>
-        </div>
-        <x-filament-widgets::widgets
-            :widgets="[
-                \App\Filament\FC\Widgets\FcKpiStats::class,
-                \App\Filament\FC\Widgets\FcAttentionList::class,
-            ]"
-            :columns="1"
-        />
-    </div>
 
-    {{-- ══════════════════════════════════════════════════════════════════════
-         SECTION 5 — Aktivitas & Tren
-    ══════════════════════════════════════════════════════════════════════ --}}
-    <div>
-        <div class="mb-2 flex items-center gap-2 px-1">
-            <x-heroicon-o-chart-bar class="h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                Aktivitas
-            </span>
-        </div>
-        <x-filament-widgets::widgets
-            :widgets="[
-                \App\Filament\FC\Widgets\FcStatusChart::class,
-                \App\Filament\FC\Widgets\FcRecentActivities::class,
-            ]"
-            :columns="1"
-        />
-    </div>
 
 </x-filament-panels::page>

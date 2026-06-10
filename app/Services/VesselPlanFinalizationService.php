@@ -6,6 +6,7 @@ use App\Enums\VesselPlanStatus;
 use App\Models\VesselPlan;
 use App\Models\VesselPlanItem;
 use App\Models\Voyage;
+use App\Models\VoyageScheduleHistory;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -31,10 +32,17 @@ class VesselPlanFinalizationService
                 'created_by' => $userId,
             ]);
 
+            // Ambil draft snapshot payload untuk merekonstruksi Draft Schedule per voyage
+            $draftPayload = $this->buildDraftScheduleIndex($plan);
+
             $count = 0;
 
             foreach ($plan->items()->with('voyage')->orderBy('planned_etd')->get() as $item) {
-                $this->syncVoyage($plan, $item);
+                $voyage = $this->syncVoyage($plan, $item);
+
+                // Simpan Schedule History: draft + final
+                $this->recordScheduleHistory($voyage, $item, $draftPayload, $userId);
+
                 $count++;
             }
 
@@ -60,6 +68,93 @@ class VesselPlanFinalizationService
 
             return $count;
         });
+    }
+
+    /**
+     * Bangun index ETD/ETA dari draft_submitted snapshot, di-key by item_id.
+     *
+     * @return array<int, array{planned_etd: string|null, planned_eta: string|null, captured_at: string|null}>
+     */
+    protected function buildDraftScheduleIndex(VesselPlan $plan): array
+    {
+        $draftSnapshot = $plan->draftSnapshot();
+
+        if (! $draftSnapshot) {
+            return [];
+        }
+
+        $capturedAt  = $draftSnapshot->created_at?->toIso8601String();
+        $payload     = $draftSnapshot->schedule_payload ?? [];
+
+        return collect($payload)
+            ->keyBy('item_id')
+            ->map(fn ($row) => [
+                'planned_etd'  => $row['planned_etd']  ?? null,
+                'planned_eta'  => $row['planned_eta']  ?? null,
+                'captured_at'  => $capturedAt,
+            ])
+            ->all();
+    }
+
+    /**
+     * Upsert voyage_schedule_histories untuk 'draft' dan 'final'.
+     *
+     * draft  = ETD/ETA dari draft_submitted snapshot, sailing_days dihitung dari sana.
+     * final  = ETD/ETA voyage setelah finalisasi, sailing_days dari voyage.etd→eta.
+     *
+     * updateOrCreate agar re-finalisasi (revisi → final ulang) tidak duplikasi.
+     * Jika final sudah ada dan ETD/ETA berubah, sailing_days ikut di-update.
+     */
+    protected function recordScheduleHistory(
+        Voyage         $voyage,
+        VesselPlanItem $item,
+        array          $draftIndex,
+        int            $userId
+    ): void {
+        $actorName    = optional(\App\Models\User::find($userId))->name ?? 'System';
+        $finalizedAt  = now();
+
+        // ── Draft Schedule ──────────────────────────────────────────────────
+        $draftRow = $draftIndex[$item->id] ?? null;
+
+        if ($draftRow && ($draftRow['planned_etd'] || $draftRow['planned_eta'])) {
+            VoyageScheduleHistory::updateOrCreate(
+                [
+                    'voyage_id'     => $voyage->id,
+                    'schedule_type' => 'draft',
+                ],
+                [
+                    'etd'          => $draftRow['planned_etd'],
+                    'eta'          => $draftRow['planned_eta'],
+                    'sailing_days' => VoyageScheduleHistory::calcSailingDays(
+                        $draftRow['planned_etd'],
+                        $draftRow['planned_eta']
+                    ),
+                    'notes'        => 'Draft schedule — jadwal awal sebelum persetujuan TAM',
+                    'captured_at'  => $draftRow['captured_at'] ?? $finalizedAt,
+                    'captured_by'  => $actorName,
+                ]
+            );
+        }
+
+        // ── Final Schedule ──────────────────────────────────────────────────
+        VoyageScheduleHistory::updateOrCreate(
+            [
+                'voyage_id'     => $voyage->id,
+                'schedule_type' => 'final',
+            ],
+            [
+                'etd'          => $voyage->etd,
+                'eta'          => $voyage->eta,
+                'sailing_days' => VoyageScheduleHistory::calcSailingDays(
+                    $voyage->etd,
+                    $voyage->eta
+                ),
+                'notes'        => 'Final schedule — disetujui dan difinalisasi oleh TAM',
+                'captured_at'  => $finalizedAt,
+                'captured_by'  => $actorName,
+            ]
+        );
     }
 
     protected function syncVoyage(VesselPlan $plan, VesselPlanItem $item): Voyage

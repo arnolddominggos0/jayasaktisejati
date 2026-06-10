@@ -14,4 +14,17 @@ class ViewVesselPlan extends ViewRecord
     {
         return [VesselPlanAnalysis::class];
     }
+
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        // Eager load semua relasi yang dibutuhkan oleh 3 tab
+        $this->record->loadMissing([
+            'items.vessel',
+            'items.shippingLine',
+            'items.voyage',
+            'snapshots',        // untuk draftSnapshot() & finalSnapshot() tanpa query ulang
+        ]);
+    }
 }

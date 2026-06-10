@@ -10,6 +10,7 @@ use App\Services\OperationalDaysHelper;
 use App\Services\SlaEvaluator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Voyage extends Model
@@ -111,6 +112,26 @@ class Voyage extends Model
 
             if ($voyage->atd_at && $voyage->ata_at) {
                 SlaEvaluator::evaluateVoyage($voyage);
+
+                // Auto-save 'actual' schedule history ketika ATD & ATA tersedia.
+                // updateOrCreate agar tidak duplikasi jika voyage di-update ulang.
+                VoyageScheduleHistory::updateOrCreate(
+                    [
+                        'voyage_id'     => $voyage->id,
+                        'schedule_type' => 'actual',
+                    ],
+                    [
+                        'etd'          => $voyage->atd_at,
+                        'eta'          => $voyage->ata_at,
+                        'sailing_days' => VoyageScheduleHistory::calcSailingDays(
+                            $voyage->atd_at,
+                            $voyage->ata_at
+                        ),
+                        'notes'        => 'Actual — diambil dari ATD/ATA voyage',
+                        'captured_at'  => now(),
+                        'captured_by'  => optional(auth_user())->name ?? 'System',
+                    ]
+                );
             }
 
             if ($voyage->eta) {
@@ -177,6 +198,95 @@ class Voyage extends Model
     public function delayLogs(): HasMany
     {
         return $this->hasMany(VoyageDelayLog::class);
+    }
+
+    public function scheduleHistories(): HasMany
+    {
+        return $this->hasMany(VoyageScheduleHistory::class)->orderBy('schedule_type');
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Schedule Analysis — Vessel Plan (murni dari ETD/ETA, standar TAM)
+    //
+    // Standar TAM:
+    //   Dwelling  = 6 hari  (konstanta — tidak dihitung, selalu 6)
+    //   Sailing   = eta - etd (satu-satunya variabel)
+    //   Dooring   = 3 hari  (konstanta — tidak dihitung, selalu 3)
+    //   Lead Time = 6 + sailing + 3
+    //   Standard  = 19 hari
+    //   Variance  = lead_time - 19
+    // ──────────────────────────────────────────────────────────────────────
+
+    const TAM_DWELLING_STANDARD  = 6;
+    const TAM_SAILING_STANDARD   = 10;
+    const TAM_DOORING_STANDARD   = 3;
+    const TAM_LEAD_TIME_STANDARD = 19;   // 6 + 10 + 3
+
+    /**
+     * Sailing Schedule (hari): Final ETD → Final ETA.
+     * Ini satu-satunya komponen yang bervariasi per voyage.
+     */
+    public function getSailingScheduleDaysAttribute(): ?float
+    {
+        if (! $this->etd || ! $this->eta) {
+            return null;
+        }
+
+        return round($this->etd->diffInSeconds($this->eta) / 86400, 1);
+    }
+
+    /**
+     * Lead Time Schedule (hari) = Dwelling(6) + Sailing + Dooring(3).
+     */
+    public function getLeadTimeScheduleDaysAttribute(): ?float
+    {
+        $sailing = $this->sailing_schedule_days;
+
+        if ($sailing === null) {
+            return null;
+        }
+
+        return self::TAM_DWELLING_STANDARD + $sailing + self::TAM_DOORING_STANDARD;
+    }
+
+    /**
+     * Variance dari Lead Time Standard TAM (19 hari).
+     * Positif = lebih lama (buruk), Negatif = lebih cepat (baik).
+     */
+    public function getLeadTimeVarianceAttribute(): ?float
+    {
+        $lt = $this->lead_time_schedule_days;
+
+        if ($lt === null) {
+            return null;
+        }
+
+        return round($lt - self::TAM_LEAD_TIME_STANDARD, 1);
+    }
+
+    /**
+     * Status analisa jadwal berdasarkan variance Lead Time.
+     *   on_standard     : variance ≤ 0
+     *   minor_deviation : variance 1–2
+     *   high_deviation  : variance > 2
+     */
+    public function getScheduleAnalysisStatusAttribute(): string
+    {
+        $v = $this->lead_time_variance;
+
+        if ($v === null) {
+            return 'unknown';
+        }
+
+        if ($v <= 0) {
+            return 'on_standard';
+        }
+
+        if ($v <= 2) {
+            return 'minor_deviation';
+        }
+
+        return 'high_deviation';
     }
 
     public function milestones(): HasMany

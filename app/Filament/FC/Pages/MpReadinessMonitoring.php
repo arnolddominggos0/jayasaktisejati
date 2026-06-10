@@ -4,6 +4,8 @@ namespace App\Filament\FC\Pages;
 
 use App\Filament\FC\Resources\BriefingSessionResource;
 use App\Filament\FC\Resources\ContainerReadinessSessionResource;
+use App\Filament\FC\Widgets\OperationalStatsWidget;
+use App\Filament\FC\Widgets\UnitMasukChartWidget;
 use App\Models\BriefingSession;
 use App\Models\ContainerReadinessSession;
 use App\Models\Depot;
@@ -94,9 +96,17 @@ class MpReadinessMonitoring extends Page
 
     protected function getHeaderWidgets(): array
     {
-        // KPI summary tahunan dihapus — Dashboard adalah command center harian.
-        // Monitoring Operasional = analisa & histori periode (tidak ada widget duplikat).
-        return [];
+        // KPI periodik + tren unit masuk — data historis tahunan, bukan hari ini.
+        // Data hari ini ada di Dashboard FC.
+        return [
+            OperationalStatsWidget::class,
+            UnitMasukChartWidget::class,
+        ];
+    }
+
+    public function getHeaderWidgetsColumns(): int | array
+    {
+        return 1;
     }
 
     public function mount(): void
