@@ -5,6 +5,7 @@ namespace App\Filament\FC\Resources;
 use App\Enums\MPCheckStatus;
 use App\Filament\FC\Resources\BriefingSessionResource\Pages;
 use App\Filament\FC\Resources\BriefingSessionResource\RelationManagers\AttendancesRelationManager;
+use App\Filament\FC\Resources\BriefingSessionResource\RelationManagers\StockApdChecksRelationManager;
 use App\Models\BriefingSession;
 use App\Models\Depot;
 use Filament\Facades\Filament;
@@ -19,7 +20,6 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -39,7 +39,10 @@ class BriefingSessionResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 3;
+
+    // Disembunyikan dari navigasi — akses melalui Monitoring Operasional
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function canViewAny(): bool
     {
@@ -132,11 +135,18 @@ class BriefingSessionResource extends Resource
                         ->default(fn() => Filament::auth()->user()?->id),
 
                     TextInput::make('summary_headcount')
-                        ->label('Target Jumlah MP')
+                        ->label('Kebutuhan Tim SOP')
                         ->numeric()
                         ->minValue(0)
-                        ->default(8)
-                        ->helperText('Target jumlah manpower yang harus hadir'),
+                        ->default(5)
+                        ->helperText('SOP minimum: 1 Koordinator + 4 Operator = 5 MP'),
+
+                    TextInput::make('unit_masuk_yard')
+                        ->label('Unit Masuk Yard/PDC')
+                        ->numeric()
+                        ->minValue(0)
+                        ->suffix('unit')
+                        ->placeholder('—'),
 
                     Textarea::make('notes')
                         ->label('Catatan / Topik Briefing')
@@ -174,6 +184,7 @@ class BriefingSessionResource extends Resource
                     ->sortable()
                     ->weight('bold'),
 
+                // ── Depot & PIC (toggleable — detail reference) ───────────
                 TextColumn::make('depot.name')
                     ->label('Depot')
                     ->sortable()
@@ -184,22 +195,66 @@ class BriefingSessionResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('summary_headcount')
-                    ->label('Target MP')
+                // ── Unit Masuk Yard/PDC ────────────────────────────────────
+                TextColumn::make('unit_masuk_yard')
+                    ->label('Unit Masuk')
+                    ->placeholder('—')
                     ->alignCenter()
+                    ->suffix(fn ($state) => $state !== null ? ' unit' : '')
                     ->sortable(),
 
-                ViewColumn::make('attendance_progress')
-                    ->label('Kehadiran')
-                    ->state(function ($record) {
-                        $present = (int) ($record->present_attendances_count ?? $record->presentAttendances()->count());
-                        $target = max(0, (int) $record->summary_headcount);
-                        $percent = $target > 0 ? (int) round(min(100, ($present / $target) * 100)) : 0;
-                        $tone = $target > 0 ? ($present >= $target ? 'emerald' : ($present >= ceil($target * 0.5) ? 'amber' : 'rose')) : 'gray';
+                // ── Need Tim SOP ───────────────────────────────────────────
+                TextColumn::make('summary_headcount')
+                    ->label('Need Tim')
+                    ->alignCenter()
+                    ->suffix(' MP')
+                    ->sortable(),
 
-                        return ['present' => $present, 'target' => $target, 'percent' => $percent, 'tone' => $tone];
+                // ── MP Attend — from withCount('presentAttendances') ───────
+                TextColumn::make('present_attendances_count')
+                    ->label('MP Attend')
+                    ->alignCenter()
+                    ->suffix(' MP')
+                    ->sortable(),
+
+                // ── Gap = attend − need (computed in PHP, no query) ────────
+                TextColumn::make('attendance_gap')
+                    ->label('Gap')
+                    ->state(function ($record) {
+                        $attend = (int) ($record->present_attendances_count ?? 0);
+                        $need   = (int) ($record->summary_headcount ?? 0);
+
+                        return $attend - $need;
                     })
-                    ->view('tables.columns.attendance-progress')
+                    ->formatStateUsing(fn ($state) => $state > 0 ? "+{$state}" : (string) $state)
+                    ->color(fn ($state) => match (true) {
+                        $state > 0  => 'success',
+                        $state === 0 => 'gray',
+                        default     => 'danger',
+                    })
+                    ->weight(fn ($state) => $state < 0 ? 'bold' : null)
+                    ->alignCenter()
+                    ->sortable(false),
+
+                // ── Readiness OK/NG badge ──────────────────────────────────
+                TextColumn::make('readiness_ok')
+                    ->label('Readiness')
+                    ->badge()
+                    ->state(fn ($record) => (int) ($record->summary_headcount ?? 0) > 0
+                        ? ((int) ($record->present_attendances_count ?? 0) >= (int) $record->summary_headcount)
+                        : null
+                    )
+                    ->formatStateUsing(fn ($state) => match (true) {
+                        $state === true  => 'OK',
+                        $state === false => 'NG',
+                        default          => '—',
+                    })
+                    ->color(fn ($state) => match (true) {
+                        $state === true  => 'success',
+                        $state === false => 'danger',
+                        default          => 'gray',
+                    })
+                    ->alignCenter()
                     ->sortable(false),
 
                 TextColumn::make('mp_check_status')
@@ -270,6 +325,7 @@ class BriefingSessionResource extends Resource
     {
         return [
             AttendancesRelationManager::class,
+            StockApdChecksRelationManager::class,
         ];
     }
 

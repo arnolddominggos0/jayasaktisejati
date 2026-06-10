@@ -6,11 +6,14 @@ use App\Enums\MPCheckStatus;
 use App\Filament\FC\Resources\BriefingSessionResource;
 use Filament\Actions\EditAction;
 use Filament\Infolists;
+use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Support\Facades\Storage;
 
 class ViewBriefingSession extends ViewRecord
 {
@@ -44,8 +47,14 @@ class ViewBriefingSession extends ViewRecord
                             ->icon('heroicon-o-user'),
 
                         TextEntry::make('summary_headcount')
-                            ->label('Target MP')
+                            ->label('Kebutuhan Tim SOP')
                             ->icon('heroicon-o-users'),
+
+                        TextEntry::make('unit_masuk_yard')
+                            ->label('Unit Masuk Yard/PDC')
+                            ->icon('heroicon-o-cube')
+                            ->suffix(' unit')
+                            ->placeholder('—'),
 
                         TextEntry::make('notes')
                             ->label('Catatan / Topik')
@@ -54,7 +63,200 @@ class ViewBriefingSession extends ViewRecord
                     ]),
 
                 // ─────────────────────────────────────────────────────────────
-                // Section 2 — MP Check status
+                // Section 2 — STATUS OPERASIONAL (computed readiness summary)
+                // Single pane of glass: unit masuk, kehadiran, gap, fit status,
+                // APD availability, and the final SIAP/BELUM SIAP badge.
+                //
+                // Rule for SIAP OPERASIONAL:
+                //   attend >= need  AND  fit >= need  AND  apd_shortage = false
+                //
+                // Layout (columns = 4):
+                //   Row 1: Unit Masuk | Need Tim | MP Attend | Gap
+                //   Row 2: Siap Kerja | Perlu Recheck | Tidak Fit | Status APD
+                //   Row 3: Status Operasional badge (full width)
+                // ─────────────────────────────────────────────────────────────
+                Section::make('Status Operasional')
+                    ->icon('heroicon-o-signal')
+                    ->columns(4)
+                    ->schema([
+
+                        // ── Row 1 — numbers ──────────────────────────────────
+
+                        TextEntry::make('unit_masuk_yard')
+                            ->label('Unit Masuk')
+                            ->icon('heroicon-o-cube')
+                            ->placeholder('—')
+                            ->suffix(fn ($state) => $state !== null ? ' unit' : ''),
+
+                        TextEntry::make('summary_headcount')
+                            ->label('Need Tim SOP')
+                            ->icon('heroicon-o-users')
+                            ->suffix(' MP'),
+
+                        TextEntry::make('mp_attend_summary')
+                            ->label('MP Attend')
+                            ->icon('heroicon-o-user-group')
+                            ->state(fn ($record) => $record->attendances
+                                ->filter(fn ($a) => (
+                                    $a->attendance_status instanceof \App\Enums\AttendanceStatus
+                                        ? $a->attendance_status->value
+                                        : (string) $a->attendance_status
+                                ) === 'present')
+                                ->count()
+                            )
+                            ->suffix(' MP')
+                            ->color(function ($state, $record) {
+                                $need = (int) ($record->summary_headcount ?? 0);
+                                return $need > 0
+                                    ? ($state >= $need ? 'success' : 'danger')
+                                    : 'gray';
+                            }),
+
+                        TextEntry::make('gap_summary')
+                            ->label('Gap')
+                            ->icon('heroicon-o-arrows-up-down')
+                            ->state(function ($record) {
+                                $attend = $record->attendances
+                                    ->filter(fn ($a) => (
+                                        $a->attendance_status instanceof \App\Enums\AttendanceStatus
+                                            ? $a->attendance_status->value
+                                            : (string) $a->attendance_status
+                                    ) === 'present')
+                                    ->count();
+
+                                return $attend - (int) ($record->summary_headcount ?? 0);
+                            })
+                            ->formatStateUsing(fn ($state) => $state > 0 ? "+{$state} MP" : "{$state} MP")
+                            ->color(fn ($state) => match (true) {
+                                $state > 0  => 'success',
+                                $state === 0 => 'gray',
+                                default     => 'danger',
+                            }),
+
+                        // ── Row 2 — readiness breakdown + APD ────────────────
+
+                        TextEntry::make('siap_kerja_summary')
+                            ->label('Siap Kerja')
+                            ->icon('heroicon-o-check-badge')
+                            ->state(fn ($record) => $record->attendances
+                                ->filter(fn ($a) => $a->final_mp_status === 'Siap Kerja')
+                                ->count()
+                            )
+                            ->suffix(' MP')
+                            ->color(fn ($state) => $state > 0 ? 'success' : 'gray'),
+
+                        TextEntry::make('recheck_summary')
+                            ->label('Perlu Recheck')
+                            ->icon('heroicon-o-clock')
+                            ->state(fn ($record) => $record->attendances
+                                ->filter(fn ($a) => in_array($a->final_mp_status, [
+                                    'Perlu Pemeriksaan Ulang',
+                                    'Istirahat 30 Menit',
+                                    'APD Tidak Lengkap',
+                                ], true))
+                                ->count()
+                            )
+                            ->suffix(' MP')
+                            ->color(fn ($state) => $state > 0 ? 'warning' : 'gray'),
+
+                        TextEntry::make('tidak_fit_summary')
+                            ->label('Tidak Fit')
+                            ->icon('heroicon-o-exclamation-triangle')
+                            ->state(fn ($record) => $record->attendances
+                                ->filter(fn ($a) => $a->final_mp_status === 'Tidak Fit')
+                                ->count()
+                            )
+                            ->suffix(' MP')
+                            ->color(fn ($state) => $state > 0 ? 'danger' : 'gray'),
+
+                        TextEntry::make('apd_ringkasan_status')
+                            ->label('Status APD')
+                            ->icon('heroicon-o-shield-check')
+                            ->badge()
+                            ->state(function ($record) {
+                                $checks = $record->stockApdChecks;
+                                if ($checks->isEmpty()) {
+                                    return 'belum_dicek';
+                                }
+
+                                return $checks->contains(fn ($c) => $c->computed_status === 'kurang')
+                                    ? 'kurang'
+                                    : 'cukup';
+                            })
+                            ->formatStateUsing(function ($state, $record) {
+                                if ($state === 'kurang') {
+                                    $n = $record->stockApdChecks
+                                        ->where('computed_status', 'kurang')
+                                        ->count();
+
+                                    return "{$n} Jenis Kurang";
+                                }
+
+                                return match ($state) {
+                                    'cukup'      => 'Cukup',
+                                    'belum_dicek' => 'Belum Dicek',
+                                    default       => $state,
+                                };
+                            })
+                            ->color(fn ($state) => match ($state) {
+                                'cukup'  => 'success',
+                                'kurang' => 'danger',
+                                default  => 'gray',
+                            }),
+
+                        // ── Row 3 — final STATUS OPERASIONAL badge ────────────
+                        //
+                        // SIAP OPERASIONAL = attend >= need AND fit >= need AND apd_shortage = false
+                        // Note: if APD belum dicek, apd_shortage = false (no shortage detected).
+
+                        TextEntry::make('status_operasional_badge')
+                            ->label('Status Operasional')
+                            ->badge()
+                            ->weight('bold')
+                            ->columnSpanFull()
+                            ->state(function ($record) {
+                                $need = (int) ($record->summary_headcount ?? 0);
+
+                                if ($need === 0) {
+                                    return 'no_data';
+                                }
+
+                                $attend = $record->attendances
+                                    ->filter(fn ($a) => (
+                                        $a->attendance_status instanceof \App\Enums\AttendanceStatus
+                                            ? $a->attendance_status->value
+                                            : (string) $a->attendance_status
+                                    ) === 'present')
+                                    ->count();
+
+                                $fit = $record->attendances
+                                    ->filter(fn ($a) => $a->final_mp_status === 'Siap Kerja')
+                                    ->count();
+
+                                $apdShortage = $record->stockApdChecks
+                                    ->contains(fn ($c) => $c->computed_status === 'kurang');
+
+                                if ($attend >= $need && $fit >= $need && ! $apdShortage) {
+                                    return 'siap';
+                                }
+
+                                return 'belum_siap';
+                            })
+                            ->formatStateUsing(fn ($state) => match ($state) {
+                                'siap'      => '✓ SIAP OPERASIONAL',
+                                'belum_siap' => '✗ BELUM SIAP',
+                                default      => '— Data Tidak Cukup',
+                            })
+                            ->color(fn ($state) => match ($state) {
+                                'siap'      => 'success',
+                                'belum_siap' => 'danger',
+                                default      => 'gray',
+                            }),
+
+                    ]),
+
+                // ─────────────────────────────────────────────────────────────
+                // Section 3 — MP Check status (stored, from AppSheet workflow)
                 // ─────────────────────────────────────────────────────────────
                 Section::make('Status MP Check')
                     ->columns(3)
@@ -92,26 +294,26 @@ class ViewBriefingSession extends ViewRecord
                     ->schema([
                         TextEntry::make('mp_hadir')
                             ->label('Hadir')
-                            ->state(fn ($record) => $record->attendances()
+                            ->state(fn($record) => $record->attendances()
                                 ->where('attendance_status', 'present')
                                 ->count())
-                            ->suffix(fn ($record) => ' / ' . (int) $record->summary_headcount)
+                            ->suffix(fn($record) => ' / ' . (int) $record->summary_headcount)
                             ->color('success')
                             ->icon('heroicon-o-check-circle'),
 
                         TextEntry::make('mp_tidak_hadir')
                             ->label('Tidak Hadir / Sakit')
-                            ->state(fn ($record) => $record->attendances()
+                            ->state(fn($record) => $record->attendances()
                                 ->where('attendance_status', '!=', 'present')
                                 ->count())
-                            ->color(fn ($record) => $record->attendances()->where('attendance_status', '!=', 'present')->count() > 0
+                            ->color(fn($record) => $record->attendances()->where('attendance_status', '!=', 'present')->count() > 0
                                 ? 'danger'
                                 : 'gray')
                             ->icon('heroicon-o-x-circle'),
 
                         TextEntry::make('mp_apd_lengkap')
                             ->label('APD Lengkap')
-                            ->state(fn ($record) => $record->attendances()
+                            ->state(fn($record) => $record->attendances()
                                 ->where('attendance_status', 'present')
                                 ->where('has_ppe', true)
                                 ->count())
@@ -122,7 +324,7 @@ class ViewBriefingSession extends ViewRecord
                             ->label('Siap Kerja')
                             ->state(function ($record) {
                                 return $record->attendances
-                                    ->filter(fn ($a) => $a->final_mp_status === 'Siap Kerja')
+                                    ->filter(fn($a) => $a->final_mp_status === 'Siap Kerja')
                                     ->count();
                             })
                             ->color('success')
@@ -132,24 +334,24 @@ class ViewBriefingSession extends ViewRecord
                             ->label('Perlu Recheck')
                             ->state(function ($record) {
                                 return $record->attendances
-                                    ->filter(fn ($a) => in_array($a->final_mp_status, [
+                                    ->filter(fn($a) => in_array($a->final_mp_status, [
                                         'Perlu Pemeriksaan Ulang',
                                         'APD Tidak Lengkap',
                                         'Istirahat 30 Menit',
                                     ], true))
                                     ->count();
                             })
-                            ->color(fn ($state) => $state > 0 ? 'warning' : 'gray')
+                            ->color(fn($state) => $state > 0 ? 'warning' : 'gray')
                             ->icon('heroicon-o-clock'),
 
                         TextEntry::make('mp_tidak_fit')
                             ->label('Tidak Fit')
                             ->state(function ($record) {
                                 return $record->attendances
-                                    ->filter(fn ($a) => $a->final_mp_status === 'Tidak Fit')
+                                    ->filter(fn($a) => $a->final_mp_status === 'Tidak Fit')
                                     ->count();
                             })
-                            ->color(fn ($state) => $state > 0 ? 'danger' : 'gray')
+                            ->color(fn($state) => $state > 0 ? 'danger' : 'gray')
                             ->icon('heroicon-o-exclamation-triangle'),
                     ]),
 
@@ -162,7 +364,7 @@ class ViewBriefingSession extends ViewRecord
                     ->schema([
                         TextEntry::make('avg_temperature')
                             ->label('Rata-rata Suhu')
-                            ->state(fn ($record) => $record->attendances()
+                            ->state(fn($record) => $record->attendances()
                                 ->where('attendance_status', 'present')
                                 ->whereNotNull('temperature')
                                 ->avg('temperature')
@@ -185,22 +387,22 @@ class ViewBriefingSession extends ViewRecord
 
                         TextEntry::make('health_complaint_count')
                             ->label('Keluhan Kesehatan')
-                            ->state(fn ($record) => $record->attendances()
+                            ->state(fn($record) => $record->attendances()
                                 ->where('attendance_status', 'present')
                                 ->whereNotNull('health_complaint')
                                 ->count() . ' orang')
-                            ->color(fn ($record) => $record->attendances()
+                            ->color(fn($record) => $record->attendances()
                                 ->where('attendance_status', 'present')
                                 ->whereNotNull('health_complaint')
                                 ->count() > 0 ? 'warning' : 'gray'),
 
                         TextEntry::make('recheck_count')
                             ->label('Proses Recheck')
-                            ->state(fn ($record) => $record->attendances()
+                            ->state(fn($record) => $record->attendances()
                                 ->where('attendance_status', 'present')
                                 ->where('recheck_required', true)
                                 ->count() . ' orang')
-                            ->color(fn ($record) => $record->attendances()
+                            ->color(fn($record) => $record->attendances()
                                 ->where('attendance_status', 'present')
                                 ->where('recheck_required', true)
                                 ->count() > 0 ? 'warning' : 'gray'),
@@ -208,7 +410,10 @@ class ViewBriefingSession extends ViewRecord
 
                 // ─────────────────────────────────────────────────────────────
                 // Section 5 — Stock APD
-                // Reuses stockApdChecks() HasMany relation on BriefingSession
+                // Reuses stockApdChecks() HasMany relation on BriefingSession.
+                // Status uses computed_status accessor (not the raw DB `status`
+                // column) to avoid AppSheet inconsistency bugs.
+                // Visibility uses cached collection — avoids an extra EXISTS query.
                 // ─────────────────────────────────────────────────────────────
                 Section::make('Stok APD')
                     ->schema([
@@ -217,30 +422,49 @@ class ViewBriefingSession extends ViewRecord
                             ->schema([
                                 TextEntry::make('ppe_type')
                                     ->label('Jenis APD')
-                                    ->weight('bold'),
+                                    ->formatStateUsing(fn ($state) => match (strtolower((string) $state)) {
+                                        'helm'          => 'Helm Safety',
+                                        'rompi'         => 'Rompi',
+                                        'sepatu'        => 'Sepatu Safety',
+                                        'sarung_tangan' => 'Sarung Tangan',
+                                        default         => (string) $state,
+                                    })
+                                    ->weight('bold')
+                                    ->icon('heroicon-o-shield-check'),
 
-                                TextEntry::make('stock_available')
-                                    ->label('Stok Tersedia')
-                                    ->placeholder('—')
-                                    ->color(fn ($state, $record) => (
-                                        $state !== null
-                                        && $record->required_quantity !== null
-                                        && $state < $record->required_quantity
-                                    ) ? 'danger' : 'success'),
+                                // Combined Stok / Butuh / Gap — one entry, one glance.
+                                // Color: gray = data belum diisi, success = cukup, danger = kurang.
+                                TextEntry::make('apd_detail')
+                                    ->label('Stok · Butuh · Gap')
+                                    ->state(function ($record) {
+                                        $stok  = $record->stock_available !== null
+                                            ? $record->stock_available
+                                            : '—';
+                                        $butuh = $record->required_quantity !== null
+                                            ? $record->required_quantity
+                                            : '—';
+                                        $gap   = $record->gap !== null
+                                            ? ($record->gap > 0 ? "+{$record->gap}" : (string) $record->gap)
+                                            : '—';
 
-                                TextEntry::make('required_quantity')
-                                    ->label('Kebutuhan')
-                                    ->placeholder('—'),
+                                        return "Stok: {$stok}  ·  Butuh: {$butuh}  ·  Gap: {$gap}";
+                                    })
+                                    ->color(fn ($state, $record) => match (true) {
+                                        $record->gap === null => 'gray',
+                                        $record->gap >= 0     => 'success',
+                                        default               => 'danger',
+                                    }),
 
-                                TextEntry::make('status')
+                                TextEntry::make('computed_status')
                                     ->label('Status')
                                     ->badge()
-                                    ->formatStateUsing(fn ($state) => match (strtolower((string) $state)) {
-                                        'cukup'  => 'Cukup',
-                                        'kurang' => 'Kurang',
-                                        default  => $state ?? '—',
+                                    ->formatStateUsing(fn ($state) => match ($state) {
+                                        'cukup'       => 'Cukup',
+                                        'kurang'      => 'Kurang',
+                                        'belum_diisi' => 'Belum Diisi',
+                                        default       => $state ?? '—',
                                     })
-                                    ->color(fn ($state) => match (strtolower((string) $state)) {
+                                    ->color(fn ($state) => match ($state) {
                                         'cukup'  => 'success',
                                         'kurang' => 'danger',
                                         default  => 'gray',
@@ -248,13 +472,33 @@ class ViewBriefingSession extends ViewRecord
 
                                 TextEntry::make('remark')
                                     ->label('Catatan')
-                                    ->placeholder('—')
-                                    ->columnSpan(2),
+                                    ->placeholder('—'),
                             ])
-                            ->columns(5)
+                            ->columns(4)
                             ->placeholder('Belum ada data stok APD dicatat.'),
                     ])
-                    ->visible(fn ($record) => $record->stockApdChecks()->exists()),
+                    // Use cached collection (.stockApdChecks) instead of fresh
+                    // query (.stockApdChecks()) to avoid an extra EXISTS SQL call.
+                    ->visible(fn ($record) => $record->stockApdChecks->isNotEmpty()),
+
+                // ─────────────────────────────────────────────────────────────
+                // Section 6 — Bukti Briefing
+                // ─────────────────────────────────────────────────────────────
+                Section::make('Bukti Briefing')
+                    ->icon('heroicon-o-photo')
+                    ->visible(fn($record) => filled($record?->briefing_evidence_path))
+                    ->schema([
+                        ViewEntry::make('briefing_evidence_path')
+                            ->view('components.briefing-evidence'),
+                            
+                        TextEntry::make('evidence_empty_state')
+                            ->label('')
+                            ->state('Belum ada dokumentasi briefing.')
+                            ->color('gray')
+                            ->icon('heroicon-o-photo')
+                            ->columnSpanFull()
+                            ->visible(fn($record): bool => ! filled($record?->briefing_evidence_path)),
+                    ]),
 
             ]);
     }

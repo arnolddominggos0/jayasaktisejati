@@ -225,7 +225,8 @@ class AppSheetService
         $mappedData['session_id'] = $session->id;
 
         // ── Resolve MP type ───────────────────────────────────────────────────
-        $mpType     = strtolower($mappedData['mp_type'] ?? 'regular');
+        // normalizeValue() already lowercased and mapped Indonesian → English.
+        $mpType = $mappedData['mp_type'] ?? 'regular';
         $backupName = $mappedData['backup_name'] ?? null;
 
         // ── Resolve manpower (AppSheet MP ID → Laravel manpowers.id) ─────────
@@ -329,7 +330,8 @@ class AppSheetService
 
         $rawSessionId = $mappedData['session_id'] ?? null;
         $manpowerId = $mappedData['manpower_id'] ?? null;
-        $mpType = strtolower($mappedData['mp_type'] ?? 'regular');
+        // normalizeValue() already normalized mp_type to lowercase English.
+        $mpType = $mappedData['mp_type'] ?? 'regular';
         $backupName = $mappedData['backup_name'] ?? null;
 
         if ($rawSessionId) {
@@ -657,13 +659,25 @@ class AppSheetService
             if ($fieldName === 'fit_status') {
                 return strtoupper(trim($value));
             }
+
             if ($fieldName === 'attendance_status') {
                 return match (strtolower(trim($value))) {
-                    'hadir' => 'present',
-                    'tidak hadir' => 'absent',
-                    'sakit' => 'sick',
-                    'izin' => 'leave',
-                    default => $value,
+                    'hadir'        => 'present',
+                    'tidak hadir'  => 'absent',
+                    'sakit'        => 'sick',
+                    'izin'         => 'leave',
+                    default        => $value,
+                };
+            }
+
+            // Normalize mp_type: AppSheet sends Indonesian ("Reguler"/"Backup") or
+            // English variants.  Centralised here so callers always receive the
+            // canonical lowercase English value used by syncBriefingAttendance().
+            if ($fieldName === 'mp_type') {
+                return match (strtolower(trim($value))) {
+                    'reguler', 'regular' => 'regular',
+                    'backup'             => 'backup',
+                    default              => strtolower(trim($value)),
                 };
             }
         }

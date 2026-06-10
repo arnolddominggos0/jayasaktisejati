@@ -23,7 +23,10 @@ class ListBriefingSessions extends ListRecords
 
     protected function getHeaderWidgets(): array
     {
-        return [FcTodayBriefingSummary::class];
+        return [
+            // Today's briefing quick-summary (session-level card)
+            FcTodayBriefingSummary::class,
+        ];
     }
 
     // -------------------------------------------------------------------------

@@ -3,16 +3,15 @@
 namespace App\Filament\FC\Resources\BriefingSessionResource\RelationManagers;
 
 use App\Enums\AttendanceStatus;
-use App\Enums\PpeCondition;
 use App\Models\BriefingAttendance;
-use App\Models\BriefingAttendancePpeItem;
 use App\Models\Manpower;
 use Filament\Forms;
-use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -20,6 +19,7 @@ use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 use Illuminate\Validation\Rule;
 
 class AttendancesRelationManager extends RelationManager
@@ -30,150 +30,303 @@ class AttendancesRelationManager extends RelationManager
 
     protected static ?string $title = 'Kehadiran & Pemeriksaan MP';
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // FORM
+    // ═══════════════════════════════════════════════════════════════════════
+
     public function form(Forms\Form $form): Forms\Form
     {
-        $parseBp = function (?string $value): array {
-            if (! is_string($value)) {
-                return [null, null];
-            }
-
-            return preg_match('/^\s*(\d{2,3})\s*\/\s*(\d{2,3})\s*$/', $value, $m)
-                ? [(int) $m[1], (int) $m[2]]
-                : [null, null];
-        };
-
         return $form->schema([
-            Section::make('Data Kehadiran')
-                ->columns(2)
-                ->schema([
-                    Select::make('manpower_id')
-                        ->label('Nama MP')
-                        ->options(function () {
-                            $session = $this->getOwnerRecord();
-
-                            return Manpower::query()
-                                ->when($session?->depot_id, fn ($query) => $query->where('depot_id', $session->depot_id))
-                                ->orderBy('name')
-                                ->pluck('name', 'id');
-                        })
-                        ->required()
-                        ->searchable()
-                        ->preload()
-                        ->rule(function (?BriefingAttendance $record) {
-                            $session = $this->getOwnerRecord();
-
-                            return Rule::unique('briefing_attendances', 'manpower_id')
-                                ->where(fn ($query) => $query->where('session_id', $session->id))
-                                ->ignore($record?->getKey());
-                        }),
-
-                    Select::make('attendance_status')
-                        ->label('Status Kehadiran')
-                        ->options(collect(AttendanceStatus::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()]))
-                        ->default(AttendanceStatus::Present->value)
-                        ->required()
-                        ->live()
-                        ->native(false),
-                ]),
-
-            Section::make('Pemeriksaan Kesehatan')
-                ->columns(2)
-                ->visible(fn (Get $get) => $get('attendance_status') === AttendanceStatus::Present->value)
-                ->schema([
-                    TextInput::make('temperature')
-                        ->label('Suhu Tubuh (°C)')
-                        ->numeric()
-                        ->minValue(35)
-                        ->maxValue(42)
-                        ->step(0.1)
-                        ->suffix('°C')
-                        ->required(fn (Get $get) => $get('attendance_status') === AttendanceStatus::Present->value),
-
-                    TextInput::make('bp')
-                        ->label('Tekanan Darah (mmHg)')
-                        ->placeholder('120/80')
-                        ->rules(['nullable', 'regex:/^\s*(\d{2,3})\s*\/\s*(\d{2,3})\s*$/'])
-                        ->required(fn (Get $get) => $get('attendance_status') === AttendanceStatus::Present->value)
-                        ->dehydrated()
-                        ->afterStateHydrated(function ($set, $state, ?BriefingAttendance $record) {
-                            if (! $record) {
-                                return;
-                            }
-                            $set('bp', ($record->bp_systolic && $record->bp_diastolic) ? ($record->bp_systolic.'/'.$record->bp_diastolic) : null);
-                        })
-                        ->afterStateUpdated(function ($set, $state) use ($parseBp) {
-                            [$sys, $dia] = $parseBp($state);
-                            $set('bp_systolic', $sys);
-                            $set('bp_diastolic', $dia);
-                        })
-                        ->columnSpan(1),
-
-                    Hidden::make('bp_systolic')->dehydrated(),
-                    Hidden::make('bp_diastolic')->dehydrated(),
-
-                    TextInput::make('has_ppe')
-                        ->label('APD Lengkap')
-                        ->formatStateUsing(fn ($state) => $state ? 'Ya' : 'Tidak')
-                        ->disabled()
-                        ->dehydrated(false),
-
-                    Textarea::make('health_complaint')
-                        ->label('Keluhan Kesehatan')
-                        ->rows(2)
-                        ->maxLength(500)
-                        ->columnSpanFull(),
-                ]),
-
-            Section::make('Pemeriksaan APD (Alat Pelindung Diri)')
-                ->columns(4)
-                ->visible(fn (Get $get) => $get('attendance_status') === AttendanceStatus::Present->value)
-                ->schema([
-                    Select::make('helm_condition')
-                        ->label('Helm')
-                        ->options(collect(PpeCondition::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()]))
-                        ->default(PpeCondition::Baik->value)
-                        ->required(fn (Get $get) => $get('attendance_status') === AttendanceStatus::Present->value)
-                        ->native(false)
-                        ->dehydrated(false)
-                        ->live(),
-
-                    Select::make('rompi_condition')
-                        ->label('Rompi')
-                        ->options(collect(PpeCondition::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()]))
-                        ->default(PpeCondition::Baik->value)
-                        ->required(fn (Get $get) => $get('attendance_status') === AttendanceStatus::Present->value)
-                        ->native(false)
-                        ->dehydrated(false)
-                        ->live(),
-
-                    Select::make('sepatu_condition')
-                        ->label('Sepatu Safety')
-                        ->options(collect(PpeCondition::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()]))
-                        ->default(PpeCondition::Baik->value)
-                        ->required(fn (Get $get) => $get('attendance_status') === AttendanceStatus::Present->value)
-                        ->native(false)
-                        ->dehydrated(false)
-                        ->live(),
-
-                    Select::make('sarung_tangan_condition')
-                        ->label('Sarung Tangan')
-                        ->options(collect(PpeCondition::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()]))
-                        ->default(PpeCondition::Baik->value)
-                        ->required(fn (Get $get) => $get('attendance_status') === AttendanceStatus::Present->value)
-                        ->native(false)
-                        ->dehydrated(false)
-                        ->live(),
-                ]),
-
-            Section::make('Catatan')
-                ->schema([
-                    Textarea::make('remark')
-                        ->label('Catatan')
-                        ->rows(2)
-                        ->maxLength(500),
-                ]),
+            $this->dataKehadiranSection(),
+            $this->makePemeriksaanSection(),
+            $this->statusAkhirSection(),
+            $this->catatanSection(),
         ]);
     }
+
+    // ─── Form section builders ───────────────────────────────────────────────
+
+    /**
+     * DATA KEHADIRAN — nama MP (reguler) + status kehadiran.
+     */
+    private function dataKehadiranSection(): Section
+    {
+        return Section::make('Data Kehadiran')
+            ->columns(2)
+            ->schema([
+
+                Select::make('manpower_id')
+                    ->label('Nama MP')
+                    ->options(function () {
+                        $session = $this->getOwnerRecord();
+
+                        return Manpower::query()
+                            ->when(
+                                $session?->depot_id,
+                                fn ($q) => $q->where('depot_id', $session->depot_id)
+                            )
+                            ->orderBy('name')
+                            ->pluck('name', 'id');
+                    })
+                    ->required()
+                    ->searchable()
+                    ->preload()
+                    ->rule(function (?BriefingAttendance $record) {
+                        $session = $this->getOwnerRecord();
+
+                        return Rule::unique('briefing_attendances', 'manpower_id')
+                            ->where(fn ($q) => $q->where('session_id', $session->id))
+                            ->ignore($record?->getKey());
+                    }),
+
+                Select::make('attendance_status')
+                    ->label('Status Kehadiran')
+                    ->options(
+                        collect(AttendanceStatus::cases())
+                            ->mapWithKeys(fn ($c) => [$c->value => $c->label()])
+                    )
+                    ->default(AttendanceStatus::Present->value)
+                    ->required()
+                    ->live()
+                    ->native(false),
+
+            ]);
+    }
+
+    /**
+     * DATA BACKUP — nama bebas (bukan dari tabel manpower) + status kehadiran.
+     * Digunakan oleh "Tambah Backup MP" action.
+     */
+    private function dataBackupSection(): Section
+    {
+        return Section::make('Data Backup MP')
+            ->columns(2)
+            ->schema([
+
+                TextInput::make('backup_name')
+                    ->label('Nama Backup MP')
+                    ->required()
+                    ->maxLength(255)
+                    ->placeholder('Nama lengkap backup MP'),
+
+                Select::make('attendance_status')
+                    ->label('Status Kehadiran')
+                    ->options(
+                        collect(AttendanceStatus::cases())
+                            ->mapWithKeys(fn ($c) => [$c->value => $c->label()])
+                    )
+                    ->default(AttendanceStatus::Present->value)
+                    ->required()
+                    ->live()
+                    ->native(false),
+
+            ]);
+    }
+
+    /**
+     * PEMERIKSAAN MP — digunakan oleh reguler & backup.
+     *
+     * Section muncul hanya jika attendance_status = present.
+     * Keluhan hanya muncul + wajib jika ada vital yang abnormal.
+     *
+     * signature_path adalah legacy field (nullable) — tidak dikumpulkan via Filament.
+     */
+    private function makePemeriksaanSection(): Section
+    {
+        /*
+         * Abnormal vitals threshold:
+         *   Suhu     : 35.5 – 37.5 °C
+         *   Sistolik : 90   – 120  mmHg
+         *   Diastolik: 60   – 80   mmHg
+         */
+        $isVitalsAbnormal = static function (Get $get): bool {
+            if ($get('attendance_status') !== AttendanceStatus::Present->value) {
+                return false;
+            }
+
+            $temp = (float) ($get('temperature')  ?? 0);
+            $sys  = (int)   ($get('bp_systolic')   ?? 0);
+            $dia  = (int)   ($get('bp_diastolic')  ?? 0);
+
+            if ($temp > 0 && ($temp < 35.5 || $temp > 37.5)) {
+                return true;
+            }
+            if ($sys > 0 && ($sys < 90 || $sys > 120)) {
+                return true;
+            }
+            if ($dia > 0 && ($dia < 60 || $dia > 80)) {
+                return true;
+            }
+
+            return false;
+        };
+
+        $isPresent = fn (Get $get) => $get('attendance_status') === AttendanceStatus::Present->value;
+
+        return Section::make('Pemeriksaan MP')
+            ->columns(2)
+            ->visible($isPresent)
+            ->schema([
+
+                TextInput::make('temperature')
+                    ->label('Suhu Tubuh')
+                    ->numeric()
+                    ->minValue(35)
+                    ->maxValue(42)
+                    ->step(0.1)
+                    ->suffix('°C')
+                    ->helperText('Normal: 35.5 °C – 37.5 °C')
+                    ->required($isPresent)
+                    ->live(onBlur: true)
+                    ->columnSpanFull(),
+
+                TextInput::make('bp_systolic')
+                    ->label('TD Sistolik')
+                    ->numeric()
+                    ->minValue(60)
+                    ->maxValue(250)
+                    ->suffix('mmHg')
+                    ->helperText('Normal: 90 – 120 mmHg')
+                    ->required($isPresent)
+                    ->live(onBlur: true),
+
+                TextInput::make('bp_diastolic')
+                    ->label('TD Diastolik')
+                    ->numeric()
+                    ->minValue(40)
+                    ->maxValue(150)
+                    ->suffix('mmHg')
+                    ->helperText('Normal: 60 – 80 mmHg')
+                    ->required($isPresent)
+                    ->live(onBlur: true),
+
+                // APD — compact toggle button pair (Ya / Tidak)
+                ToggleButtons::make('has_ppe')
+                    ->label('APD Lengkap')
+                    ->boolean()
+                    ->inline()
+                    ->grouped()
+                    ->default(true)
+                    ->live()
+                    ->columnSpanFull(),
+
+                // ⚠ Warning — muncul hanya jika vital di luar batas normal
+                Placeholder::make('vitals_abnormal_notice')
+                    ->label('')
+                    ->content(fn () => new HtmlString(
+                        '<div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3'
+                        . ' text-sm font-medium text-amber-800 dark:border-amber-700/50'
+                        . ' dark:bg-amber-900/20 dark:text-amber-300">'
+                        . '⚠&nbsp; Pemeriksaan tidak normal. Mohon isi keluhan kesehatan.'
+                        . '</div>'
+                    ))
+                    ->visible($isVitalsAbnormal)
+                    ->columnSpanFull(),
+
+                // Keluhan — muncul & wajib hanya jika vital abnormal
+                Textarea::make('health_complaint')
+                    ->label('Keluhan Kesehatan')
+                    ->rows(3)
+                    ->maxLength(500)
+                    ->visible($isVitalsAbnormal)
+                    ->required($isVitalsAbnormal)
+                    ->columnSpanFull(),
+
+            ]);
+    }
+
+    /**
+     * STATUS AKHIR — pratinjau langsung di form (create & edit).
+     *
+     * - Tidak hadir  → badge abu
+     * - has_ppe=false → badge amber (APD Tidak Lengkap) — live dari form state
+     * - Edit mode     → status aktual dari $record->final_mp_status
+     * - Create mode   → "Belum Dinilai" (evaluasi oleh sistem health check)
+     */
+    private function statusAkhirSection(): Section
+    {
+        $colorMap = [
+            'Siap Kerja'              => 'emerald',
+            'APD Tidak Lengkap'       => 'amber',
+            'Istirahat 30 Menit'      => 'amber',
+            'Perlu Pemeriksaan Ulang' => 'amber',
+            'Tidak Fit'               => 'rose',
+            'Tidak Hadir'             => 'gray',
+        ];
+
+        return Section::make('Status Akhir')
+            ->description('Pratinjau evaluasi sistem berdasarkan data pemeriksaan saat ini.')
+            ->schema([
+
+                Placeholder::make('final_status_display')
+                    ->label('Status')
+                    ->live()
+                    ->content(function (Get $get, $record) use ($colorMap): HtmlString {
+                        $attendStatus = $get('attendance_status');
+
+                        // Tidak hadir → langsung gray
+                        if ($attendStatus !== AttendanceStatus::Present->value) {
+                            return new HtmlString(
+                                '<span class="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold'
+                                . ' bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">Tidak Hadir</span>'
+                            );
+                        }
+
+                        // APD tidak lengkap — deteksi langsung dari form state (sebelum save)
+                        $hasPpe = $get('has_ppe');
+                        if ($hasPpe === false || $hasPpe === 0 || $hasPpe === '0') {
+                            return new HtmlString(
+                                '<span class="inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold'
+                                . ' bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">APD Tidak Lengkap</span>'
+                            );
+                        }
+
+                        // Edit mode — tampilkan status tersimpan dari record
+                        if ($record !== null) {
+                            $status = $record->final_mp_status ?? '—';
+                            $color  = $colorMap[$status] ?? 'gray';
+
+                            return new HtmlString(
+                                "<span class=\"inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold"
+                                . " bg-{$color}-100 text-{$color}-800"
+                                . " dark:bg-{$color}-900/30 dark:text-{$color}-300\">"
+                                . e($status)
+                                . '</span>'
+                            );
+                        }
+
+                        // Create mode — belum bisa dinilai tanpa hasil health check
+                        return new HtmlString(
+                            '<span class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium'
+                            . ' bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">⏳&nbsp; Belum Dinilai</span>'
+                            . '<span class="ml-2 text-xs text-gray-400 dark:text-gray-500"> — dievaluasi setelah health check</span>'
+                        );
+                    }),
+
+            ]);
+    }
+
+    /**
+     * CATATAN — opsional, selalu visible, collapsed by default.
+     */
+    private function catatanSection(): Section
+    {
+        return Section::make('Catatan')
+            ->collapsed()
+            ->schema([
+
+                Textarea::make('remark')
+                    ->label('Catatan')
+                    ->rows(2)
+                    ->maxLength(500)
+                    ->placeholder('Keterangan tambahan (opsional)'),
+
+            ]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // TABLE
+    // ═══════════════════════════════════════════════════════════════════════
 
     public function table(Tables\Table $table): Tables\Table
     {
@@ -181,97 +334,208 @@ class AttendancesRelationManager extends RelationManager
             ->recordTitleAttribute('id')
             ->defaultSort('created_at')
             ->columns([
+
+                // ── Nama MP ────────────────────────────────────────────────
                 TextColumn::make('manpower.name')
                     ->label('Nama MP')
                     ->sortable()
                     ->searchable()
-                    ->weight('bold'),
+                    ->weight('bold')
+                    ->formatStateUsing(function ($state, $record) {
+                        if ($record->is_backup) {
+                            return ($record->backup_name ?? $state) . ' (Backup)';
+                        }
 
-                TextColumn::make('attendance_status')
-                    ->label('Status')
+                        return $state ?? '-';
+                    }),
+
+                // ── Status Akhir (badge, prominent) ───────────────────────
+                TextColumn::make('final_mp_status')
+                    ->label('Status Akhir')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => AttendanceStatus::tryFrom($state)?->label() ?? $state)
-                    ->color(fn ($state) => AttendanceStatus::tryFrom($state)?->color() ?? 'gray')
+                    ->formatStateUsing(fn ($state) => $state ?? 'Belum Dinilai')
+                    ->color(fn ($state) => match ($state) {
+                        'Siap Kerja'              => 'success',
+                        'Tidak Fit'               => 'danger',
+                        'APD Tidak Lengkap'       => 'warning',
+                        'Istirahat 30 Menit'      => 'info',
+                        'Perlu Pemeriksaan Ulang' => 'warning',
+                        'Tidak Hadir'             => 'gray',
+                        default                   => 'gray',
+                    })
+                    ->sortable(false),
+
+                // ── Status Kehadiran ───────────────────────────────────────
+                TextColumn::make('attendance_status')
+                    ->label('Kehadiran')
+                    ->badge()
+                    ->formatStateUsing(function ($state) {
+                        $enum = $state instanceof AttendanceStatus
+                            ? $state
+                            : AttendanceStatus::tryFrom((string) $state);
+
+                        return $enum?->label() ?? (string) $state;
+                    })
+                    ->color(function ($state) {
+                        $enum = $state instanceof AttendanceStatus
+                            ? $state
+                            : AttendanceStatus::tryFrom((string) $state);
+
+                        return $enum?->color() ?? 'gray';
+                    })
                     ->sortable(),
 
+                // ── Suhu ───────────────────────────────────────────────────
                 TextColumn::make('temperature')
                     ->label('Suhu')
-                    ->state(fn ($record) => $record->temperature ? number_format((float) $record->temperature, 1).'°C' : '-')
-                    ->color(fn ($record) => ($record->temperature && ($record->temperature < 36.5 || $record->temperature > 37.6)) ? 'danger' : null)
+                    ->state(fn ($record) => $record->temperature
+                        ? number_format((float) $record->temperature, 1) . '°C'
+                        : '-')
+                    ->color(fn ($record) => ($record->temperature
+                        && ($record->temperature < 35.5 || $record->temperature > 37.5))
+                        ? 'danger'
+                        : null)
                     ->sortable(),
 
+                // ── Tensi ──────────────────────────────────────────────────
                 TextColumn::make('bp_display')
                     ->label('Tensi')
-                    ->state(fn ($record) => ($record->bp_systolic && $record->bp_diastolic) ? "{$record->bp_systolic}/{$record->bp_diastolic}" : '-')
+                    ->state(fn ($record) => ($record->bp_systolic && $record->bp_diastolic)
+                        ? "{$record->bp_systolic}/{$record->bp_diastolic}"
+                        : '-')
                     ->color(function ($record) {
                         if (! $record->bp_systolic || ! $record->bp_diastolic) {
                             return null;
                         }
-                        $ok = ($record->bp_systolic >= 90 && $record->bp_diastolic >= 60) && ($record->bp_systolic <= 140 && $record->bp_diastolic <= 90);
+                        $ok = ($record->bp_systolic  >= 90  && $record->bp_diastolic >= 60)
+                            && ($record->bp_systolic  <= 120 && $record->bp_diastolic <= 80);
 
                         return $ok ? null : 'danger';
                     }),
 
-                TextColumn::make('helm_status')
-                    ->label('Helm')
-                    ->state(fn ($record) => $record->ppeItems()->where('ppe_type', 'helm')->value('condition') ?? '-')
+                // ── APD — single badge ─────────────────────────────────────
+                TextColumn::make('has_ppe')
+                    ->label('APD')
                     ->badge()
-                    ->color(fn ($state) => $state === 'baik' ? 'success' : ($state === 'rusak' ? 'danger' : 'warning')),
+                    ->formatStateUsing(function ($state, $record) {
+                        $val = $record->attendance_status instanceof AttendanceStatus
+                            ? $record->attendance_status->value
+                            : (string) $record->attendance_status;
 
-                TextColumn::make('rompi_status')
-                    ->label('Rompi')
-                    ->state(fn ($record) => $record->ppeItems()->where('ppe_type', 'rompi')->value('condition') ?? '-')
-                    ->badge()
-                    ->color(fn ($state) => $state === 'baik' ? 'success' : ($state === 'rusak' ? 'danger' : 'warning')),
+                        if ($val !== 'present') {
+                            return '—';
+                        }
 
-                TextColumn::make('sepatu_status')
-                    ->label('Sepatu')
-                    ->state(fn ($record) => $record->ppeItems()->where('ppe_type', 'sepatu')->value('condition') ?? '-')
-                    ->badge()
-                    ->color(fn ($state) => $state === 'baik' ? 'success' : ($state === 'rusak' ? 'danger' : 'warning')),
+                        return $state ? 'Lengkap' : 'Tidak Lengkap';
+                    })
+                    ->color(function ($state, $record) {
+                        $val = $record->attendance_status instanceof AttendanceStatus
+                            ? $record->attendance_status->value
+                            : (string) $record->attendance_status;
 
-                TextColumn::make('sarung_tangan_status')
-                    ->label('Sarung Tangan')
-                    ->state(fn ($record) => $record->ppeItems()->where('ppe_type', 'sarung_tangan')->value('condition') ?? '-')
-                    ->badge()
-                    ->color(fn ($state) => $state === 'baik' ? 'success' : ($state === 'rusak' ? 'danger' : 'warning')),
+                        if ($val !== 'present') {
+                            return 'gray';
+                        }
 
+                        return $state ? 'success' : 'danger';
+                    }),
+
+                // ── Tanda Tangan (legacy — tersimpan dari AppSheet, tidak dikumpulkan Filament) ──
+                TextColumn::make('signature_path')
+                    ->label('TTD')
+                    ->state(fn ($record) => $record->signature_path ? '✓' : '—')
+                    ->color(fn ($record) => $record->signature_path ? 'success' : 'gray')
+                    ->alignCenter()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                // ── Keluhan ────────────────────────────────────────────────
                 TextColumn::make('health_complaint')
                     ->label('Keluhan')
-                    ->limit(20)
+                    ->limit(25)
                     ->tooltip(fn ($record) => $record->health_complaint)
+                    ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
+
             ])
             ->filters([
+
                 Filter::make('present')
                     ->label('Hadir')
-                    ->query(fn (Builder $query) => $query->where('attendance_status', AttendanceStatus::Present->value)),
+                    ->query(fn (Builder $q) => $q->where('attendance_status', AttendanceStatus::Present->value)),
+
                 Filter::make('absent')
                     ->label('Tidak Hadir')
-                    ->query(fn (Builder $query) => $query->where('attendance_status', AttendanceStatus::Absent->value)),
+                    ->query(fn (Builder $q) => $q->where('attendance_status', AttendanceStatus::Absent->value)),
+
                 Filter::make('sick')
                     ->label('Sakit')
-                    ->query(fn (Builder $query) => $query->where('attendance_status', AttendanceStatus::Sick->value)),
+                    ->query(fn (Builder $q) => $q->where('attendance_status', AttendanceStatus::Sick->value)),
+
+                Filter::make('perlu_tindakan')
+                    ->label('Perlu Tindakan')
+                    ->query(
+                        fn (Builder $q) => $q
+                            ->where('attendance_status', AttendanceStatus::Present->value)
+                            ->where(fn ($inner) => $inner
+                                ->where('has_ppe', false)
+                                ->orWhereNull('has_ppe')
+                                ->orWhereNull('fit_status')
+                                ->orWhere('fit_status', 'TIDAK FIT')
+                                ->orWhere('recheck_required', true)
+                                ->orWhereNotNull('medical_action')
+                            )
+                    ),
+
             ])
             ->headerActions([
+
+                // ── Tambah MP Reguler ──────────────────────────────────────
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah MP')
                     ->mutateFormDataUsing(function (array $data) {
-                        $session = $this->getOwnerRecord();
-                        $data['session_id'] = $session->id;
+                        $data['session_id'] = $this->getOwnerRecord()->id;
+                        $data['mp_type']    = 'regular';  // selalu reguler via form ini
 
                         return $data;
-                    })
-                    ->after(function (BriefingAttendance $record) {
-                        $this->syncPpeItems($record);
                     }),
 
+                // ── Tambah Backup MP ───────────────────────────────────────
+                Tables\Actions\Action::make('addBackup')
+                    ->label('Tambah Backup MP')
+                    ->icon('heroicon-o-user-plus')
+                    ->color('warning')
+                    ->modalHeading('Tambah Backup MP')
+                    ->modalDescription(
+                        'Backup MP adalah tenaga pengganti yang tidak terdaftar di roster depot.'
+                    )
+                    ->form(fn () => [
+                        $this->dataBackupSection(),
+                        $this->makePemeriksaanSection(),
+                        $this->catatanSection(),
+                    ])
+                    ->action(function (array $data): void {
+                        $session = $this->getOwnerRecord();
+
+                        BriefingAttendance::create([
+                            ...$data,
+                            'session_id'  => $session->id,
+                            'manpower_id' => null,   // backup tidak punya FK ke manpower
+                            'mp_type'     => 'backup',
+                        ]);
+
+                        Notification::make()
+                            ->title('Backup MP ditambahkan')
+                            ->success()
+                            ->send();
+                    }),
+
+                // ── Generate Semua MP Depot ────────────────────────────────
                 Tables\Actions\Action::make('generateAll')
                     ->label('Generate Semua MP Depot')
                     ->icon('heroicon-o-sparkles')
                     ->requiresConfirmation()
                     ->modalDescription('Buat absensi untuk semua MP aktif di depot ini?')
-                    ->action(function () {
+                    ->action(function (): void {
                         $session = $this->getOwnerRecord();
 
                         $mpIds = Manpower::query()
@@ -282,13 +546,19 @@ class AttendancesRelationManager extends RelationManager
                         $created = 0;
                         foreach ($mpIds as $mpId) {
                             $attendance = BriefingAttendance::firstOrCreate(
-                                ['session_id' => $session->id, 'manpower_id' => $mpId],
-                                ['attendance_status' => AttendanceStatus::Present->value]
+                                [
+                                    'session_id'  => $session->id,
+                                    'manpower_id' => $mpId,
+                                ],
+                                [
+                                    'attendance_status' => AttendanceStatus::Present->value,
+                                    'mp_type'           => 'regular',   // eksplisit reguler
+                                    'has_ppe'           => true,
+                                ]
                             );
 
                             if ($attendance->wasRecentlyCreated) {
                                 $created++;
-                                $this->syncPpeItems($attendance);
                             }
                         }
 
@@ -297,13 +567,10 @@ class AttendancesRelationManager extends RelationManager
                             ->success()
                             ->send();
                     }),
+
             ])
             ->actions([
-                Tables\Actions\EditAction::make()
-                    ->label('Ubah')
-                    ->after(function (BriefingAttendance $record) {
-                        $this->syncPpeItems($record);
-                    }),
+                Tables\Actions\EditAction::make()->label('Ubah'),
                 Tables\Actions\DeleteAction::make()->label('Hapus'),
             ])
             ->bulkActions([
@@ -311,39 +578,5 @@ class AttendancesRelationManager extends RelationManager
                     Tables\Actions\DeleteBulkAction::make()->label('Hapus Terpilih'),
                 ]),
             ]);
-    }
-
-    private function syncPpeItems(BriefingAttendance $attendance): void
-    {
-        $data = $this->form->getRawState();
-
-        if ($attendance->attendance_status !== AttendanceStatus::Present->value) {
-            return;
-        }
-
-        $ppeItems = [
-            'helm' => $data['helm_condition'] ?? PpeCondition::Baik->value,
-            'rompi' => $data['rompi_condition'] ?? PpeCondition::Baik->value,
-            'sepatu' => $data['sepatu_condition'] ?? PpeCondition::Baik->value,
-            'sarung_tangan' => $data['sarung_tangan_condition'] ?? PpeCondition::Baik->value,
-        ];
-
-        foreach ($ppeItems as $type => $condition) {
-            BriefingAttendancePpeItem::updateOrCreate(
-                [
-                    'attendance_id' => $attendance->id,
-                    'ppe_type' => $type,
-                ],
-                ['condition' => $condition]
-            );
-        }
-
-        $allGood = collect($ppeItems)->every(fn ($condition) => $condition === PpeCondition::Baik->value);
-        $attendance->update(['has_ppe' => $allGood]);
-
-        $session = $attendance->session;
-        if ($session) {
-            $session->refreshSufficientFlag();
-        }
     }
 }

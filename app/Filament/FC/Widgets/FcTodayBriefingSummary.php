@@ -51,11 +51,10 @@ class FcTodayBriefingSummary extends Widget
 
         $hadir        = $attendances->where('attendance_status', 'present')->count();
         $tidakHadir   = $attendances->where('attendance_status', '!=', 'present')->count();
-        $siapKerja    = $attendances->filter(fn ($a) => $a->final_mp_status === 'Siap Kerja')->count();
-        $perluRecheck = $attendances->filter(fn ($a) => in_array($a->final_mp_status, [
-            'Perlu Pemeriksaan Ulang', 'APD Tidak Lengkap', 'Istirahat 30 Menit',
-        ], true))->count();
-        $tidakFit     = $attendances->filter(fn ($a) => $a->final_mp_status === 'Tidak Fit')->count();
+        // MP FIT: fit_status = 'FIT' (present + recheck yang lulus)
+        $fitCount     = $attendances->where('fit_status', 'FIT')->count();
+        $perluRecheck = $attendances->where('recheck_required', true)->count();
+        $tidakFit     = $attendances->where('fit_status', 'UNFIT')->count();
 
         $apdChecks = $session->stockApdChecks;
         $apdTotal  = $apdChecks->count();
@@ -70,6 +69,9 @@ class FcTodayBriefingSummary extends Widget
 
         $target = (int) $session->summary_headcount;
 
+        // Status kesiapan berdasarkan jumlah MP FIT vs kebutuhan
+        $isReady = $fitCount >= $target;
+
         return [
             'session'       => $session,
             'has_session'   => true,
@@ -79,13 +81,13 @@ class FcTodayBriefingSummary extends Widget
             'target'        => $target,
             'hadir'         => $hadir,
             'tidak_hadir'   => $tidakHadir,
-            'siap_kerja'    => $siapKerja,
+            'fit_count'     => $fitCount,
             'perlu_recheck' => $perluRecheck,
             'tidak_fit'     => $tidakFit,
             'apd_total'     => $apdTotal,
             'apd_kurang'    => $apdKurang,
-            // Compact readiness flag — matches FcOperationalReadiness logic
-            'is_ready'      => $status?->value === 'cleared',
+            // Status readiness: FIT >= target (bukan mp_check_status cleared)
+            'is_ready'      => $isReady,
         ];
     }
 

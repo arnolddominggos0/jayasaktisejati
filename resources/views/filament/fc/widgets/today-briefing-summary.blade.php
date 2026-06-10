@@ -49,7 +49,7 @@
         $isReady  = $data['is_ready'];
         $hadir    = (int) $data['hadir'];
         $target   = (int) $data['target'];
-        $siap     = (int) $data['siap_kerja'];
+        $fitCount = (int) $data['fit_count'];
         $recheck  = (int) $data['perlu_recheck'];
         $progress = $target > 0 ? min(100, (int) round(($hadir / $target) * 100)) : 0;
 
@@ -89,15 +89,21 @@
         $barColor = $progress >= 100 ? 'bg-green-500'
             : ($progress >= 60  ? 'bg-amber-500' : 'bg-rose-500');
 
+        // ── Kesiapan operasional (FIT >= target) ─────────────────────────────
+        $fitProgress = $target > 0 ? min(100, (int) round(($fitCount / $target) * 100)) : 0;
+        $fitColor    = $fitCount >= $target ? 'text-emerald-600 dark:text-emerald-400'
+                     : ($fitCount >= ceil($target * 0.6) ? 'text-amber-600 dark:text-amber-400'
+                                                          : 'text-rose-600 dark:text-rose-400');
+
         // ── Gate loading status ───────────────────────────────────────────────
         if ($isReady) {
-            $gate = ['label' => 'Terbuka',  'dot' => 'bg-green-500',
+            $gate = ['label' => 'SIAP',       'dot' => 'bg-green-500',
                      'bg'  => 'bg-green-50 dark:bg-green-900/20',
                      'text' => 'text-green-700 dark:text-green-300', 'pulse' => false];
         } else {
-            $gate = ['label' => 'Tertutup', 'dot' => 'bg-red-500',
+            $gate = ['label' => 'BELUM SIAP', 'dot' => 'bg-red-500',
                      'bg'  => 'bg-red-50 dark:bg-red-900/20',
-                     'text' => 'text-red-700 dark:text-red-300',   'pulse' => true];
+                     'text' => 'text-red-700 dark:text-red-300',     'pulse' => true];
         }
 
         // ── Card outer ring ───────────────────────────────────────────────────
@@ -180,27 +186,27 @@
                 </div>
             </div>
 
-            {{-- ③ Siap Kerja --}}
+            {{-- ③ MP FIT --}}
             <div class="flex h-full flex-col justify-between px-4 py-4">
-                <p class="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Siap Kerja</p>
-                <p class="mt-1 text-3xl font-extrabold tabular-nums leading-none
-                           {{ $siap > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-300 dark:text-gray-600' }}">
-                    {{ $siap }}
+                <p class="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">MP FIT</p>
+                <p class="mt-1 text-3xl font-extrabold tabular-nums leading-none {{ $fitColor }}">
+                    {{ $fitCount }}
+                    <span class="text-base font-normal text-gray-400">/ {{ $target }}</span>
                 </p>
                 <p class="mt-1 text-xs {{ $recheck > 0 ? 'font-medium text-amber-600 dark:text-amber-400' : 'text-gray-400' }}">
-                    {{ $recheck > 0 ? $recheck . ' perlu recheck' : 'orang siap bertugas' }}
+                    {{ $recheck > 0 ? $recheck . ' perlu recheck' : 'fit_status = FIT' }}
                 </p>
             </div>
 
-            {{-- ④ Gate Loading --}}
+            {{-- ④ Kesiapan Operasional --}}
             <div class="flex h-full flex-col justify-between px-4 py-4">
-                <p class="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Gate Loading</p>
+                <p class="text-[11px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Kesiapan</p>
                 <div class="mt-1.5 inline-flex w-fit items-center gap-2 rounded-lg px-3 py-1.5 {{ $gate['bg'] }}">
                     <span class="h-2.5 w-2.5 rounded-full {{ $gate['dot'] }} {{ $gate['pulse'] ? 'animate-pulse' : '' }}"></span>
                     <span class="text-sm font-bold {{ $gate['text'] }}">{{ $gate['label'] }}</span>
                 </div>
                 <p class="mt-1 text-xs text-gray-400">
-                    {{ $isReady ? 'Operasional dapat berjalan' : 'MP Check belum selesai' }}
+                    {{ $isReady ? 'FIT ≥ kebutuhan MP' : 'FIT belum mencukupi' }}
                 </p>
             </div>
         </div>

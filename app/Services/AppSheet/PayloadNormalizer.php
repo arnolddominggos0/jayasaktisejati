@@ -1,5 +1,11 @@
 <?php
 
+/**
+ * @deprecated DEAD CODE — PayloadNormalizer is never used from any active code path.
+ * Note: this class lacks the normalizeValue() logic present in AppSheetService.
+ * The active normalization path is AppSheetService::normalizeValue(). See BaseSyncHandler.php.
+ */
+
 namespace App\Services\AppSheet;
 
 use Exception;
