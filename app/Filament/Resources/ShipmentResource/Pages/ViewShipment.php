@@ -4,12 +4,16 @@ namespace App\Filament\Resources\ShipmentResource\Pages;
 
 use App\Enums\ShipmentMode;
 use App\Filament\Resources\ShipmentResource;
+use App\Filament\Resources\UnitResource;
+use App\Models\UnitInspection;
+use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Actions\Action;
+use Illuminate\Support\Facades\DB;
 
 class ViewShipment extends ViewRecord
 {
