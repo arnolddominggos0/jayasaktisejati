@@ -1,129 +1,123 @@
 @php
 /**
- * Tab: Schedule History Logbook — Vessel Plan
- *
- * Menampilkan perbandingan Draft vs Final Schedule per vessel.
- *
- * Sumber data:
- *   Draft  = VesselPlanSnapshot(stage='draft_submitted').schedule_payload
- *   Final  = VesselPlanItem.planned_etd / planned_eta (current state)
- *
- * Actual TIDAK ditampilkan di sini — actual adalah domain Voyage.
- *
- * Delta = Final - Draft (dalam hari, positif = terlambat/naik).
- *
- * Klik baris → detail drawer Alpine.js
- * Backfill ready: seeder bisa mengisi draft dari snapshot historis.
- */
+* Tab: Schedule History Logbook — Vessel Plan
+*
+* Menampilkan perbandingan Draft vs Final Schedule per vessel.
+*
+* Sumber data:
+* Draft = VesselPlanSnapshot(stage='draft_submitted').schedule_payload
+* Final = VesselPlanItem.planned_etd / planned_eta (current state)
+*
+* Actual TIDAK ditampilkan di sini — actual adalah domain Voyage.
+*
+* Delta = Final - Draft (dalam hari, positif = terlambat/naik).
+*
+* Klik baris → detail drawer Alpine.js
+* Backfill ready: seeder bisa mengisi draft dari snapshot historis.
+*/
+
+@php
 
 use Carbon\Carbon;
 
 $historyRows = $items->map(function ($item) {
 
-    $voyage = $item->voyage;
+```
+$voyage = $item->voyage;
 
-    $histories = $voyage?->scheduleHistories ?? collect();
+$histories = $voyage?->scheduleHistories ?? collect();
 
-    $draft  = $histories->firstWhere('schedule_type', 'draft');
-    $final  = $histories->firstWhere('schedule_type', 'final');
-    $actual = $histories->firstWhere('schedule_type', 'actual');
+$draft = $histories->firstWhere('schedule_type', 'draft');
+$final = $histories->firstWhere('schedule_type', 'final');
+$actual = $histories->firstWhere('schedule_type', 'actual');
 
-    return [
-        'vessel' => $item->vessel?->name,
-        'voyage_no' => $item->voyage_no,
+return [
 
-        'draft_etd' => $draft?->etd?->format('d M Y'),
-        'draft_eta' => $draft?->eta?->format('d M Y'),
+'id' => $item->id,
 
-        'final_etd' => $final?->etd?->format('d M Y'),
-        'final_eta' => $final?->eta?->format('d M Y'),
+'vessel' => $item->vessel?->name ?? '—',
 
-        'actual_atd' => $actual?->etd?->format('d M Y'),
-        'actual_ata' => $actual?->eta?->format('d M Y'),
+'voyage_no' => $item->voyage_no ?? '—',
 
-        'draft_sailing' => $draft?->sailing_days,
-        'final_sailing' => $final?->sailing_days,
-        'actual_sailing' => $actual?->sailing_days,
+'shipping_line' => $item->shippingLine?->name ?? '—',
 
-        'delta_df' => \App\Models\VoyageScheduleHistory::sailingVariance(
-            $draft,
-            $final
-        ),
+// Draft
+'draft_etd' => $draft?->etd?->format('d M Y'),
+'draft_eta' => $draft?->eta?->format('d M Y'),
+'draft_sailing' => $draft?->sailing_days,
 
-        'delta_fa' => \App\Models\VoyageScheduleHistory::sailingVariance(
-            $final,
-            $actual
-        ),
+// Final
+'final_etd' => $final?->etd?->format('d M Y'),
+'final_eta' => $final?->eta?->format('d M Y'),
+'final_sailing' => $final?->sailing_days,
 
-        'delta_da' => \App\Models\VoyageScheduleHistory::sailingVariance(
-            $draft,
-            $actual
-        ),
-    ];
+// Actual
+'actual_etd' => $actual?->etd?->format('d M Y'),
+'actual_eta' => $actual?->eta?->format('d M Y'),
+'actual_sailing' => $actual?->sailing_days,
+
+// Variance
+'delta_df' => (
+$draft && $final
+)
+? round($final->sailing_days - $draft->sailing_days, 1)
+: null,
+
+'delta_fa' => (
+$final && $actual
+)
+? round($actual->sailing_days - $final->sailing_days, 1)
+: null,
+
+'delta_da' => (
+$draft && $actual
+)
+? round($actual->sailing_days - $draft->sailing_days, 1)
+: null,
+
+];
+```
+
 });
 
-// ── Build history rows ──────────────────────────────────────────────────────
-$historyRows = $items->map(function ($item) use ($draftMap) {
-    $draftRow = $draftMap[$item->id] ?? null;
+$alpineData = $historyRows->values()->toJson();
 
-    $draftEtdStr = $draftRow['planned_etd'] ?? null;
-    $draftEtaStr = $draftRow['planned_eta'] ?? null;
+$varianceClass = function ($v) {
 
-    $draftEtd = $draftEtdStr ? Carbon::parse($draftEtdStr) : null;
-    $draftEta = $draftEtaStr ? Carbon::parse($draftEtaStr) : null;
+```
+if ($v === null) {
+return 'text-gray-400';
+}
 
-    $finalEtd = $item->planned_etd;
-    $finalEta = $item->planned_eta;
+if ($v == 0) {
+return 'text-gray-500';
+}
 
-    // Delta: positif = final lebih lambat dari draft (mundur jadwal)
-    $deltaEtd = ($draftEtd && $finalEtd) ? (int) $draftEtd->diffInDays($finalEtd, false) : null;
-    $deltaEta = ($draftEta && $finalEta) ? (int) $draftEta->diffInDays($finalEta, false) : null;
+return $v > 0
+? 'text-red-600 font-semibold'
+: 'text-emerald-600 font-semibold';
+```
 
-    $draftSailing = ($draftEtd && $draftEta)
-        ? (int) $draftEtd->diffInDays($draftEta)
-        : null;
-
-    $finalSailing = ($finalEtd && $finalEta)
-        ? (int) $finalEtd->diffInDays($finalEta)
-        : null;
-
-    return [
-        'id'             => $item->id,
-        'vessel'         => $item->vessel?->name ?? '—',
-        'voyage_no'      => $item->voyage_no ?? '—',
-        'shipping_line'  => $item->shippingLine?->name ?? '—',
-
-        // Draft
-        'draft_etd'      => $draftEtd?->format('d M Y'),
-        'draft_eta'      => $draftEta?->format('d M Y'),
-        'draft_sailing'  => $draftSailing,
-        'has_draft'      => $draftRow !== null,
-
-        // Final
-        'final_etd'      => $finalEtd?->format('d M Y'),
-        'final_eta'      => $finalEta?->format('d M Y'),
-        'final_sailing'  => $finalSailing,
-
-        // Delta
-        'delta_etd'      => $deltaEtd,
-        'delta_eta'      => $deltaEta,
-        'delta_sailing'  => ($draftSailing !== null && $finalSailing !== null)
-                                ? $finalSailing - $draftSailing
-                                : null,
-    ];
-})->values()->all();
-
-// ── Alpine data — di-encode aman untuk JS ──────────────────────────────────
-$alpineData = json_encode($historyRows, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
-
-// ── Delta label helper ──────────────────────────────────────────────────────
-$deltaLabel = function (?int $d, bool $short = false): array {
-    if ($d === null) return ['text' => '—',                          'class' => 'text-gray-400'];
-    if ($d === 0)    return ['text' => '±0',                         'class' => 'text-gray-500'];
-    if ($d > 0)      return ['text' => '+' . $d . ($short ? '' : ' hari'), 'class' => 'text-amber-600 font-semibold'];
-    return                  ['text' =>       $d . ($short ? '' : ' hari'), 'class' => 'text-emerald-600 font-semibold'];
 };
+
+$varianceLabel = function ($v) {
+
+```
+if ($v === null) {
+return '—';
+}
+
+if ($v == 0) {
+return '±0';
+}
+
+return ($v > 0 ? '+' : '') . $v . ' hr';
+```
+
+};
+
 @endphp
+
 
 {{-- Alpine root — table + detail drawer --}}
 <div
@@ -143,8 +137,7 @@ $deltaLabel = function (?int $d, bool $short = false): array {
             return (d > 0 ? '+' : '') + d + unit;
         }
     }"
-    class="space-y-5"
->
+    class="space-y-5">
 
     {{-- Header --}}
     <div class="flex items-start justify-between flex-wrap gap-3">
@@ -194,77 +187,113 @@ $deltaLabel = function (?int $d, bool $short = false): array {
             <thead>
                 <tr class="bg-gray-50 border-b border-gray-200">
                     {{-- Vessel --}}
-                    <th class="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-gray-400 font-bold">
-                        Vessel
-                    </th>
-                    {{-- Draft --}}
-                    <th class="text-center px-3 py-3 text-[11px] uppercase tracking-wider font-bold">
-                        <span class="text-blue-500">Draft</span> ETD
-                    </th>
-                    <th class="text-center px-3 py-3 text-[11px] uppercase tracking-wider font-bold">
-                        <span class="text-blue-500">Draft</span> ETA
-                    </th>
-                    {{-- Final --}}
-                    <th class="text-center px-3 py-3 text-[11px] uppercase tracking-wider font-bold">
-                        <span class="text-emerald-600">Final</span> ETD
-                    </th>
-                    <th class="text-center px-3 py-3 text-[11px] uppercase tracking-wider font-bold">
-                        <span class="text-emerald-600">Final</span> ETA
-                    </th>
-                    {{-- Delta --}}
-                    <th class="text-center px-3 py-3 text-[11px] uppercase tracking-wider text-gray-400 font-bold">
-                        Δ ETD
-                    </th>
-                    <th class="text-center px-3 py-3 text-[11px] uppercase tracking-wider text-gray-400 font-bold">
-                        Δ ETA
-                    </th>
+                    <thead>
+                        <tr class="bg-gray-50 border-b">
+
+                            ```
+                            <th class="px-4 py-3 text-left">
+                                Vessel
+                            </th>
+
+                            <th class="px-3 py-3 text-center">
+                                Draft
+                            </th>
+
+                            <th class="px-3 py-3 text-center">
+                                Final
+                            </th>
+
+                            <th class="px-3 py-3 text-center">
+                                Actual
+                            </th>
+
+                            <th class="px-3 py-3 text-center">
+                                Draft→Final
+                            </th>
+
+                            <th class="px-3 py-3 text-center">
+                                Final→Actual
+                            </th>
+
+                            <th class="px-3 py-3 text-center">
+                                Draft→Actual
+                            </th>
+                            ```
+
+                        </tr>
+                    </thead>
                     {{-- Action --}}
                     <th class="px-4 py-3 w-10"></th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
-                @foreach ($historyRows as $i => $row)
-                @php
-                    $de = $deltaLabel($row['delta_etd']);
-                    $da = $deltaLabel($row['delta_eta']);
-                @endphp
-                <tr
-                    class="hover:bg-gray-50 cursor-pointer transition-colors"
-                    @click="showDetail(rows[{{ $i }}])"
-                >
-                    {{-- Vessel --}}
+            <tbody>
+
+                @foreach ($historyRows as $row)
+
+                <tr class="hover:bg-gray-50">
+
+                    ```
                     <td class="px-4 py-3">
-                        <div class="font-semibold text-gray-800">{{ $row['vessel'] }}</div>
-                        <div class="text-[11px] text-gray-400 font-mono">{{ $row['voyage_no'] }}</div>
+
+                        <div class="font-semibold">
+                            {{ $row['vessel'] }}
+                        </div>
+
+                        <div class="text-xs text-gray-400">
+                            {{ $row['voyage_no'] }}
+                        </div>
+
                     </td>
 
-                    {{-- Draft --}}
-                    <td class="px-3 py-3 text-center font-mono text-blue-600 text-xs">
-                        {{ $row['draft_etd'] ?? '—' }}
-                    </td>
-                    <td class="px-3 py-3 text-center font-mono text-blue-600 text-xs">
-                        {{ $row['draft_eta'] ?? '—' }}
+                    <td class="px-3 py-3 text-center text-xs">
+
+                        <div>{{ $row['draft_etd'] ?? '—' }}</div>
+                        <div>{{ $row['draft_eta'] ?? '—' }}</div>
+
+                        <div class="mt-1 font-semibold text-blue-600">
+                            {{ $row['draft_sailing'] ?? '—' }}
+                        </div>
+
                     </td>
 
-                    {{-- Final --}}
-                    <td class="px-3 py-3 text-center font-mono text-emerald-700 text-xs font-semibold">
-                        {{ $row['final_etd'] ?? '—' }}
-                    </td>
-                    <td class="px-3 py-3 text-center font-mono text-emerald-700 text-xs font-semibold">
-                        {{ $row['final_eta'] ?? '—' }}
+                    <td class="px-3 py-3 text-center text-xs">
+
+                        <div>{{ $row['final_etd'] ?? '—' }}</div>
+                        <div>{{ $row['final_eta'] ?? '—' }}</div>
+
+                        <div class="mt-1 font-semibold text-emerald-600">
+                            {{ $row['final_sailing'] ?? '—' }}
+                        </div>
+
                     </td>
 
-                    {{-- Delta --}}
-                    <td class="px-3 py-3 text-center text-xs {{ $de['class'] }}">{{ $de['text'] }}</td>
-                    <td class="px-3 py-3 text-center text-xs {{ $da['class'] }}">{{ $da['text'] }}</td>
+                    <td class="px-3 py-3 text-center text-xs">
 
-                    {{-- Arrow --}}
-                    <td class="px-4 py-3 text-gray-300 hover:text-gray-500">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                        </svg>
+                        <div>{{ $row['actual_etd'] ?? '—' }}</div>
+                        <div>{{ $row['actual_eta'] ?? '—' }}</div>
+
+                        <div class="mt-1 font-semibold text-violet-600">
+                            {{ $row['actual_sailing'] ?? '—' }}
+                        </div>
+
                     </td>
+
+                    <td class="px-3 py-3 text-center {{ $varianceClass($row['delta_df']) }}">
+                        {{ $varianceLabel($row['delta_df']) }}
+                    </td>
+
+                    <td class="px-3 py-3 text-center {{ $varianceClass($row['delta_fa']) }}">
+                        {{ $varianceLabel($row['delta_fa']) }}
+                    </td>
+
+                    <td class="px-3 py-3 text-center {{ $varianceClass($row['delta_da']) }}">
+                        {{ $varianceLabel($row['delta_da']) }}
+                    </td>
+                    ```
+
                 </tr>
+
                 @endforeach
             </tbody>
         </table>
@@ -283,8 +312,7 @@ $deltaLabel = function (?int $d, bool $short = false): array {
         x-transition:leave-end="opacity-0"
         @click.self="open = false"
         class="fixed inset-0 bg-black/30 z-40"
-        x-cloak
-    ></div>
+        x-cloak></div>
 
     {{-- Drawer panel --}}
     <div
@@ -296,8 +324,7 @@ $deltaLabel = function (?int $d, bool $short = false): array {
         x-transition:leave-start="translate-x-0"
         x-transition:leave-end="translate-x-full"
         class="fixed top-0 right-0 h-full w-full max-w-sm bg-white shadow-2xl z-50 overflow-y-auto"
-        x-cloak
-    >
+        x-cloak>
         <template x-if="selected">
             <div class="p-6 space-y-6">
 
@@ -310,7 +337,7 @@ $deltaLabel = function (?int $d, bool $short = false): array {
                     </div>
                     <button @click="open = false" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
                 </div>
@@ -325,17 +352,17 @@ $deltaLabel = function (?int $d, bool $short = false): array {
                         <div>
                             <div class="text-[10px] text-blue-400 uppercase mb-1">ETD</div>
                             <div class="font-semibold text-blue-800 text-sm"
-                                 x-text="selected.draft_etd || '—'"></div>
+                                x-text="selected.draft_etd || '—'"></div>
                         </div>
                         <div>
                             <div class="text-[10px] text-blue-400 uppercase mb-1">ETA</div>
                             <div class="font-semibold text-blue-800 text-sm"
-                                 x-text="selected.draft_eta || '—'"></div>
+                                x-text="selected.draft_eta || '—'"></div>
                         </div>
                         <div class="col-span-2">
                             <div class="text-[10px] text-blue-400 uppercase mb-1">Sailing</div>
                             <div class="font-semibold text-blue-800 text-sm"
-                                 x-text="selected.draft_sailing !== null ? selected.draft_sailing + ' hari' : '—'"></div>
+                                x-text="selected.draft_sailing !== null ? selected.draft_sailing + ' hari' : '—'"></div>
                         </div>
                     </div>
                 </div>
@@ -350,17 +377,17 @@ $deltaLabel = function (?int $d, bool $short = false): array {
                         <div>
                             <div class="text-[10px] text-emerald-400 uppercase mb-1">ETD</div>
                             <div class="font-semibold text-emerald-800 text-sm"
-                                 x-text="selected.final_etd || '—'"></div>
+                                x-text="selected.final_etd || '—'"></div>
                         </div>
                         <div>
                             <div class="text-[10px] text-emerald-400 uppercase mb-1">ETA</div>
                             <div class="font-semibold text-emerald-800 text-sm"
-                                 x-text="selected.final_eta || '—'"></div>
+                                x-text="selected.final_eta || '—'"></div>
                         </div>
                         <div class="col-span-2">
                             <div class="text-[10px] text-emerald-400 uppercase mb-1">Sailing</div>
                             <div class="font-semibold text-emerald-800 text-sm"
-                                 x-text="selected.final_sailing !== null ? selected.final_sailing + ' hari' : '—'"></div>
+                                x-text="selected.final_sailing !== null ? selected.final_sailing + ' hari' : '—'"></div>
                         </div>
                     </div>
                 </div>
@@ -375,21 +402,21 @@ $deltaLabel = function (?int $d, bool $short = false): array {
                         <div class="flex items-center justify-between">
                             <span class="text-sm text-gray-500">ETD</span>
                             <span class="text-sm font-semibold"
-                                  :class="deltaClass(selected.delta_etd)"
-                                  x-text="deltaText(selected.delta_etd)"></span>
+                                :class="deltaClass(selected.delta_etd)"
+                                x-text="deltaText(selected.delta_etd)"></span>
                         </div>
                         <div class="flex items-center justify-between">
                             <span class="text-sm text-gray-500">ETA</span>
                             <span class="text-sm font-semibold"
-                                  :class="deltaClass(selected.delta_eta)"
-                                  x-text="deltaText(selected.delta_eta)"></span>
+                                :class="deltaClass(selected.delta_eta)"
+                                x-text="deltaText(selected.delta_eta)"></span>
                         </div>
                         <div class="border-t border-gray-200 pt-2.5">
                             <div class="flex items-center justify-between">
                                 <span class="text-sm text-gray-500">Sailing</span>
                                 <span class="text-sm font-semibold"
-                                      :class="deltaClass(selected.delta_sailing)"
-                                      x-text="deltaText(selected.delta_sailing)"></span>
+                                    :class="deltaClass(selected.delta_sailing)"
+                                    x-text="deltaText(selected.delta_sailing)"></span>
                             </div>
                         </div>
                     </div>
