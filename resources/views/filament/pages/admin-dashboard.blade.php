@@ -561,6 +561,33 @@
 
         </div>
 
+        {{-- ── Ringkasan Pemeriksaan Checksheet ─────────────────────────── --}}
+        @php $insp = $this->getInspeksiRingkasan(); @endphp
+        <div class="{{ $cardClass }} p-5">
+            <div class="flex items-center gap-2 mb-4">
+                <x-heroicon-m-clipboard-document-check class="w-5 h-5 text-indigo-500" />
+                <h3 class="text-base font-semibold text-gray-800 dark:text-white">Pemeriksaan Unit</h3>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div class="text-center p-3 rounded-lg bg-gray-50 dark:bg-gray-700">
+                    <p class="text-3xl font-bold text-gray-800 dark:text-white">{{ number_format($insp['total']) }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Total Unit</p>
+                </div>
+                <div class="text-center p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/30">
+                    <p class="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{{ number_format($insp['sudah']) }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Sudah Diperiksa</p>
+                </div>
+                <div class="text-center p-3 rounded-lg {{ $insp['belum'] > 0 ? 'bg-amber-50 dark:bg-amber-900/30' : 'bg-gray-50 dark:bg-gray-700' }}">
+                    <p class="text-3xl font-bold {{ $insp['belum'] > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400' }}">{{ number_format($insp['belum']) }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Belum Diperiksa</p>
+                </div>
+                <div class="text-center p-3 rounded-lg {{ $insp['ng'] > 0 ? 'bg-rose-50 dark:bg-rose-900/30' : 'bg-gray-50 dark:bg-gray-700' }}">
+                    <p class="text-3xl font-bold {{ $insp['ng'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-400' }}">{{ number_format($insp['ng']) }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Temuan NG</p>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     {{-- Single source of truth for all chart data --}}

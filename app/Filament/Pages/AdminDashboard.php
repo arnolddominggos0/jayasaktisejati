@@ -791,4 +791,26 @@ class AdminDashboard extends Page implements HasForms
             ],
         ];
     }
+
+    public function getInspeksiRingkasan(): array
+    {
+        $total = DB::table('units')->count();
+
+        $sudah = DB::table('units as u')
+            ->join('unit_inspections as ui', 'ui.unit_id', '=', 'u.id')
+            ->distinct('u.id')
+            ->count('u.id');
+
+        $ng = DB::table('unit_inspection_items as uii')
+            ->join('unit_inspections as ui', 'ui.id', '=', 'uii.unit_inspection_id')
+            ->where('uii.result', 'ng')
+            ->count();
+
+        return [
+            'total' => $total,
+            'sudah' => $sudah,
+            'belum' => max(0, $total - $sudah),
+            'ng'    => $ng,
+        ];
+    }
 }
