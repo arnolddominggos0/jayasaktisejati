@@ -67,41 +67,27 @@ class ShipmentResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
-
-        $u = Filament::auth()->user();
-        if (! $u) {
-            return $query->whereRaw('1=0');
-        }
-
-        $query->where('mode', ShipmentMode::Sea->value);
-
         $branchId = app()->bound('scope.branch_id')
             ? app('scope.branch_id')
             : null;
 
-        $depotId = app()->bound('scope.depot_id')
-            ? app('scope.depot_id')
-            : null;
-
-        if (! $branchId || ! $depotId) {
-            return $query->whereRaw('1=0');
-        }
-
-        $query->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id'));
-
-        $query->where(function ($w) use ($depotId, $u) {
-            $w->where('assigned_depot_id', $depotId)
-                ->orWhere('coordinator_id', $u->id);
-        });
-
-        return $query->with([
-            'customer:id,name',
-            'receiver:id,name',
-            'originCity:id,name',
-            'destinationCity:id,name',
-            'latestTrack',
-        ]);
+        return parent::getEloquentQuery()
+            ->where('mode', ShipmentMode::Sea->value)
+            ->when(
+                $branchId,
+                fn($q) => $q->where(
+                    fn($w) =>
+                    $w->where('branch_id', $branchId)
+                        ->orWhereNull('branch_id')
+                )
+            )
+            ->with([
+                'customer:id,name',
+                'receiver:id,name',
+                'originCity:id,name',
+                'destinationCity:id,name',
+                'latestTrack',
+            ]);
     }
 
     protected static function getNextTrackStatusOptions(Shipment $record): array
@@ -310,7 +296,7 @@ class ShipmentResource extends Resource
                     ->directory('shipment-tracks/checkseet')
                     ->multiple()
                     ->image()
-                    ->required(fn (Forms\Get $get) => $get('checkseet_status') === 'ng'),
+                    ->required(fn(Forms\Get $get) => $get('checkseet_status') === 'ng'),
             ]);
     }
 
@@ -640,7 +626,7 @@ class ShipmentResource extends Resource
                             static::optionalChecksheetSchema(),
                         ])
                         ->action(fn(Shipment $record, array $data) =>
-                            static::appendTrackWithCheckseet($record, TrackStatus::Handover, $data, 'Handover Depo')),
+                        static::appendTrackWithCheckseet($record, TrackStatus::Handover, $data, 'Handover Depo')),
 
                     Tables\Actions\Action::make('stuffing')
                         ->label('Stuffing & Segel')
@@ -778,7 +764,7 @@ class ShipmentResource extends Resource
                             static::optionalChecksheetSchema(),
                         ])
                         ->action(fn(Shipment $record, array $data) =>
-                            static::appendTrackWithCheckseet($record, TrackStatus::Unloading, $data, 'Pembongkaran')),
+                        static::appendTrackWithCheckseet($record, TrackStatus::Unloading, $data, 'Pembongkaran')),
 
                     Tables\Actions\Action::make('handoverTrucking')
                         ->label('Handover Selfdrive')
@@ -798,7 +784,7 @@ class ShipmentResource extends Resource
                             static::optionalChecksheetSchema(),
                         ])
                         ->action(fn(Shipment $record, array $data) =>
-                            static::appendTrackWithCheckseet($record, TrackStatus::DeliveryToCustomer, $data, 'Antar ke Customer')),
+                        static::appendTrackWithCheckseet($record, TrackStatus::DeliveryToCustomer, $data, 'Antar ke Customer')),
 
                     Tables\Actions\Action::make('markDelivered')
                         ->label('Tandai Terkirim')
