@@ -2,241 +2,140 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\MPCheckStatus;
 use App\Filament\Resources\BriefingSessionResource\Pages;
-use App\Filament\Resources\BriefingSessionResource\RelationManagers\AttendanceRelationManager;
+use App\Filament\Resources\BriefingSessionResource\RelationManagers\AttendancesRelationManager;
+use App\Filament\Resources\BriefingSessionResource\RelationManagers\StockApdChecksRelationManager;
 use App\Models\BriefingSession;
-use App\Models\Depot;
-use App\Models\User;
-use Filament\Facades\Filament;
-use Filament\Forms;
 use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Get;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 
+/**
+ * Admin panel — Briefing Session resource.
+ *
+ * Hak akses Super Admin: View All, Review, Approve, Audit.
+ * FC YANG MEMBUAT SESSION — admin hanya melihat & menyetujui.
+ *
+ * Prinsip:
+ *   - canCreate = false  (FC yang input, bukan admin)
+ *   - getPages = [index, view]  (tidak ada create / edit)
+ *   - Relation managers: read-only (Attendances + StockApdChecks)
+ */
 class BriefingSessionResource extends Resource
 {
     protected static ?string $model = BriefingSession::class;
 
-    protected static ?string $navigationGroup = 'Transaksi';
+    protected static ?string $navigationGroup = 'Operasional';
+    protected static ?string $navigationLabel = 'Briefing Session';
+    protected static ?string $pluralLabel     = 'Briefing Session';
+    protected static ?string $modelLabel      = 'Sesi Briefing';
+    protected static ?string $navigationIcon  = 'heroicon-m-clipboard-document-check';
+    protected static ?int    $navigationSort  = 1;
 
-    protected static ?string $navigationLabel = 'Briefing MP';
+    // ── Permissions ──────────────────────────────────────────────────────────
 
-    protected static ?string $pluralLabel = 'Briefing MP';
-
-    protected static ?string $modelLabel = 'Sesi Briefing';
-
-    protected static ?string $navigationIcon = 'heroicon-m-clipboard-document-check';
-
-    protected static ?int $navigationSort = 20;
-
-    public static function form(Forms\Form $form): Forms\Form
+    public static function canCreate(): bool
     {
-        return $form->schema([
-            DatePicker::make('date')
-                ->label('Tanggal')
-                ->default(now())
-                ->closeOnDateSelection()
-                ->required()
-                ->rule(function (Get $get, ?BriefingSession $record) {
-                    $depotId = (int) $get('depot_id');
-                    if (! $depotId) {
-                        return null;
-                    }
-
-                    return Rule::unique('briefing_sessions', 'date')
-                        ->where(fn ($query) => $query->where('depot_id', $depotId))
-                        ->ignore($record?->id);
-                }),
-
-            Select::make('depot_id')
-                ->relationship('depot', 'name', function (EloquentBuilder $query) {
-                    $u = Filament::auth()?->user();
-
-                    $isFc = false;
-                    if ($u) {
-                        $isFc = DB::table('model_has_roles')
-                            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-                            ->where('model_has_roles.model_type', User::class)
-                            ->where('model_has_roles.model_id', $u->id)
-                            ->where('roles.name', 'field_coordinator')
-                            ->exists();
-                    }
-
-                    if ($u && $isFc && $u->effectiveBranchId()) {
-                        $query->where('branch_id', $u->effectiveBranchId());
-                    }
-
-                    $query->orderBy('name');
-                })
-                ->label('Depot')
-                ->searchable()
-                ->preload()
-                ->required()
-                ->reactive(),
-
-            Select::make('coordinator_user_id')
-                ->label('PIC')
-                ->options(function (Get $get) {
-                    $depotId = $get('depot_id');
-                    $branchId = $depotId ? Depot::query()->whereKey($depotId)->value('branch_id') : null;
-
-                    return User::role('field_coordinator')
-                        ->when($branchId, fn ($query) => $query->where(fn ($q) => $q->where('scope_branch_id', $branchId)->orWhere(fn ($q2) => $q2->whereNull('scope_branch_id')->where('branch_id', $branchId))))
-                        ->orderBy('name')
-                        ->pluck('name', 'id');
-                })
-                ->searchable()
-                ->preload()
-                ->required()
-                ->rule(function (Get $get) {
-                    return function (string $attribute, $value, \Closure $fail) use ($get) {
-                        if (! $value) {
-                            return;
-                        }
-                        $depotId = (int) $get('depot_id');
-                        $branchId = $depotId ? Depot::query()->whereKey($depotId)->value('branch_id') : null;
-                        $ok = User::role('field_coordinator')
-                            ->when($branchId, fn ($query) => $query->where(fn ($q) => $q->where('scope_branch_id', $branchId)->orWhere(fn ($q2) => $q2->whereNull('scope_branch_id')->where('branch_id', $branchId))))
-                            ->whereKey($value)
-                            ->exists();
-                        if (! $ok) {
-                            $fail('PIC harus koordinator lapangan di cabang yang sama.');
-                        }
-                    };
-                }),
-
-            TextInput::make('summary_headcount')
-                ->label('Jumlah MP')
-                ->numeric()
-                ->minValue(0)
-                ->default(0),
-
-            Placeholder::make('computed_sufficient')
-                ->label('Kecukupan')
-                ->content(function (?BriefingSession $record) {
-                    if (! $record?->id) {
-                        return '—';
-                    }
-                    $present = $record->presentAttendances()->count();
-                    $target = (int) $record->summary_headcount;
-                    if ($target <= 0) {
-                        return 'Target belum diisi';
-                    }
-
-                    return $present >= $target
-                        ? "Cukup ({$present}/{$target})"
-                        : "Tidak Cukup ({$present}/{$target})";
-                })
-                ->extraAttributes(function (?BriefingSession $record) {
-                    if (! $record?->id || ! $record->summary_headcount) {
-                        return ['class' => 'text-gray-500'];
-                    }
-                    $present = $record->presentAttendances()->count();
-                    $target = (int) $record->summary_headcount;
-
-                    return ['class' => $present >= $target ? 'text-green-600 font-medium' : 'text-rose-600 font-medium'];
-                }),
-
-            Textarea::make('summary_solution')
-                ->label('Solusi/Keterangan')
-                ->columnSpanFull()
-                ->required(function (Get $get, ?BriefingSession $record) {
-                    $target = (int) $get('summary_headcount');
-                    if (! $record?->id || $target <= 0) {
-                        return false;
-                    }
-                    $present = $record->presentAttendances()->count();
-
-                    return $present < $target;
-                }),
-
-            Textarea::make('notes')
-                ->label('Catatan')
-                ->columnSpanFull(),
-        ])->columns(2);
+        return false;
     }
+
+    // ── Table ─────────────────────────────────────────────────────────────────
 
     public static function table(Tables\Table $table): Tables\Table
     {
         return $table
-            ->query(function (): EloquentBuilder {
-                return static::getEloquentQuery();
-            })
+            ->query(fn (): EloquentBuilder => static::getEloquentQuery())
             ->defaultSort('date', 'desc')
             ->columns([
-                TextColumn::make('date')->date()->label('Tanggal')->sortable(),
-                TextColumn::make('depot.name')->label('Depot')->sortable()->toggleable(),
-                TextColumn::make('coordinator.name')->label('Koordinator')->sortable()->toggleable(),
-                TextColumn::make('summary_headcount')->label('Target MP')->sortable()->toggleable(),
+                TextColumn::make('date')
+                    ->label('Tanggal')
+                    ->date('d M Y')
+                    ->sortable()
+                    ->searchable(),
 
-                ViewColumn::make('attendance_progress')
-                    ->label('Hadir')
-                    ->state(function ($record) {
-                        $present = (int) ($record->present_attendances_count ?? $record->presentAttendances()->count());
-                        $target = max(0, (int) $record->summary_headcount);
+                TextColumn::make('depot.name')
+                    ->label('Depot / Lokasi')
+                    ->sortable()
+                    ->searchable(),
 
-                        $percent = $target > 0 ? (int) round(min(100, ($present / $target) * 100)) : 0;
-
-                        $tone = 'gray';
-                        if ($target > 0) {
-                            $tone = $present >= $target ? 'emerald'
-                                : ($present >= ceil($target * 0.5) ? 'amber' : 'rose');
-                        }
-
-                        return [
-                            'present' => $present,
-                            'target' => $target,
-                            'percent' => $percent,
-                            'tone' => $tone,
-                        ];
-                    })
-                    ->view('tables.columns.attendance-progress')
-                    ->sortable(false)
+                TextColumn::make('coordinator.name')
+                    ->label('Field Coordinator')
+                    ->sortable()
+                    ->searchable()
                     ->toggleable(),
 
-                TextColumn::make('present_attendances_count')
-                    ->label('Hadir (x/y)')
-                    ->getStateUsing(fn ($record) => $record->summary_headcount
-                        ? "{$record->present_attendances_count}/{$record->summary_headcount}"
-                        : (string) $record->present_attendances_count)
+                TextColumn::make('attendances_count')
+                    ->label('Total Peserta')
                     ->sortable()
-                    ->extraAttributes(['class' => 'font-medium'])
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->alignCenter(),
 
-                TextColumn::make('summary_sufficient')->label('Kecukupan')
-                    ->state(function ($record) {
-                        $present = $record->present_attendances_count ?? $record->presentAttendances()->count();
-                        $target = (int) $record->summary_headcount;
-                        if ($target <= 0) {
-                            return 'Belum Ditentukan';
+                TextColumn::make('unit_masuk_yard')
+                    ->label('Unit Masuk')
+                    ->sortable()
+                    ->suffix(' unit')
+                    ->alignCenter()
+                    ->placeholder('—'),
+
+                TextColumn::make('mp_check_status')
+                    ->label('Status MP Check')
+                    ->badge()
+                    ->formatStateUsing(function ($state): string {
+                        if ($state instanceof MPCheckStatus) {
+                            return $state->label();
                         }
 
-                        return $present >= $target ? 'Cukup' : 'Tidak Cukup';
+                        return MPCheckStatus::tryFrom((string) $state)?->label()
+                            ?? (string) ($state ?? 'Draft');
                     })
+                    ->color(function ($state): string {
+                        $enum = $state instanceof MPCheckStatus
+                            ? $state
+                            : MPCheckStatus::tryFrom((string) $state);
+
+                        return match ($enum?->value) {
+                            'cleared'                  => 'success',
+                            'on_check'                 => 'warning',
+                            'waiting_action', 'failed' => 'danger',
+                            default                    => 'gray',
+                        };
+                    })
+                    ->sortable(),
+
+                TextColumn::make('approved_at')
+                    ->label('Persetujuan')
                     ->badge()
-                    ->color(fn ($record) => ($record->summary_headcount > 0 && ($record->present_attendances_count ?? 0) < $record->summary_headcount) ? 'danger' : 'success')
-                    ->tooltip(fn ($record) => 'Hadir '.($record->present_attendances_count ?? 0).' / Target '.(int) $record->summary_headcount),
+                    ->state(fn ($record) => $record->approved_at
+                        ? \Carbon\Carbon::parse($record->approved_at)->format('d M Y')
+                        : 'Belum Ditinjau')
+                    ->color(fn ($record) => $record->approved_at ? 'success' : 'warning')
+                    ->sortable(),
+
+                TextColumn::make('created_at')
+                    ->label('Dibuat')
+                    ->since()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                Filter::make('today')->label('Hari ini')
-                    ->query(fn (EloquentBuilder $query) => $query->whereDate('date', now()->toDateString())),
-                Filter::make('bulan_ini')->label('Bulan ini')
-                    ->query(fn (EloquentBuilder $query) => $query->whereBetween('date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])),
+                Filter::make('belum_approve')
+                    ->label('Belum Ditinjau')
+                    ->query(fn (EloquentBuilder $q) => $q->whereNull('approved_at')),
+
+                Filter::make('sudah_approve')
+                    ->label('Sudah Disetujui')
+                    ->query(fn (EloquentBuilder $q) => $q->whereNotNull('approved_at')),
+
                 Filter::make('rentang')
-                    ->form([DatePicker::make('from')->label('Dari'), DatePicker::make('until')->label('Sampai')])
-                    ->query(function (EloquentBuilder $query, array $data) {
+                    ->form([
+                        DatePicker::make('from')->label('Dari'),
+                        DatePicker::make('until')->label('Sampai'),
+                    ])
+                    ->query(function (EloquentBuilder $query, array $data): void {
                         if ($data['from'] ?? null) {
                             $query->whereDate('date', '>=', $data['from']);
                         }
@@ -244,59 +143,31 @@ class BriefingSessionResource extends Resource
                             $query->whereDate('date', '<=', $data['until']);
                         }
                     }),
-                SelectFilter::make('depot_id')->label('Depot')->relationship('depot', 'name'),
-                SelectFilter::make('coordinator_user_id')->label('Koordinator')->relationship('coordinator', 'name'),
-            ])
-            ->headerActions([
-                Tables\Actions\Action::make('startToday')
-                    ->label('Mulai Briefing Hari Ini')
-                    ->icon('heroicon-m-play')
-                    ->action(function () {
-                        $u = Filament::auth()?->user();
 
-                        $isFc = false;
-                        if ($u) {
-                            $isFc = DB::table('model_has_roles')
-                                ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
-                                ->where('model_has_roles.model_type', User::class)
-                                ->where('model_has_roles.model_id', $u->id)
-                                ->where('roles.name', 'field_coordinator')
-                                ->exists();
-                        }
+                SelectFilter::make('depot_id')
+                    ->label('Depot')
+                    ->relationship('depot', 'name'),
 
-                        $depotId = Depot::query()
-                            ->when(
-                                $u && $isFc && $u->effectiveBranchId(),
-                                fn ($query) => $query->where('branch_id', $u->effectiveBranchId())
-                            )
-                            ->orderBy('name')
-                            ->value('id');
-
-                        $session = BriefingSession::firstOrCreate(
-                            ['date' => now()->toDateString(), 'depot_id' => $depotId],
-                            ['coordinator_user_id' => $u?->id, 'summary_headcount' => 0]
-                        );
-
-                        return redirect(static::getUrl('edit', ['record' => $session]));
-                    }),
-                Tables\Actions\CreateAction::make()->label('Tambah Sesi'),
+                SelectFilter::make('mp_check_status')
+                    ->label('Status MP Check')
+                    ->options(
+                        collect(MPCheckStatus::cases())
+                            ->mapWithKeys(fn ($c) => [$c->value => $c->label()])
+                    ),
             ])
             ->actions([
-                Tables\Actions\Action::make('kelola')
-                    ->label('Kelola')
-                    ->icon('heroicon-m-clipboard-document-list')
-                    ->url(fn ($record) => static::getUrl('edit', ['record' => $record])),
-                Tables\Actions\EditAction::make()->label('Ubah'),
-                Tables\Actions\DeleteAction::make()->label('Hapus'),
+                Tables\Actions\ViewAction::make()->label('Detail'),
             ])
-            ->bulkActions([Tables\Actions\DeleteBulkAction::make()->label('Hapus')]);
+            ->bulkActions([]);
     }
+
+    // ── Query ─────────────────────────────────────────────────────────────────
 
     public static function getEloquentQuery(): EloquentBuilder
     {
         $query = static::getModel()::query()
             ->with(['depot:id,name', 'coordinator:id,name'])
-            ->withCount(['attendances', 'presentAttendances']);
+            ->withCount('attendances');
 
         $branchId = app()->bound('currentBranchId') ? app('currentBranchId') : null;
         if ($branchId) {
@@ -306,19 +177,23 @@ class BriefingSessionResource extends Resource
         return $query;
     }
 
+    // ── Relations ─────────────────────────────────────────────────────────────
+
     public static function getRelations(): array
     {
         return [
-            AttendanceRelationManager::class,
+            AttendancesRelationManager::class,
+            StockApdChecksRelationManager::class,
         ];
     }
+
+    // ── Pages ─────────────────────────────────────────────────────────────────
 
     public static function getPages(): array
     {
         return [
             'index' => Pages\ListBriefingSessions::route('/'),
-            'create' => Pages\CreateBriefingSession::route('/create'),
-            'edit' => Pages\EditBriefingSession::route('/{record}/edit'),
+            'view'  => Pages\ViewBriefingSession::route('/{record}'),
         ];
     }
 }
