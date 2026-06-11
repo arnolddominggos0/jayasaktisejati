@@ -3,6 +3,7 @@
 use App\Http\Controllers\Public\LandingController;
 use App\Http\Controllers\Public\TrackingController;
 use App\Http\Controllers\ShipmentPrintController;
+use App\Http\Controllers\VoyageQuickReportController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/ping', fn() => 'pong');
@@ -25,6 +26,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/shipments/{shipment}/packing-list', [ShipmentPrintController::class, 'packingList'])
         ->name('shipments.print.packing');
+
+    Route::get('/voyages/{voyageId}/quick-report', [VoyageQuickReportController::class, 'generate'])
+        ->name('voyage.quick-report');
 });
 
 Route::get('/tracking/{code}', function (string $code) {
