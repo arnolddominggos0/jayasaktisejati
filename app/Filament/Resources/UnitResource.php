@@ -9,6 +9,7 @@ use App\Models\Shipment;
 use App\Models\Unit;
 use App\Models\UnitInspection;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -36,7 +37,7 @@ class UnitResource extends Resource
     protected static ?string $navigationLabel = 'Pemeriksaan Unit';
     protected static ?string $navigationGroup = 'Quality Assurance';
     protected static ?int    $navigationSort  = 2;
-    protected static bool    $shouldRegisterNavigation = false;
+    protected static bool    $shouldRegisterNavigation = true;
     protected static ?string $modelLabel      = 'Unit';
     protected static ?string $pluralModelLabel = 'Pemeriksaan Unit';
 
@@ -115,6 +116,12 @@ class UnitResource extends Resource
                         'belum_diperiksa'  => 'Belum Diperiksa',
                         default            => $state,
                     }),
+            ])
+            ->recordUrl(fn (Unit $r) => self::getUrl('view', ['record' => $r->id]))
+            ->actions([
+                ViewAction::make()
+                    ->label('Detail')
+                    ->url(fn (Unit $r) => self::getUrl('view', ['record' => $r->id])),
             ])
             ->defaultSort('id', 'desc')
             ->filters([

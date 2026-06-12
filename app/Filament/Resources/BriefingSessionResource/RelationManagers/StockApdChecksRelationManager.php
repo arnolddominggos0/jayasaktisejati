@@ -1,4 +1,4 @@
-git add <?php
+<?php
 
 namespace App\Filament\Resources\BriefingSessionResource\RelationManagers;
 

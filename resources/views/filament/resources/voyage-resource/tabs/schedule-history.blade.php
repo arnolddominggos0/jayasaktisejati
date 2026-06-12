@@ -21,17 +21,11 @@
  *   Blade tidak memicu query tambahan.
  */
 
-// ── DEBUG BLOCK — hapus setelah diagnosis selesai ─────────────────────────────
-$__dbg_isVoyage      = isset($v) && $v instanceof \App\Models\Voyage;
-$__dbg_relationLoaded = $__dbg_isVoyage && $v->relationLoaded('scheduleHistories');
-$__dbg_rawHistories  = $__dbg_isVoyage
-    ? \App\Models\VoyageScheduleHistory::where('voyage_id', $v->id)->get()
-    : collect();
-// ── END DEBUG SETUP ───────────────────────────────────────────────────────────
-
 // ── Source data ───────────────────────────────────────────────────────────────
-// Fallback: jika relasi tidak ter-load (Livewire re-hydration), query langsung.
-$histories = $__dbg_isVoyage
+$__isVoyage = isset($v) && $v instanceof \App\Models\Voyage;
+
+// Query langsung agar tidak bergantung pada Livewire re-hydration state.
+$histories = $__isVoyage
     ? \App\Models\VoyageScheduleHistory::where('voyage_id', $v->id)
         ->orderBy('schedule_type')
         ->get()
@@ -136,75 +130,6 @@ $hasAnyData = $draft || $final || $actual;
 $versionCount = collect([$draft, $final, $actual])->filter()->count();
 @endphp
 
-{{-- ═══════════════════════════════════════════════════════════════════════
-     DEBUG PANEL — hapus setelah diagnosis selesai
-════════════════════════════════════════════════════════════════════════ --}}
-<div class="mb-4 rounded-xl border-2 border-dashed border-orange-300 bg-orange-50 p-4 text-xs font-mono space-y-1">
-    <div class="font-bold text-orange-700 text-sm mb-2">⚙ SCHEDULE HISTORY DEBUG</div>
-
-    <div><span class="text-orange-500">$v instanceof Voyage:</span>
-        <strong class="{{ $__dbg_isVoyage ? 'text-green-700' : 'text-red-700' }}">
-            {{ $__dbg_isVoyage ? 'YES (id='.$v->id.')' : 'NO / null' }}
-        </strong>
-    </div>
-
-    <div><span class="text-orange-500">relationLoaded(scheduleHistories):</span>
-        <strong class="{{ $__dbg_relationLoaded ? 'text-green-700' : 'text-red-700' }}">
-            {{ $__dbg_relationLoaded ? 'YES' : 'NO — relasi tidak ter-load saat render' }}
-        </strong>
-    </div>
-
-    <div><span class="text-orange-500">$histories (query langsung) count:</span>
-        <strong>{{ $histories->count() }}</strong>
-    </div>
-
-    <div><span class="text-orange-500">$__dbg_rawHistories (fresh query) count:</span>
-        <strong>{{ $__dbg_rawHistories->count() }}</strong>
-    </div>
-
-    {{-- Raw rows dari DB --}}
-    @foreach($__dbg_rawHistories as $__h)
-    <div class="pl-4 border-l-2 border-orange-200">
-        <span class="text-orange-500">row id={{ $__h->id }}:</span>
-        schedule_type=<strong>{{ $__h->getRawOriginal('schedule_type') }}</strong>
-        | etd_raw=<strong>{{ $__h->getRawOriginal('etd') ?? 'NULL' }}</strong>
-        | etd_cast=<strong>{{ $__h->etd?->format('d M Y H:i:s') ?? 'NULL' }}</strong>
-        | eta_raw=<strong>{{ $__h->getRawOriginal('eta') ?? 'NULL' }}</strong>
-        | sailing=<strong>{{ $__h->sailing_days ?? 'NULL' }}</strong>
-    </div>
-    @endforeach
-
-    {{-- firstWhere results --}}
-    <div class="mt-2 pt-2 border-t border-orange-200">
-        <span class="text-orange-500">firstWhere('draft'):</span>
-        @if($draft)
-            <strong class="text-green-700">FOUND id={{ $draft->id }}</strong>
-            | etd={{ $draft->etd?->format('d M Y') ?? '<span class="text-red-700">NULL</span>' }}
-            | etd getRawOriginal={{ $draft->getRawOriginal('etd') ?? 'NULL' }}
-        @else
-            <strong class="text-red-700">NULL — tidak ditemukan</strong>
-        @endif
-    </div>
-    <div>
-        <span class="text-orange-500">firstWhere('final'):</span>
-        @if($final)
-            <strong class="text-green-700">FOUND id={{ $final->id }}</strong>
-            | etd={{ $final->etd?->format('d M Y') ?? 'NULL' }}
-        @else
-            <strong class="text-red-700">NULL</strong>
-        @endif
-    </div>
-    <div>
-        <span class="text-orange-500">firstWhere('actual'):</span>
-        @if($actual)
-            <strong class="text-green-700">FOUND id={{ $actual->id }}</strong>
-            | etd={{ $actual->etd?->format('d M Y') ?? 'NULL' }}
-        @else
-            <strong class="text-red-700">NULL</strong>
-        @endif
-    </div>
-</div>
-{{-- / DEBUG PANEL --}}
 
 <div class="space-y-5">
 

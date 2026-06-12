@@ -227,14 +227,36 @@ class AdminDashboard extends Page implements HasForms
 
         return Cache::remember($cacheKey, now()->addSeconds(30), function () use ($start, $end) {
 
+            $loadedStatuses = [
+                TrackStatus::UnitLoading->value,
+                TrackStatus::OnShip->value,
+                TrackStatus::VesselDepart->value,
+            ];
+
+            $portStatuses = [
+                TrackStatus::DeliveryToPort->value,
+                TrackStatus::Stacking->value,
+            ];
+
+            // Penentu port stock berbasis track-status, bukan delivered_at.
+            // - Harus punya track delivery_to_port/stacking <= $end
+            // - Belum punya track onship/unit_loading/vessel_depart <= $end
+            // Ini agar shipment lama (masuk port bulan lalu) tetap ikut dihitung
+            // dan delivered_at yang terisi oleh generator tidak memblokir.
+            $customerIds = $this->getConfigCustomerIds();
+
             $shipments = $this->baseShipmentQuery()
-                ->whereHas(
-                    'tracks',
-                    fn($q) => $q->whereBetween('tracked_at', [$start, $end])
+                ->when(! empty($customerIds), fn($qq) => $qq->whereIn('customer_id', $customerIds))
+                ->whereHas('tracks', fn($q) => $q
+                    ->whereIn('status', $portStatuses)
+                    ->where('tracked_at', '<=', $end)
+                )
+                ->whereDoesntHave('tracks', fn($q) => $q
+                    ->whereIn('status', $loadedStatuses)
+                    ->where('tracked_at', '<=', $end)
                 )
                 ->with([
-                    'tracks' => fn($q) => $q->whereBetween('tracked_at', [$start, $end])
-                        ->orderBy('tracked_at', 'asc'),
+                    'tracks' => fn($q) => $q->orderBy('tracked_at', 'asc'),
                     'units:id,shipment_id',
                 ])
                 ->get();
@@ -245,7 +267,11 @@ class AdminDashboard extends Page implements HasForms
             $over3 = 0;   // unit-based over-3-days count
 
             foreach ($shipments as $shipment) {
-                $tracks = $shipment->tracks;
+                // Ambil track sampai akhir periode — shipment lama tetap masuk hitungan
+                $tracks = $shipment->tracks
+                    ->filter(fn($t) => $t->tracked_at && $t->tracked_at <= $end)
+                    ->values();
+
                 if ($tracks->isEmpty()) {
                     continue;
                 }
@@ -256,20 +282,15 @@ class AdminDashboard extends Page implements HasForms
                     ? $last->status->value
                     : (string) $last->status;
 
-                if (! in_array($lastStatus, [
-                    TrackStatus::DeliveryToPort->value,
-                    TrackStatus::Stacking->value,
-                ], true)) {
+                // Hanya shipment yang posisi terakhirnya di port
+                if (! in_array($lastStatus, $portStatuses, true)) {
                     continue;
                 }
 
+                // Sudah naik kapal / berangkat → bukan port stock lagi
                 $alreadyLoaded = $tracks->contains(fn($t) => in_array(
                     $t->status instanceof \BackedEnum ? $t->status->value : (string) $t->status,
-                    [
-                        TrackStatus::UnitLoading->value,
-                        TrackStatus::OnShip->value,
-                        TrackStatus::VesselDepart->value,
-                    ],
+                    $loadedStatuses,
                     true
                 ));
 
