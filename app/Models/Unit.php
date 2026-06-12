@@ -39,15 +39,8 @@ class Unit extends Model
         return $this->hasMany(UnitCheck::class);
     }
 
-    /**
-     * Seluruh inspection history unit ini, urut sesuai urutan stage journey.
-     * Order: pickup → handover_depot → loading → unloading → selfdrive → dooring
-     */
     public function inspections(): HasMany
     {
-        return $this->hasMany(UnitInspection::class)
-            ->orderByRaw(
-                "ARRAY_POSITION(ARRAY['pickup','handover_depot','loading','unloading','selfdrive','dooring']::text[], stage)"
-            );
+        return $this->hasMany(UnitInspection::class);
     }
 }

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\UnitResource\Pages\ListUnits;
 use App\Filament\Resources\UnitResource\Pages\ViewUnit;
 use App\Filament\Resources\UnitResource\RelationManagers\UnitInspectionsRelationManager;
+use App\Filament\Resources\ShipmentResource;
 use App\Models\Shipment;
 use App\Models\Unit;
 use App\Models\UnitInspection;

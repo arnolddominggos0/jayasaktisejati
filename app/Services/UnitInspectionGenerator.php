@@ -18,16 +18,13 @@ use Illuminate\Support\Facades\Log;
  *   - Tinker manual: $generator->generateHistorical($unit, [...stages])
  *
  * Default behavior untuk historical_import:
- *   - Semua item result = 'ok'
- *   - Status header = 'passed'
+ *   - Semua item result = 'ok', finding_type = null
+ *   - Status header = 'passed', gate_decision = 'accept'
  *   - Source = 'historical_import'
  *   - Skip stage yang sudah ada (idempotent)
  */
 class UnitInspectionGenerator
 {
-    /**
-     * Template items per stage dari config.
-     */
     private array $templates;
 
     public function __construct()
@@ -40,14 +37,10 @@ class UnitInspectionGenerator
     /**
      * Generate historical inspection untuk satu unit, untuk stages yang diminta.
      *
-     * @param  Unit     $unit     Unit yang akan di-generate
-     * @param  string[] $stages   Subset dari STAGES — ['pickup','loading','unloading','dooring']
-     * @param  Carbon|null $checkedAt  Timestamp inspeksi (default: unit->created_at atau now())
-     * @return array { inspections_created: int, items_created: int, skipped: string[] }
-     *
-     * @example (Tinker)
-     *   $gen = app(\App\Services\UnitInspectionGenerator::class);
-     *   $gen->generateHistorical($unit, ['pickup','loading','unloading','dooring']);
+     * @param  Unit       $unit
+     * @param  string[]   $stages
+     * @param  Carbon|null $checkedAt
+     * @return array { unit_id, inspections_created, items_created, skipped_stages }
      */
     public function generateHistorical(
         Unit $unit,
@@ -60,9 +53,9 @@ class UnitInspectionGenerator
         $itemsCreated       = 0;
         $skipped            = [];
 
-        // Validasi stages
-        $validStages = array_intersect($stages, UnitInspection::STAGES);
+        $validStages   = array_intersect($stages, UnitInspection::STAGES);
         $invalidStages = array_diff($stages, UnitInspection::STAGES);
+
         if ($invalidStages) {
             Log::warning('UnitInspectionGenerator: invalid stages', [
                 'unit_id' => $unit->id,
@@ -70,7 +63,6 @@ class UnitInspectionGenerator
             ]);
         }
 
-        // Existing stages — idempotent: skip yang sudah ada
         $existingStages = UnitInspection::where('unit_id', $unit->id)
             ->pluck('stage')
             ->toArray();
@@ -85,26 +77,26 @@ class UnitInspectionGenerator
                     continue;
                 }
 
-                // Buat inspection header
                 $inspection = UnitInspection::create([
-                    'unit_id'    => $unit->id,
-                    'stage'      => $stage,
-                    'status'     => UnitInspection::STATUS_PASSED,
-                    'source'     => UnitInspection::SOURCE_HISTORICAL_IMPORT,
-                    'checked_at' => $checkedAt,
-                    'notes'      => 'Historical sample import',
+                    'unit_id'       => $unit->id,
+                    'stage'         => $stage,
+                    'status'        => UnitInspection::STATUS_PASSED,
+                    'source'        => UnitInspection::SOURCE_HISTORICAL_IMPORT,
+                    'gate_decision' => UnitInspection::GATE_ACCEPT,
+                    'checked_at'    => $checkedAt,
+                    'submitted_at'  => $checkedAt,
+                    'notes'         => 'Historical sample import',
                 ]);
 
                 $inspectionsCreated++;
 
-                // Buat item-items
-                $items = $this->buildItems($stage);
-                foreach ($items as $item) {
+                foreach ($this->buildItems($stage) as $item) {
                     UnitInspectionItem::create([
                         'unit_inspection_id' => $inspection->id,
                         'category'           => $item['category'],
                         'item_name'          => $item['item_name'],
                         'result'             => UnitInspectionItem::RESULT_OK,
+                        'finding_type'       => null,
                         'notes'              => null,
                     ]);
                     $itemsCreated++;
@@ -113,31 +105,25 @@ class UnitInspectionGenerator
         });
 
         return [
-            'unit_id'              => $unit->id,
-            'inspections_created'  => $inspectionsCreated,
-            'items_created'        => $itemsCreated,
-            'skipped_stages'       => $skipped,
+            'unit_id'             => $unit->id,
+            'inspections_created' => $inspectionsCreated,
+            'items_created'       => $itemsCreated,
+            'skipped_stages'      => $skipped,
         ];
     }
 
     /**
      * Generate untuk banyak unit sekaligus.
-     * Mengembalikan summary agregat.
-     *
-     * @param  Unit[]   $units
-     * @param  string[] $stages
-     * @param  Carbon|null $checkedAt
-     * @return array { units_processed, inspections_created, items_created, skipped_total }
      */
     public function generateHistoricalBatch(
         iterable $units,
         array $stages,
         ?Carbon $checkedAt = null
     ): array {
-        $totalUnits        = 0;
-        $totalInspections  = 0;
-        $totalItems        = 0;
-        $totalSkipped      = 0;
+        $totalUnits       = 0;
+        $totalInspections = 0;
+        $totalItems       = 0;
+        $totalSkipped     = 0;
 
         foreach ($units as $unit) {
             $result = $this->generateHistorical($unit, $stages, $checkedAt);
@@ -158,26 +144,25 @@ class UnitInspectionGenerator
     // ── Private helpers ───────────────────────────────────────────────────────
 
     /**
-     * Bangun flat list items [{category, item_name}] untuk stage tertentu.
+     * Bangun flat list items [{category, item_name, type}] untuk stage tertentu.
      * handover_depot → inherit template dari pickup.
      */
     private function buildItems(string $stage): array
     {
-        // handover_depot pakai template pickup
         $templateKey = ($stage === 'handover_depot') ? 'pickup' : $stage;
         $template    = $this->templates[$templateKey] ?? [];
 
-        // Fallback jika template null (nilai null artinya inherit pickup)
         if ($template === null) {
             $template = $this->templates['pickup'] ?? [];
         }
 
         $items = [];
-        foreach ($template as $category => $itemNames) {
-            foreach ($itemNames as $itemName) {
+        foreach ($template as $category => $categoryItems) {
+            foreach ($categoryItems as $item) {
                 $items[] = [
                     'category'  => $category,
-                    'item_name' => $itemName,
+                    'item_name' => $item['name'],
+                    'type'      => $item['type'],
                 ];
             }
         }
@@ -186,7 +171,7 @@ class UnitInspectionGenerator
     }
 
     /**
-     * Hitung total items yang akan dihasilkan per stage (untuk dry-run / preview).
+     * Hitung total items yang akan dihasilkan per stage (dry-run / preview).
      */
     public function countItemsForStage(string $stage): int
     {
