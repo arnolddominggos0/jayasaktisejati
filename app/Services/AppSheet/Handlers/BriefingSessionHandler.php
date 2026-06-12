@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * @deprecated DEAD CODE — not called from any route or controller.
+ * Active path: AppSheetService::syncBriefingSession(). See BaseSyncHandler for details.
+ */
+
 namespace App\Services\AppSheet\Handlers;
 
 use App\Models\BriefingSession;

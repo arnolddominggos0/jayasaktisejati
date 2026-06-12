@@ -21,7 +21,7 @@ class ShipmentHistoryResource extends Resource
 {
     protected static ?string $model = Shipment::class;
 
-    protected static ?string $navigationGroup   = 'Riwayat';
+    protected static ?string $navigationGroup   = 'Pengiriman';
     protected static ?string $navigationLabel   = 'Riwayat Pengiriman';
     protected static ?string $modelLabel        = 'Riwayat Pengiriman';
     protected static ?string $pluralModelLabel  = 'Riwayat Pengiriman';
@@ -110,19 +110,22 @@ class ShipmentHistoryResource extends Resource
     {
         return $table
             ->columns([
+                // ── Primary identifier ────────────────────────────────────
                 TextColumn::make('code')
                     ->label('Kode')
                     ->badge()
-                    ->extraAttributes(['class' => 'font-mono'])
+                    ->extraAttributes(['class' => 'font-mono text-xs'])
                     ->copyable()
                     ->searchable()
                     ->sortable(),
 
-                IconColumn::make('mode')
-                    ->label('Moda')
-                    ->icon(fn($state) => ($state?->value ?? $state) === ShipmentMode::Sea->value ? 'heroicon-m-cog-8-tooth' : 'heroicon-m-truck')
-                    ->color(fn($state) => ($state?->value ?? $state) === ShipmentMode::Sea->value ? 'primary' : 'warning')
-                    ->tooltip(fn($state) => ($state?->value ?? $state) === ShipmentMode::Sea->value ? 'Laut' : 'Darat'),
+                // ── SPPB / Document number (secondary identifier) ─────────
+                TextColumn::make('doc_number')
+                    ->label('No. SPPB / Dok')
+                    ->placeholder('—')
+                    ->searchable()
+                    ->copyable()
+                    ->extraAttributes(['class' => 'text-xs']),
 
                 TextColumn::make('customer.name')
                     ->label('Pengirim')
@@ -130,97 +133,77 @@ class ShipmentHistoryResource extends Resource
                     ->sortable()
                     ->searchable(),
 
-                TextColumn::make('receiver.name')
-                    ->label('Penerima')
-                    ->badge()
-                    ->sortable()
-                    ->searchable(),
-
-                TextColumn::make('route_summary')
+                // ── Route ─────────────────────────────────────────────────
+                TextColumn::make('route_label')
                     ->label('Rute')
-                    ->html()
-                    ->getStateUsing(
-                        fn(Shipment $record) =>
-                        "<div class='font-medium'>" . ($record->originCity->name ?? '-') . " &rarr; " . ($record->destinationCity->name ?? '-') . "</div>"
+                    ->getStateUsing(fn(Shipment $record) =>
+                        ($record->originCity?->name ?? '—') . ' → ' . ($record->destinationCity?->name ?? '—')
+                    )
+                    ->wrap(),
+
+                // ── Voyage (booking snapshot string) ──────────────────────
+                TextColumn::make('voyage_snapshot')
+                    ->label('Voyage')
+                    ->getStateUsing(fn(Shipment $record) =>
+                        data_get($record->getAttributes(), 'voyage') ?? '—'
+                    )
+                    ->placeholder('—')
+                    ->searchable(query: fn($query, $search) =>
+                        $query->where('voyage', 'like', "%{$search}%")
                     )
                     ->toggleable(),
 
-                TextColumn::make('kpi_summary')
-                    ->label('KPI Manado')
-                    ->state(fn(Shipment $r) => $r->kpiManadoSummaryText() ?? '-')
-                    ->tooltip('KPI Manado: Normal ≤19 hari, Urgent ≤17 hari')
-                    ->wrap(),
-
-                TextColumn::make('kpi_status')
-                    ->label('Status KPI')
-                    ->badge()
-                    ->state(function (Shipment $r) {
-                        $ev = $r->evaluateKpiForManado();
-                        return $ev['applies'] ? ($ev['badge'] ?? 'Menunggu') : '—';
-                    })
-                    ->color(function (Shipment $r) {
-                        $ev = $r->evaluateKpiForManado();
-                        if (!($ev['applies'] ?? false)) return 'gray';
-                        return match ($ev['badge'] ?? 'Pending') {
-                            'On Time', 'Tepat Waktu' => 'success',
-                            'Late', 'Terlambat'    => 'danger',
-                            default   => 'gray',
-                        };
-                    }),
-
+                // ── Final status ──────────────────────────────────────────
                 TextColumn::make('status')
-                    ->label('Status Akhir')
+                    ->label('Status')
                     ->badge()
-                    ->tooltip(fn(Shipment $r) => $r->status === ShipmentStatus::Delivered ? 'Terkirim ke penerima (ATA)' : 'Dibatalkan oleh admin/koordinator')
-                    ->getStateUsing(fn(Shipment $record) => $record->status?->label() ?? (is_string($record->status) ? $record->status : '-'))
+                    ->getStateUsing(fn(Shipment $record) =>
+                        $record->status?->label() ?? (is_string($record->status) ? $record->status : '-')
+                    )
                     ->colors([
                         'success' => ['Terkirim'],
                         'danger'  => ['Dibatalkan'],
                     ])
                     ->sortable(),
 
+                // ── Completion date ───────────────────────────────────────
                 TextColumn::make('completed_at')
                     ->label('Selesai')
                     ->getStateUsing(function (Shipment $record) {
                         if ($record->status === ShipmentStatus::Delivered) {
                             return $record->delivered_at
-                                ?? $record->tracks()
-                                ->where('status', 'delivered')
-                                ->latest('tracked_at')
-                                ->value('tracked_at');
+                                ?? $record->tracks()->where('status', 'delivered')->latest('tracked_at')->value('tracked_at');
                         }
-
                         if ($record->status === ShipmentStatus::Cancelled) {
                             return $record->cancelled_at
-                                ?? $record->tracks()
-                                ->where('status', 'cancelled')
-                                ->latest('tracked_at')
-                                ->value('tracked_at');
+                                ?? $record->tracks()->where('status', 'cancelled')->latest('tracked_at')->value('tracked_at');
                         }
-
                         return null;
                     })
                     ->placeholder('—')
-                    ->dateTime('d M Y H:i')
+                    ->dateTime('d M Y')
                     ->badge()
-                    ->color(fn(Shipment $record) => $record->status === ShipmentStatus::Delivered ? 'success' : 'danger')
+                    ->color(fn(Shipment $record) => $record->status === ShipmentStatus::Delivered
+                        ? 'success'
+                        : 'danger')
                     ->sortable(),
 
-                TextColumn::make('eta')
-                    ->label('ETA (Terakhir)')
-                    ->dateTime('d M Y H:i')
-                    ->placeholder('—')
-                    ->toggleable(),
+                // ── Toggleable ────────────────────────────────────────────
+                TextColumn::make('mode')
+                    ->label('Moda')
+                    ->formatStateUsing(fn($state) => ($state?->value ?? $state) === ShipmentMode::Sea->value ? 'Laut' : 'Darat')
+                    ->badge()
+                    ->color(fn($state) => ($state?->value ?? $state) === ShipmentMode::Sea->value ? 'primary' : 'warning')
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('receiver.name')
+                    ->label('Penerima')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('updated_at')
                     ->label('Diubah')
                     ->since()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-
-                TextColumn::make('created_at')
-                    ->label('Dibuat')
-                    ->dateTime('d M Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -287,20 +270,43 @@ class ShipmentHistoryResource extends Resource
             )
 
             ->actions([
-                ActionGroup::make([
-                    Action::make('detail')
-                        ->label('Detail')
-                        ->icon('heroicon-o-eye')
-                        ->color('gray')
-                        ->url(fn($record) => static::getUrl('view', ['record' => $record])),
+                // Primary action — always visible
+                Action::make('detail')
+                    ->label('Lihat')
+                    ->icon('heroicon-o-eye')
+                    ->color('gray')
+                    ->url(fn($record) => static::getUrl('view', ['record' => $record])),
 
-                    Action::make('edit_direct')
-                        ->label('Edit')
+                // Secondary actions grouped
+                ActionGroup::make([
+                    Action::make('print_resi')
+                        ->label('Print Resi')
+                        ->icon('heroicon-o-document-text')
+                        ->color('gray')
+                        ->url(fn($record) => route('shipments.resi', $record) . '?download=1')
+                        ->openUrlInNewTab(),
+
+                    Action::make('print_waybill')
+                        ->label('Waybill')
+                        ->icon('heroicon-o-printer')
+                        ->color('gray')
+                        ->url(fn($record) => route('shipments.print.waybill', $record))
+                        ->openUrlInNewTab(),
+
+                    Action::make('print_packing')
+                        ->label('Packing List')
+                        ->icon('heroicon-o-clipboard-document-list')
+                        ->color('gray')
+                        ->url(fn($record) => route('shipments.print.packing', $record))
+                        ->openUrlInNewTab(),
+
+                    Action::make('correction')
+                        ->label('Koreksi Data')
                         ->icon('heroicon-o-pencil-square')
                         ->color('warning')
                         ->visible(fn() => auth_user()?->hasRole('super_admin') === true)
                         ->url(fn($record) => ShipmentResource::getUrl('edit', ['record' => $record])),
-                ])->label('Aksi'),
+                ])->icon('heroicon-m-ellipsis-horizontal')->color('gray'),
             ]);
     }
 

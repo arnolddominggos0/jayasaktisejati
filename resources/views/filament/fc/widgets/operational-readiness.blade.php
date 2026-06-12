@@ -198,12 +198,21 @@
         </div>
     @elseif($state === 'no_session')
         <div class="mx-4 mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-800/50 dark:bg-amber-900/20">
-            <div class="flex items-start gap-3">
-                <x-heroicon-o-clock class="h-5 w-5 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-                <div>
-                    <div class="text-sm font-semibold text-amber-800 dark:text-amber-300">Belum Ada Briefing Hari Ini</div>
-                    <div class="mt-1 text-sm text-amber-700 dark:text-amber-400">Data kesiapan operasional akan muncul setelah briefing dimulai.</div>
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex items-start gap-3">
+                    <x-heroicon-o-clock class="h-5 w-5 flex-shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                    <div>
+                        <div class="text-sm font-semibold text-amber-800 dark:text-amber-300">Belum Ada Briefing Hari Ini</div>
+                        <div class="mt-1 text-sm text-amber-700 dark:text-amber-400">Data kesiapan operasional akan muncul setelah briefing dimulai.</div>
+                    </div>
                 </div>
+                @if(isset($createBriefingUrl))
+                    <a href="{{ $createBriefingUrl }}"
+                       class="flex-shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-500 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600">
+                        <x-heroicon-m-plus class="h-4 w-4" />
+                        Buat Briefing
+                    </a>
+                @endif
             </div>
         </div>
     @endif

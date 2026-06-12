@@ -5,10 +5,11 @@ namespace App\Filament\FC\Resources;
 use App\Enums\MPCheckStatus;
 use App\Filament\FC\Resources\BriefingSessionResource\Pages;
 use App\Filament\FC\Resources\BriefingSessionResource\RelationManagers\AttendancesRelationManager;
+use App\Filament\FC\Resources\BriefingSessionResource\RelationManagers\StockApdChecksRelationManager;
 use App\Models\BriefingSession;
 use App\Models\Depot;
-use App\Models\User;
 use Filament\Facades\Filament;
+use Filament\Forms\Get;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
@@ -16,11 +17,9 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
-use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -40,7 +39,10 @@ class BriefingSessionResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 3;
+
+    // Disembunyikan dari navigasi — akses melalui Monitoring Operasional
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function canViewAny(): bool
     {
@@ -61,7 +63,7 @@ class BriefingSessionResource extends Resource
             : ($user->effectiveBranchId() ?? null);
 
         if ($branchId) {
-            $query->whereHas('depot', fn ($q) => $q->where('branch_id', $branchId));
+            $query->whereHas('depot', fn($q) => $q->where('branch_id', $branchId));
         }
 
         $depotId = app()->bound('scope.depot_id')
@@ -87,7 +89,27 @@ class BriefingSessionResource extends Resource
                         ->default(now())
                         ->closeOnDateSelection()
                         ->required()
-                        ->live(),
+                        ->live()
+                        ->rules([
+                            // Prevent duplicate briefings: one per depot per day.
+                            fn(Get $get, ?BriefingSession $record): \Closure => function (
+                                string $attribute,
+                                mixed  $value,
+                                \Closure $fail,
+                            ) use ($get, $record): void {
+                                $depotId = $get('depot_id');
+                                if (! $value || ! $depotId) {
+                                    return;
+                                }
+                                $exists = BriefingSession::whereDate('date', $value)
+                                    ->where('depot_id', $depotId)
+                                    ->when($record?->id, fn($q, $id) => $q->where('id', '!=', $id))
+                                    ->exists();
+                                if ($exists) {
+                                    $fail('Briefing untuk tanggal ini di depot yang dipilih sudah ada.');
+                                }
+                            },
+                        ]),
 
                     Select::make('depot_id')
                         ->label('Depot')
@@ -110,14 +132,21 @@ class BriefingSessionResource extends Resource
                         ->searchable()
                         ->preload()
                         ->required()
-                        ->default(fn () => Filament::auth()->user()?->id),
+                        ->default(fn() => Filament::auth()->user()?->id),
 
                     TextInput::make('summary_headcount')
-                        ->label('Target Jumlah MP')
+                        ->label('Kebutuhan Tim SOP')
                         ->numeric()
                         ->minValue(0)
-                        ->default(8)
-                        ->helperText('Target jumlah manpower yang harus hadir'),
+                        ->default(5)
+                        ->helperText('SOP minimum: 1 Koordinator + 4 Operator = 5 MP'),
+
+                    TextInput::make('unit_masuk_yard')
+                        ->label('Unit Masuk Yard/PDC')
+                        ->numeric()
+                        ->minValue(0)
+                        ->suffix('unit')
+                        ->placeholder('—'),
 
                     Textarea::make('notes')
                         ->label('Catatan / Topik Briefing')
@@ -126,26 +155,21 @@ class BriefingSessionResource extends Resource
                 ]),
 
             Section::make('Status MP Check')
-                ->columns(3)
+                ->columns(1)
                 ->schema([
                     Placeholder::make('mp_check_status_display')
                         ->label('Status')
-                        ->content(fn (?BriefingSession $record) => $record?->mp_check_status ? MPCheckStatus::from($record->mp_check_status)->label() : 'Draft')
-                        ->extraAttributes(fn (?BriefingSession $record) => [
-                            'class' => $record?->mp_check_status === MPCheckStatus::Approved->value
-                                ? 'text-green-600 font-bold'
-                                : 'text-gray-600 font-medium',
-                        ]),
-
-                    Placeholder::make('approver_display')
-                        ->label('Disetujui Oleh')
-                        ->content(fn (?BriefingSession $record) => $record?->approved_by ? User::find($record->approved_by)?->name : '-'),
-
-                    Placeholder::make('approved_at_display')
-                        ->label('Waktu Approve')
-                        ->content(fn (?BriefingSession $record) => $record?->approved_at ? $record->approved_at->format('d M Y H:i') : '-'),
+                        ->content(function (?BriefingSession $record): string {
+                            if (! $record?->mp_check_status) {
+                                return 'Draft';
+                            }
+                            $enum = $record->mp_check_status instanceof MPCheckStatus
+                                ? $record->mp_check_status
+                                : MPCheckStatus::tryFrom((string) $record->mp_check_status);
+                            return $enum?->label() ?? 'Draft';
+                        }),
                 ])
-                ->visible(fn (?BriefingSession $record) => $record !== null),
+                ->visible(fn(?BriefingSession $record) => $record !== null),
         ]);
     }
 
@@ -160,52 +184,118 @@ class BriefingSessionResource extends Resource
                     ->sortable()
                     ->weight('bold'),
 
+                // ── Depot & PIC (toggleable — detail reference) ───────────
                 TextColumn::make('depot.name')
                     ->label('Depot')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('coordinator.name')
                     ->label('PIC')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('summary_headcount')
-                    ->label('Target MP')
+                // ── Unit Masuk Yard/PDC ────────────────────────────────────
+                TextColumn::make('unit_masuk_yard')
+                    ->label('Unit Masuk')
+                    ->placeholder('—')
+                    ->alignCenter()
+                    ->suffix(fn ($state) => $state !== null ? ' unit' : '')
                     ->sortable(),
 
-                ViewColumn::make('attendance_progress')
-                    ->label('Kehadiran')
-                    ->state(function ($record) {
-                        $present = (int) ($record->present_attendances_count ?? $record->presentAttendances()->count());
-                        $target = max(0, (int) $record->summary_headcount);
-                        $percent = $target > 0 ? (int) round(min(100, ($present / $target) * 100)) : 0;
-                        $tone = $target > 0 ? ($present >= $target ? 'emerald' : ($present >= ceil($target * 0.5) ? 'amber' : 'rose')) : 'gray';
+                // ── Need Tim SOP ───────────────────────────────────────────
+                TextColumn::make('summary_headcount')
+                    ->label('Need Tim')
+                    ->alignCenter()
+                    ->suffix(' MP')
+                    ->sortable(),
 
-                        return ['present' => $present, 'target' => $target, 'percent' => $percent, 'tone' => $tone];
+                // ── MP Attend — from withCount('presentAttendances') ───────
+                TextColumn::make('present_attendances_count')
+                    ->label('MP Attend')
+                    ->alignCenter()
+                    ->suffix(' MP')
+                    ->sortable(),
+
+                // ── Gap = attend − need (computed in PHP, no query) ────────
+                TextColumn::make('attendance_gap')
+                    ->label('Gap')
+                    ->state(function ($record) {
+                        $attend = (int) ($record->present_attendances_count ?? 0);
+                        $need   = (int) ($record->summary_headcount ?? 0);
+
+                        return $attend - $need;
                     })
-                    ->view('tables.columns.attendance-progress')
+                    ->formatStateUsing(fn ($state) => $state > 0 ? "+{$state}" : (string) $state)
+                    ->color(fn ($state) => match (true) {
+                        $state > 0  => 'success',
+                        $state === 0 => 'gray',
+                        default     => 'danger',
+                    })
+                    ->weight(fn ($state) => $state < 0 ? 'bold' : null)
+                    ->alignCenter()
+                    ->sortable(false),
+
+                // ── Readiness OK/NG badge ──────────────────────────────────
+                TextColumn::make('readiness_ok')
+                    ->label('Readiness')
+                    ->badge()
+                    ->state(fn ($record) => (int) ($record->summary_headcount ?? 0) > 0
+                        ? ((int) ($record->present_attendances_count ?? 0) >= (int) $record->summary_headcount)
+                        : null
+                    )
+                    ->formatStateUsing(fn ($state) => match (true) {
+                        $state === true  => 'OK',
+                        $state === false => 'NG',
+                        default          => '—',
+                    })
+                    ->color(fn ($state) => match (true) {
+                        $state === true  => 'success',
+                        $state === false => 'danger',
+                        default          => 'gray',
+                    })
+                    ->alignCenter()
                     ->sortable(false),
 
                 TextColumn::make('mp_check_status')
-                    ->label('Status MP')
+                    ->label('Status')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => MPCheckStatus::tryFrom($state)?->label() ?? $state)
-                    ->color(fn ($state) => MPCheckStatus::tryFrom($state)?->color() ?? 'gray')
+                    ->formatStateUsing(function ($state): string {
+                        $val = $state instanceof MPCheckStatus ? $state : MPCheckStatus::tryFrom((string) $state);
+                        return $val?->label() ?? (string) $state;
+                    })
+                    ->color(function ($state): string {
+                        $val = $state instanceof MPCheckStatus ? $state->value : (string) $state;
+                        return match ($val) {
+                            'cleared'             => 'success',
+                            'on_check'            => 'warning',
+                            'waiting_action',
+                            'failed'              => 'danger',
+                            default               => 'gray',
+                        };
+                    })
                     ->sortable(),
+            ])
+            ->emptyStateIcon('heroicon-o-clipboard-document-check')
+            ->emptyStateHeading('Belum ada briefing')
+            ->emptyStateDescription('Buat briefing harian untuk memulai operasional hari ini.')
+            ->emptyStateActions([
+                Tables\Actions\CreateAction::make()
+                    ->label('Mulai Briefing')
+                    ->icon('heroicon-m-plus'),
             ])
             ->filters([
                 Filter::make('today')
                     ->label('Hari Ini')
-                    ->query(fn (Builder $query) => $query->whereDate('date', now()->toDateString())),
+                    ->query(fn(Builder $query) => $query->whereDate('date', now()->toDateString())),
 
                 Filter::make('this_week')
                     ->label('Minggu Ini')
-                    ->query(fn (Builder $query) => $query->whereBetween('date', [now()->startOfWeek()->toDateString(), now()->endOfWeek()->toDateString()])),
+                    ->query(fn(Builder $query) => $query->whereBetween('date', [now()->startOfWeek()->toDateString(), now()->endOfWeek()->toDateString()])),
 
                 Filter::make('this_month')
                     ->label('Bulan Ini')
-                    ->query(fn (Builder $query) => $query->whereBetween('date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])),
+                    ->query(fn(Builder $query) => $query->whereBetween('date', [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()])),
 
                 SelectFilter::make('depot_id')
                     ->label('Depot')
@@ -213,36 +303,9 @@ class BriefingSessionResource extends Resource
 
                 SelectFilter::make('mp_check_status')
                     ->label('Status MP Check')
-                    ->options(collect(MPCheckStatus::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])),
+                    ->options(collect(MPCheckStatus::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()])),
             ])
             ->actions([
-                Tables\Actions\Action::make('approve')
-                    ->label('Approve')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->modalHeading('Approve Briefing Session')
-                    ->modalDescription('Setujui sesi briefing ini? Ini akan membuka gate untuk loading.')
-                    ->visible(fn (BriefingSession $record) => in_array($record->mp_check_status, [
-                        MPCheckStatus::Draft->value,
-                        MPCheckStatus::OnCheck->value,
-                        MPCheckStatus::WaitingAction->value,
-                    ]))
-                    ->action(function (BriefingSession $record) {
-                        $record->update([
-                            'mp_check_status' => MPCheckStatus::Approved->value,
-                            'approved_at' => now(),
-                            'approved_by' => Filament::auth()->user()?->id,
-                        ]);
-
-                        $record->refreshSufficientFlag();
-
-                        Notification::make()
-                            ->title('Briefing Disetujui')
-                            ->success()
-                            ->send();
-                    }),
-
                 Tables\Actions\ViewAction::make()
                     ->label('Lihat')
                     ->icon('heroicon-o-eye'),
@@ -262,6 +325,7 @@ class BriefingSessionResource extends Resource
     {
         return [
             AttendancesRelationManager::class,
+            StockApdChecksRelationManager::class,
         ];
     }
 

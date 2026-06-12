@@ -23,6 +23,7 @@ class BriefingSession extends Model
 
         // operational
         'notes',
+        'unit_masuk_yard',
 
         // manpower summary
         'summary_headcount',

@@ -16,7 +16,21 @@ class EditVesselPlan extends EditRecord
 {
     protected static string $resource = VesselPlanResource::class;
 
-    // 1. Evaluasi Risiko Jadwal — above the form
+    protected static string $view = 'filament.resources.vessel-plan-resource.pages.edit-vessel-plan';
+
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        // Eager-load semua relasi yang dibutuhkan Tab 2 (Analysis) dan Tab 3 (History)
+        $this->record->loadMissing([
+            'items.vessel',
+            'items.shippingLine',
+            'items.voyage.scheduleHistories',
+            'snapshots',
+        ]);
+    }
+
     protected function getHeaderWidgets(): array
     {
         return [VesselPlanAnalysis::class];

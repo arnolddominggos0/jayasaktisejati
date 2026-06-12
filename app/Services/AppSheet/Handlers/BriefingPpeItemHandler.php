@@ -1,5 +1,13 @@
 <?php
 
+/**
+ * @deprecated DEAD CODE — not called from any route or controller.
+ * Active path: AppSheetService::syncBriefingPpeItem(). See BaseSyncHandler for details.
+ *
+ * WARNING: This handler validates a "status" field that does not exist in config/appsheet.php.
+ * The correct field name is "condition" (mapped from "Kondisi APD"). Do NOT activate without fixing.
+ */
+
 namespace App\Services\AppSheet\Handlers;
 
 use App\Models\BriefingAttendance;

@@ -201,22 +201,56 @@ $progressPct = $totalSteps > 0 ? intval(round(($doneCount / $totalSteps) * 100))
                                         @foreach ($hit->checkseet as $item)
                                         @php
                                             $csStatus = $item['checkseet_status'] ?? '-';
-                                            $csBadge = match ($csStatus) {
-                                                'ok' => 'bg-green-100 text-green-800 ring-green-200',
-                                                'ng' => 'bg-red-100 text-red-800 ring-red-200',
-                                                default => 'bg-gray-100 text-gray-700 ring-gray-200',
+                                            $csBadge  = match ($csStatus) {
+                                                'ok'  => 'bg-green-100 text-green-800 ring-1 ring-green-200',
+                                                'ng'  => 'bg-red-100 text-red-800 ring-1 ring-red-200',
+                                                default => 'bg-gray-100 text-gray-700 ring-1 ring-gray-200',
                                             };
+                                            $csRow    = $csStatus === 'ng'
+                                                ? 'border-l-2 border-l-red-400 bg-red-50/60'
+                                                : 'bg-gray-50';
+                                            $itemAtts = array_filter((array) ($item['attachments'] ?? []));
                                         @endphp
-                                        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                                            <span class="inline-flex items-center rounded px-1.5 py-0.5 ring-1 {{ $csBadge }}">
-                                                {{ strtoupper($csStatus) }}
-                                            </span>
-                                            <span class="text-gray-700">
-                                                {{ $item['model'] ?? '—' }}
-                                                @if (!empty($item['no_rangka']))
-                                                <span class="text-gray-400">· {{ $item['no_rangka'] }}</span>
+                                        <div class="rounded-md {{ $csRow }} px-2.5 py-1.5">
+                                            {{-- Row 1: badge + unit identifiers --}}
+                                            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs">
+                                                <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold {{ $csBadge }}">
+                                                    {{ strtoupper($csStatus) }}
+                                                </span>
+                                                @if (!empty($item['model']))
+                                                <span class="font-medium text-gray-800">{{ $item['model'] }}</span>
                                                 @endif
-                                            </span>
+                                                @if (!empty($item['warna']))
+                                                <span class="text-gray-500">
+                                                    {{ $item['warna'] }}
+                                                </span>
+                                                @endif
+                                            </div>
+                                            {{-- Row 2: chassis / engine (monospaced) --}}
+                                            @if (!empty($item['no_rangka']) || !empty($item['no_mesin']))
+                                            <div class="mt-0.5 flex flex-wrap gap-x-3 text-[11px] text-gray-500">
+                                                @if (!empty($item['no_rangka']))
+                                                <span>Rangka: <span class="font-mono text-gray-700">{{ $item['no_rangka'] }}</span></span>
+                                                @endif
+                                                @if (!empty($item['no_mesin']))
+                                                <span>Mesin: <span class="font-mono text-gray-700">{{ $item['no_mesin'] }}</span></span>
+                                                @endif
+                                            </div>
+                                            @endif
+                                            {{-- Row 3: per-unit photo attachments (from checkseet JSON) --}}
+                                            @if (!empty($itemAtts))
+                                            <div class="mt-1 flex flex-wrap gap-1.5">
+                                                @foreach ($itemAtts as $att)
+                                                @if (is_string($att) && $att)
+                                                <a href="{{ Storage::url($att) }}" target="_blank"
+                                                   class="inline-flex items-center gap-1 rounded bg-white px-1.5 py-0.5 text-[11px] text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50">
+                                                    <x-filament::icon icon="heroicon-m-photo" class="h-3 w-3 text-gray-400" />
+                                                    Foto unit
+                                                </a>
+                                                @endif
+                                                @endforeach
+                                            </div>
+                                            @endif
                                         </div>
                                         @endforeach
                                     </div>

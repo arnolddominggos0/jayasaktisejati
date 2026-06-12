@@ -31,6 +31,7 @@ class ViewVoyage extends ViewRecord
             'checkpoints',
             'vesselChecks',
             'delayLogs',
+            'scheduleHistories',
         ]);
     }
 

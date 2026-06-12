@@ -67,41 +67,27 @@ class ShipmentResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery();
-
-        $u = Filament::auth()->user();
-        if (! $u) {
-            return $query->whereRaw('1=0');
-        }
-
-        $query->where('mode', ShipmentMode::Sea->value);
-
         $branchId = app()->bound('scope.branch_id')
             ? app('scope.branch_id')
             : null;
 
-        $depotId = app()->bound('scope.depot_id')
-            ? app('scope.depot_id')
-            : null;
-
-        if (! $branchId || ! $depotId) {
-            return $query->whereRaw('1=0');
-        }
-
-        $query->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id'));
-
-        $query->where(function ($w) use ($depotId, $u) {
-            $w->where('assigned_depot_id', $depotId)
-                ->orWhere('coordinator_id', $u->id);
-        });
-
-        return $query->with([
-            'customer:id,name',
-            'receiver:id,name',
-            'originCity:id,name',
-            'destinationCity:id,name',
-            'latestTrack',
-        ]);
+        return parent::getEloquentQuery()
+            ->where('mode', ShipmentMode::Sea->value)
+            ->when(
+                $branchId,
+                fn($q) => $q->where(
+                    fn($w) =>
+                    $w->where('branch_id', $branchId)
+                        ->orWhereNull('branch_id')
+                )
+            )
+            ->with([
+                'customer:id,name',
+                'receiver:id,name',
+                'originCity:id,name',
+                'destinationCity:id,name',
+                'latestTrack',
+            ]);
     }
 
     protected static function getNextTrackStatusOptions(Shipment $record): array
@@ -269,6 +255,99 @@ class ShipmentResource extends Resource
                 ->helperText('Wajib diisi minimal 20 karakter. Dicatat untuk audit.')
                 ->columnSpan(12),
         ];
+    }
+
+    /**
+     * Reusable optional checkseet Repeater for quick actions.
+     *
+     * Unlike trackUpdateForm(), this has no minItems and is never required —
+     * FC may submit without filling unit data.  When at least one row IS added
+     * the inner fields (model, no_rangka, etc.) remain required, so partial rows
+     * are still rejected.
+     */
+    protected static function optionalChecksheetSchema(): Repeater
+    {
+        return Repeater::make('checkseet')
+            ->label('Checksheet Unit (Opsional)')
+            ->helperText('Tambahkan kondisi setiap unit. Bisa dikosongkan jika tidak diperlukan.')
+            ->collapsible()
+            ->orderColumn(false)
+            ->default([])
+            ->schema([
+                Radio::make('checkseet_status')
+                    ->label('Kondisi')
+                    ->options(['ok' => 'OK', 'ng' => 'NG'])
+                    ->required(),
+                TextInput::make('model')
+                    ->label('Model')
+                    ->required(),
+                TextInput::make('no_rangka')
+                    ->label('No. Rangka')
+                    ->required(),
+                TextInput::make('no_mesin')
+                    ->label('No. Mesin')
+                    ->required(),
+                TextInput::make('warna')
+                    ->label('Warna')
+                    ->required(),
+                FileUpload::make('attachments')
+                    ->label('Foto Unit')
+                    ->disk('public')
+                    ->directory('shipment-tracks/checkseet')
+                    ->multiple()
+                    ->image()
+                    ->required(fn(Forms\Get $get) => $get('checkseet_status') === 'ng'),
+            ]);
+    }
+
+    /**
+     * Shared action callback: append a track entry with optional checkseet.
+     *
+     * - Wraps appendTrack() in a try-catch so DomainExceptions (MP check gate,
+     *   invalid transitions) surface as Filament danger notifications.
+     * - Sends a warning notification when no checkseet rows were provided.
+     * - Sends a success notification listing how many units were recorded.
+     */
+    protected static function appendTrackWithCheckseet(
+        Shipment    $record,
+        TrackStatus $status,
+        array       $data,
+        string      $label,
+    ): void {
+        $checkseet = ! empty($data['checkseet']) ? $data['checkseet'] : null;
+
+        try {
+            $record->appendTrack(
+                $status,
+                $data['note'] ?? null,
+                null,   // location — not collected in quick actions
+                null,   // track-level attachments — not collected in quick actions
+                null,   // override — quick actions don't support admin override
+                $checkseet,
+            );
+        } catch (DomainException $e) {
+            Notification::make()
+                ->title($e->getMessage())
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        if (empty($checkseet)) {
+            Notification::make()
+                ->title("{$label} dicatat")
+                ->body('Checksheet tidak diisi. Data kondisi unit tidak tersimpan.')
+                ->warning()
+                ->send();
+        } else {
+            $count = count($checkseet);
+            Notification::make()
+                ->title("{$label} dicatat")
+                ->body("{$count} unit tercatat dalam checksheet.")
+                ->success()
+                ->send();
+        }
     }
 
     public static function form(Forms\Form $form): Forms\Form
@@ -542,8 +621,12 @@ class ShipmentResource extends Resource
                         ->icon('heroicon-m-building-office')
                         ->color('info')
                         ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::Pickup->value)
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::Handover, $data['note'] ?? null)),
+                        ->form([
+                            Textarea::make('note')->label('Catatan')->rows(3),
+                            static::optionalChecksheetSchema(),
+                        ])
+                        ->action(fn(Shipment $record, array $data) =>
+                        static::appendTrackWithCheckseet($record, TrackStatus::Handover, $data, 'Handover Depo')),
 
                     Tables\Actions\Action::make('stuffing')
                         ->label('Stuffing & Segel')
@@ -676,11 +759,15 @@ class ShipmentResource extends Resource
                         ->icon('heroicon-m-arrow-down-tray')
                         ->color('info')
                         ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::VesselArrival->value)
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::Unloading, $data['note'] ?? null)),
+                        ->form([
+                            Textarea::make('note')->label('Catatan')->rows(3),
+                            static::optionalChecksheetSchema(),
+                        ])
+                        ->action(fn(Shipment $record, array $data) =>
+                        static::appendTrackWithCheckseet($record, TrackStatus::Unloading, $data, 'Pembongkaran')),
 
                     Tables\Actions\Action::make('handoverTrucking')
-                        ->label('Handover Self-Drive')
+                        ->label('Handover Selfdrive')
                         ->icon('heroicon-m-arrow-trending-up')
                         ->color('info')
                         ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::Unloading->value)
@@ -692,8 +779,12 @@ class ShipmentResource extends Resource
                         ->icon('heroicon-m-user')
                         ->color('info')
                         ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::Unloading->value)
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::DeliveryToCustomer, $data['note'] ?? null)),
+                        ->form([
+                            Textarea::make('note')->label('Catatan')->rows(3),
+                            static::optionalChecksheetSchema(),
+                        ])
+                        ->action(fn(Shipment $record, array $data) =>
+                        static::appendTrackWithCheckseet($record, TrackStatus::DeliveryToCustomer, $data, 'Antar ke Customer')),
 
                     Tables\Actions\Action::make('markDelivered')
                         ->label('Tandai Terkirim')

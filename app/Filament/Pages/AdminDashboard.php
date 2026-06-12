@@ -227,24 +227,51 @@ class AdminDashboard extends Page implements HasForms
 
         return Cache::remember($cacheKey, now()->addSeconds(30), function () use ($start, $end) {
 
+            $loadedStatuses = [
+                TrackStatus::UnitLoading->value,
+                TrackStatus::OnShip->value,
+                TrackStatus::VesselDepart->value,
+            ];
+
+            $portStatuses = [
+                TrackStatus::DeliveryToPort->value,
+                TrackStatus::Stacking->value,
+            ];
+
+            // Penentu port stock berbasis track-status, bukan delivered_at.
+            // - Harus punya track delivery_to_port/stacking <= $end
+            // - Belum punya track onship/unit_loading/vessel_depart <= $end
+            // Ini agar shipment lama (masuk port bulan lalu) tetap ikut dihitung
+            // dan delivered_at yang terisi oleh generator tidak memblokir.
+            $customerIds = $this->getConfigCustomerIds();
+
             $shipments = $this->baseShipmentQuery()
-                ->whereHas(
-                    'tracks',
-                    fn($q) => $q->whereBetween('tracked_at', [$start, $end])
+                ->when(! empty($customerIds), fn($qq) => $qq->whereIn('customer_id', $customerIds))
+                ->whereHas('tracks', fn($q) => $q
+                    ->whereIn('status', $portStatuses)
+                    ->where('tracked_at', '<=', $end)
+                )
+                ->whereDoesntHave('tracks', fn($q) => $q
+                    ->whereIn('status', $loadedStatuses)
+                    ->where('tracked_at', '<=', $end)
                 )
                 ->with([
-                    'tracks' => fn($q) => $q->whereBetween('tracked_at', [$start, $end])
-                        ->orderBy('tracked_at', 'asc'),
+                    'tracks' => fn($q) => $q->orderBy('tracked_at', 'asc'),
+                    'units:id,shipment_id',
                 ])
                 ->get();
 
             $items = [];
-            $total = 0;
-            $sumAge = 0;
-            $over3 = 0;
+            $total = 0;   // unit-based total (not shipment count)
+            $sumAge = 0;  // unit-weighted age sum for correct avg_age
+            $over3 = 0;   // unit-based over-3-days count
 
             foreach ($shipments as $shipment) {
-                $tracks = $shipment->tracks;
+                // Ambil track sampai akhir periode — shipment lama tetap masuk hitungan
+                $tracks = $shipment->tracks
+                    ->filter(fn($t) => $t->tracked_at && $t->tracked_at <= $end)
+                    ->values();
+
                 if ($tracks->isEmpty()) {
                     continue;
                 }
@@ -255,20 +282,15 @@ class AdminDashboard extends Page implements HasForms
                     ? $last->status->value
                     : (string) $last->status;
 
-                if (! in_array($lastStatus, [
-                    TrackStatus::DeliveryToPort->value,
-                    TrackStatus::Stacking->value,
-                ], true)) {
+                // Hanya shipment yang posisi terakhirnya di port
+                if (! in_array($lastStatus, $portStatuses, true)) {
                     continue;
                 }
 
+                // Sudah naik kapal / berangkat → bukan port stock lagi
                 $alreadyLoaded = $tracks->contains(fn($t) => in_array(
                     $t->status instanceof \BackedEnum ? $t->status->value : (string) $t->status,
-                    [
-                        TrackStatus::UnitLoading->value,
-                        TrackStatus::OnShip->value,
-                        TrackStatus::VesselDepart->value,
-                    ],
+                    $loadedStatuses,
                     true
                 ));
 
@@ -283,27 +305,32 @@ class AdminDashboard extends Page implements HasForms
                     ->startOfDay()
                     ->diffInDays($end->copy()->startOfDay());
 
-                $total++;
-                $sumAge += $age;
+                // Each physical vehicle in this SPPB is a distinct unit at port.
+                // getRelation() bypasses the 'units'=>'array' cast.
+                $unitCount = max(1, $shipment->getRelation('units')->count());
+
+                $total   += $unitCount;
+                $sumAge  += $age * $unitCount;
                 if ($age >= 3) {
-                    $over3++;
+                    $over3 += $unitCount;
                 }
 
                 $items[] = [
                     'shipment_id' => $shipment->id,
-                    'code' => $shipment->code,
-                    'route' => $shipment->route_label,
-                    'status' => $lastStatus,
-                    'age_days' => $age,
+                    'code'        => $shipment->code,
+                    'route'       => $shipment->route_label,
+                    'status'      => $lastStatus,
+                    'age_days'    => $age,
+                    'unit_count'  => $unitCount,
                     'stacking_at' => $last->tracked_at->toDateTimeString(),
                 ];
             }
 
             return [
-                'total' => $total,
-                'avg_age' => $total > 0 ? round($sumAge / $total, 1) : 0,
+                'total'      => $total,
+                'avg_age'    => $total > 0 ? round($sumAge / $total, 1) : 0,
                 'over_three' => $over3,
-                'items' => $items,
+                'items'      => $items,
             ];
         });
     }
@@ -500,11 +527,12 @@ class AdminDashboard extends Page implements HasForms
 
         $rows = $this->tamBaseQuery()
             ->whereBetween('delivered_at', [$start, $end])
+            ->with('units:id,shipment_id')
             ->get();
 
-        $total = 0;
+        $total  = 0;
         $onTime = 0;
-        $late = 0;
+        $late   = 0;
 
         foreach ($rows as $shipment) {
             if (! method_exists($shipment, 'evaluateKpiForManado')) {
@@ -517,26 +545,31 @@ class AdminDashboard extends Page implements HasForms
                 continue;
             }
 
-            $total++;
+            // Count per unit — each physical vehicle is 1 KPI data point.
+            // getRelation() bypasses the 'units'=>'array' cast in Shipment::$casts
+            // that would otherwise intercept $shipment->units and return null.
+            $unitCount = max(1, $shipment->getRelation('units')->count());
+
+            $total += $unitCount;
             $badge = $evaluation['badge'] ?? null;
 
             if (in_array($badge, ['On Time', 'Tepat Waktu'], true)) {
-                $onTime++;
+                $onTime += $unitCount;
             }
 
             if (in_array($badge, ['Late', 'Terlambat'], true)) {
-                $late++;
+                $late += $unitCount;
             }
         }
 
         return [
-            'total' => $total,
-            'on_time' => $onTime,
-            'late' => $late,
-            'on_time_pct' => $total > 0
+            'total'        => $total,
+            'on_time'      => $onTime,
+            'late'         => $late,
+            'on_time_pct'  => $total > 0
                 ? round(($onTime / $total) * 100, 1)
                 : 0,
-            'late_pct' => $total > 0
+            'late_pct'     => $total > 0
                 ? round(($late / $total) * 100, 1)
                 : 0,
             'target_total' => (int) ($cfg['thresholds']['total_days']['normal'] ?? 19),
@@ -579,21 +612,24 @@ class AdminDashboard extends Page implements HasForms
 
     public function getTamLeadTimeSeries(): array
     {
-        $cfg = config('jss_kpi.manado', []);
+        $cfg        = config('jss_kpi.manado', []);
         $thresholds = $cfg['thresholds'] ?? [];
-        $targetDw = (float) ($thresholds['dwelling_days'] ?? 6);
-        $targetSa = (float) ($thresholds['sailing_days'] ?? 10);
-        $targetDo = (float) ($thresholds['dooring_days'] ?? 2);
+        $targetDw    = (float) ($thresholds['dwelling_days']        ?? 6);
+        $targetSa    = (float) ($thresholds['sailing_days']         ?? 10);
+        $targetDo    = (float) ($thresholds['dooring_days']         ?? 2);
         $targetTotal = (float) ($thresholds['total_days']['normal'] ?? 19);
+
         [$start, $end] = $this->getPeriodRange();
 
-        $rows = $this->tamBaseQuery()->whereBetween('delivered_at', [$start, $end])->with('tracks:id,shipment_id,status,tracked_at')->get();
+        $rows = $this->tamBaseQuery()
+            ->whereBetween('delivered_at', [$start, $end])
+            ->with(['tracks:id,shipment_id,status,tracked_at', 'units:id,shipment_id'])
+            ->get();
 
-        $sumDw = 0.0;
-        $sumSa = 0.0;
-        $sumDo = 0.0;
-        $sumTotal = 0.0;
-        $n = 0;
+        // Unit-weighted sums so that SPPBs with 7 units weigh 7× more than single-unit SPPBs.
+        $sumDw = $sumSa = $sumDo = $sumTotal = 0.0;
+        $weightedN = 0;
+
         foreach ($rows as $s) {
             if (! method_exists($s, 'evaluateKpiForManado')) {
                 continue;
@@ -606,32 +642,42 @@ class AdminDashboard extends Page implements HasForms
             $dw = $summary['dwelling']['actual'] ?? null;
             $sa = $summary['sailing']['actual'] ?? null;
             $do = $summary['dooring']['actual'] ?? null;
-            $tt = $summary['total']['actual'] ?? null;
+            $tt = $summary['total']['actual']   ?? null;
+
             if ($dw !== null && $sa !== null && $do !== null && $tt !== null) {
-                $sumDw += (float) $dw;
-                $sumSa += (float) $sa;
-                $sumDo += (float) $do;
-                $sumTotal += (float) $tt;
-                $n++;
+                $unitCount  = max(1, $s->getRelation('units')->count());
+                $sumDw    += (float) $dw * $unitCount;
+                $sumSa    += (float) $sa * $unitCount;
+                $sumDo    += (float) $do * $unitCount;
+                $sumTotal += (float) $tt * $unitCount;
+                $weightedN += $unitCount;
             }
         }
 
-        if ($n > 0) {
-            $avgDw = $sumDw / $n;
-            $avgSa = $sumSa / $n;
-            $avgDo = $sumDo / $n;
-            $avgTotal = $sumTotal / $n;
+        if ($weightedN > 0) {
+            $avgDw    = (int) round($sumDw    / $weightedN);
+            $avgSa    = (int) round($sumSa    / $weightedN);
+            $avgDo    = (int) round($sumDo    / $weightedN);
+            $avgTotal = (int) round($sumTotal / $weightedN);
         } else {
-            $avgDw = $avgSa = $avgDo = $avgTotal = 0.0;
+            $avgDw = $avgSa = $avgDo = $avgTotal = 0;
         }
 
-        return ['labels' => ['Dwelling', 'Sailing', 'Dooring', 'Total'], 'values' => [$avgDw, $avgSa, $avgDo, $avgTotal], 'avg_days' => ['dwelling' => $avgDw, 'sailing' => $avgSa, 'dooring' => $avgDo, 'total' => $avgTotal], 'targets' => [$targetDw, $targetSa, $targetDo, $targetTotal]];
+        return [
+            'labels'   => ['Dwelling', 'Sailing', 'Dooring', 'Total'],
+            'values'   => [$avgDw, $avgSa, $avgDo, $avgTotal],
+            'avg_days' => ['dwelling' => $avgDw, 'sailing' => $avgSa, 'dooring' => $avgDo, 'total' => $avgTotal],
+            'targets'  => [$targetDw, $targetSa, $targetDo, $targetTotal],
+        ];
     }
 
     public function getTamLeadTimeEvaluation(): array
     {
         [$start, $end] = $this->getPeriodRange();
-        $rows = $this->tamBaseQuery()->whereBetween('delivered_at', [$start, $end])->with('tracks:id,shipment_id,status,tracked_at')->get();
+        $rows = $this->tamBaseQuery()
+            ->whereBetween('delivered_at', [$start, $end])
+            ->with(['tracks:id,shipment_id,status,tracked_at', 'units:id,shipment_id'])
+            ->get();
 
         $metrics = ['dwelling' => ['ok' => 0, 'ng' => 0, 'pending' => 0], 'sailing' => ['ok' => 0, 'ng' => 0, 'pending' => 0], 'dooring' => ['ok' => 0, 'ng' => 0, 'pending' => 0], 'total' => ['ok' => 0, 'ng' => 0, 'pending' => 0]];
 
@@ -643,6 +689,8 @@ class AdminDashboard extends Page implements HasForms
             if (! ($ev['applies'] ?? false)) {
                 continue;
             }
+            // Count per unit so achievement percentages reflect physical vehicles, not SPPBs.
+            $unitCount = max(1, $s->getRelation('units')->count());
             $summary = $ev['summary'] ?? [];
             foreach (['dwelling', 'sailing', 'dooring', 'total'] as $key) {
                 if (! isset($summary[$key])) {
@@ -650,11 +698,11 @@ class AdminDashboard extends Page implements HasForms
                 }
                 $st = $summary[$key]['status'] ?? 'PENDING';
                 if ($st === 'OK') {
-                    $metrics[$key]['ok']++;
+                    $metrics[$key]['ok'] += $unitCount;
                 } elseif ($st === 'LATE') {
-                    $metrics[$key]['ng']++;
+                    $metrics[$key]['ng'] += $unitCount;
                 } else {
-                    $metrics[$key]['pending']++;
+                    $metrics[$key]['pending'] += $unitCount;
                 }
             }
         }
@@ -712,12 +760,11 @@ class AdminDashboard extends Page implements HasForms
         foreach ($months as $m) {
             $rows = $this->tamBaseQuery()
                 ->whereBetween('delivered_at', [$m['start'], $m['end']])
-                ->with('tracks:id,shipment_id,status,tracked_at')
+                ->with(['tracks:id,shipment_id,status,tracked_at', 'units:id,shipment_id'])
                 ->get();
 
-            $sumDw = 0.0;
-            $sumSa = 0.0;
-            $sumDo = 0.0;
+            $sumDw = $sumSa = $sumDo = 0.0;
+            $weightedN = 0;
             $n = 0;
 
             foreach ($rows as $s) {
@@ -734,16 +781,18 @@ class AdminDashboard extends Page implements HasForms
                 $do = $summary['dooring']['actual'] ?? null;
 
                 if ($dw !== null && $sa !== null && $do !== null) {
-                    $sumDw += (float) $dw;
-                    $sumSa += (float) $sa;
-                    $sumDo += (float) $do;
+                    $unitCount  = max(1, $s->getRelation('units')->count());
+                    $sumDw    += (float) $dw * $unitCount;
+                    $sumSa    += (float) $sa * $unitCount;
+                    $sumDo    += (float) $do * $unitCount;
+                    $weightedN += $unitCount;
                     $n++;
                 }
             }
 
-            $avgDw = $n > 0 ? round($sumDw / $n, 2) : null;
-            $avgSa = $n > 0 ? round($sumSa / $n, 2) : null;
-            $avgDo = $n > 0 ? round($sumDo / $n, 2) : null;
+            $avgDw = $weightedN > 0 ? (int) round($sumDw / $weightedN) : null;
+            $avgSa = $weightedN > 0 ? (int) round($sumSa / $weightedN) : null;
+            $avgDo = $weightedN > 0 ? (int) round($sumDo / $weightedN) : null;
 
             $result[] = [
                 'month' => $m['label'],
@@ -761,6 +810,28 @@ class AdminDashboard extends Page implements HasForms
                 'sailing' => $targetSa,
                 'dooring' => $targetDo,
             ],
+        ];
+    }
+
+    public function getInspeksiRingkasan(): array
+    {
+        $total = DB::table('units')->count();
+
+        $sudah = DB::table('units as u')
+            ->join('unit_inspections as ui', 'ui.unit_id', '=', 'u.id')
+            ->distinct('u.id')
+            ->count('u.id');
+
+        $ng = DB::table('unit_inspection_items as uii')
+            ->join('unit_inspections as ui', 'ui.id', '=', 'uii.unit_inspection_id')
+            ->where('uii.result', 'ng')
+            ->count();
+
+        return [
+            'total' => $total,
+            'sudah' => $sudah,
+            'belum' => max(0, $total - $sudah),
+            'ng'    => $ng,
         ];
     }
 }

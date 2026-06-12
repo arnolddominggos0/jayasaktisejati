@@ -12,15 +12,15 @@ class MpCheckGate
     {
         $date ??= now();
 
-        $approved = BriefingSession::query()
+        $cleared = BriefingSession::query()
             ->where('depot_id', $depot->id)
             ->whereDate('date', $date)
-            ->where('mp_check_status', 'approved')
+            ->where('mp_check_status', 'cleared')
             ->exists();
 
-        if (! $approved) {
+        if (! $cleared) {
             throw new \DomainException(
-                'MP Check belum di-approve untuk depot dan tanggal ini.'
+                'MP Check belum selesai (Cleared) untuk depot dan tanggal ini.'
             );
         }
     }

@@ -624,15 +624,25 @@ class Shipment extends Model
 
     protected function handleMpCheck(TrackStatus $status, ?array $override): void
     {
+        // Unloading is a Destination FC operation — validate the destination depot's
+        // MP briefing, not the origin depot's. This ensures FC Bitung's morning
+        // briefing gates their unloading operations, not FC Jakarta's.
+        //
+        // Stuffing and UnitLoading remain origin-side checks (assignedDepot).
+        //
+        // If no destination depot can be resolved (pod_id unset or no depot for that
+        // port), fall back to assignedDepot so existing behavior is preserved.
+        $depot = $status === TrackStatus::Unloading
+            ? ($this->destinationDepot() ?? $this->assignedDepot)
+            : $this->assignedDepot;
+
         try {
-            MpCheckGate::ensureApproved($this->assignedDepot);
+            MpCheckGate::ensureApproved($depot);
         } catch (DomainException $e) {
             // Only allow override for sea shipments with proper authorization
             $isSea = ($this->mode?->value ?? $this->mode) === 'sea';
 
-            if (
-                ! Auth::user()?->hasRole('super_admin')
-            ) {
+            if (! Auth::user()?->hasRole('super_admin')) {
                 throw $e;
             }
 
@@ -657,14 +667,15 @@ class Shipment extends Model
                 }
             }
 
+            // Log which depot was actually checked, not always the origin
             DB::table('mp_check_overrides')->insert([
-                'shipment_id' => $this->id,
-                'depot_id' => $this->assigned_depot_id,
+                'shipment_id'  => $this->id,
+                'depot_id'     => $depot?->id ?? $this->assigned_depot_id,
                 'track_status' => $status->value,
-                'override_by' => Auth::id(),
-                'reason' => $override['reason'],
-                'created_at' => now(),
-                'updated_at' => now(),
+                'override_by'  => Auth::id(),
+                'reason'       => $override['reason'],
+                'created_at'   => now(),
+                'updated_at'   => now(),
             ]);
         }
     }
@@ -898,6 +909,25 @@ class Shipment extends Model
         return $this->belongsTo(Depot::class, 'assigned_depot_id');
     }
 
+    /**
+     * The depot at the shipment's Port of Discharge.
+     *
+     * Resolution chain: shipment.pod_id → depots.port_id
+     * FK-complete — no migration needed.
+     * Returns null if pod_id is unset or no depot serves that port.
+     *
+     * Used by handleMpCheck() to validate the correct depot's MP briefing
+     * for destination-side operations (Unloading).
+     */
+    public function destinationDepot(): ?Depot
+    {
+        if (! $this->pod_id) {
+            return null;
+        }
+
+        return Depot::where('port_id', $this->pod_id)->first();
+    }
+
     public function destinationOffice()
     {
         return $this->belongsTo(Office::class, 'destination_office_id');
@@ -1067,6 +1097,47 @@ class Shipment extends Model
         }
 
         return implode('  |  ', $parts);
+    }
+
+    // ─── Unit-derived container accessors ──────────────────────────────────────
+    // Source of truth: units.container_display (not shipments.container_no).
+    // These accessors are always derived from child Unit rows and are never
+    // written back to the shipments table, so they stay correct after any
+    // SPPB consolidation or unit reassignment.
+
+    /**
+     * Return an ordered, deduplicated list of container identifiers
+     * taken from the child Unit rows for this shipment.
+     *
+     * @return string[]
+     */
+    public function getContainerListAttribute(): array
+    {
+        return $this->units()
+            ->whereNotNull('container_display')
+            ->pluck('container_display')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Number of distinct containers used by units of this shipment.
+     */
+    public function getContainerCountAttribute(): int
+    {
+        return count($this->container_list);
+    }
+
+    /**
+     * Comma-separated container identifiers, suitable for display in a
+     * single text field.  Returns an empty string when no units have
+     * container_display set.
+     */
+    public function getContainerDisplayAttribute(): string
+    {
+        return collect($this->container_list)->implode(', ');
     }
 
     public function kpiBranchId(): ?int

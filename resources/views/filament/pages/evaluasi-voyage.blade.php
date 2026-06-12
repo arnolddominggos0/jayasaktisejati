@@ -250,11 +250,19 @@
                     </div>
                 @endif
             </div>
-            <button wire:click="exportVoyageDetail"
-                    class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition">
-                <x-heroicon-o-arrow-down-tray class="w-4 h-4" />
-                Export Excel
-            </button>
+            <div class="flex items-center gap-2">
+                <a href="{{ route('voyage.quick-report', ['voyageId' => $selectedVoyageId]) }}"
+                   target="_blank"
+                   class="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition">
+                    <x-heroicon-o-document-text class="w-4 h-4" />
+                    Quick Report PDF
+                </a>
+                <button wire:click="exportVoyageDetail"
+                        class="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition">
+                    <x-heroicon-o-arrow-down-tray class="w-4 h-4" />
+                    Export Excel
+                </button>
+            </div>
         </div>
     </div>
 

@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Manpower extends Model
 {
     protected $fillable = [
+        'appsheet_id',
         'name',
         'domain',
         'skills',
@@ -18,7 +19,7 @@ class Manpower extends Model
         'license_number',
         'branch_id',
         'depot_id',
-        'active'
+        'active',
     ];
 
     protected $casts = [

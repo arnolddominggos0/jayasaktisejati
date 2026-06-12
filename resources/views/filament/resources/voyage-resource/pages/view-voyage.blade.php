@@ -16,6 +16,7 @@ $headerBorder = OperationalUi::severityBorder($state->severity);
 <x-filament-panels::page>
     <div class="max-w-6xl mx-auto space-y-5">
 
+        {{-- ── Page header ──────────────────────────────────────────────── --}}
         <div class="flex items-start justify-between gap-4">
             <div>
                 <div class="text-xs text-gray-400 uppercase tracking-wider font-semibold">
@@ -43,6 +44,7 @@ $headerBorder = OperationalUi::severityBorder($state->severity);
             </a>
         </div>
 
+        {{-- ── Voyage identity card ─────────────────────────────────────── --}}
         <div class="bg-white border border-gray-200 rounded-2xl {{ $headerBorder }} p-4 shadow-sm">
             <div class="flex items-start justify-between gap-5">
 
@@ -95,125 +97,207 @@ $headerBorder = OperationalUi::severityBorder($state->severity);
                 </div>
 
                 <div class="shrink-0">
-                    <x-operational.badge :label="strtoupper($state->status->label())" :color="$statusBadge['class']" size="sm" />
+                    <x-operational.badge
+                        :label="strtoupper($state->status->label())"
+                        :color="$statusBadge['class']"
+                        size="sm" />
                 </div>
             </div>
         </div>
 
+        {{-- ── KPI badges ───────────────────────────────────────────────── --}}
         <div class="flex items-center gap-2 flex-wrap">
             {!! OperationalUi::kpiBadge($state->otb, 'OTB') !!}
             {!! OperationalUi::kpiBadge($state->otd, 'OTD') !!}
             {!! OperationalUi::kpiBadge($state->ota, 'OTA') !!}
         </div>
 
-        <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
-            <div class="flex items-center justify-between mb-4">
-                <div class="text-[11px] uppercase tracking-wider font-bold text-gray-500">
-                    Timeline Operasional
-                </div>
+        {{-- ── Tab Navigation ───────────────────────────────────────────── --}}
+        <div
+            x-data="{ tab: new URLSearchParams(window.location.search).get('tab') || 'overview' }"
+            x-init="$watch('tab', v => {
+                const u = new URL(window.location);
+                u.searchParams.set('tab', v);
+                window.history.replaceState({}, '', u);
+            })"
+        >
+            {{-- Tab bar --}}
+            <div class="flex items-center gap-1 border-b border-gray-200 mb-5">
 
-                <div class="text-[11px] text-gray-400">
-                    {{ collect($v->checkpoints)->count() + collect($v->vesselChecks)->count() + collect($v->milestones)->count() + ($v->delayLogs?->count() ?? 0) }} kejadian
-                </div>
+                <button
+                    @click="tab = 'overview'"
+                    :class="tab === 'overview'
+                        ? 'border-b-2 border-primary-600 text-primary-700 font-semibold'
+                        : 'text-gray-500 hover:text-gray-700'"
+                    class="px-4 py-2.5 text-sm transition-colors -mb-px">
+                    Overview
+                </button>
+
+                <button
+                    @click="tab = 'analysis'"
+                    :class="tab === 'analysis'
+                        ? 'border-b-2 border-primary-600 text-primary-700 font-semibold'
+                        : 'text-gray-500 hover:text-gray-700'"
+                    class="px-4 py-2.5 text-sm transition-colors -mb-px">
+                    Analysis
+                </button>
+
+                <button
+                    @click="tab = 'schedule'"
+                    :class="tab === 'schedule'
+                        ? 'border-b-2 border-primary-600 text-primary-700 font-semibold'
+                        : 'text-gray-500 hover:text-gray-700'"
+                    class="px-4 py-2.5 text-sm transition-colors -mb-px">
+                    Schedule History
+                </button>
+
             </div>
 
-            <x-voyage-operational-timeline :voyage="$v" />
-        </div>
+            {{-- ────────────────────────────────────────────────────────────
+                 TAB: Overview
+                 Isi lama yang sudah ada: Timeline, Kesiapan, Milestone
+            ──────────────────────────────────────────────────────────────── --}}
+            <div x-show="tab === 'overview'" x-cloak class="space-y-5">
 
-        <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
-            <div class="flex items-center justify-between mb-4">
-                <div class="text-[11px] uppercase tracking-wider font-bold text-gray-500">
-                    Kesiapan
-                </div>
-
-                <div class="text-[11px] text-gray-400">
-                    {{ collect($v->vesselChecks)->count() }} pemeriksaan
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                @forelse ($v->vesselChecks as $vc)
-                @php
-                $vcDisplay = OperationalUi::vesselCheckStatusLabel($vc);
-                $ok = data_get($vc, 'status.value') === 'ok';
-                @endphp
-
-                <div class="rounded-xl border border-gray-100 px-3 py-2">
-                    <div class="flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-2">
-                            <div class="text-[11px] font-mono text-gray-400">
-                                VC
-                            </div>
-
-                            <div class="font-semibold text-sm text-gray-800">
-                                {{ $vc->day_code }}
-                            </div>
+                {{-- Timeline Operasional --}}
+                <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="text-[11px] uppercase tracking-wider font-bold text-gray-500">
+                            Timeline Operasional
                         </div>
 
-                        <div class="{{ $vcDisplay['class'] }} font-bold text-sm">
-                            {{ $vcDisplay['label'] }}
+                        <div class="text-[11px] text-gray-400">
+                            {{ collect($v->checkpoints)->count() + collect($v->vesselChecks)->count() + collect($v->milestones)->count() + ($v->delayLogs?->count() ?? 0) }} kejadian
                         </div>
                     </div>
 
-                    @php
-                    $note = data_get($vc, 'note');
-                    @endphp
+                    <x-voyage-operational-timeline :voyage="$v" />
+                </div>
 
-                    @if ($note)
-                    <div class="mt-1 text-[12px] text-gray-500">
-                        {{ $note }}
+                {{-- Kesiapan --}}
+                <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="text-[11px] uppercase tracking-wider font-bold text-gray-500">
+                            Kesiapan
+                        </div>
+
+                        <div class="text-[11px] text-gray-400">
+                            {{ collect($v->vesselChecks)->count() }} pemeriksaan
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        @forelse ($v->vesselChecks as $vc)
+                        @php
+                        $vcDisplay = OperationalUi::vesselCheckStatusLabel($vc);
+                        $ok = data_get($vc, 'status.value') === 'ok';
+                        @endphp
+
+                        <div class="rounded-xl border border-gray-100 px-3 py-2">
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="flex items-center gap-2">
+                                    <div class="text-[11px] font-mono text-gray-400">
+                                        VC
+                                    </div>
+
+                                    <div class="font-semibold text-sm text-gray-800">
+                                        {{ $vc->day_code }}
+                                    </div>
+                                </div>
+
+                                <div class="{{ $vcDisplay['class'] }} font-bold text-sm">
+                                    {{ $vcDisplay['label'] }}
+                                </div>
+                            </div>
+
+                            @php
+                            $note = data_get($vc, 'note');
+                            @endphp
+
+                            @if ($note)
+                            <div class="mt-1 text-[12px] text-gray-500">
+                                {{ $note }}
+                            </div>
+                            @endif
+                        </div>
+                        @empty
+                        <div class="col-span-2 text-sm text-gray-400 italic">
+                            Belum ada data kesiapan vessel.
+                        </div>
+                        @endforelse
+                    </div>
+                </div>
+
+                {{-- Milestone --}}
+                <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="text-[11px] uppercase tracking-wider font-bold text-gray-500">
+                            Milestone
+                        </div>
+
+                        <div class="text-[11px] text-gray-400">
+                            {{ $state->milestoneTotalCount }} milestone
+                        </div>
+                    </div>
+
+                    @if ($state->milestoneTotalCount > 0)
+                    <div class="grid grid-cols-4 gap-3">
+                        @foreach ($v->milestones as $m)
+                        @php
+                        $chip = OperationalUi::milestoneChip($m);
+                        @endphp
+
+                        <div class="rounded-xl border px-3 py-3 {{ $chip['class'] }}">
+                            <div class="flex items-center justify-between">
+                                <div class="font-bold text-sm uppercase">
+                                    {{ $m->code }}
+                                </div>
+
+                                <div class="font-black">
+                                    {{ $chip['icon'] }}
+                                </div>
+                            </div>
+
+                            <div class="mt-2 text-[11px]">
+                                {{ optional($m->milestone_date)->format('d M Y') }}
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                    @else
+                    <div class="py-3 text-sm text-gray-400 italic">
+                        Belum ada milestone operasional.
                     </div>
                     @endif
                 </div>
-                @empty
-                <div class="col-span-2 text-sm text-gray-400 italic">
-                    Belum ada data kesiapan vessel.
-                </div>
-                @endforelse
+
             </div>
+            {{-- /tab:overview --}}
+
+            {{-- ────────────────────────────────────────────────────────────
+                 TAB: Analysis
+                 Dwelling / Sailing / Dooring / Lead Time Plan
+            ──────────────────────────────────────────────────────────────── --}}
+            <div x-show="tab === 'analysis'" x-cloak>
+                <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
+                    @include('filament.resources.voyage-resource.tabs.analysis')
+                </div>
+            </div>
+            {{-- /tab:analysis --}}
+
+            {{-- ────────────────────────────────────────────────────────────
+                 TAB: Schedule History
+                 Draft / Final / Actual + Variance
+            ──────────────────────────────────────────────────────────────── --}}
+            <div x-show="tab === 'schedule'" x-cloak>
+                <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
+                    @include('filament.resources.voyage-resource.tabs.schedule-history')
+                </div>
+            </div>
+            {{-- /tab:schedule --}}
+
         </div>
-
-        <div class="bg-white border border-gray-200 rounded-2xl shadow-sm p-5">
-            <div class="flex items-center justify-between mb-4">
-                <div class="text-[11px] uppercase tracking-wider font-bold text-gray-500">
-                    Milestone
-                </div>
-
-                <div class="text-[11px] text-gray-400">
-                    {{ $state->milestoneTotalCount }} milestone
-                </div>
-            </div>
-
-            @if ($state->milestoneTotalCount > 0)
-            <div class="grid grid-cols-4 gap-3">
-                @foreach ($v->milestones as $m)
-                @php
-                $chip = OperationalUi::milestoneChip($m);
-                @endphp
-
-                <div class="rounded-xl border px-3 py-3 {{ $chip['class'] }}">
-                    <div class="flex items-center justify-between">
-                        <div class="font-bold text-sm uppercase">
-                            {{ $m->code }}
-                        </div>
-
-                        <div class="font-black">
-                            {{ $chip['icon'] }}
-                        </div>
-                    </div>
-
-                    <div class="mt-2 text-[11px]">
-                        {{ optional($m->milestone_date)->format('d M Y') }}
-                    </div>
-                </div>
-                @endforeach
-            </div>
-            @else
-            <div class="py-3 text-sm text-gray-400 italic">
-                Belum ada milestone operasional.
-            </div>
-            @endif
-        </div>
+        {{-- /x-data tabs --}}
 
     </div>
 </x-filament-panels::page>

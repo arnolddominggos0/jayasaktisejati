@@ -37,7 +37,7 @@ enum TrackStatus: string
             self::VesselDepart       => 'Kapal Berangkat',
             self::VesselArrival      => 'Kapal Tiba',
             self::Unloading          => 'Pembongkaran',
-            self::HandoverTrucking   => 'Handover Self-Drive',
+            self::HandoverTrucking   => 'Handover Selfdrive',
             self::DeliveryToCustomer => 'Antar ke Customer',
             self::Delivered          => 'Terkirim',
             self::Hold               => 'Ditahan',

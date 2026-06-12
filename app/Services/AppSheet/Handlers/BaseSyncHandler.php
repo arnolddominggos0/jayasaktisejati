@@ -1,5 +1,16 @@
 <?php
 
+/**
+ * @deprecated This Handler architecture is DEAD CODE and is NOT used in production.
+ *
+ * The active path is:
+ *   AppSheetWebhookController → AppSheetService::syncFromWebhook() → sync*() methods
+ *
+ * These classes were built as a planned refactor but were never wired into any route,
+ * service provider, or controller.  They remain here for reference only.
+ * Do NOT activate them without a full integration audit and test cycle.
+ */
+
 namespace App\Services\AppSheet\Handlers;
 
 use Exception;

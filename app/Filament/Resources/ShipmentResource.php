@@ -63,7 +63,7 @@ class ShipmentResource extends Resource
 {
     protected static ?string $model = Shipment::class;
 
-    protected static ?string $navigationGroup = 'Eksekusi Pengiriman';
+    protected static ?string $navigationGroup = 'Pengiriman';
 
     protected static ?string $navigationLabel = 'Permintaan Pengiriman';
 
@@ -613,11 +613,20 @@ class ShipmentResource extends Resource
                                     ->required(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
                                     ->columnSpan(4),
 
+                                // Shown only when the shipment has NO unit-relation rows yet
+                                // (new shipment, or legacy single-container FCL/LCL).
+                                // For SPPB shipments the truth lives in units.container_display.
                                 TextInput::make('container_no')
                                     ->label('No. Kontainer')
                                     ->maxLength(20)
-                                    ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value)
-                                    ->required(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value)
+                                    ->visible(fn(Get $get, $record) =>
+                                        $get('mode') === ShipmentMode::Sea->value
+                                        && ($record === null || empty($record->container_display))
+                                    )
+                                    ->required(fn(Get $get, $record) =>
+                                        $get('mode') === ShipmentMode::Sea->value
+                                        && ($record === null || empty($record->container_display))
+                                    )
                                     ->live(onBlur: true)
                                     ->afterStateUpdated(function (Get $get, Set $set) {
                                         $label = app(ShipmentService::class)->fanOutContainerNo(
@@ -625,38 +634,40 @@ class ShipmentResource extends Resource
                                             $get('seal_no')
                                         );
 
+                                        // Fan-out to LCL general items only.
+                                        // Vehicle units manage their own container_display per unit.
                                         $items = $get('lcl_items') ?? [];
                                         foreach ($items as $i => $row) {
                                             $items[$i]['container_display'] = $label;
                                         }
                                         $set('lcl_items', $items);
-
-                                        $units = $get('units') ?? [];
-                                        foreach ($units as $i => $row) {
-                                            $units[$i]['container_display'] = $label;
-                                        }
-                                        $set('units', $units);
                                     })
                                     ->columnSpan(4),
 
+                                // Readonly info shown when units already carry container_display.
+                                // Replaces the editable container_no field for SPPB / multi-container shipments.
+                                Placeholder::make('container_digunakan')
+                                    ->label('Container Digunakan')
+                                    ->content(fn($record) => $record?->container_display ?: '—')
+                                    ->visible(fn(Get $get, $record) =>
+                                        $get('mode') === ShipmentMode::Sea->value
+                                        && $record !== null
+                                        && !empty($record->container_display)
+                                    )
+                                    ->columnSpan(4),
+
+                                // Seal No belongs to the container, not to individual vehicle units.
+                                // For vehicle cargo: stored in sea_containers.seal_no (SeaContainer model).
+                                // For LCL/FCL general cargo: stored here at shipment level (single-container legacy).
+                                // Not required for vehicle cargo — seal is captured at container level.
                                 TextInput::make('seal_no')
                                     ->label('Seal No.')
                                     ->maxLength(20)
                                     ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value)
-                                    ->required(function (Get $get) {
-                                        if ($get('mode') !== ShipmentMode::Sea->value) {
-                                            return false;
-                                        }
-
-                                        $isVehicle = $get('cargo_type') === CargoType::Vehicle->value;
-                                        $loading = $get('vehicle_loading');
-
-                                        if ($isVehicle && $loading === 'flat_rack') {
-                                            return false;
-                                        }
-
-                                        return true;
-                                    })
+                                    ->required(fn(Get $get) =>
+                                        $get('mode') === ShipmentMode::Sea->value
+                                        && $get('cargo_type') !== CargoType::Vehicle->value
+                                    )
                                     ->live(onBlur: true)
                                     ->afterStateUpdated(function (Get $get, Set $set) {
                                         $label = app(ShipmentService::class)->fanOutContainerNo(
@@ -664,17 +675,13 @@ class ShipmentResource extends Resource
                                             $get('seal_no')
                                         );
 
+                                        // Fan-out to LCL general items only.
+                                        // Vehicle units manage their own container_display per unit.
                                         $items = $get('lcl_items') ?? [];
                                         foreach ($items as $i => $row) {
                                             $items[$i]['container_display'] = $label;
                                         }
                                         $set('lcl_items', $items);
-
-                                        $units = $get('units') ?? [];
-                                        foreach ($units as $i => $row) {
-                                            $units[$i]['container_display'] = $label;
-                                        }
-                                        $set('units', $units);
                                     })
                                     ->columnSpan(4),
 
@@ -825,17 +832,9 @@ class ShipmentResource extends Resource
                                         TextInput::make('qty')->label('Qty')->numeric()->minValue(1)->default(1)->columnSpan(1),
                                         TextInput::make('notes')->label('Ket')->maxLength(120)->columnSpan(5),
                                         TextInput::make('container_display')
-                                            ->label('Dalam Kontainer')
-                                            ->disabled()
-                                            ->dehydrated(false)
-                                            ->formatStateUsing(function (Get $get) {
-                                                $no = trim((string) ($get('../../container_no') ?? ''));
-                                                $seal = trim((string) ($get('../../seal_no') ?? ''));
-
-                                                return ($no === '' && $seal === '')
-                                                    ? '–'
-                                                    : ($seal !== '' ? ($no . ' • ' . $seal) : $no);
-                                            })
+                                            ->label('Container No')
+                                            ->maxLength(30)
+                                            ->placeholder('TAKU 000000-0')
                                             ->columnSpan(3),
                                     ])
                                     ->addActionLabel('Tambah Unit')

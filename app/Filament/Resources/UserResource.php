@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\Branch;
 use App\Models\Customer;
+use App\Models\Depot;
 use App\Models\User;
 use Filament\Forms\Components\Group;
 use Filament\Forms\Components\Section;
@@ -171,6 +172,73 @@ class UserResource extends Resource
                     ->separator(', ')
                     ->sortable(false)
                     ->formatStateUsing(fn ($state) => is_array($state) ? implode(', ', $state) : (string) $state),
+
+                TextColumn::make('fc_scope_status')
+                    ->label('Scope FC')
+                    ->getStateUsing(function (User $record): string {
+                        if (! $record->hasRole('field_coordinator')) {
+                            return '—';
+                        }
+
+                        $scopeComplete = $record->scope_unit_id
+                            && $record->scope_branch_id
+                            && $record->scope_unit_type;
+
+                        if ($scopeComplete) {
+                            // Verify live depot assignment still matches
+                            $liveDepot = Depot::where('coordinator_user_id', $record->id)->first();
+                            if (! $liveDepot) {
+                                return '⚠ Tidak ada depot';
+                            }
+                            $mismatch = $record->scope_unit_id !== $liveDepot->id
+                                || $record->scope_branch_id !== $liveDepot->branch_id
+                                || $record->scope_unit_type !== 'depot';
+                            return $mismatch ? '⚠ Scope mismatch' : '✓ Lengkap';
+                        }
+
+                        // Scope fields NULL — check if depot exists as fallback
+                        $liveDepot = Depot::where('coordinator_user_id', $record->id)->first();
+                        if (! $liveDepot) {
+                            return '⚠ Tidak ada depot';
+                        }
+
+                        return '⚠ Scope tidak diisi';
+                    })
+                    ->badge()
+                    ->color(function (User $record): string {
+                        if (! $record->hasRole('field_coordinator')) {
+                            return 'gray';
+                        }
+
+                        $scopeComplete = $record->scope_unit_id
+                            && $record->scope_branch_id
+                            && $record->scope_unit_type;
+
+                        if ($scopeComplete) {
+                            $liveDepot = Depot::where('coordinator_user_id', $record->id)->first();
+                            if (! $liveDepot) return 'danger';
+                            $mismatch = $record->scope_unit_id !== $liveDepot->id
+                                || $record->scope_branch_id !== $liveDepot->branch_id
+                                || $record->scope_unit_type !== 'depot';
+                            return $mismatch ? 'danger' : 'success';
+                        }
+
+                        $liveDepot = Depot::where('coordinator_user_id', $record->id)->first();
+                        return $liveDepot ? 'warning' : 'danger';
+                    })
+                    ->tooltip(function (User $record): ?string {
+                        if (! $record->hasRole('field_coordinator')) {
+                            return null;
+                        }
+                        if (! $record->scope_unit_id) {
+                            return 'scope_branch_id, scope_unit_id, scope_unit_type belum diisi. '
+                                . 'Middleware menggunakan fallback depot langsung. '
+                                . 'Isi scope fields di form edit user untuk konfigurasi kanonik.';
+                        }
+                        return null;
+                    })
+                    ->toggleable(),
+
                 TextColumn::make('updated_at')->label('Diubah')->since()->sortable(),
             ])
             ->filters([

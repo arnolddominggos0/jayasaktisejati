@@ -4,12 +4,16 @@ namespace App\Filament\Resources\ShipmentResource\Pages;
 
 use App\Enums\ShipmentMode;
 use App\Filament\Resources\ShipmentResource;
+use App\Filament\Resources\UnitResource;
+use App\Models\UnitInspection;
+use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Actions\Action;
+use Illuminate\Support\Facades\DB;
 
 class ViewShipment extends ViewRecord
 {
@@ -54,6 +58,71 @@ class ViewShipment extends ViewRecord
                             }),
                     ])
                     ->visible(fn ($record) => $record->loadingSessions()->exists()),
+
+                // ── Ringkasan Pemeriksaan Checksheet ──────────────────────────
+                Section::make('Ringkasan Pemeriksaan')
+                    ->icon('heroicon-m-clipboard-document-check')
+                    ->columns(4)
+                    ->schema([
+                        TextEntry::make('insp_total_unit')
+                            ->label('Unit')
+                            ->getStateUsing(fn ($record): int =>
+                                (int) DB::table('units')
+                                    ->where('shipment_id', $record->id)
+                                    ->count()
+                            )
+                            ->weight('bold'),
+
+                        TextEntry::make('insp_sudah')
+                            ->label('Sudah Diperiksa')
+                            ->getStateUsing(fn ($record): int =>
+                                (int) DB::table('units as u')
+                                    ->join('unit_inspections as ui', 'ui.unit_id', '=', 'u.id')
+                                    ->where('u.shipment_id', $record->id)
+                                    ->distinct('u.id')
+                                    ->count('u.id')
+                            )
+                            ->badge()
+                            ->color('success'),
+
+                        TextEntry::make('insp_belum')
+                            ->label('Belum Diperiksa')
+                            ->getStateUsing(function ($record): int {
+                                $total = (int) DB::table('units')
+                                    ->where('shipment_id', $record->id)
+                                    ->count();
+                                $sudah = (int) DB::table('units as u')
+                                    ->join('unit_inspections as ui', 'ui.unit_id', '=', 'u.id')
+                                    ->where('u.shipment_id', $record->id)
+                                    ->distinct('u.id')
+                                    ->count('u.id');
+                                return max(0, $total - $sudah);
+                            })
+                            ->badge()
+                            ->color(fn (int $state) => $state > 0 ? 'warning' : 'gray'),
+
+                        TextEntry::make('insp_ng')
+                            ->label('Temuan NG')
+                            ->getStateUsing(fn ($record): int =>
+                                (int) DB::table('unit_inspection_items as uii')
+                                    ->join('unit_inspections as ui', 'ui.id', '=', 'uii.unit_inspection_id')
+                                    ->join('units as u', 'u.id', '=', 'ui.unit_id')
+                                    ->where('u.shipment_id', $record->id)
+                                    ->where('uii.result', 'ng')
+                                    ->count()
+                            )
+                            ->badge()
+                            ->color(fn (int $state) => $state > 0 ? 'danger' : 'gray'),
+
+                        TextEntry::make('insp_link')
+                            ->label('')
+                            ->getStateUsing(fn ($record): string => 'Lihat Unit →')
+                            ->url(fn ($record): string =>
+                                UnitResource::getUrl('index') . '?tableFilters[shipment_id][value]=' . $record->id
+                            )
+                            ->color('primary')
+                            ->columnSpanFull(),
+                    ]),
             ]);
     }
 

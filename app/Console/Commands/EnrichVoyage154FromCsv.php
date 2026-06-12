@@ -10,9 +10,11 @@ class EnrichVoyage154FromCsv extends Command
     protected $signature = 'voyage154:enrich-from-csv
                             {--dry-run : Tampilkan rencana perubahan tanpa menyimpan ke database}';
 
-    protected $description = 'Enrichment & normalisasi data Voyage 154 dari CSV tam_v154.csv: '
+    protected $description = '[COMPLETED — one-time historical import, do not re-run] '
+        . 'Enrichment & normalisasi data Voyage 154 dari CSV tam_v154.csv: '
         . 'isi reg_no, color, do_number, container_display pada units, '
-        . 'dan verifikasi destination_city_id pada shipments.';
+        . 'dan verifikasi destination_city_id pada shipments. '
+        . 'Shipment codes subsequently refactored from VOY154TTSTJKTMND-XXX to JSS0526SH-series (Part J).';
 
     private const CSV_PATH = 'storage/imports/tam/may2026/tam_v154.csv';
 
@@ -317,7 +319,7 @@ class EnrichVoyage154FromCsv extends Command
         // Distribusi destination city
         $cityDist = DB::table('shipments as s')
             ->join('cities as c', 'c.id', '=', 's.destination_city_id')
-            ->where('s.code', 'like', 'VOY154%')
+            ->where('s.voyage_id', 1)   // Voyage 154 (codes refactored to JSS0526SH-series)
             ->selectRaw('c.name as city_name, COUNT(*) as cnt')
             ->groupBy('c.name')
             ->orderByDesc('cnt')
@@ -338,12 +340,12 @@ class EnrichVoyage154FromCsv extends Command
         // Cek unit yang masih NULL (seharusnya 0 setelah enrichment)
         $nullUnits = DB::table('units as u')
             ->join('shipments as s', 's.id', '=', 'u.shipment_id')
-            ->where('s.code', 'like', 'VOY154%')
+            ->where('s.voyage_id', 1)   // Voyage 154 (codes refactored to JSS0526SH-series)
             ->whereNull('u.reg_no')
             ->count();
 
         $nullCityShipments = DB::table('shipments')
-            ->where('code', 'like', 'VOY154%')
+            ->where('voyage_id', 1)   // Voyage 154 (codes refactored to JSS0526SH-series)
             ->whereNull('destination_city_id')
             ->count();
 

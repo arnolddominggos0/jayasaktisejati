@@ -30,8 +30,15 @@ class LoadingSessionResource extends Resource
 {
     protected static ?string $model = LoadingSession::class;
 
-    // Hidden from navigation - only accessible as Shipment sub-process
+    // Navigation hidden — LoadingSession is an internal AppSheet-driven workflow.
+    // Model, observer, auto-create service, and AppSheet handler remain intact.
+    // Re-enable by setting true when a dedicated LoadingSession UI is needed.
     protected static bool $shouldRegisterNavigation = false;
+
+    protected static ?string $navigationLabel  = 'Sesi Loading';
+    protected static ?string $navigationGroup  = 'Operasional Lapangan';
+    protected static ?string $navigationIcon   = 'heroicon-o-clipboard-document-list';
+    protected static ?int    $navigationSort   = 15;
 
     protected static ?string $modelLabel       = 'Sesi Loading';
     protected static ?string $pluralModelLabel = 'Sesi Loading';

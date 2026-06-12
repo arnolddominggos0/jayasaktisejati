@@ -197,8 +197,9 @@ class ViewShipment extends ViewRecord
                             ->placeholder('—')
                             ->columnSpan(3),
 
-                        TextEntry::make('container_no')
-                            ->label('No Kontainer')
+                        TextEntry::make('container_display')
+                            ->label(fn (Shipment $record) => $record->container_count > 1 ? 'Containers' : 'Container')
+                            ->getStateUsing(fn (Shipment $record) => $record->container_display ?: null)
                             ->placeholder('—')
                             ->columnSpan(4),
 

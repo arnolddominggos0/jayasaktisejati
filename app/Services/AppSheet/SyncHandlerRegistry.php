@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * @deprecated DEAD CODE — SyncHandlerRegistry is never instantiated from any active code path.
+ * The active path is AppSheetService (monolith). See BaseSyncHandler.php for full context.
+ */
+
 namespace App\Services\AppSheet;
 
 use App\Services\AppSheet\Handlers\BaseSyncHandler;

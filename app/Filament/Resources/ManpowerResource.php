@@ -24,6 +24,14 @@ class ManpowerResource extends Resource
     public static function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([
+            Forms\Components\TextInput::make('appsheet_id')
+                ->label('AppSheet ID')
+                ->helperText('Key kolom dari tabel manpower di AppSheet (UNIQUEID atau integer). Diisi saat import atau sinkronisasi AppSheet.')
+                ->nullable()
+                ->unique(ignoreRecord: true)
+                ->maxLength(64)
+                ->columnSpan(2),
+
             Forms\Components\TextInput::make('name')->label('Nama')->required(),
             Forms\Components\Select::make('domain')->label('Domain')
                 ->options(collect(MPDomain::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))->required(),
@@ -51,6 +59,13 @@ class ManpowerResource extends Resource
     public static function table(Tables\Table $table): Tables\Table
     {
         return $table->columns([
+            Tables\Columns\TextColumn::make('appsheet_id')
+                ->label('AppSheet ID')
+                ->searchable()
+                ->copyable()
+                ->placeholder('—')
+                ->toggleable(isToggledHiddenByDefault: true),
+
             Tables\Columns\TextColumn::make('name')->label('Nama')->searchable(),
             Tables\Columns\TextColumn::make('domain')->badge()->label('Domain')
                 ->state(fn($record) => $record->domain?->label() ?? (string) $record->domain)

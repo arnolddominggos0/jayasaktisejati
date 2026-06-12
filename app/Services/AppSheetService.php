@@ -169,9 +169,25 @@ class AppSheetService
                 $mappedData
             ),
 
-            'delete' => BriefingSession::where('date', $date)
-                ->where('depot_id', $depotId)
-                ->delete(),
+            'delete' => (function () use ($date, $depotId) {
+                $session = BriefingSession::where('date', $date)
+                    ->where('depot_id', $depotId)
+                    ->first();
+
+                if (! $session) {
+                    return 0;
+                }
+
+                // Cleared sessions represent completed MP checks — guard against
+                // accidental deletion via AppSheet webhook after operations start.
+                if ($session->mp_check_status === MPCheckStatus::Cleared) {
+                    throw new Exception(
+                        "Briefing {$date} di depot {$depotId} sudah berstatus Cleared dan tidak dapat dihapus melalui AppSheet."
+                    );
+                }
+
+                return $session->delete();
+            })(),
 
             default => throw new Exception("Unknown operation: {$operation}"),
         };
@@ -194,69 +210,83 @@ class AppSheetService
             return $this->deleteBriefingAttendance($mappedData, $appsheetId);
         }
 
-        $sessionId = $mappedData['session_id'] ?? null;
-        $manpowerId = $mappedData['manpower_id'] ?? null;
+        // ── Resolve session (AppSheet appsheet_id → Laravel PK) ──────────────
+        $appsheetSessionId = $mappedData['session_id'] ?? null;
 
-        $session = BriefingSession::where(
-            'appsheet_id',
-            $sessionId
-        )->first();
+        $session = BriefingSession::where('appsheet_id', $appsheetSessionId)->first();
 
         if (! $session) {
             throw new Exception(
-                "Session AppSheet {$sessionId} tidak ditemukan"
+                "Session AppSheet {$appsheetSessionId} tidak ditemukan"
             );
         }
 
         $sessionId = $session->id;
         $mappedData['session_id'] = $session->id;
 
-        $mpType = strtolower(
-            $mappedData['mp_type'] ?? 'regular'
-        );
-
+        // ── Resolve MP type ───────────────────────────────────────────────────
+        // normalizeValue() already lowercased and mapped Indonesian → English.
+        $mpType = $mappedData['mp_type'] ?? 'regular';
         $backupName = $mappedData['backup_name'] ?? null;
 
-        Log::info('DEBUG MP CHECK', [
-            'mappedData' => $mappedData,
-            'mpType' => $mpType,
-            'backupName' => $backupName,
-            'manpowerId' => $manpowerId,
+        // ── Resolve manpower (AppSheet MP ID → Laravel manpowers.id) ─────────
+        // AppSheet sends the key column of its own manpower table as "MP ID".
+        // That key is NOT the same as manpowers.id; it must be resolved via
+        // the appsheet_id bridge column added to the manpowers table.
+        $appsheetMpId = $mappedData['manpower_id'] ?? null;  // raw value from payload
+        $resolvedManpowerId = null;
+
+        if ($mpType === 'regular') {
+            if (blank($appsheetMpId)) {
+                throw new Exception('MP ID wajib untuk MP reguler');
+            }
+
+            $manpower = \App\Models\Manpower::where('appsheet_id', (string) $appsheetMpId)->first();
+
+            if (! $manpower) {
+                Log::warning('[BRIEFING_MP_RESOLVE] Manpower AppSheet ID tidak ditemukan — attendance dilewati.', [
+                    'appsheet_mp_id'      => $appsheetMpId,
+                    'appsheet_session_id' => $appsheetSessionId,
+                    'session_id'          => $sessionId,
+                    'operation'           => $operation,
+                ]);
+
+                // Graceful skip: do not insert a row with an invalid FK.
+                // The operator must first sync manpower master data via
+                // `php artisan manpower:import-appsheet` or AppSheet daftar_mp webhook.
+                return null;
+            }
+
+            $resolvedManpowerId = $manpower->id;
+        }
+
+        // Write the resolved Laravel PK (or null for backup MP) back into mappedData.
+        $mappedData['manpower_id'] = $resolvedManpowerId;
+
+        Log::info('[BRIEFING_MP_RESOLVE] Manpower resolved.', [
+            'appsheet_mp_id'      => $appsheetMpId,
+            'resolved_manpower_id' => $resolvedManpowerId,
+            'mp_type'             => $mpType,
+            'session_id'          => $sessionId,
         ]);
 
-        if (! $sessionId) {
-            throw new Exception('Session ID wajib diisi');
-        }
-
-        if (
-            $mpType === 'regular'
-            && ! $manpowerId
-        ) {
-            throw new Exception(
-                'MP ID wajib untuk MP reguler'
-            );
-        }
-
-        if (
-            $mpType === 'backup'
-            && blank($backupName)
-        ) {
-            throw new Exception(
-                'Nama Backup MP wajib diisi'
-            );
+        // ── Validation ────────────────────────────────────────────────────────
+        if ($mpType === 'backup' && blank($backupName)) {
+            throw new Exception('Nama Backup MP wajib diisi');
         }
 
         BriefingSession::where('id', $sessionId)->exists()
             || throw new Exception("Briefing Session ID {$sessionId} tidak ditemukan");
 
+        // ── Upsert key ────────────────────────────────────────────────────────
         $uniqueKeys = $mpType === 'backup'
             ? [
-                'session_id' => $sessionId,
+                'session_id'  => $sessionId,
                 'backup_name' => $backupName,
             ]
             : [
-                'session_id' => $sessionId,
-                'manpower_id' => $manpowerId,
+                'session_id'  => $sessionId,
+                'manpower_id' => $resolvedManpowerId,
             ];
 
         $result = match ($operation) {
@@ -300,7 +330,8 @@ class AppSheetService
 
         $rawSessionId = $mappedData['session_id'] ?? null;
         $manpowerId = $mappedData['manpower_id'] ?? null;
-        $mpType = strtolower($mappedData['mp_type'] ?? 'regular');
+        // normalizeValue() already normalized mp_type to lowercase English.
+        $mpType = $mappedData['mp_type'] ?? 'regular';
         $backupName = $mappedData['backup_name'] ?? null;
 
         if ($rawSessionId) {
@@ -628,13 +659,25 @@ class AppSheetService
             if ($fieldName === 'fit_status') {
                 return strtoupper(trim($value));
             }
+
             if ($fieldName === 'attendance_status') {
                 return match (strtolower(trim($value))) {
-                    'hadir' => 'present',
-                    'tidak hadir' => 'absent',
-                    'sakit' => 'sick',
-                    'izin' => 'leave',
-                    default => $value,
+                    'hadir'        => 'present',
+                    'tidak hadir'  => 'absent',
+                    'sakit'        => 'sick',
+                    'izin'         => 'leave',
+                    default        => $value,
+                };
+            }
+
+            // Normalize mp_type: AppSheet sends Indonesian ("Reguler"/"Backup") or
+            // English variants.  Centralised here so callers always receive the
+            // canonical lowercase English value used by syncBriefingAttendance().
+            if ($fieldName === 'mp_type') {
+                return match (strtolower(trim($value))) {
+                    'reguler', 'regular' => 'regular',
+                    'backup'             => 'backup',
+                    default              => strtolower(trim($value)),
                 };
             }
         }
@@ -656,26 +699,21 @@ class AppSheetService
 
         $required = (int) $session->summary_headcount;
 
-        $session->summary_sufficient =
-            $fitCount >= $required;
+        // Refresh factual headcount flag.
+        $session->summary_sufficient = $fitCount >= $required;
 
+        // Recalculate operational status based on live data.
         // pending operational
         if ($session->pending_activity) {
+            $session->mp_check_status = MPCheckStatus::WaitingAction;
 
-            $session->mp_check_status =
-                MPCheckStatus::WaitingAction;
-
-            // manpower kurang
+        // manpower kurang
         } elseif ($fitCount < $required) {
+            $session->mp_check_status = MPCheckStatus::OnCheck;
 
-            $session->mp_check_status =
-                MPCheckStatus::OnCheck;
-
-            // siap operasional
+        // siap operasional
         } else {
-
-            $session->mp_check_status =
-                MPCheckStatus::Cleared;
+            $session->mp_check_status = MPCheckStatus::Cleared;
         }
 
         $session->saveQuietly();
