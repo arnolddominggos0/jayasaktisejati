@@ -173,25 +173,6 @@ class Shipment extends Model
 
         static::created(function (Shipment $m) {
             $m->ensureTrackSkeleton();
-
-            $firstStatus = $m->mode === ShipmentMode::Sea
-                ? TrackStatus::Pickup
-                : TrackStatus::Pickup;
-
-            $existingTrack = $m->tracks()->where('status', $firstStatus->value)->first();
-
-            if ($existingTrack && ! $existingTrack->tracked_at) {
-                $existingTrack->updateQuietly([
-                    'tracked_at' => now(),
-                    'note' => 'Menunggu penjemputan',
-                ]);
-            } elseif (! $existingTrack) {
-                $m->tracks()->create([
-                    'status' => $firstStatus->value,
-                    'tracked_at' => now(),
-                    'note' => 'Menunggu penjemputan',
-                ]);
-            }
         });
 
         static::saving(function (Shipment $m) {

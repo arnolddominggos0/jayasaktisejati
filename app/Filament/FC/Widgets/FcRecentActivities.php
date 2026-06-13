@@ -3,6 +3,7 @@
 namespace App\Filament\FC\Widgets;
 
 use App\Models\ShipmentTrack;
+use App\Services\ShipmentOperationalGateResolver;
 use Filament\Facades\Filament;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -17,15 +18,15 @@ class FcRecentActivities extends BaseWidget
 
     public function table(Table $table): Table
     {
-        $u = Filament::auth()->user();
-        $branchId = app()->bound('scope.branch_id') ? app('scope.branch_id') : ($u?->effectiveBranchId() ?? null);
-        $depotId = app()->bound('scope.depot_id') ? app('scope.depot_id') : null;
+        $u       = Filament::auth()->user();
+        $depotId = app()->bound('scope.depot_id') ? (int) app('scope.depot_id') : null;
+        $userId  = (int) ($u?->id ?? 0);
 
         return $table
-            ->query(function () use ($u, $branchId, $depotId): Builder {
+            ->query(function () use ($depotId, $userId): Builder {
                 $q = ShipmentTrack::query()
                     ->with([
-                        'shipment:id,code,origin_city_id,destination_city_id,mode,assigned_depot_id,coordinator_id,branch_id',
+                        'shipment:id,code,origin_city_id,destination_city_id,mode,assigned_depot_id',
                         'shipment.originCity:id,name',
                         'shipment.destinationCity:id,name',
                         'user:id,name',
@@ -33,20 +34,13 @@ class FcRecentActivities extends BaseWidget
                     ->whereNotNull('tracked_at')
                     ->latest('tracked_at');
 
-                $q->whereHas('shipment', function (Builder $s) use ($u, $branchId, $depotId) {
+                $q->whereHas('shipment', function (Builder $s) use ($depotId, $userId) {
                     $s->where('mode', 'sea');
 
-                    if ($branchId) {
-                        $s->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id'));
-                    }
-
                     if ($depotId) {
-                        $s->where(function ($w) use ($depotId, $u) {
-                            $w->where('assigned_depot_id', $depotId)
-                                ->orWhere('coordinator_id', $u?->id);
-                        });
+                        ShipmentOperationalGateResolver::scopeForDepot($s, $depotId, $userId);
                     } else {
-                        $s->where('coordinator_id', $u?->id);
+                        $s->where('coordinator_id', $userId);
                     }
                 });
 

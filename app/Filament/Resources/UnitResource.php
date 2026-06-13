@@ -49,11 +49,16 @@ class UnitResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn (Builder $q) => $q
+            ->modifyQueryUsing(fn (Builder $query) => $query
                 ->with(['shipment.voyage.vessel', 'shipment.customer'])
-                ->withCount('inspections')
-                ->withCount(['inspections as inspections_failed_count' => fn (Builder $sub) =>
-                    $sub->where('status', UnitInspection::STATUS_FAILED)
+                ->withCount([
+                    // Only submitted inspections count toward QA metrics.
+                    // Draft inspections (submitted_at IS NULL) are excluded.
+                    'inspections' => fn (Builder $sub) =>
+                        $sub->whereNotNull('submitted_at'),
+                    'inspections as inspections_failed_count' => fn (Builder $sub) =>
+                        $sub->whereNotNull('submitted_at')
+                            ->where('status', UnitInspection::STATUS_FAILED),
                 ])
             )
             ->columns([
@@ -221,9 +226,12 @@ class UnitResource extends Resource
                         TextEntry::make('checksheet_status')
                             ->label('Status Pemeriksaan')
                             ->getStateUsing(function (Unit $record): string {
-                                $total = $record->inspections()->count();
+                                $total = $record->inspections()->whereNotNull('submitted_at')->count();
                                 if ($total === 0) return 'belum';
-                                $failed = $record->inspections()->where('status', UnitInspection::STATUS_FAILED)->count();
+                                $failed = $record->inspections()
+                                    ->whereNotNull('submitted_at')
+                                    ->where('status', UnitInspection::STATUS_FAILED)
+                                    ->count();
                                 return $failed > 0 ? 'ada_temuan' : 'selesai';
                             })
                             ->badge()
@@ -243,7 +251,7 @@ class UnitResource extends Resource
                                 TextEntry::make('tahap_selesai')
                                     ->label('Tahap')
                                     ->getStateUsing(fn (Unit $record): string =>
-                                        $record->inspections()->count() . ' / 6'
+                                        $record->inspections()->whereNotNull('submitted_at')->count() . ' / 6'
                                     )
                                     ->weight('bold'),
 
@@ -253,6 +261,7 @@ class UnitResource extends Resource
                                         (int) DB::table('unit_inspection_items')
                                             ->join('unit_inspections', 'unit_inspections.id', '=', 'unit_inspection_items.unit_inspection_id')
                                             ->where('unit_inspections.unit_id', $record->id)
+                                            ->whereNotNull('unit_inspections.submitted_at')
                                             ->count()
                                     ),
 
@@ -262,6 +271,7 @@ class UnitResource extends Resource
                                         (int) DB::table('unit_inspection_items')
                                             ->join('unit_inspections', 'unit_inspections.id', '=', 'unit_inspection_items.unit_inspection_id')
                                             ->where('unit_inspections.unit_id', $record->id)
+                                            ->whereNotNull('unit_inspections.submitted_at')
                                             ->where('unit_inspection_items.result', 'ng')
                                             ->count()
                                     )
@@ -274,6 +284,7 @@ class UnitResource extends Resource
                             ->label('Tahap Pemeriksaan')
                             ->getStateUsing(function (Unit $record): string {
                                 $done = $record->inspections()
+                                    ->whereNotNull('submitted_at')
                                     ->get(['stage', 'status'])
                                     ->keyBy('stage');
 

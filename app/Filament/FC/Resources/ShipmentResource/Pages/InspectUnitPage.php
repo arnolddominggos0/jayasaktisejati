@@ -1,0 +1,195 @@
+<?php
+
+namespace App\Filament\FC\Resources\ShipmentResource\Pages;
+
+use App\Filament\FC\Resources\ShipmentResource;
+use App\Models\Unit;
+use App\Models\UnitInspection;
+use App\Models\UnitInspectionItem;
+use App\Services\InspectionDraftAutoCreate;
+use App\Services\InspectionGateEvaluator;
+use Filament\Actions\Action;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ToggleButtons;
+use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Notifications\Notification;
+use Filament\Resources\Pages\Page;
+use Illuminate\Contracts\Support\Htmlable;
+
+class InspectUnitPage extends Page
+{
+    protected static string $resource = ShipmentResource::class;
+    protected static string $view = 'filament.fc.resources.shipment-resource.pages.inspect-unit';
+
+    public ?Unit $unit = null;
+    public ?UnitInspection $inspection = null;
+    public bool $isReadOnly = false;
+
+    public ?array $data = [];
+
+    public function mount(int|string $record, int|string $unit): void
+    {
+        $this->record = $this->resolveRecord($record);
+
+        $this->unit = Unit::findOrFail($unit);
+
+        $stage = $this->resolveStage();
+        abort_if(! $stage, 404, 'Tidak ada tahap inspeksi aktif untuk shipment ini.');
+
+        $this->inspection = UnitInspection::with(['items', 'checkedBy'])
+            ->where('unit_id', $this->unit->id)
+            ->where('stage', $stage)
+            ->firstOrFail();
+
+        $this->isReadOnly = $this->inspection->submitted_at !== null;
+
+        $this->form->fill([
+            'items' => $this->inspection->items->map(fn (UnitInspectionItem $item) => [
+                'id'           => $item->id,
+                'category'     => $item->category,
+                'item_name'    => $item->item_name,
+                'result'       => $item->result,
+                'finding_type' => $item->finding_type,
+                'notes'        => $item->notes,
+            ])->toArray(),
+        ]);
+    }
+
+    private function resolveStage(): ?string
+    {
+        $status = $this->record?->currentTrackStatus();
+        if (! $status) {
+            return null;
+        }
+
+        return InspectionDraftAutoCreate::resolveStage($status);
+    }
+
+    public function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Repeater::make('items')
+                    ->label('Item Pemeriksaan')
+                    ->schema([
+                        Hidden::make('id'),
+
+                        Grid::make(4)->schema([
+                            TextInput::make('category')
+                                ->label('Kategori')
+                                ->disabled()
+                                ->dehydrated(false),
+
+                            TextInput::make('item_name')
+                                ->label('Item')
+                                ->columnSpan(2)
+                                ->disabled()
+                                ->dehydrated(false),
+
+                            ToggleButtons::make('result')
+                                ->label('Hasil')
+                                ->options([
+                                    UnitInspectionItem::RESULT_OK => 'OK',
+                                    UnitInspectionItem::RESULT_NG => 'NG',
+                                ])
+                                ->colors([
+                                    UnitInspectionItem::RESULT_OK => 'success',
+                                    UnitInspectionItem::RESULT_NG => 'danger',
+                                ])
+                                ->default(UnitInspectionItem::RESULT_OK)
+                                ->required()
+                                ->live()
+                                ->disabled($this->isReadOnly)
+                                ->grouped(),
+                        ]),
+
+                        Grid::make(2)->schema([
+                            Select::make('finding_type')
+                                ->label('Jenis Temuan')
+                                ->options(UnitInspectionItem::FINDING_LABELS)
+                                ->required(fn (Get $get) => $get('result') === UnitInspectionItem::RESULT_NG)
+                                ->visible(fn (Get $get) => $get('result') === UnitInspectionItem::RESULT_NG)
+                                ->disabled($this->isReadOnly)
+                                ->live(),
+
+                            Textarea::make('notes')
+                                ->label('Catatan / Deskripsi Temuan')
+                                ->rows(2)
+                                ->required(fn (Get $get) => $get('result') === UnitInspectionItem::RESULT_NG)
+                                ->visible(fn (Get $get) => $get('result') === UnitInspectionItem::RESULT_NG)
+                                ->disabled($this->isReadOnly),
+                        ]),
+                    ])
+                    ->addable(false)
+                    ->deletable(false)
+                    ->reorderable(false)
+                    ->columnSpanFull(),
+            ])
+            ->statePath('data');
+    }
+
+    public function submit(): void
+    {
+        if ($this->isReadOnly) {
+            return;
+        }
+
+        $formData = $this->form->getState();
+
+        foreach ($formData['items'] as $itemData) {
+            $isNg = $itemData['result'] === UnitInspectionItem::RESULT_NG;
+
+            UnitInspectionItem::where('id', $itemData['id'])->update([
+                'result'       => $itemData['result'],
+                'finding_type' => $isNg ? ($itemData['finding_type'] ?? null) : null,
+                'notes'        => $isNg ? ($itemData['notes'] ?? null) : null,
+            ]);
+        }
+
+        $this->inspection->refresh();
+
+        $gateDecision = app(InspectionGateEvaluator::class)->evaluate($this->inspection);
+        $hasNg        = $this->inspection->items()->where('result', UnitInspectionItem::RESULT_NG)->exists();
+
+        $this->inspection->update([
+            'submitted_at'  => now(),
+            'checked_at'    => now(),
+            'checked_by'    => auth()->id(),
+            'status'        => $hasNg ? UnitInspection::STATUS_FAILED : UnitInspection::STATUS_PASSED,
+            'gate_decision' => $gateDecision,
+        ]);
+
+        Notification::make()
+            ->title('Inspeksi berhasil disubmit')
+            ->body('Gate Decision: ' . (UnitInspection::GATE_LABELS[$gateDecision] ?? $gateDecision))
+            ->success()
+            ->send();
+
+        $this->redirect(ShipmentResource::getUrl('view', ['record' => $this->record->getKey()]));
+    }
+
+    public function getTitle(): string|Htmlable
+    {
+        $stageLabel = $this->inspection?->stage_label ?? 'Inspeksi';
+        $chassis    = $this->unit?->chassis_no ?? '—';
+
+        return "Inspeksi: {$stageLabel} — {$chassis}";
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('back')
+                ->label('Kembali ke Shipment')
+                ->url(ShipmentResource::getUrl('view', ['record' => $this->record->getKey()]))
+                ->icon('heroicon-m-arrow-left')
+                ->color('gray'),
+        ];
+    }
+}

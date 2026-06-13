@@ -8,14 +8,17 @@ use App\Enums\ShipmentMode;
 use App\Enums\ShipmentStatus;
 use App\Enums\TrackStatus;
 use App\Filament\FC\Resources\ShipmentResource\Pages\EditShipment;
+use App\Filament\FC\Resources\ShipmentResource\Pages\InspectUnitPage;
 use App\Filament\FC\Resources\ShipmentResource\Pages\ListShipments;
 use App\Filament\FC\Resources\ShipmentResource\Pages\ViewShipment;
 use App\Filament\FC\Resources\ShipmentResource\RelationManagers\LoadingSessionsRelationManager;
+use App\Filament\FC\Resources\ShipmentResource\RelationManagers\ShipmentUnitsRelationManager;
 use App\Models\City;
 use App\Models\Depot;
 use App\Models\LoadingSession;
 use App\Models\Shipment;
 use App\Services\LoadingSessionAutoCreate;
+use App\Services\ShipmentOperationalGateResolver;
 use DomainException;
 use Filament\Facades\Filament;
 use Filament\Forms;
@@ -67,20 +70,11 @@ class ShipmentResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $branchId = app()->bound('scope.branch_id')
-            ? app('scope.branch_id')
-            : null;
+        $depotId = app()->bound('scope.depot_id') ? (int) app('scope.depot_id') : null;
+        $userId  = Filament::auth()->id();
 
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->where('mode', ShipmentMode::Sea->value)
-            ->when(
-                $branchId,
-                fn($q) => $q->where(
-                    fn($w) =>
-                    $w->where('branch_id', $branchId)
-                        ->orWhereNull('branch_id')
-                )
-            )
             ->with([
                 'customer:id,name',
                 'receiver:id,name',
@@ -88,6 +82,13 @@ class ShipmentResource extends Resource
                 'destinationCity:id,name',
                 'latestTrack',
             ]);
+
+        if (! $depotId) {
+            // No depot assigned to this FC — show only shipments they coordinate directly.
+            return $query->where('coordinator_id', $userId);
+        }
+
+        return ShipmentOperationalGateResolver::scopeForDepot($query, $depotId, $userId);
     }
 
     protected static function getNextTrackStatusOptions(Shipment $record): array
@@ -186,41 +187,6 @@ class ShipmentResource extends Resource
                 ->required()
                 ->columnSpan(6),
 
-            Repeater::make('checkseet')
-                ->label('Checksheet Unit')
-                ->collapsible()
-                ->orderColumn(false)
-                ->visible(fn(Forms\Get $get) => in_array($get('track_status'), [
-                    TrackStatus::Handover->value,
-                    TrackStatus::Stuffing->value,
-                    TrackStatus::Unloading->value,
-                    TrackStatus::HandoverTrucking->value,
-                    TrackStatus::DeliveryToCustomer->value,
-                ], true))
-                ->required(fn(Forms\Get $get) => in_array($get('track_status'), [
-                    TrackStatus::Handover->value,
-                    TrackStatus::Stuffing->value,
-                    TrackStatus::Unloading->value,
-                    TrackStatus::HandoverTrucking->value,
-                    TrackStatus::DeliveryToCustomer->value,
-                ], true))
-                ->minItems(1)
-                ->default([])
-                ->schema([
-                    Radio::make('checkseet_status')
-                        ->options(['ok' => 'OK', 'ng' => 'NG'])
-                        ->required(),
-                    TextInput::make('model')->required(),
-                    TextInput::make('no_rangka')->required(),
-                    TextInput::make('no_mesin')->required(),
-                    TextInput::make('warna')->required(),
-                    FileUpload::make('attachments')
-                        ->disk('public')
-                        ->directory('shipment-tracks/checkseet')
-                        ->multiple()
-                        ->required(fn(Forms\Get $get) => $get('checkseet_status') === 'ng'),
-                ])
-                ->columnSpan(12),
 
             Textarea::make('note')
                 ->label('Catatan Lapangan')
@@ -535,7 +501,7 @@ class ShipmentResource extends Resource
                     ->icon('heroicon-m-pencil-square')
                     ->color('info')
                     ->form(static::trackUpdateForm())
-                    ->action(function (Shipment $record, array $data) {
+                    ->action(function (Shipment $record, array $data, $livewire) {
                         $status = TrackStatus::from($data['track_status']);
 
                         $existingTrack = $record->tracks()
@@ -585,6 +551,10 @@ class ShipmentResource extends Resource
                                 ->body("Status diubah ke: {$status->label()}")
                                 ->success()
                                 ->send();
+
+                            if ($status === TrackStatus::Pickup) {
+                                $livewire->redirect(ShipmentResource::getUrl('view', ['record' => $record->getKey()]));
+                            }
                         } catch (DomainException $e) {
                             Notification::make()
                                 ->title($e->getMessage())
@@ -611,9 +581,22 @@ class ShipmentResource extends Resource
                         ->color('info')
                         ->visible(fn(Shipment $record) => ($record->status?->value ?? (string) $record->status) === 'pending')
                         ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(function (Shipment $record, array $data) {
-                            $record->appendTrack(TrackStatus::Pickup, $data['note'] ?? null);
-                            Notification::make()->title('Status: Penjemputan')->success()->send();
+                        ->action(function (Shipment $record, array $data, $livewire) {
+                            if (blank($record->coordinator_id)) {
+                                $record->forceFill(['coordinator_id' => Filament::auth()->id()])->saveQuietly();
+                            }
+                            try {
+                                $record->appendTrack(TrackStatus::Pickup, $data['note'] ?? null);
+                            } catch (DomainException $e) {
+                                Notification::make()->title($e->getMessage())->danger()->send();
+                                return;
+                            }
+                            Notification::make()
+                                ->title('Penjemputan dicatat')
+                                ->body('Silakan lakukan inspeksi pickup untuk setiap unit pada tab Unit & Inspeksi.')
+                                ->success()
+                                ->send();
+                            $livewire->redirect(ShipmentResource::getUrl('view', ['record' => $record->getKey()]));
                         }),
 
                     Tables\Actions\Action::make('handover')
@@ -621,12 +604,15 @@ class ShipmentResource extends Resource
                         ->icon('heroicon-m-building-office')
                         ->color('info')
                         ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::Pickup->value)
-                        ->form([
-                            Textarea::make('note')->label('Catatan')->rows(3),
-                            static::optionalChecksheetSchema(),
-                        ])
-                        ->action(fn(Shipment $record, array $data) =>
-                        static::appendTrackWithCheckseet($record, TrackStatus::Handover, $data, 'Handover Depo')),
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->action(function (Shipment $record, array $data) {
+                            try {
+                                $record->appendTrack(TrackStatus::Handover, $data['note'] ?? null);
+                                Notification::make()->title('Handover Depo dicatat')->success()->send();
+                            } catch (DomainException $e) {
+                                Notification::make()->title($e->getMessage())->danger()->send();
+                            }
+                        }),
 
                     Tables\Actions\Action::make('stuffing')
                         ->label('Stuffing & Segel')
@@ -759,12 +745,15 @@ class ShipmentResource extends Resource
                         ->icon('heroicon-m-arrow-down-tray')
                         ->color('info')
                         ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::VesselArrival->value)
-                        ->form([
-                            Textarea::make('note')->label('Catatan')->rows(3),
-                            static::optionalChecksheetSchema(),
-                        ])
-                        ->action(fn(Shipment $record, array $data) =>
-                        static::appendTrackWithCheckseet($record, TrackStatus::Unloading, $data, 'Pembongkaran')),
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->action(function (Shipment $record, array $data) {
+                            try {
+                                $record->appendTrack(TrackStatus::Unloading, $data['note'] ?? null);
+                                Notification::make()->title('Pembongkaran dicatat')->success()->send();
+                            } catch (DomainException $e) {
+                                Notification::make()->title($e->getMessage())->danger()->send();
+                            }
+                        }),
 
                     Tables\Actions\Action::make('handoverTrucking')
                         ->label('Handover Selfdrive')
@@ -779,12 +768,15 @@ class ShipmentResource extends Resource
                         ->icon('heroicon-m-user')
                         ->color('info')
                         ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::Unloading->value)
-                        ->form([
-                            Textarea::make('note')->label('Catatan')->rows(3),
-                            static::optionalChecksheetSchema(),
-                        ])
-                        ->action(fn(Shipment $record, array $data) =>
-                        static::appendTrackWithCheckseet($record, TrackStatus::DeliveryToCustomer, $data, 'Antar ke Customer')),
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->action(function (Shipment $record, array $data) {
+                            try {
+                                $record->appendTrack(TrackStatus::DeliveryToCustomer, $data['note'] ?? null);
+                                Notification::make()->title('Antar ke Customer dicatat')->success()->send();
+                            } catch (DomainException $e) {
+                                Notification::make()->title($e->getMessage())->danger()->send();
+                            }
+                        }),
 
                     Tables\Actions\Action::make('markDelivered')
                         ->label('Tandai Terkirim')
@@ -830,15 +822,17 @@ class ShipmentResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ListShipments::route('/'),
-            'view' => ViewShipment::route('/{record}'),
-            'edit' => EditShipment::route('/{record}/edit'),
+            'index'        => ListShipments::route('/'),
+            'view'         => ViewShipment::route('/{record}'),
+            'edit'         => EditShipment::route('/{record}/edit'),
+            'inspect-unit' => InspectUnitPage::route('/{record}/units/{unit}/inspect'),
         ];
     }
 
     public static function getRelations(): array
     {
         return [
+            ShipmentUnitsRelationManager::class,
             LoadingSessionsRelationManager::class,
         ];
     }

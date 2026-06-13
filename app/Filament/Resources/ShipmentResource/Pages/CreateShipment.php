@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ShipmentResource\Pages;
 
 use App\Enums\RequestType;
+use App\Enums\ShipmentStatus;
 use App\Filament\Resources\ShipmentResource;
 use App\Models\Shipment;
 use App\Models\Voyage;
@@ -42,21 +43,27 @@ class CreateShipment extends CreateRecord
         // Never derive branch from the admin user's account for SEA shipments.
 
         if ($mode === 'sea') {
-            if (empty($data['branch_id']) || empty($data['assigned_depot_id'])) {
-                $podId = null;
+            $podId = null;
 
-                // Get pod_id from the selected voyage
-                if (! empty($data['voyage_id'])) {
-                    $podId = Voyage::whereKey($data['voyage_id'])->value('pod_id');
+            // Snapshot voyage fields into shipment — voyage is the source of truth,
+            // shipment must carry its own copy so gate resolution never depends on voyage FK.
+            if (! empty($data['voyage_id'])) {
+                $voyage = Voyage::whereKey($data['voyage_id'])->first(['pol_id', 'pod_id']);
+                if ($voyage) {
+                    $data['pol_id'] = $data['pol_id'] ?: $voyage->pol_id;
+                    $data['pod_id'] = $data['pod_id'] ?: $voyage->pod_id;
+                    $podId = $voyage->pod_id;
                 }
+            }
 
-                if ($podId) {
-                    $resolved = app(ShipmentService::class)->resolveByPod($podId);
+            if ($podId) {
+                $resolved = app(ShipmentService::class)->resolveByPod($podId);
 
-                    if ($resolved) {
-                        $data['branch_id']        = $data['branch_id']        ?: $resolved['branch_id'];
-                        $data['assigned_depot_id'] = $data['assigned_depot_id'] ?: $resolved['depot_id'];
-                    }
+                if ($resolved) {
+                    // For sea shipments, branch always follows the pickup depot (resolved from POD),
+                    // not the admin user's branch — ensures FC scope query can find the record.
+                    $data['branch_id']        = $resolved['branch_id'];
+                    $data['assigned_depot_id'] = $data['assigned_depot_id'] ?: $resolved['depot_id'];
                 }
             }
 
@@ -152,6 +159,8 @@ class CreateShipment extends CreateRecord
 
             $shipment->units()->createMany($toInsert);
         }
+
+        $shipment->forceFill(['status' => ShipmentStatus::Pending])->saveQuietly();
 
         return $shipment;
     }

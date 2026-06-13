@@ -4,6 +4,7 @@ namespace App\Filament\FC\Widgets;
 
 use App\Enums\ShipmentStatus;
 use App\Models\Shipment;
+use App\Services\ShipmentOperationalGateResolver;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget as Widget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -16,17 +17,15 @@ class FcKpiStats extends Widget
 
     protected function getSeaBaseQuery(): Builder
     {
-        $u = Filament::auth()->user();
-        $branchId = app()->bound('scope.branch_id') ? app('scope.branch_id') : ($u?->effectiveBranchId() ?? null);
-        $depotId = app()->bound('scope.depot_id') ? app('scope.depot_id') : null;
+        $u       = Filament::auth()->user();
+        $depotId = app()->bound('scope.depot_id') ? (int) app('scope.depot_id') : null;
+        $userId  = (int) ($u?->id ?? 0);
 
-        return Shipment::query()
-            ->where('mode', 'sea')
-            ->when($branchId, fn (Builder $query) => $query->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id')))
-            ->when($depotId, fn (Builder $query) => $query->where(function ($w) use ($depotId, $u) {
-                $w->where('assigned_depot_id', $depotId)
-                    ->orWhere('coordinator_id', $u?->id);
-            }), fn (Builder $query) => $query->where('coordinator_id', $u?->id));
+        $query = Shipment::query()->where('mode', 'sea');
+
+        return $depotId
+            ? ShipmentOperationalGateResolver::scopeForDepot($query, $depotId, $userId)
+            : $query->where('coordinator_id', $userId);
     }
 
     protected function getStats(): array

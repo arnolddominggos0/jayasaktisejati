@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use App\Enums\TrackStatus;
 use App\Models\Depot;
 use App\Models\Shipment;
 use App\Models\User;
+use App\Services\ShipmentOperationalGateResolver;
 
 /**
  * Single source of truth for FC ownership resolution.
@@ -57,22 +57,14 @@ class ShipmentOwnership
     /**
      * Resolve the depot that serves as the destination for a shipment.
      *
-     * Chain: shipment.pod_id → depots.port_id → depot.id
-     *
-     * This is FK-complete — depots.port_id is a constrained FK to ports.id,
-     * and shipments.pod_id is also a FK to ports.id. No migration needed.
-     *
-     * Returns null if pod_id is unset or no depot is configured for that port.
+     * Delegates to ShipmentOperationalGateResolver which handles the full
+     * two-step chain:
+     *   Step 1: shipment.pod_id → depots.port_id
+     *   Step 2: voyage.pod_id  → depots.port_id  (fallback when pod_id is NULL)
      */
     public static function resolveDestinationDepotId(Shipment $shipment): ?int
     {
-        if (! $shipment->pod_id) {
-            return null;
-        }
-
-        $id = Depot::where('port_id', $shipment->pod_id)->value('id');
-
-        return $id ? (int) $id : null;
+        return ShipmentOperationalGateResolver::resolveDestinationDepotId($shipment);
     }
 
     // -------------------------------------------------------------------------
@@ -137,18 +129,13 @@ class ShipmentOwnership
      * 'pre_transfer'  — shipment is at Origin FC (Pickup through VesselDepart)
      * 'post_transfer' — shipment is at Destination FC (VesselArrival through Delivered)
      *
-     * Transfer trigger: VesselArrival (normalized order value = 90).
-     * VesselArrival itself is a Destination FC action — Destination FC records it.
+     * Delegates to ShipmentOperationalGateResolver::resolve() which correctly
+     * excludes hold/cancelled from gate determination (they inherit the last
+     * real track status rather than counting as destination-phase events).
      */
     public static function phase(Shipment $shipment): string
     {
-        $status = $shipment->currentTrackStatus();
-
-        if (! $status) {
-            return 'pre_transfer';
-        }
-
-        return $status->toNormalizedValue() >= TrackStatus::VesselArrival->toNormalizedValue()
+        return ShipmentOperationalGateResolver::resolve($shipment) === ShipmentOperationalGateResolver::DESTINATION
             ? 'post_transfer'
             : 'pre_transfer';
     }

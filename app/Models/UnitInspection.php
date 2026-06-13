@@ -78,8 +78,9 @@ class UnitInspection extends Model
 
     // ── Status constants ──────────────────────────────────────────────────────
 
-    public const STATUS_PASSED = 'passed';
-    public const STATUS_FAILED = 'failed';
+    public const STATUS_PENDING = 'pending'; // draft — submitted_at IS NULL, awaiting inspector
+    public const STATUS_PASSED  = 'passed';
+    public const STATUS_FAILED  = 'failed';
 
     // ── Source constants ──────────────────────────────────────────────────────
 

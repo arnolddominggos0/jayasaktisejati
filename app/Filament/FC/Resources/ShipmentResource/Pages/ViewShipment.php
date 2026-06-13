@@ -3,9 +3,13 @@
 namespace App\Filament\FC\Resources\ShipmentResource\Pages;
 
 use App\Enums\{ShipmentMode, ServiceType, ContainerSize, DeliveryScope, CargoType};
+use App\Enums\TrackStatus;
 use App\Filament\FC\Resources\ShipmentResource;
 use App\Models\Shipment;
+use DomainException;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\Section;
@@ -28,6 +32,30 @@ class ViewShipment extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('startPickup')
+                ->label('Mulai Penjemputan')
+                ->icon('heroicon-m-truck')
+                ->color('info')
+                ->visible(fn () => ($this->record->status?->value ?? (string) $this->record->status) === 'pending')
+                ->form([Textarea::make('note')->label('Catatan')->rows(3)])
+                ->action(function (array $data) {
+                    if (blank($this->record->coordinator_id)) {
+                        $this->record->forceFill(['coordinator_id' => auth()->id()])->saveQuietly();
+                    }
+                    try {
+                        $this->record->appendTrack(TrackStatus::Pickup, $data['note'] ?? null);
+                    } catch (DomainException $e) {
+                        Notification::make()->title($e->getMessage())->danger()->send();
+                        return;
+                    }
+                    Notification::make()
+                        ->title('Penjemputan dicatat')
+                        ->body('Silakan lakukan inspeksi pickup untuk setiap unit pada tab Unit & Inspeksi.')
+                        ->success()
+                        ->send();
+                    $this->redirect(ShipmentResource::getUrl('view', ['record' => $this->record->getKey()]));
+                }),
+
             Action::make('printWaybill')
                 ->label('Cetak Waybill')
                 ->icon('heroicon-m-printer')

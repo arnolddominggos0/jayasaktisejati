@@ -9,6 +9,7 @@ use App\Models\Branch;
 use App\Models\BriefingSession;
 use App\Models\Depot;
 use App\Models\Shipment;
+use App\Services\ShipmentOperationalGateResolver;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
@@ -88,19 +89,20 @@ class Dashboard extends Page
         $user = Filament::auth()->user();
         if (! $user) return 0;
 
-        $branchId = app()->bound('scope.branch_id')
-            ? app('scope.branch_id')
-            : ($user->effectiveBranchId() ?? null);
-        $depotId = app()->bound('scope.depot_id') ? app('scope.depot_id') : null;
+        $depotId = app()->bound('scope.depot_id') ? (int) app('scope.depot_id') : null;
+        $userId  = (int) $user->id;
 
-        return Shipment::query()
+        $query = Shipment::query()
             ->where('mode', 'sea')
-            ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value])
-            ->when($branchId, fn (Builder $q) => $q->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id')))
-            ->when($depotId,
-                fn (Builder $q) => $q->where(fn ($w) => $w->where('assigned_depot_id', $depotId)->orWhere('coordinator_id', $user->id)),
-                fn (Builder $q) => $q->where('coordinator_id', $user->id)
-            )
+            ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value]);
+
+        if ($depotId) {
+            ShipmentOperationalGateResolver::scopeForDepot($query, $depotId, $userId);
+        } else {
+            $query->where('coordinator_id', $userId);
+        }
+
+        return $query
             ->where(fn (Builder $q) => $q
                 ->where('priority', 'urgent')
                 ->orWhere('status', ShipmentStatus::Hold->value)

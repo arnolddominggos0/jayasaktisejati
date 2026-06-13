@@ -5,6 +5,7 @@ namespace App\Filament\FC\Widgets;
 use App\Enums\ShipmentStatus;
 use App\Models\Branch;
 use App\Models\Shipment;
+use App\Services\ShipmentOperationalGateResolver;
 use Filament\Facades\Filament;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -59,26 +60,28 @@ class FcAttentionList extends BaseWidget
 
     public function table(Table $table): Table
     {
-        $u = Filament::auth()->user();
-        $branchId = app()->bound('scope.branch_id') ? app('scope.branch_id') : ($u?->effectiveBranchId() ?? null);
-        $depotId = app()->bound('scope.depot_id') ? app('scope.depot_id') : null;
+        $u       = Filament::auth()->user();
+        $depotId = app()->bound('scope.depot_id') ? (int) app('scope.depot_id') : null;
+        $userId  = (int) ($u?->id ?? 0);
 
         return $table
-            ->query(function () use ($u, $branchId, $depotId): Builder {
-                return Shipment::query()
+            ->query(function () use ($depotId, $userId): Builder {
+                $query = Shipment::query()
                     ->with([
                         'latestTrack',
                         'originCity:id,name',
                         'destinationCity:id,name',
                     ])
                     ->where('mode', 'sea')
-                    ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value])
-                    ->when($branchId, fn (Builder $q) => $q->where(fn ($w) => $w->where('branch_id', $branchId)->orWhereNull('branch_id')))
-                    ->when($depotId, fn (Builder $q) => $q->where(function ($w) use ($depotId, $u) {
-                        $w->where('assigned_depot_id', $depotId)
-                            ->orWhere('coordinator_id', $u?->id);
-                    }), fn (Builder $q) => $q->where('coordinator_id', $u?->id))
-                    ->where(function (Builder $q) {
+                    ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value]);
+
+                if ($depotId) {
+                    ShipmentOperationalGateResolver::scopeForDepot($query, $depotId, $userId);
+                } else {
+                    $query->where('coordinator_id', $userId);
+                }
+
+                return $query->where(function (Builder $q) {
                         $q->where('priority', 'urgent')
                             ->orWhere('status', ShipmentStatus::Hold->value)
                             ->orWhere(function (Builder $q2) {

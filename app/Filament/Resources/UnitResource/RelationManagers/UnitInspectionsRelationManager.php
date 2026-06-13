@@ -24,6 +24,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * UnitInspectionsRelationManager
@@ -46,6 +47,7 @@ class UnitInspectionsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn (Builder $query) => $query->whereNotNull('submitted_at'))
             ->columns([
                 TextColumn::make('stage')
                     ->label('Stage')
@@ -218,7 +220,6 @@ class UnitInspectionsRelationManager extends RelationManager
 
             Repeater::make('items')
                 ->label('Item Pemeriksaan')
-                ->relationship('items')
                 ->schema([
                     TextInput::make('category')
                         ->label('Kategori')

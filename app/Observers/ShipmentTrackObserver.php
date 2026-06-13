@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Enums\TrackStatus;
 use App\Models\ShipmentTrack;
+use App\Services\InspectionDraftAutoCreate;
 use App\Services\LoadingSessionAutoCreate;
 use App\Supports\ShipmentStatusSyncer;
 use Illuminate\Support\Arr;
@@ -59,6 +60,7 @@ class ShipmentTrackObserver
     public function creating(ShipmentTrack $m): void
     {
         LoadingSessionAutoCreate::ensureForTrack($m);
+        InspectionDraftAutoCreate::ensureForTrack($m);
     }
 
     public function created(ShipmentTrack $m): void
