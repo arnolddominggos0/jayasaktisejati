@@ -3,20 +3,16 @@
 namespace App\Filament\FC\Resources\ShipmentResource\Pages;
 
 use App\Enums\{ShipmentMode, ServiceType, ContainerSize, DeliveryScope, CargoType};
-use App\Enums\TrackStatus;
 use App\Filament\FC\Resources\ShipmentResource;
 use App\Models\Shipment;
-use DomainException;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Textarea;
-use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists\Infolist;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\View as ViewComponent;
-use Illuminate\Support\Facades\Auth; 
+use Illuminate\Support\Facades\Auth;
 
 class ViewShipment extends ViewRecord
 {
@@ -32,29 +28,16 @@ class ViewShipment extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('startPickup')
-                ->label('Mulai Penjemputan')
-                ->icon('heroicon-m-truck')
-                ->color('info')
-                ->visible(fn () => ($this->record->status?->value ?? (string) $this->record->status) === 'pending')
-                ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                ->action(function (array $data) {
-                    if (blank($this->record->coordinator_id)) {
-                        $this->record->forceFill(['coordinator_id' => auth()->id()])->saveQuietly();
-                    }
-                    try {
-                        $this->record->appendTrack(TrackStatus::Pickup, $data['note'] ?? null);
-                    } catch (DomainException $e) {
-                        Notification::make()->title($e->getMessage())->danger()->send();
-                        return;
-                    }
-                    Notification::make()
-                        ->title('Penjemputan dicatat')
-                        ->body('Silakan lakukan inspeksi pickup untuk setiap unit pada tab Unit & Inspeksi.')
-                        ->success()
-                        ->send();
-                    $this->redirect(ShipmentResource::getUrl('view', ['record' => $this->record->getKey()]));
-                }),
+            Action::make('continueOperational')
+                ->label('Lanjutkan Proses Operasional')
+                ->icon('heroicon-m-arrow-right-circle')
+                ->color('warning')
+                ->url(fn () => \App\Filament\FC\Pages\OperationalTasks::getUrl())
+                ->visible(fn () => ! in_array(
+                    $this->record->status?->value ?? (string) $this->record->status,
+                    ['delivered', 'cancelled'],
+                    true
+                )),
 
             Action::make('printWaybill')
                 ->label('Cetak Waybill')
@@ -317,7 +300,7 @@ class ViewShipment extends ViewRecord
                     TextEntry::make('notes')->label('Catatan Pengiriman')->placeholder('—'),
                 ]),
 
-            Section::make('Timeline Status')
+            Section::make('Timeline Operasional')
                 ->collapsible()
                 ->schema([
                     ViewComponent::make('timeline')
@@ -326,8 +309,8 @@ class ViewShipment extends ViewRecord
                             'items' => fn() => $this->record
                                 ->tracks()
                                 ->with(['user:id,name'])
-                                ->orderByDesc('tracked_at')
-                                ->get(['id', 'shipment_id', 'status', 'tracked_at', 'location', 'note', 'created_by', 'checkseet', 'attachments']),
+                                ->orderBy('tracked_at', 'asc')
+                                ->get(['id', 'shipment_id', 'status', 'tracked_at', 'location', 'note', 'created_by', 'checkseet', 'attachments', 'check_result']),
                         ]),
                 ]),
 

@@ -256,6 +256,42 @@ $progressPct = $totalSteps > 0 ? intval(round(($doneCount / $totalSteps) * 100))
                                     </div>
                                     @endif
 
+                                    @if ($hit && !empty($hit->check_result))
+                                    @php
+                                        $checkResultRaw = $hit->check_result;
+                                        $checkResultData = is_string($checkResultRaw) ? json_decode($checkResultRaw, true) : (array) $checkResultRaw;
+                                        $unitInspections = $checkResultData['unit_inspections'] ?? [];
+                                        $gdLabels = [
+                                            'accept'            => 'Accept',
+                                            'allow_with_remark' => 'Allow w/ Remark',
+                                            'return_to_pdc'     => 'Return to PDC',
+                                        ];
+                                    @endphp
+                                    @if (!empty($unitInspections))
+                                    <div class="mt-2 rounded-md bg-gray-50 px-2.5 py-1.5 ring-1 ring-gray-100">
+                                        <div class="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Hasil Inspeksi Unit</div>
+                                        <div class="space-y-0.5">
+                                            @foreach ($unitInspections as $ins)
+                                            @php
+                                                $gd = $ins['gate_decision'] ?? null;
+                                                $gdLabel = $gd ? ($gdLabels[$gd] ?? $gd) : ($ins['status'] ?? '—');
+                                                $gdColor = match ($gd) {
+                                                    'accept'            => 'bg-green-100 text-green-800 ring-green-200',
+                                                    'allow_with_remark' => 'bg-yellow-100 text-yellow-800 ring-yellow-200',
+                                                    'return_to_pdc'     => 'bg-red-100 text-red-800 ring-red-200',
+                                                    default             => 'bg-gray-100 text-gray-600 ring-gray-200',
+                                                };
+                                            @endphp
+                                            <div class="flex items-center gap-2 text-xs">
+                                                <span class="text-gray-500">Unit #{{ $ins['unit_id'] }}</span>
+                                                <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-semibold {{ $gdColor }} ring-1">{{ $gdLabel }}</span>
+                                            </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                    @endif
+                                    @endif
+
                                     @if ($hit && !empty($hit->attachments) && is_array($hit->attachments))
                                     <div class="mt-2 flex flex-wrap gap-2">
                                         @foreach ($hit->attachments as $att)

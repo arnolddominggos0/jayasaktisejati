@@ -38,38 +38,48 @@ class CreateShipment extends CreateRecord
         $mode = $data['mode'] ?? null;
 
         // ── Branch + Depot resolution ──────────────────────────────────────
-        // Source of truth for SEA: POD (Port of Discharge) from the Voyage.
+        // Source of truth for SEA: POL (Port of Loading — origin port) from the Voyage.
         // Source of truth for LAND: the logged-in user's effective branch.
         // Never derive branch from the admin user's account for SEA shipments.
 
         if ($mode === 'sea') {
-            $podId = null;
+            $polId = null;
 
             // Snapshot voyage fields into shipment — voyage is the source of truth,
             // shipment must carry its own copy so gate resolution never depends on voyage FK.
             if (! empty($data['voyage_id'])) {
                 $voyage = Voyage::whereKey($data['voyage_id'])->first(['pol_id', 'pod_id']);
                 if ($voyage) {
-                    $data['pol_id'] = $data['pol_id'] ?: $voyage->pol_id;
-                    $data['pod_id'] = $data['pod_id'] ?: $voyage->pod_id;
-                    $podId = $voyage->pod_id;
+                    $data['pol_id'] = !empty($data['pol_id'])
+                        ? $data['pol_id']
+                        : $voyage->pol_id;
+
+                    $data['pod_id'] = !empty($data['pod_id'])
+                        ? $data['pod_id']
+                        : $voyage->pod_id;
+                    $polId = $voyage->pol_id;
                 }
             }
 
-            if ($podId) {
-                $resolved = app(ShipmentService::class)->resolveByPod($podId);
+            if ($polId) {
+                // Ownership follows origin depot (POL), not destination.
+                $resolved = app(ShipmentService::class)->resolveByPol($polId);
 
                 if ($resolved) {
-                    // For sea shipments, branch always follows the pickup depot (resolved from POD),
-                    // not the admin user's branch — ensures FC scope query can find the record.
-                    $data['branch_id']        = $resolved['branch_id'];
-                    $data['assigned_depot_id'] = $data['assigned_depot_id'] ?: $resolved['depot_id'];
+                    // Always override — form pre-fill may have used POD (wrong).
+                    // Server-side POL resolution is the canonical source of truth.
+                    $data['branch_id']         = $resolved['branch_id'];
+                    $data['assigned_depot_id'] = $resolved['depot_id'];
+
+                    if (empty($data['coordinator_id']) && $resolved['coordinator_id']) {
+                        $data['coordinator_id'] = $resolved['coordinator_id'];
+                    }
                 }
             }
 
             if (empty($data['assigned_depot_id'])) {
                 throw ValidationException::withMessages([
-                    'assigned_depot_id' => 'Depo tidak ditemukan untuk rute ini. Pastikan POD voyage sudah dikonfigurasi di menu Depo.',
+                    'assigned_depot_id' => 'Depo tidak ditemukan untuk rute ini. Pastikan POL voyage sudah dikonfigurasi di menu Depo.',
                 ]);
             }
         } else {

@@ -16,7 +16,7 @@ use App\Filament\Resources\ShipmentResource\Pages\ListShipments;
 use App\Filament\Resources\ShipmentResource\Pages\ViewShipment;
 use App\Filament\Resources\ShipmentResource\RelationManagers\LoadingSessionsRelationManager;
 use App\Models\Armada;
-use App\Models\Branch;
+use App\Models\City;
 use App\Models\Customer;
 use App\Models\Depot;
 use App\Models\Driver;
@@ -848,57 +848,76 @@ class ShipmentResource extends Resource
                                     ->hidden(fn(Get $get) => $get('mode') !== ShipmentMode::Sea->value)
                                     ->options(function () {
                                         return Voyage::with(['vessel', 'pol', 'pod'])
-                                            ->orderByDesc('etd')
+                                            ->whereNull('atd_at')
+                                            ->where('etd', '>=', now()->startOfDay())
+                                            ->where('etd', '<=', now()->addMonth()->endOfMonth())
+                                            ->orderBy('etd', 'asc')
                                             ->limit(50)
                                             ->get()
-                                            ->mapWithKeys(fn($v) => [
-                                                $v->id => sprintf(
-                                                    '%s / %s — %s (%s → %s)',
-                                                    $v->vessel?->name ?: '-',
-                                                    $v->voyage_no,
-                                                    $v->etd ? Carbon::parse($v->etd)->format('d M Y H:i') : '-',
-                                                    $v->pol?->code ?: $v->pol?->name ?: '-',
-                                                    $v->pod?->code ?: $v->pod?->name ?: '-',
-                                                ),
-                                            ])->toArray();
+                                            ->mapWithKeys(function ($v) {
+                                                $name = $v->vessel?->name ?: '(kapal tidak diketahui)';
+                                                if ($v->voyage_no && ! preg_match('/^VY-\d{6}-\d+$/', (string) $v->voyage_no)) {
+                                                    $name .= ' ' . $v->voyage_no;
+                                                }
+                                                return [
+                                                    $v->id => sprintf(
+                                                        '%s | ETD %s | %s → %s',
+                                                        $name,
+                                                        $v->etd ? Carbon::parse($v->etd)->format('d M Y') : '-',
+                                                        $v->pol?->name ?: $v->pol?->code ?: '-',
+                                                        $v->pod?->name ?: $v->pod?->code ?: '-',
+                                                    ),
+                                                ];
+                                            })->toArray();
                                     })
                                     ->getSearchResultsUsing(function (string $search) {
                                         return Voyage::with(['vessel', 'pol', 'pod'])
-                                            ->where('voyage_no', 'ilike', "%{$search}%")
-                                            ->orWhereHas('vessel', fn($query) => $query->where('name', 'ilike', "%{$search}%"))
-                                            ->orWhereHas('pol', fn($query) => $query
-                                                ->where('code', 'ilike', "%{$search}%")
-                                                ->orWhere('name', 'ilike', "%{$search}%"))
-                                            ->orWhereHas('pod', fn($query) => $query
-                                                ->where('code', 'ilike', "%{$search}%")
-                                                ->orWhere('name', 'ilike', "%{$search}%"))
-                                            ->orderByDesc('etd')
+                                            ->whereNull('atd_at')
+                                            ->where('etd', '>=', now()->startOfDay())
+                                            ->where('etd', '<=', now()->addMonth()->endOfMonth())
+                                            ->where(fn ($q) => $q
+                                                ->where('voyage_no', 'ilike', "%{$search}%")
+                                                ->orWhereHas('vessel', fn ($query) => $query->where('name', 'ilike', "%{$search}%"))
+                                                ->orWhereHas('pol', fn ($query) => $query
+                                                    ->where('code', 'ilike', "%{$search}%")
+                                                    ->orWhere('name', 'ilike', "%{$search}%"))
+                                                ->orWhereHas('pod', fn ($query) => $query
+                                                    ->where('code', 'ilike', "%{$search}%")
+                                                    ->orWhere('name', 'ilike', "%{$search}%"))
+                                            )
+                                            ->orderBy('etd', 'asc')
                                             ->limit(50)
                                             ->get()
-                                            ->mapWithKeys(fn($v) => [
-                                                $v->id => sprintf(
-                                                    '%s / %s — %s (%s → %s)',
-                                                    $v->vessel?->name ?: '-',
-                                                    $v->voyage_no,
-                                                    $v->etd ? Carbon::parse($v->etd)->format('d M Y H:i') : '-',
-                                                    $v->pol?->code ?: $v->pol?->name ?: '-',
-                                                    $v->pod?->code ?: $v->pod?->name ?: '-',
-                                                ),
-                                            ])->toArray();
+                                            ->mapWithKeys(function ($v) {
+                                                $name = $v->vessel?->name ?: '(kapal tidak diketahui)';
+                                                if ($v->voyage_no && ! preg_match('/^VY-\d{6}-\d+$/', (string) $v->voyage_no)) {
+                                                    $name .= ' ' . $v->voyage_no;
+                                                }
+                                                return [
+                                                    $v->id => sprintf(
+                                                        '%s | ETD %s | %s → %s',
+                                                        $name,
+                                                        $v->etd ? Carbon::parse($v->etd)->format('d M Y') : '-',
+                                                        $v->pol?->name ?: $v->pol?->code ?: '-',
+                                                        $v->pod?->name ?: $v->pod?->code ?: '-',
+                                                    ),
+                                                ];
+                                            })->toArray();
                                     })
                                     ->getOptionLabelUsing(function ($value) {
                                         $v = Voyage::with(['vessel', 'pol', 'pod'])->find($value);
-
-                                        return $v
-                                            ? sprintf(
-                                                '%s / %s — %s (%s → %s)',
-                                                $v->vessel?->name ?: '-',
-                                                $v->voyage_no,
-                                                $v->etd ? Carbon::parse($v->etd)->format('d M Y H:i') : '-',
-                                                $v->pol?->code ?: $v->pol?->name ?: '-',
-                                                $v->pod?->code ?: $v->pod?->name ?: '-',
-                                            )
-                                            : null;
+                                        if (! $v) return null;
+                                        $name = $v->vessel?->name ?: '(kapal tidak diketahui)';
+                                        if ($v->voyage_no && ! preg_match('/^VY-\d{6}-\d+$/', (string) $v->voyage_no)) {
+                                            $name .= ' ' . $v->voyage_no;
+                                        }
+                                        return sprintf(
+                                            '%s | ETD %s | %s → %s',
+                                            $name,
+                                            $v->etd ? Carbon::parse($v->etd)->format('d M Y') : '-',
+                                            $v->pol?->name ?: $v->pol?->code ?: '-',
+                                            $v->pod?->name ?: $v->pod?->code ?: '-',
+                                        );
                                     })
                                     ->live()
                                     ->afterStateUpdated(function ($state, Get $get, Set $set) {
@@ -919,16 +938,16 @@ class ShipmentResource extends Resource
                                             $set('etd', optional($v->etd)->toDateTimeString());
                                             $set('eta', optional($v->eta)->toDateTimeString());
 
-                                            // Resolve branch + depot dari POD (destination port)
-                                            $resolved = $v->pod_id
-                                                ? app(\App\Services\ShipmentService::class)->resolveByPod($v->pod_id)
+                                            // Ownership selalu dari POL (origin port), bukan POD.
+                                            $resolved = $v->pol_id
+                                                ? app(\App\Services\ShipmentService::class)->resolveByPol($v->pol_id)
                                                 : null;
 
                                             if ($resolved) {
                                                 $set('branch_id', $resolved['branch_id']);
                                                 $set('assigned_depot_id', $resolved['depot_id']);
                                             } else {
-                                                // Fallback: POD tidak punya depot, gunakan branch_id dari form
+                                                // Fallback: POL tidak punya depot, gunakan branch_id dari form
                                                 $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->effectiveBranchId());
                                                 $set('assigned_depot_id', self::resolveDepotId($branchId, $get('mode'), $state));
                                             }
@@ -936,17 +955,34 @@ class ShipmentResource extends Resource
                                     })
                                     ->columnSpan(12),
 
-                                TextInput::make('vessel_name')->disabled()->dehydrated()->columnSpan(4),
-                                TextInput::make('voyage')->disabled()->dehydrated()->columnSpan(4),
-                                DateTimePicker::make('etd')->disabled()->seconds(false)->dehydrated()->columnSpan(4),
-                                DateTimePicker::make('eta')->disabled()->seconds(false)->dehydrated()->columnSpan(4),
-                                TextInput::make('pol')->disabled()->dehydrated()->columnSpan(4),
-                                TextInput::make('pod')->disabled()->dehydrated()->columnSpan(4),
+                                Hidden::make('vessel_name')->dehydrated(),
+                                Hidden::make('voyage')->dehydrated(),
+                                Hidden::make('etd')->dehydrated(),
+                                Hidden::make('eta')->dehydrated(),
+                                Hidden::make('pol')->dehydrated(),
+                                Hidden::make('pod')->dehydrated(),
 
                                 Hidden::make('assigned_depot_id')->dehydrated(),
 
+                                Placeholder::make('voyage_info_card')
+                                    ->label('Voyage Terpilih')
+                                    ->content(function (Get $get): string {
+                                        if (! $get('voyage_id')) {
+                                            return '— Pilih jadwal kapal untuk melihat detail —';
+                                        }
+                                        $vessel   = $get('vessel_name') ?: '—';
+                                        $voyageNo = $get('voyage') ?: '—';
+                                        $pol      = $get('pol') ?: '—';
+                                        $pod      = $get('pod') ?: '—';
+                                        $etd      = $get('etd') ? Carbon::parse($get('etd'))->format('d M Y H:i') : '—';
+                                        $eta      = $get('eta') ? Carbon::parse($get('eta'))->format('d M Y H:i') : '—';
+
+                                        return "{$vessel} / {$voyageNo} | {$pol} → {$pod} | ETD: {$etd} | ETA: {$eta}";
+                                    })
+                                    ->columnSpan(12),
+
                                 Placeholder::make('auto_depot_display')
-                                    ->label('Depo Penugasan (otomatis)')
+                                    ->label('Depo Penugasan')
                                     ->content(function (Get $get) {
                                         $depotId = $get('assigned_depot_id');
 
@@ -954,48 +990,39 @@ class ShipmentResource extends Resource
                                             return Depot::whereKey($depotId)->value('name') ?: '—';
                                         }
 
-                                        return 'Belum ada depo — pilih Voyage dengan POD yang sudah dikonfigurasi.';
+                                        return '— Pilih voyage untuk menentukan depo —';
                                     })
-                                    ->columnSpan(12),
+                                    ->columnSpan(['default' => 12, 'md' => 6]),
 
-                                Select::make('branch_id')
-                                    ->label('Cabang Operasional')
-                                    ->options(Branch::pluck('name', 'id'))
-                                    ->searchable()
-                                    ->live()
-                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
-                                        if ($state) {
-                                            $depotId = self::resolveDepotId(
-                                                (int) $state,
-                                                $get('mode'),
-                                                (int) ($get('voyage_id') ?: 0) ?: null
-                                            );
-                                            $set('assigned_depot_id', $depotId);
-                                        }
-                                    })
-                                    ->helperText('Terisi otomatis dari POD voyage. Override jika diperlukan.')
-                                    ->visible(fn () => auth()->user()?->hasRole('super_admin')),
+                                Placeholder::make('destination_routing_preview')
+                                    ->label('Rute Tujuan')
+                                    ->content(function (Get $get): string {
+                                        $voyageId   = $get('voyage_id');
+                                        $destCityId = $get('destination_city_id');
 
-                                Placeholder::make('assignment_hint')
-                                    ->label('Status Penugasan Depo')
-                                    ->content(function (?Shipment $record) {
-                                        if (! $record) {
-                                            return '—';
+                                        if (! $voyageId) {
+                                            return '— Pilih voyage untuk melihat rute tujuan —';
                                         }
 
-                                        $mode = $record->mode instanceof ShipmentMode
-                                            ? $record->mode->value
-                                            : (string) $record->mode;
+                                        $v = Voyage::with(['pod'])->find($voyageId);
 
-                                        if ($mode !== ShipmentMode::Sea->value) {
-                                            return 'Non-SEA: tidak memakai penugasan depo.';
+                                        if (! $v || ! $v->pod_id) {
+                                            return '— POD voyage belum dikonfigurasi —';
                                         }
 
-                                        return $record->assignedDepot?->name
-                                            ? ('Assigned ke: ' . $record->assignedDepot->name)
-                                            : 'Belum ter-assign.';
+                                        $podName   = $v->pod?->name ?: ($v->pod?->code ?: '—');
+                                        $destDepot = Depot::where('port_id', $v->pod_id)
+                                            ->where('mode', 'sea')
+                                            ->value('name');
+                                        $cityName  = $destCityId
+                                            ? City::whereKey($destCityId)->value('name')
+                                            : null;
+
+                                        $parts = array_filter([$cityName, $podName, $destDepot]);
+
+                                        return $parts ? implode(' → ', $parts) : '—';
                                     })
-                                    ->columnSpan(12),
+                                    ->columnSpan(['default' => 12, 'md' => 6]),
                             ]),
                     ]),
 

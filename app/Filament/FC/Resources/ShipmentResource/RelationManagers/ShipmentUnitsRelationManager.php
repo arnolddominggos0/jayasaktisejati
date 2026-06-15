@@ -6,6 +6,8 @@ use App\Enums\TrackStatus;
 use App\Filament\FC\Resources\ShipmentResource;
 use App\Models\Unit;
 use App\Models\UnitInspection;
+use App\Services\ShipmentOwnership;
+use Filament\Facades\Filament;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
@@ -178,7 +180,10 @@ class ShipmentUnitsRelationManager extends RelationManager
                     ->icon(fn (Unit $record) => $this->buildActionIcon($record))
                     ->color(fn (Unit $record) => $this->buildActionColor($record))
                     ->size('sm')
-                    ->visible(fn (Unit $record) => $this->getActiveInspectionStage() !== null)
+                    ->visible(fn (Unit $record) =>
+                        $this->getActiveInspectionStage() !== null
+                        && ShipmentOwnership::canEdit(Filament::auth()->user(), $this->ownerRecord)
+                    )
                     ->disabled(fn (Unit $record) => $this->resolveInspectionForActive($record) === null)
                     ->url(fn (Unit $record) => ShipmentResource::getUrl(
                         'inspect-unit',

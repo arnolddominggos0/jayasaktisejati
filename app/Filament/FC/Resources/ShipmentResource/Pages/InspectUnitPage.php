@@ -8,6 +8,7 @@ use App\Models\UnitInspection;
 use App\Models\UnitInspectionItem;
 use App\Services\InspectionDraftAutoCreate;
 use App\Services\InspectionGateEvaluator;
+use App\Services\ShipmentOwnership;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Hidden;
@@ -37,7 +38,15 @@ class InspectUnitPage extends Page
     {
         $this->record = $this->resolveRecord($record);
 
+        abort_unless(auth()->user()?->can('view', $this->record), 403);
+
         $this->unit = Unit::findOrFail($unit);
+
+        abort_if(
+            (int) $this->unit->shipment_id !== (int) $this->record->getKey(),
+            403,
+            'Unit tidak milik shipment ini.'
+        );
 
         $stage = $this->resolveStage();
         abort_if(! $stage, 404, 'Tidak ada tahap inspeksi aktif untuk shipment ini.');
@@ -139,6 +148,11 @@ class InspectUnitPage extends Page
         if ($this->isReadOnly) {
             return;
         }
+
+        abort_unless(
+            auth()->user() && ShipmentOwnership::canEdit(auth()->user(), $this->record),
+            403
+        );
 
         $formData = $this->form->getState();
 

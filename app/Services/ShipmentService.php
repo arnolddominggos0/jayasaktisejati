@@ -35,10 +35,41 @@ class ShipmentService
     }
 
     /**
+     * Resolve origin branch_id, depot_id, and coordinator_id for a SEA shipment
+     * from the POL (Port of Loading — origin port).
+     *
+     * Ownership always follows the origin depot, not the destination.
+     * Returns ['branch_id' => int, 'depot_id' => int, 'coordinator_id' => int|null]
+     * or null if no depot is configured for that port.
+     */
+    public function resolveByPol(?int $polId): ?array
+    {
+        if (! $polId) {
+            return null;
+        }
+
+        $depot = Depot::query()
+            ->where('port_id', $polId)
+            ->where('mode', ShipmentMode::Sea->value)
+            ->select(['id', 'branch_id', 'coordinator_user_id'])
+            ->first();
+
+        if (! $depot) {
+            return null;
+        }
+
+        return [
+            'branch_id'      => (int) $depot->branch_id,
+            'depot_id'       => (int) $depot->id,
+            'coordinator_id' => $depot->coordinator_user_id ? (int) $depot->coordinator_user_id : null,
+        ];
+    }
+
+    /**
      * Resolve branch_id and depot_id for a SEA shipment from the POD (Port of Discharge).
      *
-     * The operational branch and depot for a sea shipment is determined by the
-     * destination port (POD), not by the logged-in user's branch.
+     * Kept for gate resolver and destination-depot lookups.
+     * NOT used for shipment ownership — use resolveByPol() for ownership.
      * Returns ['branch_id' => int, 'depot_id' => int] or null if not found.
      */
     public function resolveByPod(?int $podId): ?array

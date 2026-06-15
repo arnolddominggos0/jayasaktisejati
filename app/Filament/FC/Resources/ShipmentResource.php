@@ -17,6 +17,9 @@ use App\Models\City;
 use App\Models\Depot;
 use App\Models\LoadingSession;
 use App\Models\Shipment;
+use App\Models\UnitInspection;
+use App\Models\UnitInspectionItem;
+use App\Services\InspectionDraftAutoCreate;
 use App\Services\LoadingSessionAutoCreate;
 use DomainException;
 use Filament\Facades\Filament;
@@ -24,31 +27,38 @@ use Filament\Forms;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Grid;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ToggleButtons;
+use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use App\Services\ShipmentOwnership;
+use Filament\Forms\Components\Placeholder;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class ShipmentResource extends Resource
 {
     protected static ?string $model = Shipment::class;
 
-    protected static ?string $navigationGroup = 'Manajemen Pengiriman';
+    protected static ?string $navigationGroup = 'Laporan';
 
-    protected static ?string $navigationLabel = 'Pengiriman Ditugaskan';
+    protected static ?string $navigationLabel = 'Riwayat Pengiriman';
 
     protected static ?string $modelLabel = 'Pengiriman';
 
-    protected static ?string $pluralModelLabel = 'Pengiriman Ditugaskan';
+    protected static ?string $pluralModelLabel = 'Riwayat Pengiriman';
 
-    protected static ?string $navigationIcon = 'heroicon-m-truck';
+    protected static ?string $navigationIcon = 'heroicon-o-archive-box';
 
     protected static ?int $navigationSort = 10;
 
@@ -85,7 +95,7 @@ class ShipmentResource extends Resource
         if ($depotId) {
             $query->where(function ($w) use ($depotId, $userId) {
                 $w->where('assigned_depot_id', $depotId)
-                  ->orWhere('coordinator_id', $userId);
+                    ->orWhere('coordinator_id', $userId);
             });
         } else {
             $query->where('coordinator_id', $userId);
@@ -143,7 +153,7 @@ class ShipmentResource extends Resource
         return $options;
     }
 
-    protected static function trackUpdateForm(): array
+    public static function trackUpdateForm(): array
     {
         return [
             Select::make('track_status')
@@ -223,6 +233,130 @@ class ShipmentResource extends Resource
                 ->minLength(20)
                 ->helperText('Wajib diisi minimal 20 karakter. Dicatat untuk audit.')
                 ->columnSpan(12),
+
+            // ── Checkseet opsional — hanya untuk tahap tanpa form inspeksi ────
+            static::optionalChecksheetSchema()
+                ->columnSpan(12)
+                ->visible(
+                    fn(Forms\Get $get): bool =>
+                    InspectionDraftAutoCreate::resolveStage(
+                        TrackStatus::tryFrom((string) $get('track_status')) ?? TrackStatus::Hold
+                    ) === null
+                ),
+        ];
+    }
+
+    /**
+     * Reusable inspection form fields for embedding in OperationalTasks updateTrack action.
+     *
+     * Returns a Hidden (inspection_stage) + Section containing a per-unit Repeater
+     * that mirrors the InspectUnitPage form schema for all units simultaneously.
+     *
+     * The caller (OperationalTasks) is responsible for:
+     *   - Filling 'inspection_stage' and 'inspection_units' via ->fillForm()
+     *   - Saving the submitted data to unit_inspection_items / unit_inspections
+     */
+    public static function inspectionFormFields(): array
+    {
+        return [
+            Hidden::make('inspection_stage'),
+
+            Forms\Components\Section::make('Inspeksi Unit')
+                ->description(fn(Get $get): string => match ($get('inspection_stage')) {
+                    'pickup'         => 'Pemeriksaan kondisi unit saat pickup dari PDC Asal.',
+                    'handover_depot' => 'Pemeriksaan kondisi unit saat handover ke Depo.',
+                    'loading'        => 'Pemeriksaan kondisi unit sebelum dimuat ke kontainer.',
+                    'unloading'      => 'Pemeriksaan kondisi unit setelah pembongkaran di tujuan.',
+                    'selfdrive'      => 'Pemeriksaan kondisi unit sebelum selfdrive ke customer.',
+                    'dooring'        => 'Pemeriksaan kondisi unit saat serah terima ke customer.',
+                    default          => '',
+                })
+                ->visible(fn(Get $get): bool => ! empty($get('inspection_stage')))
+                ->columnSpanFull()
+                ->schema([
+                    Repeater::make('inspection_units')
+                        ->label('Unit')
+                        ->addable(false)
+                        ->deletable(false)
+                        ->reorderable(false)
+                        ->columnSpanFull()
+                        ->schema([
+                            Hidden::make('unit_id'),
+                            Hidden::make('inspection_id'),
+                            Hidden::make('unit_label'),
+
+                            Placeholder::make('unit_header')
+                                ->label('')
+                                ->content(fn(Get $get): \Illuminate\Support\HtmlString => new \Illuminate\Support\HtmlString(
+                                    '<span class="font-semibold text-sm text-gray-900">'
+                                        . e($get('unit_label') ?: '—')
+                                        . '</span>'
+                                ))
+                                ->columnSpanFull(),
+
+                            Placeholder::make('debug_items')
+                                ->label('DEBUG')
+                                ->content(
+                                    fn(Get $get) =>
+                                    'count=' . count($get('items') ?? [])
+                                ),
+
+                            Repeater::make('items')
+                                ->label('Item Pemeriksaan')
+                                ->addable(false)
+                                ->deletable(false)
+                                ->reorderable(false)
+                                ->columnSpanFull()
+                                ->schema([
+                                    Hidden::make('item_id'),
+
+                                    Grid::make(4)->schema([
+                                        TextInput::make('category')
+                                            ->label('Kategori')
+                                            ->disabled()
+                                            ->dehydrated(false),
+
+                                        TextInput::make('item_name')
+                                            ->label('Item Pemeriksaan')
+                                            ->columnSpan(2)
+                                            ->disabled()
+                                            ->dehydrated(false),
+
+                                        ToggleButtons::make('result')
+                                            ->label('Hasil')
+                                            ->options([
+                                                UnitInspectionItem::RESULT_OK => 'OK',
+                                                UnitInspectionItem::RESULT_NG => 'NG',
+                                            ])
+                                            ->colors([
+                                                UnitInspectionItem::RESULT_OK => 'success',
+                                                UnitInspectionItem::RESULT_NG => 'danger',
+                                            ])
+                                            ->default(UnitInspectionItem::RESULT_OK)
+                                            ->required()
+                                            ->live()
+                                            ->grouped(),
+                                    ]),
+
+                                    Grid::make(2)
+                                        ->schema([
+                                            Select::make('finding_type')
+                                                ->label('Jenis Temuan')
+                                                ->options(UnitInspectionItem::FINDING_LABELS)
+                                                ->required(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG)
+                                                ->visible(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG)
+                                                ->live(),
+
+                                            Textarea::make('notes')
+                                                ->label('Catatan / Deskripsi Temuan')
+                                                ->rows(2)
+                                                ->required(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG)
+                                                ->visible(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG),
+                                        ])
+                                        ->visible(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG),
+                                ]),
+                        ]),
+                ]),
         ];
     }
 
@@ -495,328 +629,83 @@ class ShipmentResource extends Resource
                     ->label('Tujuan')
                     ->options(fn() => City::active()->orderBy('name')->pluck('name', 'id')->toArray())
                     ->searchable(),
+                Tables\Filters\SelectFilter::make('tahun')
+                    ->label('Tahun')
+                    ->options(
+                        fn() => DB::table('shipment_tracks')
+                            ->whereIn('status', [TrackStatus::Delivered->value, TrackStatus::Cancelled->value])
+                            ->whereNotNull('tracked_at')
+                            ->selectRaw('EXTRACT(YEAR FROM tracked_at)::int AS y')
+                            ->distinct()
+                            ->orderByDesc('y')
+                            ->pluck('y', 'y')
+                            ->toArray()
+                    )
+                    ->modifyQueryUsing(
+                        fn(Builder $query, array $data): Builder =>
+                        filled($data['value'])
+                            ? $query->whereHas(
+                                'latestTrack',
+                                fn(Builder $t) =>
+                                $t->whereYear('tracked_at', (int) $data['value'])->whereNotNull('tracked_at')
+                            )
+                            : $query
+                    ),
+                Tables\Filters\SelectFilter::make('bulan')
+                    ->label('Bulan')
+                    ->options([
+                        1  => 'Januari',
+                        2  => 'Februari',
+                        3  => 'Maret',
+                        4  => 'April',
+                        5  => 'Mei',
+                        6  => 'Juni',
+                        7  => 'Juli',
+                        8  => 'Agustus',
+                        9  => 'September',
+                        10 => 'Oktober',
+                        11 => 'November',
+                        12 => 'Desember',
+                    ])
+                    ->modifyQueryUsing(
+                        fn(Builder $query, array $data): Builder =>
+                        filled($data['value'])
+                            ? $query->whereHas(
+                                'latestTrack',
+                                fn(Builder $t) =>
+                                $t->whereMonth('tracked_at', (int) $data['value'])->whereNotNull('tracked_at')
+                            )
+                            : $query
+                    ),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
 
-                Tables\Actions\Action::make('updateTrack')
-                    ->label('Update Lapangan')
-                    ->icon('heroicon-m-pencil-square')
-                    ->color('info')
-                    ->form(static::trackUpdateForm())
-                    ->action(function (Shipment $record, array $data, $livewire) {
-                        $status = TrackStatus::from($data['track_status']);
-
-                        $existingTrack = $record->tracks()
-                            ->where('status', $status->value)
-                            ->whereNotNull('tracked_at')
-                            ->first();
-
-                        if ($existingTrack) {
-                            Notification::make()
-                                ->title('Status sudah pernah dicapai')
-                                ->body("'{$status->label()}' sudah diupdate pada " . $existingTrack->tracked_at->format('d M Y H:i') . '.')
-                                ->warning()
-                                ->send();
-
-                            return;
-                        }
-
-                        if ($status === TrackStatus::UnitLoading && LoadingSessionAutoCreate::isRackShipment($record)) {
-                            Notification::make()
-                                ->title('Update otomatis via AppSheet')
-                                ->body('Status "Dimuat di Kapal" untuk shipment ber-rak diupdate otomatis setelah loading checkpoint selesai di AppSheet.')
-                                ->warning()
-                                ->send();
-
-                            return;
-                        }
-
-                        $override = null;
-                        if (auth_user()?->hasRole('super_admin') && ! empty($data['override_reason'])) {
-                            $override = ['reason' => $data['override_reason']];
-                        }
-
-                        try {
-                            $record->appendTrack(
-                                $status,
-                                $data['note'] ?? null,
-                                null,
-                                null,
-                                $override,
-                                $data['checkseet'] ?? null,
-                                $data['plan_loading_time_at'] ?? null,
-                                $data['plan_closing_time_at'] ?? null,
-                            );
-
-                            Notification::make()
-                                ->title('Update lapangan tersimpan')
-                                ->body("Status diubah ke: {$status->label()}")
-                                ->success()
-                                ->send();
-
-                            if ($status === TrackStatus::Pickup) {
-                                $livewire->redirect(ShipmentResource::getUrl('view', ['record' => $record->getKey()]));
-                            }
-                        } catch (DomainException $e) {
-                            Notification::make()
-                                ->title($e->getMessage())
-                                ->danger()
-                                ->send();
-                        }
-                    }),
-
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\Action::make('toPending')
-                        ->label('Set Menunggu')
-                        ->icon('heroicon-m-clock')
+                    Tables\Actions\Action::make('printWaybill')
+                        ->label('Cetak Waybill')
+                        ->icon('heroicon-m-printer')
+                        ->color('primary')
+                        ->url(fn(Shipment $record): string => route('shipments.print.waybill', $record))
+                        ->openUrlInNewTab()
+                        ->visible(fn(Shipment $record) => auth()->user()?->can('print', $record)),
+
+                    Tables\Actions\Action::make('printPackingList')
+                        ->label('Cetak Packing List')
+                        ->icon('heroicon-m-clipboard-document-list')
+                        ->color('info')
+                        ->url(fn(Shipment $record): string => route('shipments.print.packing', $record))
+                        ->openUrlInNewTab()
+                        ->visible(fn(Shipment $record) => auth()->user()?->can('print', $record)),
+
+                    Tables\Actions\Action::make('printResi')
+                        ->label('Cetak Resi')
+                        ->icon('heroicon-m-document-text')
                         ->color('gray')
-                        ->visible(fn(Shipment $record) => in_array($record->status?->value ?? (string) $record->status, ['draft', 'hold'], true))
-                        ->requiresConfirmation()
-                        ->action(function (Shipment $record) {
-                            $record->update(['status' => ShipmentStatus::Pending->value]);
-                            Notification::make()->title('Status di-set ke Menunggu')->success()->send();
-                        }),
-
-                    Tables\Actions\Action::make('startPickup')
-                        ->label('Mulai Penjemputan')
-                        ->icon('heroicon-m-truck')
-                        ->color('info')
-                        ->visible(fn(Shipment $record) => ($record->status?->value ?? (string) $record->status) === 'pending')
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(function (Shipment $record, array $data, $livewire) {
-                            if (blank($record->coordinator_id)) {
-                                $record->forceFill(['coordinator_id' => Filament::auth()->id()])->saveQuietly();
-                            }
-                            try {
-                                $record->appendTrack(TrackStatus::Pickup, $data['note'] ?? null);
-                            } catch (DomainException $e) {
-                                Notification::make()->title($e->getMessage())->danger()->send();
-                                return;
-                            }
-                            Notification::make()
-                                ->title('Penjemputan dicatat')
-                                ->body('Silakan lakukan inspeksi pickup untuk setiap unit pada tab Unit & Inspeksi.')
-                                ->success()
-                                ->send();
-                            $livewire->redirect(ShipmentResource::getUrl('view', ['record' => $record->getKey()]));
-                        }),
-
-                    Tables\Actions\Action::make('handover')
-                        ->label('Handover Depo')
-                        ->icon('heroicon-m-building-office')
-                        ->color('info')
-                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::Pickup->value)
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(function (Shipment $record, array $data) {
-                            try {
-                                $record->appendTrack(TrackStatus::Handover, $data['note'] ?? null);
-                                Notification::make()->title('Handover Depo dicatat')->success()->send();
-                            } catch (DomainException $e) {
-                                Notification::make()->title($e->getMessage())->danger()->send();
-                            }
-                        }),
-
-                    Tables\Actions\Action::make('stuffing')
-                        ->label('Stuffing & Segel')
-                        ->icon('heroicon-m-wrench-screwdriver')
-                        ->color('info')
-                        ->visible(function (Shipment $record) {
-                            if ($record->latest_track_status?->value !== TrackStatus::Handover->value) {
-                                return false;
-                            }
-
-                            return ! LoadingSessionAutoCreate::isRackShipment($record);
-                        })
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::Stuffing, $data['note'] ?? null)),
-
-                    Tables\Actions\Action::make('stuffingViaAppSheet')
-                        ->label('Loading via AppSheet')
-                        ->icon('heroicon-m-device-phone-mobile')
-                        ->color('warning')
-                        ->requiresConfirmation()
-                        ->modalHeading('Loading via AppSheet')
-                        ->modalDescription('Untuk shipment ber-rack, proses stuffing & loading dilakukan melalui AppSheet (checkpoint). Setelah semua checkpoint selesai dan keputusan final dibuat, status akan otomatis berubah ke "Dimuat di Kapal".')
-                        ->modalSubmitAction(false)
-                        ->modalCancelActionLabel('Tutup')
-                        ->visible(function (Shipment $record) {
-                            if ($record->latest_track_status?->value !== TrackStatus::Handover->value) {
-                                return false;
-                            }
-
-                            return LoadingSessionAutoCreate::isRackShipment($record);
-                        })
-                        ->action(fn() => null),
-
-                    Tables\Actions\Action::make('deliveryToPort')
-                        ->label('Antar ke Pelabuhan')
-                        ->icon('heroicon-m-arrow-up-right')
-                        ->color('info')
-                        ->visible(function (Shipment $record) {
-                            $last = $record->latest_track_status?->value;
-                            if ($last === TrackStatus::Stuffing->value) {
-                                return true;
-                            }
-                            if ($last === TrackStatus::Handover->value && LoadingSessionAutoCreate::isRackShipment($record)) {
-                                return true;
-                            }
-
-                            return false;
-                        })
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(function (Shipment $record, array $data) {
-                            $record->appendTrack(TrackStatus::DeliveryToPort, $data['note'] ?? null);
-                            Notification::make()->title('Status: Antar ke Pelabuhan')->success()->send();
-                        }),
-
-                    Tables\Actions\Action::make('stacking')
-                        ->label('Stacking (Terminal)')
-                        ->icon('heroicon-m-rectangle-group')
-                        ->color('info')
-                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::DeliveryToPort->value)
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(function (Shipment $record, array $data) {
-                            $record->appendTrack(TrackStatus::Stacking, $data['note'] ?? null);
-                            Notification::make()->title('Status: Stacking')->success()->send();
-                        }),
-
-                    Tables\Actions\Action::make('unitLoadingAuto')
-                        ->label('Dimuat di Kapal (Otomatis)')
-                        ->icon('heroicon-m-arrow-path')
-                        ->color('success')
-                        ->requiresConfirmation()
-                        ->modalHeading('Dimuat di Kapal — Otomatis via AppSheet')
-                        ->modalDescription('Status "Dimuat di Kapal" akan otomatis diupdate setelah semua checkpoint loading selesai di AppSheet. Jika shipment ini BUKAN ber-rack, klik "Lewati" untuk update manual.')
-                        ->modalSubmitActionLabel('Update Manual (Non-Rack)')
-                        ->visible(function (Shipment $record) {
-                            if ($record->latest_track_status?->value !== TrackStatus::Stacking->value) {
-                                return false;
-                            }
-
-                            return ! LoadingSessionAutoCreate::isRackShipment($record);
-                        })
-                        ->action(function (Shipment $record, array $data) {
-                            $record->appendTrack(TrackStatus::UnitLoading, $data['note'] ?? null);
-                            Notification::make()->title('Status: Dimuat di Kapal')->success()->send();
-                        }),
-
-                    Tables\Actions\Action::make('unitLoadingInfo')
-                        ->label('Loading via AppSheet')
-                        ->icon('heroicon-m-device-phone-mobile')
-                        ->color('warning')
-                        ->requiresConfirmation()
-                        ->modalHeading('Loading Checkpoint — Via AppSheet')
-                        ->modalDescription('Untuk shipment ber-rack, status "Dimuat di Kapal" diupdate otomatis setelah loading checkpoint selesai di AppSheet. Tidak perlu input manual.')
-                        ->modalSubmitAction(false)
-                        ->modalCancelActionLabel('Tutup')
-                        ->visible(function (Shipment $record) {
-                            if ($record->latest_track_status?->value !== TrackStatus::Stacking->value) {
-                                return false;
-                            }
-
-                            return LoadingSessionAutoCreate::isRackShipment($record);
-                        })
-                        ->action(fn() => null),
-
-                    Tables\Actions\Action::make('onShip')
-                        ->label('On Ship')
-                        ->icon('heroicon-m-rocket-launch')
-                        ->color('info')
-                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::UnitLoading->value)
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::OnShip, $data['note'] ?? null)),
-
-                    Tables\Actions\Action::make('vesselDepart')
-                        ->label('Kapal Berangkat')
-                        ->icon('heroicon-m-paper-airplane')
-                        ->color('info')
-                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::OnShip->value)
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::VesselDepart, $data['note'] ?? null)),
-
-                    Tables\Actions\Action::make('vesselArrival')
-                        ->label('Kapal Tiba')
-                        ->icon('heroicon-m-flag')
-                        ->color('info')
-                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::VesselDepart->value)
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::VesselArrival, $data['note'] ?? null)),
-
-                    Tables\Actions\Action::make('unloading')
-                        ->label('Pembongkaran')
-                        ->icon('heroicon-m-arrow-down-tray')
-                        ->color('info')
-                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::VesselArrival->value)
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(function (Shipment $record, array $data) {
-                            try {
-                                $record->appendTrack(TrackStatus::Unloading, $data['note'] ?? null);
-                                Notification::make()->title('Pembongkaran dicatat')->success()->send();
-                            } catch (DomainException $e) {
-                                Notification::make()->title($e->getMessage())->danger()->send();
-                            }
-                        }),
-
-                    Tables\Actions\Action::make('handoverTrucking')
-                        ->label('Handover Selfdrive')
-                        ->icon('heroicon-m-arrow-trending-up')
-                        ->color('info')
-                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::Unloading->value)
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::HandoverTrucking, $data['note'] ?? null)),
-
-                    Tables\Actions\Action::make('deliveryToCustomer')
-                        ->label('Antar ke Customer')
-                        ->icon('heroicon-m-user')
-                        ->color('info')
-                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::Unloading->value)
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(function (Shipment $record, array $data) {
-                            try {
-                                $record->appendTrack(TrackStatus::DeliveryToCustomer, $data['note'] ?? null);
-                                Notification::make()->title('Antar ke Customer dicatat')->success()->send();
-                            } catch (DomainException $e) {
-                                Notification::make()->title($e->getMessage())->danger()->send();
-                            }
-                        }),
-
-                    Tables\Actions\Action::make('markDelivered')
-                        ->label('Tandai Terkirim')
-                        ->icon('heroicon-m-check-badge')
-                        ->color('success')
-                        ->visible(fn(Shipment $record) => $record->latest_track_status?->value === TrackStatus::DeliveryToCustomer->value)
-                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
-                        ->action(function (Shipment $record, array $data) {
-                            $record->appendTrack(TrackStatus::Delivered, $data['note'] ?? 'Terkirim');
-                            Notification::make()->title('Shipment terkirim!')->success()->send();
-                        }),
-
-                    Tables\Actions\Action::make('hold')
-                        ->label('Tahan')
-                        ->icon('heroicon-m-pause-circle')
-                        ->color('warning')
-                        ->visible(fn(Shipment $record) => $record->latest_track_status !== TrackStatus::Hold
-                            && ! in_array($record->latest_track_status, [TrackStatus::Delivered, TrackStatus::Cancelled], true)
-                            && $record->latest_track_status !== null)
-                        ->form([Textarea::make('note')->label('Alasan')->rows(3)->required()])
-                        ->action(fn(Shipment $record, array $data) => $record->appendTrack(TrackStatus::Hold, $data['note'])),
-
-                    Tables\Actions\Action::make('cancel')
-                        ->label('Batalkan')
-                        ->icon('heroicon-m-x-circle')
-                        ->color('danger')
-                        ->visible(fn(Shipment $record) => $record->canCancel())
-                        ->form([Textarea::make('note')->label('Alasan')->rows(3)->required()])
-                        ->requiresConfirmation()
-                        ->action(function (Shipment $record, array $data) {
-                            $record->appendTrack(TrackStatus::Cancelled, $data['note']);
-                            $record->forceFill([
-                                'cancelled_at' => now(),
-                                'cancelled_by' => Filament::auth()->id(),
-                            ])->save();
-                        }),
-                ])->label('Aksi Status')->icon('heroicon-m-cog')->color('secondary'),
+                        ->url(fn(Shipment $record): string => route('shipments.resi', $record))
+                        ->openUrlInNewTab()
+                        ->visible(fn(Shipment $record) => auth()->user()?->can('print', $record)),
+                ])->label('Cetak')->icon('heroicon-m-printer')->color('gray'),
             ])
             ->bulkActions([])
             ->defaultSort('updated_at', 'desc');

@@ -776,7 +776,9 @@ class Shipment extends Model
 
     public function rebuildMilestonesFromTracks(): void
     {
-        $tracks = $this->tracks()->orderBy('tracked_at')->get();
+        // Only tracks with a real timestamp count — skeleton tracks (tracked_at=null)
+        // must never contribute to milestone fields.
+        $tracks = $this->tracks()->whereNotNull('tracked_at')->orderBy('tracked_at')->get();
 
         if (self::hasCol('pickup_started_at')) {
             $this->pickup_started_at = null;
@@ -791,12 +793,12 @@ class Shipment extends Model
         }
 
         if (self::hasCol('delivered_at')) {
-            $this->delivered_at = $this->delivered_at;
+            $this->delivered_at = null;
         }
 
         foreach ($tracks as $t) {
             $s = $t->status instanceof TrackStatus ? $t->status : TrackStatus::tryFrom((string) $t->status);
-            $ts = $t->tracked_at ?? $t->created_at ?? now();
+            $ts = $t->tracked_at; // non-null guaranteed by whereNotNull filter above
 
             if (self::hasCol('pickup_started_at') && ! $this->pickup_started_at && in_array($s, [
                 TrackStatus::Pickup,
