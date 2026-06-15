@@ -5,7 +5,6 @@ namespace App\Filament\FC\Widgets;
 use App\Enums\ShipmentStatus;
 use App\Models\Branch;
 use App\Models\Shipment;
-use App\Services\ShipmentOperationalGateResolver;
 use Filament\Facades\Filament;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -76,7 +75,10 @@ class FcAttentionList extends BaseWidget
                     ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value]);
 
                 if ($depotId) {
-                    ShipmentOperationalGateResolver::scopeForDepot($query, $depotId, $userId);
+                    $query->where(function ($w) use ($depotId, $userId) {
+                        $w->where('assigned_depot_id', $depotId)
+                          ->orWhere('coordinator_id', $userId);
+                    });
                 } else {
                     $query->where('coordinator_id', $userId);
                 }

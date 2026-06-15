@@ -18,7 +18,6 @@ use App\Models\Depot;
 use App\Models\LoadingSession;
 use App\Models\Shipment;
 use App\Services\LoadingSessionAutoCreate;
-use App\Services\ShipmentOperationalGateResolver;
 use DomainException;
 use Filament\Facades\Filament;
 use Filament\Forms;
@@ -83,12 +82,16 @@ class ShipmentResource extends Resource
                 'latestTrack',
             ]);
 
-        if (! $depotId) {
-            // No depot assigned to this FC — show only shipments they coordinate directly.
-            return $query->where('coordinator_id', $userId);
+        if ($depotId) {
+            $query->where(function ($w) use ($depotId, $userId) {
+                $w->where('assigned_depot_id', $depotId)
+                  ->orWhere('coordinator_id', $userId);
+            });
+        } else {
+            $query->where('coordinator_id', $userId);
         }
 
-        return ShipmentOperationalGateResolver::scopeForDepot($query, $depotId, $userId);
+        return $query;
     }
 
     protected static function getNextTrackStatusOptions(Shipment $record): array

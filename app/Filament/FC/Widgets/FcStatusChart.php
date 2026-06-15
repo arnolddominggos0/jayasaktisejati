@@ -4,7 +4,6 @@ namespace App\Filament\FC\Widgets;
 
 use App\Enums\TrackStatus;
 use App\Models\ShipmentTrack;
-use App\Services\ShipmentOperationalGateResolver;
 use Filament\Facades\Filament;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,7 +32,10 @@ class FcStatusChart extends ChartWidget
                 $s->where('mode', 'sea');
 
                 if ($depotId) {
-                    ShipmentOperationalGateResolver::scopeForDepot($s, $depotId, $userId);
+                    $s->where(function ($w) use ($depotId, $userId) {
+                        $w->where('assigned_depot_id', $depotId)
+                          ->orWhere('coordinator_id', $userId);
+                    });
                 } else {
                     $s->where('coordinator_id', $userId);
                 }

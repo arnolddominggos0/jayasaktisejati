@@ -9,7 +9,6 @@ use App\Models\Branch;
 use App\Models\BriefingSession;
 use App\Models\Depot;
 use App\Models\Shipment;
-use App\Services\ShipmentOperationalGateResolver;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
@@ -97,7 +96,10 @@ class Dashboard extends Page
             ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value]);
 
         if ($depotId) {
-            ShipmentOperationalGateResolver::scopeForDepot($query, $depotId, $userId);
+            $query->where(function ($w) use ($depotId, $userId) {
+                $w->where('assigned_depot_id', $depotId)
+                  ->orWhere('coordinator_id', $userId);
+            });
         } else {
             $query->where('coordinator_id', $userId);
         }

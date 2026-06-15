@@ -4,7 +4,6 @@ namespace App\Filament\FC\Widgets;
 
 use App\Enums\ShipmentStatus;
 use App\Models\Shipment;
-use App\Services\ShipmentOperationalGateResolver;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget as Widget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -23,9 +22,16 @@ class FcKpiStats extends Widget
 
         $query = Shipment::query()->where('mode', 'sea');
 
-        return $depotId
-            ? ShipmentOperationalGateResolver::scopeForDepot($query, $depotId, $userId)
-            : $query->where('coordinator_id', $userId);
+        if ($depotId) {
+            $query->where(function ($w) use ($depotId, $userId) {
+                $w->where('assigned_depot_id', $depotId)
+                  ->orWhere('coordinator_id', $userId);
+            });
+        } else {
+            $query->where('coordinator_id', $userId);
+        }
+
+        return $query;
     }
 
     protected function getStats(): array
