@@ -236,25 +236,36 @@ class ShipmentTrack extends Model
                 ->filter(fn($t) => !empty($t->tracked_at))
                 ->isNotEmpty();
 
+            $currentStatus = $shipment->status instanceof ShipmentStatus
+                ? $shipment->status
+                : ShipmentStatus::tryFrom(
+                    $shipment->status instanceof \BackedEnum
+                        ? $shipment->status->value
+                        : (string) $shipment->status
+                );
+
             logger()->info('[SHIPMENT_TRACK_SAVED] revert check', [
-                'shipment_status'  => $shipment->status instanceof \BackedEnum ? $shipment->status->value : (string) $shipment->status,
+                'shipment_status'   => $currentStatus?->value,
                 'has_real_tracking' => $hasRealTracking,
-                'comparison_raw'   => [
-                    'status_type'  => get_class($shipment->status ?? 'null'),
-                    'draft_value'  => ShipmentStatus::Draft->value,
-                    'will_revert'  => !$hasRealTracking && ($shipment->status !== ShipmentStatus::Draft->value),
-                ],
+                'will_revert'       => !$hasRealTracking
+                    && $currentStatus !== ShipmentStatus::Draft
+                    && $currentStatus !== ShipmentStatus::Pending,
             ]);
 
             if (!$hasRealTracking) {
-                if ($shipment->status !== ShipmentStatus::Draft->value) {
-                    logger()->warning('[SHIPMENT_TRACK_SAVED] REVERTING SHIPMENT TO DRAFT', [
-                        'shipment_id'     => $shipment->id,
-                        'current_status'  => $shipment->status instanceof \BackedEnum ? $shipment->status->value : (string) $shipment->status,
-                    ]);
-                    $shipment->status = ShipmentStatus::Draft->value;
-                    $shipment->saveQuietly();
+                // Pending + skeleton tracks (tracked_at = null) is a valid post-sendToFc
+                // state introduced in SC.3B.20. Do NOT revert — shipment is in the FC
+                // queue awaiting its first real tracking event.
+                if ($currentStatus === ShipmentStatus::Draft || $currentStatus === ShipmentStatus::Pending) {
+                    return;
                 }
+
+                logger()->warning('[SHIPMENT_TRACK_SAVED] REVERTING SHIPMENT TO DRAFT', [
+                    'shipment_id'    => $shipment->id,
+                    'current_status' => $currentStatus?->value,
+                ]);
+                $shipment->status = ShipmentStatus::Draft->value;
+                $shipment->saveQuietly();
                 return;
             }
 
