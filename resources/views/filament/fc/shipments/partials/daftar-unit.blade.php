@@ -52,6 +52,9 @@
                         @if ($unit->color)
                             <span class="text-xs text-gray-500">{{ $unit->color }}</span>
                         @endif
+                        @if ($unit->engine_no)
+                            <span class="text-xs text-gray-500">Mesin: <span class="font-mono">{{ $unit->engine_no }}</span></span>
+                        @endif
                     </div>
                 </div>
 

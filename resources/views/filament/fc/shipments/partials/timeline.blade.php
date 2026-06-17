@@ -10,7 +10,7 @@ $tracks = ($items ?? collect())->filter(fn($t) => $t->tracked_at !== null)->sort
 $latestVal = optional($tracks->last())->status?->value;
 
 /** @var \BackedEnum[] $order */
-$order = TrackStatus::orderSea();
+$order = TrackStatus::orderForMode($shipment->mode ?? null);
 
 // For progress calculation, use last non-terminal track when current is Hold/Cancelled
 $progressVal = $latestVal;

@@ -113,6 +113,24 @@ class ViewShipment extends ViewRecord
                             ->label('Rute')
                             ->placeholder('—')
                             ->columnSpan(6),
+
+                        TextEntry::make('doc_number')
+                            ->label('No Dokumen')
+                            ->extraAttributes(['class' => 'font-mono'])
+                            ->placeholder('—')
+                            ->columnSpan(4),
+
+                        TextEntry::make('request_type')
+                            ->label('Tipe')
+                            ->formatStateUsing(fn($state) => $state?->label() ?? (string) ($state ?? '—'))
+                            ->placeholder('—')
+                            ->columnSpan(4),
+
+                        TextEntry::make('requested_at')
+                            ->label('Tgl Permintaan')
+                            ->date('d M Y')
+                            ->placeholder('—')
+                            ->columnSpan(4),
                     ]),
                 ]),
 
@@ -129,23 +147,44 @@ class ViewShipment extends ViewRecord
                     Grid::make(12)->schema([
                         TextEntry::make('pic_name')
                             ->label('PIC')
-                            ->formatStateUsing(fn (?string $state, Shipment $record) => $state
-                                ? "{$state}" . ($record->pic_phone ? " · {$record->pic_phone}" : '')
-                                : '—')
+                            ->getStateUsing(function (Shipment $record) {
+                                $name  = $record->pic_name
+                                    ?? $record->customer?->pic_name
+                                    ?? $record->customer?->name;
+                                $phone = $record->pic_phone
+                                    ?? $record->customer?->pic_phone
+                                    ?? $record->customer?->phone;
+                                return $name ? ($phone ? "{$name} · {$phone}" : $name) : null;
+                            })
+                            ->placeholder('—')
                             ->columnSpan(4),
 
                         TextEntry::make('pickup_contact_name')
                             ->label('Kontak Pickup')
-                            ->formatStateUsing(fn (?string $state, Shipment $record) => $state
-                                ? "{$state}" . ($record->pickup_contact_phone ? " · {$record->pickup_contact_phone}" : '')
-                                : '—')
+                            ->getStateUsing(function (Shipment $record) {
+                                $name  = $record->pickup_contact_name
+                                    ?? $record->customer?->pic_name
+                                    ?? $record->customer?->name;
+                                $phone = $record->pickup_contact_phone
+                                    ?? $record->customer?->pic_phone
+                                    ?? $record->customer?->phone;
+                                return $name ? ($phone ? "{$name} · {$phone}" : $name) : null;
+                            })
+                            ->placeholder('—')
                             ->columnSpan(4),
 
                         TextEntry::make('delivery_contact_name')
                             ->label('Kontak Delivery')
-                            ->formatStateUsing(fn (?string $state, Shipment $record) => $state
-                                ? "{$state}" . ($record->delivery_contact_phone ? " · {$record->delivery_contact_phone}" : '')
-                                : '—')
+                            ->getStateUsing(function (Shipment $record) {
+                                $name  = $record->delivery_contact_name
+                                    ?? $record->receiver?->pic_name
+                                    ?? $record->receiver?->name;
+                                $phone = $record->delivery_contact_phone
+                                    ?? $record->receiver?->pic_phone
+                                    ?? $record->receiver?->phone;
+                                return $name ? ($phone ? "{$name} · {$phone}" : $name) : null;
+                            })
+                            ->placeholder('—')
                             ->columnSpan(4),
                     ]),
                 ]),
@@ -282,7 +321,12 @@ class ViewShipment extends ViewRecord
                         TextEntry::make('cbm_total')->label('CBM')->formatStateUsing(fn ($v) => $v !== null ? number_format((float) $v, 3) : '—')->columnSpan(3),
                         TextEntry::make('weight_total')->label('Berat (kg)')->formatStateUsing(fn ($v) => $v !== null ? number_format((float) $v, 2) : '—')->columnSpan(3),
 
-                        TextEntry::make('etd')->label('ETD')->dateTime('d M Y H:i')->placeholder('—')->columnSpan(3),
+                        TextEntry::make('etd')
+                            ->label('ETD')
+                            ->getStateUsing(fn (Shipment $record) => $record->etd ?? $record->voyageRecord?->etd)
+                            ->dateTime('d M Y H:i')
+                            ->placeholder('—')
+                            ->columnSpan(3),
                         TextEntry::make('eta')->label('ETA')->dateTime('d M Y H:i')->placeholder('—')->columnSpan(3),
                         TextEntry::make('pickup_date')->label('Tanggal Pickup')->dateTime('d M Y H:i')->placeholder('—')->columnSpan(3),
                         TextEntry::make('estimated_ready_at')->label('Estimasi Selesai')->dateTime('d M Y H:i')->placeholder('—')->columnSpan(3),
@@ -297,7 +341,7 @@ class ViewShipment extends ViewRecord
                             ->listWithLineBreaks()
                             ->bulleted()
                             ->formatStateUsing(function ($state, Shipment $record) {
-                                return $record->units->map(function ($unit) {
+                                return $record->units()->get()->map(function ($unit) {
                                     $parts = array_filter([
                                         $unit->model_no,
                                         $unit->reg_no ? "No. Pol: {$unit->reg_no}" : null,
@@ -324,11 +368,12 @@ class ViewShipment extends ViewRecord
                     ViewComponent::make('timeline')
                         ->view('filament.fc.shipments.partials.timeline')
                         ->viewData([
-                            'items' => fn() => $this->record
+                            'items'    => fn() => $this->record
                                 ->tracks()
                                 ->with(['user:id,name'])
                                 ->orderBy('tracked_at', 'asc')
                                 ->get(['id', 'shipment_id', 'status', 'tracked_at', 'location', 'note', 'created_by', 'checkseet', 'attachments', 'check_result']),
+                            'shipment' => fn() => $this->record,
                         ]),
                 ]),
 

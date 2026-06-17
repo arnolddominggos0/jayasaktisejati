@@ -1048,12 +1048,14 @@ class Shipment extends Model
     public function getRouteLabelAttribute(): string
     {
         $origin = $this->originCity?->name
+            ?? $this->route_from
             ?? $this->origin
             ?? $this->origin_name
             ?? $this->pol_name
             ?? $this->from;
 
         $dest = $this->destinationCity?->name
+            ?? $this->route_to
             ?? $this->destination
             ?? $this->destination_name
             ?? $this->pod_name

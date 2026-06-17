@@ -67,9 +67,11 @@ class ShipmentOperationalGateResolver
             }
         }
 
-        $voyagePodId = $shipment->relationLoaded('voyage')
-            ? $shipment->voyage?->pod_id
-            : ($shipment->voyage_id ? Voyage::whereKey($shipment->voyage_id)->value('pod_id') : null);
+        // voyageRecord is the safe alias for the Voyage relation. Never use
+        // $shipment->voyage here — that resolves to the string snapshot column.
+        $voyagePodId = $shipment->voyage_id
+            ? Voyage::whereKey($shipment->voyage_id)->value('pod_id')
+            : null;
 
         if ($voyagePodId) {
             $id = Depot::where('port_id', $voyagePodId)->value('id');
