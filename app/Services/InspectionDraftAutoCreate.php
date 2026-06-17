@@ -83,13 +83,26 @@ class InspectionDraftAutoCreate
             return self::result($stage, 0, 0, 0);
         }
 
+        return self::ensureForShipmentAndStage($shipment, $stage);
+    }
+
+    /**
+     * Ensure UnitInspection drafts exist for all units of a shipment at a given stage.
+     *
+     * Called from fillForm() when no skeleton track exists yet (pickup on a brand-new
+     * shipment), so we cannot go through the observer/track lifecycle. Idempotent —
+     * uses firstOrCreate, safe to call multiple times.
+     *
+     * @return array{stage: string, units_processed: int, created: int, skipped: int}
+     */
+    public static function ensureForShipmentAndStage(\App\Models\Shipment $shipment, string $stage): array
+    {
         $units = $shipment->units()->get(['id']);
 
         if ($units->isEmpty()) {
             Log::warning('InspectionDraftAutoCreate: no units on shipment', [
                 'shipment_id'   => $shipment->id,
                 'shipment_code' => $shipment->code,
-                'track_status'  => $status->value,
                 'stage'         => $stage,
             ]);
 
@@ -129,7 +142,6 @@ class InspectionDraftAutoCreate
         Log::info('InspectionDraftAutoCreate: drafts ensured', [
             'shipment_id'     => $shipment->id,
             'shipment_code'   => $shipment->code,
-            'track_status'    => $status->value,
             'stage'           => $stage,
             'units_processed' => $units->count(),
             'created'         => $created,

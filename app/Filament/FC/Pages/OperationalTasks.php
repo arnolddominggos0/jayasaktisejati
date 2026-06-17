@@ -4,6 +4,7 @@ namespace App\Filament\FC\Pages;
 
 use App\Enums\ShipmentStatus;
 use App\Enums\TrackStatus;
+use App\Filament\FC\Pages\OperationalShipmentPage;
 use App\Filament\FC\Resources\ShipmentResource;
 use App\Models\Depot;
 use App\Models\Shipment;
@@ -105,7 +106,7 @@ class OperationalTasks extends Page implements HasTable
 
         return Shipment::query()
             ->where('mode', 'sea')
-            ->whereNotIn('status', ['delivered', 'cancelled'])
+            ->whereNotIn('status', ['draft', 'delivered', 'cancelled'])
             ->with($this->eagerLoads())
             ->where(function (Builder $outer) use ($depotId, $portId, $userId) {
 
@@ -226,7 +227,7 @@ class OperationalTasks extends Page implements HasTable
                     ->weight('bold')
                     ->url(
                         fn(Shipment $record): string =>
-                        ShipmentResource::getUrl('view', ['record' => $record->getKey()])
+                        OperationalShipmentPage::getUrl(['record' => $record->getKey()])
                     )
                     ->openUrlInNewTab(),
 
@@ -358,38 +359,46 @@ class OperationalTasks extends Page implements HasTable
                         ];
 
                         if ($stage && $nextStatus) {
-                            // Ensure draft inspection records exist for each unit
-                            $skeleton = $record->tracks()
-                                ->where('status', $nextStatus->value)
-                                ->whereNull('tracked_at')
-                                ->first();
-                            if ($skeleton) {
-                                InspectionDraftAutoCreate::ensureForTrack($skeleton);
+                            // Ensure draft inspection records exist for each unit.
+                            // ensureForShipmentAndStage() is idempotent (firstOrCreate) and handles
+                            // the pickup case where no skeleton track exists yet.
+                            try {
+                                InspectionDraftAutoCreate::ensureForShipmentAndStage($record, $stage);
+                            } catch (\Throwable $e) {
+                                \Illuminate\Support\Facades\Log::error('FC inspection draft generation failed', [
+                                    'shipment_id' => $record->id,
+                                    'stage'       => $stage,
+                                    'error'       => $e->getMessage(),
+                                ]);
                             }
 
                             $units = $record->units()->with([
                                 'inspections' => fn($q) => $q->where('stage', $stage)->with('items'),
                             ])->get();
 
-                            $data['inspection_units'] = $units->map(fn($unit) => [
-                                'unit_id'       => $unit->id,
-                                'inspection_id' => $unit->inspections->first()?->id,
-                                'unit_label'    => trim(implode(' · ', array_filter([$unit->model_no, $unit->chassis_no])))
-                                    ?: 'Unit #' . $unit->id,
-                                'items'         => ($unit->inspections->first()?->items ?? collect())
-                                    ->map(fn($item) => [
-                                        'id'           => $item->id,
-                                        'category'     => $item->category,
-                                        'item_name'    => $item->item_name,
-                                        'result'       => $item->result ?? UnitInspectionItem::RESULT_OK,
-                                        'finding_type' => $item->finding_type,
-                                        'notes'        => $item->notes,
-                                    ])->toArray(),
-                            ])->toArray();
+                            // Flat list — avoids Filament v3 nested Repeater hydration bug
+                            $flatItems = [];
+                            foreach ($units as $unit) {
+                                $inspection = $unit->inspections->first();
+                                $unitLabel  = trim(implode(' · ', array_filter([$unit->model_no, $unit->chassis_no])))
+                                    ?: 'Unit #' . $unit->id;
+                                foreach (($inspection?->items ?? collect()) as $item) {
+                                    $flatItems[] = [
+                                        'item_id'            => $item->id,
+                                        'inspection_id'      => $inspection->id,
+                                        'unit_id'            => $unit->id,
+                                        'unit_label'         => $unitLabel,
+                                        'unit_label_display' => $unitLabel,
+                                        'category'           => $item->category,
+                                        'item_name'          => $item->item_name,
+                                        'result'             => $item->result ?? UnitInspectionItem::RESULT_OK,
+                                        'finding_type'       => $item->finding_type,
+                                        'notes'              => $item->notes,
+                                    ];
+                                }
+                            }
+                            $data['inspection_items_flat'] = $flatItems;
                         }
-                        logger()->info('FC_INSPECTION_FORM', [
-                            'inspection_units' => $data['inspection_units'] ?? [],
-                        ]);
 
                         return $data;
                     })
@@ -421,13 +430,15 @@ class OperationalTasks extends Page implements HasTable
                         }
 
                         // ── Save inspection data & evaluate gate ──────────────
-                        $inspStage  = $data['inspection_stage'] ?? null;
-                        $inspUnits  = $data['inspection_units'] ?? [];
-                        $checkRefs  = [];
+                        $inspStage = $data['inspection_stage'] ?? null;
+                        $flatItems = $data['inspection_items_flat'] ?? [];
+                        $checkRefs = [];
 
-                        if ($inspStage && ! empty($inspUnits)) {
-                            foreach ($inspUnits as $unitData) {
-                                $inspId = $unitData['inspection_id'] ?? null;
+                        if ($inspStage && ! empty($flatItems)) {
+                            // Group flat rows by inspection_id so we evaluate gate once per inspection
+                            $grouped = collect($flatItems)->groupBy('inspection_id');
+
+                            foreach ($grouped as $inspId => $rows) {
                                 if (! $inspId) {
                                     continue;
                                 }
@@ -437,9 +448,12 @@ class OperationalTasks extends Page implements HasTable
                                     continue;
                                 }
 
+                                $unitId    = $rows->first()['unit_id'] ?? null;
+                                $unitLabel = $rows->first()['unit_label'] ?? ('Unit #' . $unitId);
+
                                 // Persist each item result
-                                foreach ($unitData['items'] ?? [] as $itemData) {
-                                    $itemId = $itemData['id'] ?? null;
+                                foreach ($rows as $itemData) {
+                                    $itemId = $itemData['item_id'] ?? null;
                                     if (! $itemId) {
                                         continue;
                                     }
@@ -469,7 +483,7 @@ class OperationalTasks extends Page implements HasTable
                                 ]);
 
                                 $checkRefs[] = [
-                                    'unit_id'       => $unitData['unit_id'],
+                                    'unit_id'       => $unitId,
                                     'inspection_id' => $inspection->id,
                                     'stage'         => $inspStage,
                                     'status'        => $inspection->status,
@@ -477,10 +491,9 @@ class OperationalTasks extends Page implements HasTable
                                 ];
 
                                 if ($gateDecision === UnitInspection::GATE_RETURN_TO_PDC) {
-                                    $label = $unitData['unit_label'] ?? ('Unit #' . $unitData['unit_id']);
                                     Notification::make()
                                         ->title('Gate Decision: Return to PDC')
-                                        ->body("Unit {$label} memiliki kerusakan fisik. Track status tidak dapat dilanjutkan.")
+                                        ->body("Unit {$unitLabel} memiliki kerusakan fisik. Track status tidak dapat dilanjutkan.")
                                         ->danger()
                                         ->send();
                                     return;
@@ -508,7 +521,7 @@ class OperationalTasks extends Page implements HasTable
                             // Store inspection refs in check_result for ViewShipment timeline
                             if (! empty($checkRefs)) {
                                 $savedTrack->updateQuietly([
-                                    'check_result' => json_encode(['unit_inspections' => $checkRefs]),
+                                    'check_result' => ['unit_inspections' => $checkRefs],
                                 ]);
                             }
 
@@ -519,7 +532,7 @@ class OperationalTasks extends Page implements HasTable
                                 ->send();
 
                             if ($status === TrackStatus::Pickup) {
-                                $livewire->redirect(ShipmentResource::getUrl('view', ['record' => $record->getKey()]));
+                                $livewire->redirect(OperationalShipmentPage::getUrl(['record' => $record->getKey()]));
                             }
                         } catch (DomainException $e) {
                             Notification::make()->title($e->getMessage())->danger()->send();
@@ -569,7 +582,7 @@ class OperationalTasks extends Page implements HasTable
                                 ->body('Lakukan inspeksi pickup untuk setiap unit di halaman detail.')
                                 ->success()
                                 ->send();
-                            $livewire->redirect(ShipmentResource::getUrl('view', ['record' => $record->getKey()]));
+                            $livewire->redirect(OperationalShipmentPage::getUrl(['record' => $record->getKey()]));
                         }),
 
                     Action::make('handover')
@@ -857,7 +870,7 @@ class OperationalTasks extends Page implements HasTable
                         ->color('gray')
                         ->url(
                             fn(Shipment $record): string =>
-                            ShipmentResource::getUrl('view', ['record' => $record->getKey()])
+                            OperationalShipmentPage::getUrl(['record' => $record->getKey()])
                         )
                         ->openUrlInNewTab(),
 

@@ -17,6 +17,7 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Form;
+use App\Filament\FC\Pages\OperationalShipmentPage;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -254,7 +255,7 @@ class LoadingSessionResource extends Resource
                     ->label('Pengiriman')
                     ->searchable()
                     ->placeholder('-')
-                    ->url(fn ($record) => $record->shipment_id ? ShipmentResource::getUrl('view', ['record' => $record->shipment_id]) : null, true),
+                    ->url(fn ($record) => $record->shipment_id ? OperationalShipmentPage::getUrl(['record' => $record->shipment_id]) : null, true),
 
                 TextColumn::make('briefingSession.date')
                     ->label('Tanggal Briefing')

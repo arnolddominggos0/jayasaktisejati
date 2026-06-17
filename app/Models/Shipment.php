@@ -15,6 +15,7 @@ use DomainException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -299,8 +300,6 @@ class Shipment extends Model
         });
 
         static::updated(function (Shipment $m) {
-            $m->ensureTrackSkeleton();
-
             $changed = array_keys($m->getChanges());
             $ignore = ['updated_at', 'created_at', 'edited_fields', 'last_edited_by'];
             $changed = array_values(array_diff($changed, $ignore));
@@ -320,7 +319,18 @@ class Shipment extends Model
 
     public function sendToFc(): void
     {
+        $dbStatusBefore = DB::table('shipments')->where('id', $this->id)->value('status');
+        logger()->info('[SEND_TO_FC] START', [
+            'shipment_id'      => $this->id,
+            'code'             => $this->code,
+            'memory_status'    => $this->status instanceof \BackedEnum ? $this->status->value : (string) $this->status,
+            'db_status_before' => $dbStatusBefore,
+        ]);
+
         if ($this->status !== ShipmentStatus::Draft) {
+            logger()->info('[SEND_TO_FC] EARLY_RETURN — status is not draft', [
+                'status' => $this->status instanceof \BackedEnum ? $this->status->value : (string) $this->status,
+            ]);
             return;
         }
 
@@ -333,6 +343,10 @@ class Shipment extends Model
                 $this->voyage_id
             );
 
+        logger()->info('[SEND_TO_FC] DEPOT_RESOLVED', [
+            'resolved_depot_id' => $resolvedDepotId,
+        ]);
+
         if (! $resolvedDepotId) {
             $branchName = $this->branch?->name ?? ($user?->branch?->name ?? '-');
             $modeLabel = $this->mode?->label() ?? (string) $this->mode;
@@ -341,20 +355,84 @@ class Shipment extends Model
             );
         }
 
+        logger()->info('[SEND_TO_FC] PRE_SAVE', [
+            'dirty' => $this->getDirty(),
+        ]);
+
         $this->forceFill([
             'status' => ShipmentStatus::Pending,
             'assigned_depot_id' => $resolvedDepotId,
         ])->saveQuietly();
 
-        $this->ensureTrackSkeleton();
+        $dbStatusAfterSave = DB::table('shipments')->where('id', $this->id)->value('status');
+        logger()->info('[SEND_TO_FC] STATUS_PENDING_SAVED', [
+            'memory_status'    => $this->status instanceof \BackedEnum ? $this->status->value : (string) $this->status,
+            'db_status_after'  => $dbStatusAfterSave,
+        ]);
 
-        $pickupTrack = $this->tracks()->where('status', TrackStatus::Pickup->value)->first();
-        if ($pickupTrack && ! $pickupTrack->tracked_at) {
-            $pickupTrack->updateQuietly([
-                'tracked_at' => now(),
-                'note' => 'Menunggu penjemputan',
-            ]);
+        $tracksBefore = $this->tracks()->count();
+        $this->ensureTrackSkeleton();
+        $tracksAfter = $this->tracks()->count();
+        $dbStatusAfterSkeleton = DB::table('shipments')->where('id', $this->id)->value('status');
+
+        logger()->info('[SEND_TO_FC] TRACK_SKELETON_DONE', [
+            'tracks_before'         => $tracksBefore,
+            'tracks_after'          => $tracksAfter,
+            'new_tracks_created'    => $tracksAfter - $tracksBefore,
+            'db_status_after_skel'  => $dbStatusAfterSkeleton,
+        ]);
+
+        // SC.3B.20 — one BriefingSession per depot per day; many shipments attached.
+        $session = BriefingSession::firstOrCreate(
+            [
+                'depot_id' => $resolvedDepotId,
+                'date'     => now()->toDateString(),
+            ],
+            [
+                'summary_headcount' => 5,
+                'mp_check_status'   => 'draft',
+            ]
+        );
+
+        logger()->info('[SEND_TO_FC] BRIEFING_SESSION', [
+            'session_id'       => $session->id,
+            'was_created'      => $session->wasRecentlyCreated,
+        ]);
+
+        $session->shipments()->syncWithoutDetaching([$this->id]);
+
+        $dbStatusFinal = DB::table('shipments')->where('id', $this->id)->value('status');
+        logger()->info('[SEND_TO_FC] DONE', [
+            'db_status_final' => $dbStatusFinal,
+        ]);
+    }
+
+    /**
+     * Auto-create the BriefingSession for this shipment when it is sent to FC.
+     * Idempotent — calling multiple times is safe (firstOrCreate).
+     */
+    public function ensureBriefingSession(int $depotId): BriefingSession
+    {
+        $session = BriefingSession::firstOrCreate(
+            ['shipment_id' => $this->id],
+            [
+                'depot_id'          => $depotId,
+                'date'              => now()->toDateString(),
+                'summary_headcount' => 5,
+                'mp_check_status'   => 'draft',
+            ]
+        );
+
+        if ($session->wasRecentlyCreated) {
+            foreach (['helm', 'rompi', 'sepatu', 'sarung_tangan'] as $type) {
+                \App\Models\StockApdCheck::firstOrCreate(
+                    ['session_id' => $session->id, 'ppe_type' => $type],
+                    ['required_quantity' => 5, 'stock_available' => null]
+                );
+            }
         }
+
+        return $session;
     }
 
     public static function generateCode(?string $mode = null, ?int $year = null, ?int $month = null): string
@@ -596,42 +674,26 @@ class Shipment extends Model
 
     protected function requiresMpCheck(TrackStatus $status): bool
     {
-        return in_array($status, [
-            TrackStatus::Stuffing,
-            TrackStatus::UnitLoading,
-            TrackStatus::Unloading,
-        ], true);
+        // SC.3B.20 — gate at Pickup only (work-start authorisation).
+        // Briefing cleared = permission to begin all subsequent operations.
+        return $status === TrackStatus::Pickup;
     }
 
     protected function handleMpCheck(TrackStatus $status, ?array $override): void
     {
-        // Unloading is a Destination FC operation — validate the destination depot's
-        // MP briefing, not the origin depot's. This ensures FC Bitung's morning
-        // briefing gates their unloading operations, not FC Jakarta's.
-        //
-        // Stuffing and UnitLoading remain origin-side checks (assignedDepot).
-        //
-        // If no destination depot can be resolved (pod_id unset or no depot for that
-        // port), fall back to assignedDepot so existing behavior is preserved.
-        $depot = $status === TrackStatus::Unloading
-            ? ($this->destinationDepot() ?? $this->assignedDepot)
-            : $this->assignedDepot;
-
         try {
-            MpCheckGate::ensureApproved($depot);
+            MpCheckGate::ensureApproved($this);
         } catch (DomainException $e) {
-            // Only allow override for sea shipments with proper authorization
             $isSea = ($this->mode?->value ?? $this->mode) === 'sea';
 
             if (! Auth::user()?->hasRole('super_admin')) {
                 throw $e;
             }
 
-            // For sea shipments, enforce override_reason validation
             if ($isSea) {
                 if (! is_array($override) || empty($override['reason'])) {
                     throw new DomainException(
-                        'MP Check belum diapprove. Super admin harus menyertakan alasan override (minimal 20 karakter).'
+                        'MP Check belum Cleared. Super admin harus menyertakan alasan override (minimal 20 karakter).'
                     );
                 }
 
@@ -642,16 +704,14 @@ class Shipment extends Model
                     );
                 }
             } else {
-                // Land shipments: allow override with any reason
                 if (! is_array($override) || empty($override['reason'])) {
                     throw $e;
                 }
             }
 
-            // Log which depot was actually checked, not always the origin
             DB::table('mp_check_overrides')->insert([
                 'shipment_id'  => $this->id,
-                'depot_id'     => $depot?->id ?? $this->assigned_depot_id,
+                'depot_id'     => $this->assigned_depot_id,
                 'track_status' => $status->value,
                 'override_by'  => Auth::id(),
                 'reason'       => $override['reason'],
@@ -691,13 +751,10 @@ class Shipment extends Model
 
         foreach ($necessaryStatuses as $st) {
             $value = $st instanceof TrackStatus ? $st->value : (string) $st;
-            if (! in_array($value, $existingStatuses, true)) {
-                $this->tracks()->create([
-                    'status' => $value,
-                    'tracked_at' => null,
-                ]);
-                $existingStatuses[] = $value;
-            }
+            $this->tracks()->firstOrCreate(
+                ['status' => $value],
+                ['tracked_at' => null],
+            );
         }
     }
 
@@ -914,6 +971,21 @@ class Shipment extends Model
     public function destinationOffice()
     {
         return $this->belongsTo(Office::class, 'destination_office_id');
+    }
+
+    public function briefingSession()
+    {
+        return $this->hasOne(BriefingSession::class, 'shipment_id');
+    }
+
+    public function briefingSessions(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            BriefingSession::class,
+            'briefing_session_shipments',
+            'shipment_id',
+            'briefing_session_id'
+        );
     }
 
     public function tracks()

@@ -1,85 +1,98 @@
 <?php
 
-namespace App\Filament\FC\Resources\ShipmentResource\Pages;
+namespace App\Filament\FC\Pages;
 
 use App\Enums\{ShipmentMode, ServiceType, ContainerSize, DeliveryScope, CargoType};
-use App\Filament\FC\Pages\OperationalTasks;
-use App\Filament\FC\Resources\ShipmentResource;
 use App\Models\Shipment;
 use Filament\Actions\Action;
-use Filament\Resources\Pages\ViewRecord;
-use Filament\Infolists\Infolist;
-use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\Grid;
+use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\View as ViewComponent;
+use Filament\Infolists\Concerns\InteractsWithInfolists;
+use Filament\Infolists\Contracts\HasInfolists;
+use Filament\Infolists\Infolist;
+use Filament\Pages\Page;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\Auth;
 
-class ViewShipment extends ViewRecord
+class OperationalShipmentPage extends Page implements HasInfolists
 {
-    protected static string $resource = ShipmentResource::class;
+    use InteractsWithInfolists;
+
+    protected static bool $shouldRegisterNavigation = false;
+    protected static string $view = 'filament.fc.pages.operational-shipment';
+
+    public ?Shipment $record = null;
+
+    public static function getSlug(): string
+    {
+        return 'operational-shipments';
+    }
+
+    public static function getRoutePath(): string
+    {
+        return 'operational-shipments/{record}';
+    }
+
+    public function mount(Shipment $record): void
+    {
+        $this->record = $record;
+        abort_unless(Auth::user()?->can('view', $this->record), 403);
+    }
+
+    public function getTitle(): string|Htmlable
+    {
+        return "Detail Pengiriman · {$this->record->code}";
+    }
 
     public function getBreadcrumbs(): array
     {
-        $status = $this->record?->status?->value ?? (string) $this->record?->status;
-
-        if (! in_array($status, ['delivered', 'cancelled'], true)) {
-            return [
-                OperationalTasks::getUrl() => 'Tugas Operasional',
-                $this->getTitle(),
-            ];
-        }
-
         return [
-            ShipmentResource::getUrl('index') => 'Riwayat Pengiriman',
-            $this->getTitle(),
+            OperationalTasks::getUrl() => 'Tugas Operasional',
+            '#' => $this->getTitle(),
         ];
     }
 
-    public function getTitle(): string
+    protected function makeInfolist(): Infolist
     {
-        /** @var Shipment $record */
-        $record = $this->record;
-        return "Detail Pengiriman · {$record->code}";
+        return parent::makeInfolist()
+            ->record($this->record)
+            ->columns(2);
     }
 
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('continueOperational')
-                ->label('Lanjutkan Proses Operasional')
-                ->icon('heroicon-m-arrow-right-circle')
-                ->color('warning')
-                ->url(fn () => \App\Filament\FC\Pages\OperationalTasks::getUrl())
-                ->visible(fn () => ! in_array(
-                    $this->record->status?->value ?? (string) $this->record->status,
-                    ['delivered', 'cancelled'],
-                    true
-                )),
+            Action::make('backToOperational')
+                ->label('Tugas Operasional')
+                ->icon('heroicon-m-arrow-left')
+                ->color('gray')
+                ->url(fn() => OperationalTasks::getUrl()),
 
             Action::make('printWaybill')
                 ->label('Cetak Waybill')
                 ->icon('heroicon-m-printer')
-                ->url(fn () => route('shipments.print.waybill', $this->record))
+                ->url(fn() => route('shipments.print.waybill', $this->record))
                 ->openUrlInNewTab()
                 ->color('primary')
-                ->visible(fn () => Auth::user()?->can('print', $this->record)),
+                ->visible(fn() => Auth::user()?->can('print', $this->record)),
 
             Action::make('printPackingList')
                 ->label('Cetak Packing List')
                 ->icon('heroicon-m-clipboard-document-list')
-                ->url(fn () => route('shipments.print.packing', $this->record))
+                ->url(fn() => route('shipments.print.packing', $this->record))
                 ->openUrlInNewTab()
                 ->color('info')
-                ->visible(fn () => Auth::user()?->can('print', $this->record)),
+                ->visible(fn() => Auth::user()?->can('print', $this->record)),
 
             Action::make('printResi')
                 ->label('Cetak Resi')
                 ->icon('heroicon-m-document-text')
-                ->url(fn () => route('shipments.resi', $this->record))
+                ->url(fn() => route('shipments.resi', $this->record))
                 ->openUrlInNewTab()
                 ->color('gray')
-                ->visible(fn () => Auth::user()?->can('print', $this->record)),
+                ->visible(fn() => Auth::user()?->can('print', $this->record)),
         ];
     }
 
@@ -129,21 +142,21 @@ class ViewShipment extends ViewRecord
                     Grid::make(12)->schema([
                         TextEntry::make('pic_name')
                             ->label('PIC')
-                            ->formatStateUsing(fn (?string $state, Shipment $record) => $state
+                            ->formatStateUsing(fn(?string $state, Shipment $record) => $state
                                 ? "{$state}" . ($record->pic_phone ? " · {$record->pic_phone}" : '')
                                 : '—')
                             ->columnSpan(4),
 
                         TextEntry::make('pickup_contact_name')
                             ->label('Kontak Pickup')
-                            ->formatStateUsing(fn (?string $state, Shipment $record) => $state
+                            ->formatStateUsing(fn(?string $state, Shipment $record) => $state
                                 ? "{$state}" . ($record->pickup_contact_phone ? " · {$record->pickup_contact_phone}" : '')
                                 : '—')
                             ->columnSpan(4),
 
                         TextEntry::make('delivery_contact_name')
                             ->label('Kontak Delivery')
-                            ->formatStateUsing(fn (?string $state, Shipment $record) => $state
+                            ->formatStateUsing(fn(?string $state, Shipment $record) => $state
                                 ? "{$state}" . ($record->delivery_contact_phone ? " · {$record->delivery_contact_phone}" : '')
                                 : '—')
                             ->columnSpan(4),
@@ -169,7 +182,7 @@ class ViewShipment extends ViewRecord
                         TextEntry::make('service_option')
                             ->label('Opsi')
                             ->formatStateUsing(fn(?string $state, Shipment $record) => match ($state) {
-                                'fcl' => 'FCL' . (function () use ($record) {
+                                'fcl' => 'FCL' . (function() use ($record) {
                                     $size = $record->container_size instanceof ContainerSize
                                         ? $record->container_size->label()
                                         : \App\Enums\ContainerSize::tryFrom((string) $record->container_size)?->label();
@@ -203,58 +216,33 @@ class ViewShipment extends ViewRecord
                 ]),
 
             Section::make('Informasi Kapal & Kontainer')
-                ->visible(fn (Shipment $record) => $record->mode === ShipmentMode::Sea)
+                ->visible(fn(Shipment $record) => $record->mode === ShipmentMode::Sea)
                 ->schema([
                     Grid::make(12)->schema([
-                        TextEntry::make('vessel_name')
-                            ->label('Kapal')
-                            ->placeholder('—')
-                            ->columnSpan(4),
-
-                        TextEntry::make('voyage')
-                            ->label('Voyage')
-                            ->placeholder('—')
-                            ->columnSpan(2),
-
-                        TextEntry::make('pol')
-                            ->label('POL')
-                            ->placeholder('—')
-                            ->columnSpan(3),
-
-                        TextEntry::make('pod')
-                            ->label('POD')
-                            ->placeholder('—')
-                            ->columnSpan(3),
+                        TextEntry::make('vessel_name')->label('Kapal')->placeholder('—')->columnSpan(4),
+                        TextEntry::make('voyage')->label('Voyage')->placeholder('—')->columnSpan(2),
+                        TextEntry::make('pol')->label('POL')->placeholder('—')->columnSpan(3),
+                        TextEntry::make('pod')->label('POD')->placeholder('—')->columnSpan(3),
 
                         TextEntry::make('container_display')
-                            ->label(fn (Shipment $record) => $record->container_count > 1 ? 'Containers' : 'Container')
-                            ->getStateUsing(fn (Shipment $record) => $record->container_display ?: null)
+                            ->label(fn(Shipment $record) => $record->container_count > 1 ? 'Containers' : 'Container')
+                            ->getStateUsing(fn(Shipment $record) => $record->container_display ?: null)
                             ->placeholder('—')
                             ->columnSpan(4),
 
-                        TextEntry::make('seal_no')
-                            ->label('No Segel')
-                            ->placeholder('—')
-                            ->columnSpan(4),
-
-                        TextEntry::make('container_qty')
-                            ->label('Jumlah Kontainer')
-                            ->placeholder('—')
-                            ->columnSpan(4),
+                        TextEntry::make('seal_no')->label('No Segel')->placeholder('—')->columnSpan(4),
+                        TextEntry::make('container_qty')->label('Jumlah Kontainer')->placeholder('—')->columnSpan(4),
                     ]),
                 ]),
 
             Section::make('Depo & Muatan')
                 ->schema([
                     Grid::make(12)->schema([
-                        TextEntry::make('assignedDepot.name')
-                            ->label('Depo Penugasan')
-                            ->placeholder('—')
-                            ->columnSpan(4),
+                        TextEntry::make('assignedDepot.name')->label('Depo Penugasan')->placeholder('—')->columnSpan(4),
 
                         TextEntry::make('vehicle_loading')
                             ->label('Tipe Muatan')
-                            ->formatStateUsing(fn (?string $state) => match ($state) {
+                            ->formatStateUsing(fn(?string $state) => match ($state) {
                                 'rack' => 'Rack',
                                 'flat_rack' => 'Flat Rack',
                                 'regular' => 'Reguler',
@@ -265,8 +253,8 @@ class ViewShipment extends ViewRecord
                         TextEntry::make('priority')
                             ->label('Prioritas')
                             ->badge()
-                            ->color(fn (?string $state) => $state === 'urgent' ? 'danger' : 'gray')
-                            ->formatStateUsing(fn (?string $state) => match ($state) {
+                            ->color(fn(?string $state) => $state === 'urgent' ? 'danger' : 'gray')
+                            ->formatStateUsing(fn(?string $state) => match ($state) {
                                 'urgent' => 'Urgent',
                                 'normal' => 'Normal',
                                 default => $state ?: '—',
@@ -279,9 +267,8 @@ class ViewShipment extends ViewRecord
                 ->schema([
                     Grid::make(12)->schema([
                         TextEntry::make('packages_total')->label('Koli')->placeholder('—')->columnSpan(3),
-                        TextEntry::make('cbm_total')->label('CBM')->formatStateUsing(fn ($v) => $v !== null ? number_format((float) $v, 3) : '—')->columnSpan(3),
-                        TextEntry::make('weight_total')->label('Berat (kg)')->formatStateUsing(fn ($v) => $v !== null ? number_format((float) $v, 2) : '—')->columnSpan(3),
-
+                        TextEntry::make('cbm_total')->label('CBM')->formatStateUsing(fn($v) => $v !== null ? number_format((float) $v, 3) : '—')->columnSpan(3),
+                        TextEntry::make('weight_total')->label('Berat (kg)')->formatStateUsing(fn($v) => $v !== null ? number_format((float) $v, 2) : '—')->columnSpan(3),
                         TextEntry::make('etd')->label('ETD')->dateTime('d M Y H:i')->placeholder('—')->columnSpan(3),
                         TextEntry::make('eta')->label('ETA')->dateTime('d M Y H:i')->placeholder('—')->columnSpan(3),
                         TextEntry::make('pickup_date')->label('Tanggal Pickup')->dateTime('d M Y H:i')->placeholder('—')->columnSpan(3),
@@ -289,26 +276,10 @@ class ViewShipment extends ViewRecord
                     ]),
                 ]),
 
-            Section::make('Daftar Unit')
-                ->visible(fn (Shipment $record) => $record->units()->exists())
+            Section::make('Daftar Unit & Inspeksi')
                 ->schema([
-                        TextEntry::make('units_summary')
-                            ->label('')
-                            ->listWithLineBreaks()
-                            ->bulleted()
-                            ->formatStateUsing(function ($state, Shipment $record) {
-                                return $record->units->map(function ($unit) {
-                                    $parts = array_filter([
-                                        $unit->model_no,
-                                        $unit->reg_no ? "No. Pol: {$unit->reg_no}" : null,
-                                        $unit->chassis_no ? "Rangka: {$unit->chassis_no}" : null,
-                                        $unit->engine_no ? "Mesin: {$unit->engine_no}" : null,
-                                        $unit->color ? "Warna: {$unit->color}" : null,
-                                    ]);
-                                    return implode(' · ', $parts) ?: 'Unit tanpa detail';
-                                })->toArray();
-                            })
-                            ->placeholder('Belum ada unit terdaftar.'),
+                    ViewComponent::make('daftar_unit')
+                        ->view('filament.fc.shipments.partials.daftar-unit'),
                 ]),
 
             Section::make('Catatan')
@@ -331,7 +302,6 @@ class ViewShipment extends ViewRecord
                                 ->get(['id', 'shipment_id', 'status', 'tracked_at', 'location', 'note', 'created_by', 'checkseet', 'attachments', 'check_result']),
                         ]),
                 ]),
-
         ]);
     }
 }

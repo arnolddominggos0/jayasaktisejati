@@ -7,7 +7,9 @@ use App\Enums\MPBackupType;
 use App\Enums\MPCheckStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class BriefingSession extends Model
 {
@@ -16,7 +18,8 @@ class BriefingSession extends Model
     protected $fillable = [
 
         // session
-	'appsheet_id',
+        'appsheet_id',
+        'shipment_id',
         'date',
         'depot_id',
         'coordinator_user_id',
@@ -74,6 +77,21 @@ class BriefingSession extends Model
     |--------------------------------------------------------------------------
     */
 
+    public function shipment(): BelongsTo
+    {
+        return $this->belongsTo(Shipment::class, 'shipment_id');
+    }
+
+    public function shipments(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Shipment::class,
+            'briefing_session_shipments',
+            'briefing_session_id',
+            'shipment_id'
+        );
+    }
+
     public function depot(): BelongsTo
     {
         return $this->belongsTo(Depot::class, 'depot_id');
@@ -108,11 +126,12 @@ class BriefingSession extends Model
 
     public function getDisplayLabelAttribute(): string
     {
-        $date = $this->date
-            ? $this->date->format('Y-m-d')
-            : (string) $this->date;
+        if ($this->shipment_id && $this->relationLoaded('shipment') && $this->shipment) {
+            return "{$this->shipment->code} · " . ($this->depot?->name ?? '-');
+        }
 
-        $depot = $this->depot->name ?? '-';
+        $date = $this->date?->format('Y-m-d') ?? '-';
+        $depot = $this->depot?->name ?? '-';
 
         return "{$date} · {$depot}";
     }

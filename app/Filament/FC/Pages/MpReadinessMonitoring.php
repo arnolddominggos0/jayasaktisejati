@@ -55,20 +55,24 @@ class MpReadinessMonitoring extends Page
         $depotId = $this->resolveDefaultDepotId();
 
         // ── Briefing action ───────────────────────────────────────────────────
-        $existingBriefing = BriefingSession::query()
-            ->whereDate('date', $today)
+        // SC.3B.19: Briefings now auto-created per shipment (sendToFc).
+        // "Buat manual" is a fallback for override scenarios.
+        $existingPendingBriefing = BriefingSession::query()
+            ->whereNotNull('shipment_id')
+            ->whereIn('mp_check_status', ['draft', 'on_check', 'waiting_action'])
             ->when($depotId, fn ($q) => $q->where('depot_id', $depotId))
             ->select('id')
+            ->latest()
             ->first();
 
-        $briefingAction = $existingBriefing
+        $briefingAction = $existingPendingBriefing
             ? Action::make('edit_briefing')
-                ->label('Edit Briefing Hari Ini')
+                ->label('Edit Briefing Aktif')
                 ->icon('heroicon-m-pencil-square')
                 ->color('warning')
-                ->url(BriefingSessionResource::getUrl('edit', ['record' => $existingBriefing->id]))
+                ->url(BriefingSessionResource::getUrl('edit', ['record' => $existingPendingBriefing->id]))
             : Action::make('create_briefing')
-                ->label('+ Mulai Briefing Hari Ini')
+                ->label('+ Buat Briefing Manual')
                 ->icon('heroicon-m-clipboard-document-check')
                 ->color('primary')
                 ->url(BriefingSessionResource::getUrl('create'));

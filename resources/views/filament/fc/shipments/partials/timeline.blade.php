@@ -6,7 +6,7 @@ if ($items instanceof \Closure) {
 $items = $items();
 }
 
-$tracks = ($items ?? collect())->sortBy('tracked_at')->values();
+$tracks = ($items ?? collect())->filter(fn($t) => $t->tracked_at !== null)->sortBy('tracked_at')->values();
 $latestVal = optional($tracks->last())->status?->value;
 
 /** @var \BackedEnum[] $order */
@@ -258,9 +258,7 @@ $progressPct = $totalSteps > 0 ? intval(round(($doneCount / $totalSteps) * 100))
 
                                     @if ($hit && !empty($hit->check_result))
                                     @php
-                                        $checkResultRaw = $hit->check_result;
-                                        $checkResultData = is_string($checkResultRaw) ? json_decode($checkResultRaw, true) : (array) $checkResultRaw;
-                                        $unitInspections = $checkResultData['unit_inspections'] ?? [];
+                                        $unitInspections = ($hit->check_result)['unit_inspections'] ?? [];
                                         $gdLabels = [
                                             'accept'            => 'Accept',
                                             'allow_with_remark' => 'Allow w/ Remark',

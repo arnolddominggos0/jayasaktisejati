@@ -176,13 +176,13 @@ class BriefingSessionResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            ->defaultSort('date', 'desc')
+            ->defaultSort('id', 'desc')
             ->columns([
                 TextColumn::make('date')
                     ->label('Tanggal')
                     ->date('d M Y')
                     ->sortable()
-                    ->weight('bold'),
+                    ->toggleable(isToggledHiddenByDefault: false),
 
                 // ── Depot & PIC (toggleable — detail reference) ───────────
                 TextColumn::make('depot.name')

@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\FC\Resources\ShipmentResource\Pages;
+namespace App\Filament\FC\Pages;
 
-use App\Filament\FC\Resources\ShipmentResource;
+use App\Models\Shipment;
 use App\Models\Unit;
 use App\Models\UnitInspection;
 use App\Models\UnitInspectionItem;
@@ -20,30 +20,42 @@ use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
-use Filament\Resources\Pages\Page;
+use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
 
 class InspectUnitPage extends Page
 {
-    protected static string $resource = ShipmentResource::class;
+    protected static bool $shouldRegisterNavigation = false;
     protected static string $view = 'filament.fc.resources.shipment-resource.pages.inspect-unit';
 
-    public ?Unit $unit = null;
+    // {record} in route → Livewire binds Shipment model (property name matches)
+    public ?Shipment $record = null;
+
+    public ?Unit $inspectedUnit = null;
     public ?UnitInspection $inspection = null;
     public bool $isReadOnly = false;
-
     public ?array $data = [];
 
-    public function mount(int|string $record, int|string $unit): void
+    public static function getSlug(): string
     {
-        $this->record = $this->resolveRecord($record);
+        return 'operational-inspections';
+    }
+
+    public static function getRoutePath(): string
+    {
+        return 'operational-inspections/{record}/{unit}';
+    }
+
+    public function mount(Shipment $record, int|string $unit): void
+    {
+        $this->record = $record;
 
         abort_unless(auth()->user()?->can('view', $this->record), 403);
 
-        $this->unit = Unit::findOrFail($unit);
+        $this->inspectedUnit = Unit::findOrFail($unit);
 
         abort_if(
-            (int) $this->unit->shipment_id !== (int) $this->record->getKey(),
+            (int) $this->inspectedUnit->shipment_id !== (int) $this->record->getKey(),
             403,
             'Unit tidak milik shipment ini.'
         );
@@ -52,14 +64,14 @@ class InspectUnitPage extends Page
         abort_if(! $stage, 404, 'Tidak ada tahap inspeksi aktif untuk shipment ini.');
 
         $this->inspection = UnitInspection::with(['items', 'checkedBy'])
-            ->where('unit_id', $this->unit->id)
+            ->where('unit_id', $this->inspectedUnit->id)
             ->where('stage', $stage)
             ->firstOrFail();
 
         $this->isReadOnly = $this->inspection->submitted_at !== null;
 
         $this->form->fill([
-            'items' => $this->inspection->items->map(fn (UnitInspectionItem $item) => [
+            'items' => $this->inspection->items->map(fn(UnitInspectionItem $item) => [
                 'id'           => $item->id,
                 'category'     => $item->category,
                 'item_name'    => $item->item_name,
@@ -122,16 +134,16 @@ class InspectUnitPage extends Page
                             Select::make('finding_type')
                                 ->label('Jenis Temuan')
                                 ->options(UnitInspectionItem::FINDING_LABELS)
-                                ->required(fn (Get $get) => $get('result') === UnitInspectionItem::RESULT_NG)
-                                ->visible(fn (Get $get) => $get('result') === UnitInspectionItem::RESULT_NG)
+                                ->required(fn(Get $get) => $get('result') === UnitInspectionItem::RESULT_NG)
+                                ->visible(fn(Get $get) => $get('result') === UnitInspectionItem::RESULT_NG)
                                 ->disabled($this->isReadOnly)
                                 ->live(),
 
                             Textarea::make('notes')
                                 ->label('Catatan / Deskripsi Temuan')
                                 ->rows(2)
-                                ->required(fn (Get $get) => $get('result') === UnitInspectionItem::RESULT_NG)
-                                ->visible(fn (Get $get) => $get('result') === UnitInspectionItem::RESULT_NG)
+                                ->required(fn(Get $get) => $get('result') === UnitInspectionItem::RESULT_NG)
+                                ->visible(fn(Get $get) => $get('result') === UnitInspectionItem::RESULT_NG)
                                 ->disabled($this->isReadOnly),
                         ]),
                     ])
@@ -159,7 +171,7 @@ class InspectUnitPage extends Page
         foreach ($formData['items'] as $itemData) {
             $isNg = $itemData['result'] === UnitInspectionItem::RESULT_NG;
 
-            UnitInspectionItem::where('id', $itemData['id'])->update([
+            $this->inspection->items()->whereKey($itemData['id'])->update([
                 'result'       => $itemData['result'],
                 'finding_type' => $isNg ? ($itemData['finding_type'] ?? null) : null,
                 'notes'        => $isNg ? ($itemData['notes'] ?? null) : null,
@@ -185,13 +197,22 @@ class InspectUnitPage extends Page
             ->success()
             ->send();
 
-        $this->redirect(ShipmentResource::getUrl('view', ['record' => $this->record->getKey()]));
+        $this->redirect(OperationalShipmentPage::getUrl(['record' => $this->record->getKey()]));
+    }
+
+    public function getBreadcrumbs(): array
+    {
+        return [
+            OperationalTasks::getUrl() => 'Tugas Operasional',
+            OperationalShipmentPage::getUrl(['record' => $this->record->getKey()]) => 'Detail Pengiriman',
+            '#' => $this->getTitle(),
+        ];
     }
 
     public function getTitle(): string|Htmlable
     {
         $stageLabel = $this->inspection?->stage_label ?? 'Inspeksi';
-        $chassis    = $this->unit?->chassis_no ?? '—';
+        $chassis    = $this->inspectedUnit?->chassis_no ?? '—';
 
         return "Inspeksi: {$stageLabel} — {$chassis}";
     }
@@ -201,7 +222,7 @@ class InspectUnitPage extends Page
         return [
             Action::make('back')
                 ->label('Kembali ke Shipment')
-                ->url(ShipmentResource::getUrl('view', ['record' => $this->record->getKey()]))
+                ->url(OperationalShipmentPage::getUrl(['record' => $this->record->getKey()]))
                 ->icon('heroicon-m-arrow-left')
                 ->color('gray'),
         ];

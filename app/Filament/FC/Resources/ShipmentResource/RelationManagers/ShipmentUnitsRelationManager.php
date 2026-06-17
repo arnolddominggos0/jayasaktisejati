@@ -3,6 +3,7 @@
 namespace App\Filament\FC\Resources\ShipmentResource\RelationManagers;
 
 use App\Enums\TrackStatus;
+use App\Filament\FC\Pages\InspectUnitPage;
 use App\Filament\FC\Resources\ShipmentResource;
 use App\Models\Unit;
 use App\Models\UnitInspection;
@@ -185,10 +186,10 @@ class ShipmentUnitsRelationManager extends RelationManager
                         && ShipmentOwnership::canEdit(Filament::auth()->user(), $this->ownerRecord)
                     )
                     ->disabled(fn (Unit $record) => $this->resolveInspectionForActive($record) === null)
-                    ->url(fn (Unit $record) => ShipmentResource::getUrl(
-                        'inspect-unit',
-                        ['record' => $this->ownerRecord->getKey(), 'unit' => $record->getKey()]
-                    )),
+                    ->url(fn (Unit $record) => InspectUnitPage::getUrl([
+                        'record' => $this->ownerRecord->getKey(),
+                        'unit'   => $record->getKey(),
+                    ])),
             ])
             ->paginated(false)
             ->striped();

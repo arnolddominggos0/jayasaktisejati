@@ -36,10 +36,27 @@ class FcTodayBriefingSummary extends Widget
             return $this->emptyState();
         }
 
+        // SC.3B.19: Shipment-based — show the most recent active (non-cleared) briefing
+        // for active shipments at this depot. Falls back to any recent session.
         $session = BriefingSession::query()
-            ->whereDate('date', today())
             ->where('depot_id', $depotId)
-            ->with(['attendances', 'stockApdChecks'])
+            ->whereNotNull('shipment_id')
+            ->whereIn('mp_check_status', [
+                MPCheckStatus::Draft->value,
+                MPCheckStatus::OnCheck->value,
+                MPCheckStatus::WaitingAction->value,
+            ])
+            ->with(['attendances', 'stockApdChecks', 'shipment:id,code'])
+            ->latest()
+            ->first();
+
+        // Fallback: show most recent session (including cleared) so the widget
+        // never goes blank once there's at least one session today.
+        $session ??= BriefingSession::query()
+            ->where('depot_id', $depotId)
+            ->whereDate('date', today())
+            ->with(['attendances', 'stockApdChecks', 'shipment:id,code'])
+            ->latest()
             ->first();
 
         if (! $session) {

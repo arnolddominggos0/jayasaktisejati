@@ -38,6 +38,7 @@ class ShipmentTrack extends Model
         'status'     => TrackStatus::class,
         'attachments' => 'array',
         'checkseet' => 'array',
+        'check_result' => 'array',
         'plan_loading_time_at' => 'datetime',
         'plan_closing_time_at' => 'datetime',
         'actual_loading_time_at' => 'datetime',
@@ -220,6 +221,14 @@ class ShipmentTrack extends Model
         });
 
         static::saved(function (ShipmentTrack $track) {
+            logger()->info('[SHIPMENT_TRACK_SAVED] fired', [
+                'track_id'    => $track->id,
+                'shipment_id' => $track->shipment_id,
+                'status'      => $track->status instanceof \BackedEnum ? $track->status->value : (string) $track->status,
+                'tracked_at'  => $track->tracked_at,
+                'was_dirty'   => $track->wasChanged(),
+            ]);
+
             $shipment = $track->shipment()->with('tracks')->first();
             if (!$shipment) return;
 
@@ -227,8 +236,22 @@ class ShipmentTrack extends Model
                 ->filter(fn($t) => !empty($t->tracked_at))
                 ->isNotEmpty();
 
+            logger()->info('[SHIPMENT_TRACK_SAVED] revert check', [
+                'shipment_status'  => $shipment->status instanceof \BackedEnum ? $shipment->status->value : (string) $shipment->status,
+                'has_real_tracking' => $hasRealTracking,
+                'comparison_raw'   => [
+                    'status_type'  => get_class($shipment->status ?? 'null'),
+                    'draft_value'  => ShipmentStatus::Draft->value,
+                    'will_revert'  => !$hasRealTracking && ($shipment->status !== ShipmentStatus::Draft->value),
+                ],
+            ]);
+
             if (!$hasRealTracking) {
                 if ($shipment->status !== ShipmentStatus::Draft->value) {
+                    logger()->warning('[SHIPMENT_TRACK_SAVED] REVERTING SHIPMENT TO DRAFT', [
+                        'shipment_id'     => $shipment->id,
+                        'current_status'  => $shipment->status instanceof \BackedEnum ? $shipment->status->value : (string) $shipment->status,
+                    ]);
                     $shipment->status = ShipmentStatus::Draft->value;
                     $shipment->saveQuietly();
                 }

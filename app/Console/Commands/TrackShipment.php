@@ -3,9 +3,9 @@
 namespace App\Console\Commands;
 
 use App\Enums\TrackStatus;
-use App\Models\BriefingSession;
 use App\Models\Shipment;
 use App\Models\ShipmentTrack;
+use App\Services\MpCheckGate;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Auth;
@@ -47,7 +47,6 @@ class TrackShipment extends Command
             'label' => 'Stuffing & Segel',
             'default_note' => 'Stuffing unit ke container',
             'default_location' => 'Depo',
-            'requires_mp_check' => true,
         ],
         'delivery_to_port' => [
             'label' => 'Antar ke Pelabuhan',
@@ -63,7 +62,6 @@ class TrackShipment extends Command
             'label' => 'Dimuat di Kapal',
             'default_note' => 'Unit dimuat ke kapal',
             'default_location' => 'Kapal',
-            'requires_mp_check' => true,
         ],
         'vessel_depart' => [
             'label' => 'Kapal Berangkat',
@@ -79,7 +77,6 @@ class TrackShipment extends Command
             'label' => 'Pembongkaran',
             'default_note' => 'Pembongkaran unit dari kapal',
             'default_location' => 'Pelabuhan Tujuan',
-            'requires_mp_check' => true,
         ],
         'delivery_to_customer' => [
             'label' => 'Antar ke Customer',
@@ -144,38 +141,15 @@ class TrackShipment extends Command
         $location = $this->option('location') ?? $statusConfig['default_location'];
         $time = $this->option('time') ? Carbon::parse($this->option('time')) : now();
 
-        // Check MP Check if required
-        if (isset($statusConfig['requires_mp_check']) && ! $this->option('force')) {
-            $mpCheckApproved = BriefingSession::query()
-                ->where('depot_id', $shipment->assigned_depot_id)
-                ->whereDate('date', $time->toDateString())
-                ->where('mp_check_status', 'approved')
-                ->exists();
+        // SC.3B.20 — gate only at Pickup, via pivot-based MpCheckGate.
+        if ($trackStatus === TrackStatus::Pickup && ! $this->option('force')) {
+            try {
+                MpCheckGate::ensureApproved($shipment);
+            } catch (\DomainException $e) {
+                $this->error($e->getMessage());
+                $this->error('Use --force to skip MP Check validation.');
 
-            if (! $mpCheckApproved) {
-                $this->warn('MP Check belum di-approve untuk depot dan tanggal ini.');
-                $createMpCheck = $this->confirm('Create MP Check approval now?');
-
-                if ($createMpCheck) {
-                    BriefingSession::firstOrCreate(
-                        [
-                            'depot_id' => $shipment->assigned_depot_id,
-                            'date' => $time->toDateString(),
-                        ],
-                        [
-                            'coordinator_user_id' => $fc?->id,
-                            'notes' => 'MP Check for '.$shipment->code,
-                            'mp_check_status' => 'approved',
-                            'approved_at' => $time,
-                            'approved_by' => $fc?->id,
-                        ]
-                    );
-                    $this->info('✓ MP Check approved');
-                } else {
-                    $this->error('Cannot proceed without MP Check approval. Use --force to skip.');
-
-                    return 1;
-                }
+                return 1;
             }
         }
 

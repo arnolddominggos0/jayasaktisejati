@@ -3,6 +3,7 @@
 namespace App\Filament\FC\Resources\BriefingSessionResource\Pages;
 
 use App\Enums\MPCheckStatus;
+use App\Enums\ShipmentStatus;
 use App\Filament\FC\Resources\BriefingSessionResource;
 use Filament\Actions\EditAction;
 use Filament\Infolists;
@@ -490,7 +491,7 @@ class ViewBriefingSession extends ViewRecord
                     ->schema([
                         ViewEntry::make('briefing_evidence_path')
                             ->view('components.briefing-evidence'),
-                            
+
                         TextEntry::make('evidence_empty_state')
                             ->label('')
                             ->state('Belum ada dokumentasi briefing.')
@@ -500,7 +501,53 @@ class ViewBriefingSession extends ViewRecord
                             ->visible(fn($record): bool => ! filled($record?->briefing_evidence_path)),
                     ]),
 
+                // ─────────────────────────────────────────────────────────────
+                // Section 7 — Shipment / SPPB Hari Ini (SC.3B.20)
+                // Linked via briefing_session_shipments pivot (BelongsToMany).
+                // ─────────────────────────────────────────────────────────────
+                Section::make('Shipment / SPPB Hari Ini')
+                    ->icon('heroicon-o-document-text')
+                    ->schema([
+                        RepeatableEntry::make('shipments')
+                            ->label('')
+                            ->schema([
+                                TextEntry::make('code')
+                                    ->label('SPPB / Kode')
+                                    ->weight('bold')
+                                    ->icon('heroicon-o-document'),
+
+                                TextEntry::make('status')
+                                    ->label('Status')
+                                    ->badge()
+                                    ->formatStateUsing(function ($state): string {
+                                        $enum = $state instanceof ShipmentStatus
+                                            ? $state
+                                            : ShipmentStatus::tryFrom((string) $state);
+                                        return $enum?->label() ?? ucwords(str_replace('_', ' ', (string) $state));
+                                    })
+                                    ->color(function ($state): string {
+                                        $enum = $state instanceof ShipmentStatus
+                                            ? $state
+                                            : ShipmentStatus::tryFrom((string) $state);
+                                        return $enum?->color() ?? 'gray';
+                                    }),
+
+                                TextEntry::make('customer.name')
+                                    ->label('Customer')
+                                    ->icon('heroicon-o-building-office-2')
+                                    ->placeholder('—'),
+                            ])
+                            ->columns(3)
+                            ->placeholder('Belum ada shipment yang di-attach ke sesi ini.'),
+                    ])
+                    ->visible(fn ($record) => $record->shipments->isNotEmpty()),
+
             ]);
+    }
+
+    protected function resolveRecord(int|string $key): \Illuminate\Database\Eloquent\Model
+    {
+        return parent::resolveRecord($key)->load(['shipments.customer']);
     }
 
     protected function getHeaderActions(): array

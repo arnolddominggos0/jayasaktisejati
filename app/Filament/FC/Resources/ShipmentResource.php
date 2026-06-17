@@ -8,7 +8,6 @@ use App\Enums\ShipmentMode;
 use App\Enums\ShipmentStatus;
 use App\Enums\TrackStatus;
 use App\Filament\FC\Resources\ShipmentResource\Pages\EditShipment;
-use App\Filament\FC\Resources\ShipmentResource\Pages\InspectUnitPage;
 use App\Filament\FC\Resources\ShipmentResource\Pages\ListShipments;
 use App\Filament\FC\Resources\ShipmentResource\Pages\ViewShipment;
 use App\Filament\FC\Resources\ShipmentResource\RelationManagers\LoadingSessionsRelationManager;
@@ -249,11 +248,14 @@ class ShipmentResource extends Resource
     /**
      * Reusable inspection form fields for embedding in OperationalTasks updateTrack action.
      *
-     * Returns a Hidden (inspection_stage) + Section containing a per-unit Repeater
-     * that mirrors the InspectUnitPage form schema for all units simultaneously.
+     * Uses a flat single Repeater (inspection_items_flat) instead of nested Repeaters
+     * to work around Filament v3's failure to hydrate inner Repeater items from fillForm().
+     *
+     * Each row carries: item_id, inspection_id, unit_id, unit_label, category, item_name,
+     * result, finding_type, notes.
      *
      * The caller (OperationalTasks) is responsible for:
-     *   - Filling 'inspection_stage' and 'inspection_units' via ->fillForm()
+     *   - Filling 'inspection_stage' and 'inspection_items_flat' via ->fillForm()
      *   - Saving the submitted data to unit_inspection_items / unit_inspections
      */
     public static function inspectionFormFields(): array
@@ -274,87 +276,70 @@ class ShipmentResource extends Resource
                 ->visible(fn(Get $get): bool => ! empty($get('inspection_stage')))
                 ->columnSpanFull()
                 ->schema([
-                    Repeater::make('inspection_units')
-                        ->label('Unit')
+                    Repeater::make('inspection_items_flat')
+                        ->label('Item Pemeriksaan')
                         ->addable(false)
                         ->deletable(false)
                         ->reorderable(false)
                         ->columnSpanFull()
                         ->schema([
-                            Hidden::make('unit_id'),
+                            Hidden::make('item_id'),
                             Hidden::make('inspection_id'),
+                            Hidden::make('unit_id'),
                             Hidden::make('unit_label'),
 
-                            Placeholder::make('unit_header')
-                                ->label('')
-                                ->content(fn(Get $get): \Illuminate\Support\HtmlString => new \Illuminate\Support\HtmlString(
-                                    '<span class="font-semibold text-sm text-gray-900">'
-                                        . e($get('unit_label') ?: '—')
-                                        . '</span>'
-                                ))
-                                ->columnSpanFull(),
+                            Grid::make(5)->schema([
+                                TextInput::make('unit_label_display')
+                                    ->label('Unit')
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->columnSpan(1),
 
-                            Placeholder::make('debug_items')
-                                ->label('DEBUG')
-                                ->content(
-                                    fn(Get $get) =>
-                                    'count=' . count($get('items') ?? [])
-                                ),
+                                TextInput::make('category')
+                                    ->label('Kategori')
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->columnSpan(1),
 
-                            Repeater::make('items')
-                                ->label('Item Pemeriksaan')
-                                ->addable(false)
-                                ->deletable(false)
-                                ->reorderable(false)
-                                ->columnSpanFull()
+                                TextInput::make('item_name')
+                                    ->label('Item Pemeriksaan')
+                                    ->disabled()
+                                    ->dehydrated(false)
+                                    ->columnSpan(2),
+
+                                ToggleButtons::make('result')
+                                    ->label('Hasil')
+                                    ->options([
+                                        UnitInspectionItem::RESULT_OK => 'OK',
+                                        UnitInspectionItem::RESULT_NG => 'NG',
+                                    ])
+                                    ->colors([
+                                        UnitInspectionItem::RESULT_OK => 'success',
+                                        UnitInspectionItem::RESULT_NG => 'danger',
+                                    ])
+                                    ->default(UnitInspectionItem::RESULT_OK)
+                                    ->required()
+                                    ->live()
+                                    ->grouped()
+                                    ->columnSpan(1),
+                            ]),
+
+                            Grid::make(2)
                                 ->schema([
-                                    Hidden::make('item_id'),
+                                    Select::make('finding_type')
+                                        ->label('Jenis Temuan')
+                                        ->options(UnitInspectionItem::FINDING_LABELS)
+                                        ->required(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG)
+                                        ->visible(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG)
+                                        ->live(),
 
-                                    Grid::make(4)->schema([
-                                        TextInput::make('category')
-                                            ->label('Kategori')
-                                            ->disabled()
-                                            ->dehydrated(false),
-
-                                        TextInput::make('item_name')
-                                            ->label('Item Pemeriksaan')
-                                            ->columnSpan(2)
-                                            ->disabled()
-                                            ->dehydrated(false),
-
-                                        ToggleButtons::make('result')
-                                            ->label('Hasil')
-                                            ->options([
-                                                UnitInspectionItem::RESULT_OK => 'OK',
-                                                UnitInspectionItem::RESULT_NG => 'NG',
-                                            ])
-                                            ->colors([
-                                                UnitInspectionItem::RESULT_OK => 'success',
-                                                UnitInspectionItem::RESULT_NG => 'danger',
-                                            ])
-                                            ->default(UnitInspectionItem::RESULT_OK)
-                                            ->required()
-                                            ->live()
-                                            ->grouped(),
-                                    ]),
-
-                                    Grid::make(2)
-                                        ->schema([
-                                            Select::make('finding_type')
-                                                ->label('Jenis Temuan')
-                                                ->options(UnitInspectionItem::FINDING_LABELS)
-                                                ->required(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG)
-                                                ->visible(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG)
-                                                ->live(),
-
-                                            Textarea::make('notes')
-                                                ->label('Catatan / Deskripsi Temuan')
-                                                ->rows(2)
-                                                ->required(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG)
-                                                ->visible(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG),
-                                        ])
+                                    Textarea::make('notes')
+                                        ->label('Catatan / Deskripsi Temuan')
+                                        ->rows(2)
+                                        ->required(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG)
                                         ->visible(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG),
-                                ]),
+                                ])
+                                ->visible(fn(Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG),
                         ]),
                 ]),
         ];
@@ -714,10 +699,9 @@ class ShipmentResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'        => ListShipments::route('/'),
-            'view'         => ViewShipment::route('/{record}'),
-            'edit'         => EditShipment::route('/{record}/edit'),
-            'inspect-unit' => InspectUnitPage::route('/{record}/units/{unit}/inspect'),
+            'index' => ListShipments::route('/'),
+            'view'  => ViewShipment::route('/{record}'),
+            'edit'  => EditShipment::route('/{record}/edit'),
         ];
     }
 

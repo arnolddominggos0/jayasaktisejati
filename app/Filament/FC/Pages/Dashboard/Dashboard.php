@@ -134,9 +134,19 @@ class Dashboard extends Page
             return $this->_todaySession = null;
         }
 
-        $this->_todaySession = BriefingSession::whereDate('date', Carbon::today())
+        // SC.3B.19: Prioritize most recent active (non-cleared) shipment briefing.
+        // Falls back to date-based query for legacy / backfill records.
+        $this->_todaySession = BriefingSession::query()
             ->where('depot_id', $depotId)
-            ->select('id', 'summary_headcount', 'summary_sufficient', 'unit_masuk_yard')
+            ->whereNotNull('shipment_id')
+            ->whereNotIn('mp_check_status', ['cleared', 'approved'])
+            ->select('id', 'summary_headcount', 'summary_sufficient', 'unit_masuk_yard', 'mp_check_status')
+            ->latest()
+            ->first();
+
+        $this->_todaySession ??= BriefingSession::whereDate('date', Carbon::today())
+            ->where('depot_id', $depotId)
+            ->select('id', 'summary_headcount', 'summary_sufficient', 'unit_masuk_yard', 'mp_check_status')
             ->first();
 
         return $this->_todaySession;

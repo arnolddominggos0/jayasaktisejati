@@ -7,23 +7,23 @@
         <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
             <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Model</p>
-                <p class="mt-1 font-semibold text-gray-900 dark:text-white">{{ $this->unit->model_no ?? '—' }}</p>
+                <p class="mt-1 font-semibold text-gray-900 dark:text-white">{{ $this->inspectedUnit->model_no ?? '—' }}</p>
             </div>
             <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Chassis No</p>
-                <p class="mt-1 font-mono font-bold text-gray-900 dark:text-white">{{ $this->unit->chassis_no ?? '—' }}</p>
+                <p class="mt-1 font-mono font-bold text-gray-900 dark:text-white">{{ $this->inspectedUnit->chassis_no ?? '—' }}</p>
             </div>
             <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Engine No</p>
-                <p class="mt-1 font-mono text-gray-900 dark:text-white">{{ $this->unit->engine_no ?? '—' }}</p>
+                <p class="mt-1 font-mono text-gray-900 dark:text-white">{{ $this->inspectedUnit->engine_no ?? '—' }}</p>
             </div>
             <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Warna</p>
-                <p class="mt-1 text-gray-900 dark:text-white">{{ $this->unit->color ?? '—' }}</p>
+                <p class="mt-1 text-gray-900 dark:text-white">{{ $this->inspectedUnit->color ?? '—' }}</p>
             </div>
             <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">DO Number</p>
-                <p class="mt-1 text-gray-900 dark:text-white">{{ $this->unit->do_number ?? '—' }}</p>
+                <p class="mt-1 text-gray-900 dark:text-white">{{ $this->inspectedUnit->do_number ?? '—' }}</p>
             </div>
             <div>
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Stage</p>

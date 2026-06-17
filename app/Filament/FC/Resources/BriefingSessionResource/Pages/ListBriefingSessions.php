@@ -17,95 +17,81 @@ class ListBriefingSessions extends ListRecords
 {
     protected static string $resource = BriefingSessionResource::class;
 
-    // -------------------------------------------------------------------------
-    // Header widget — today's briefing summary card
-    // -------------------------------------------------------------------------
-
     protected function getHeaderWidgets(): array
     {
         return [
-            // Today's briefing quick-summary (session-level card)
             FcTodayBriefingSummary::class,
         ];
     }
 
-    // -------------------------------------------------------------------------
-    // Header actions
-    // -------------------------------------------------------------------------
-
     protected function getHeaderActions(): array
     {
         return [
-            // "Buat Briefing Hari Ini" — only visible when no briefing exists today.
-            // When today already has a briefing, this button disappears.
-            // The summary widget above handles the "already exists" state visually.
+            // Manual create — for legacy / override scenarios.
+            // Normal flow: BriefingSession is auto-created by Shipment::sendToFc().
+            // Hidden when today's briefing for this depot already exists.
             CreateAction::make()
-                ->label('Buat Briefing Hari Ini')
+                ->label('Buat Briefing Manual')
                 ->icon('heroicon-m-plus-circle')
-                ->visible(fn () => ! $this->todayBriefingExists()),
+                ->visible(fn () => $this->todayBriefingMissing()),
         ];
     }
 
-    // -------------------------------------------------------------------------
-    // Tabs
-    // -------------------------------------------------------------------------
-
-    public function getTabs(): array
-    {
-        return [
-            'all' => Tab::make('Semua')
-                ->badge(fn () => static::getModel()::where('depot_id', $this->getScopedDepotId())->count()),
-
-            'today' => Tab::make('Hari Ini')
-                ->modifyQueryUsing(fn (Builder $query) => $query->whereDate('date', now()->toDateString()))
-                ->badge(fn () => static::getModel()::whereDate('date', now()->toDateString())->where('depot_id', $this->getScopedDepotId())->count())
-                ->icon('heroicon-o-calendar'),
-
-            'in_progress' => Tab::make('Sedang Berjalan')
-                ->modifyQueryUsing(fn (Builder $query) => $query->whereIn('mp_check_status', [
-                    MPCheckStatus::OnCheck->value,
-                    MPCheckStatus::WaitingAction->value,
-                    MPCheckStatus::Draft->value,
-                ]))
-                ->badge(fn () => static::getModel()::whereIn('mp_check_status', [
-                    MPCheckStatus::OnCheck->value,
-                    MPCheckStatus::WaitingAction->value,
-                    MPCheckStatus::Draft->value,
-                ])->where('depot_id', $this->getScopedDepotId())->count())
-                ->icon('heroicon-o-clock'),
-
-            'cleared' => Tab::make('Cleared')
-                ->modifyQueryUsing(fn (Builder $query) => $query->where('mp_check_status', MPCheckStatus::Cleared->value))
-                ->badge(fn () => static::getModel()::where('mp_check_status', MPCheckStatus::Cleared->value)->where('depot_id', $this->getScopedDepotId())->count())
-                ->icon('heroicon-o-check-circle'),
-        ];
-    }
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * True when a briefing already exists for today + this depot.
-     * Used to conditionally show/hide the "Buat Briefing Hari Ini" button.
-     */
-    protected function todayBriefingExists(): bool
+    protected function todayBriefingMissing(): bool
     {
         $depotId = $this->getScopedDepotId();
 
         if (! $depotId) {
-            return false;
+            return true; // no depot scope — let form validation handle duplicates
         }
 
-        return BriefingSession::whereDate('date', today())
+        return ! BriefingSession::whereDate('date', today())
             ->where('depot_id', $depotId)
             ->exists();
     }
 
-    /**
-     * Resolves the depot the current FC is scoped to.
-     * Mirrors ShipmentOwnership / BriefingSessionResource query logic.
-     */
+    public function getTabs(): array
+    {
+        $depotId = $this->getScopedDepotId();
+
+        return [
+            'all' => Tab::make('Semua')
+                ->badge(fn () => BriefingSession::when($depotId, fn ($q) => $q->where('depot_id', $depotId))->count()),
+
+            'needs_check' => Tab::make('Perlu MP Check')
+                ->modifyQueryUsing(fn (Builder $query) => $query->whereIn('mp_check_status', [
+                    MPCheckStatus::Draft->value,
+                    MPCheckStatus::OnCheck->value,
+                    MPCheckStatus::WaitingAction->value,
+                ]))
+                ->badge(fn () => BriefingSession::whereIn('mp_check_status', [
+                    MPCheckStatus::Draft->value,
+                    MPCheckStatus::OnCheck->value,
+                    MPCheckStatus::WaitingAction->value,
+                ])
+                    ->when($depotId, fn ($q) => $q->where('depot_id', $depotId))
+                    ->count())
+                ->icon('heroicon-o-clock'),
+
+            'cleared' => Tab::make('Cleared')
+                ->modifyQueryUsing(fn (Builder $query) => $query->where('mp_check_status', MPCheckStatus::Cleared->value))
+                ->badge(fn () => BriefingSession::where('mp_check_status', MPCheckStatus::Cleared->value)
+                    ->when($depotId, fn ($q) => $q->where('depot_id', $depotId))
+                    ->count())
+                ->icon('heroicon-o-check-circle'),
+
+            'failed' => Tab::make('Gagal / Ditangguhkan')
+                ->modifyQueryUsing(fn (Builder $query) => $query->whereIn('mp_check_status', [
+                    MPCheckStatus::Failed->value,
+                ]))
+                ->badge(fn () => BriefingSession::whereIn('mp_check_status', [
+                    MPCheckStatus::Failed->value,
+                ])->when($depotId, fn ($q) => $q->where('depot_id', $depotId))->count())
+                ->icon('heroicon-o-x-circle')
+                ->badgeColor('danger'),
+        ];
+    }
+
     protected function getScopedDepotId(): ?int
     {
         $user = Filament::auth()->user();
