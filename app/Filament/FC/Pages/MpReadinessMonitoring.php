@@ -9,19 +9,26 @@ use App\Filament\FC\Widgets\UnitMasukChartWidget;
 use App\Models\BriefingSession;
 use App\Models\ContainerReadinessSession;
 use App\Models\Depot;
+use App\Models\Shipment;
+use App\Models\Unit;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Table;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
-class MpReadinessMonitoring extends Page
+class MpReadinessMonitoring extends Page implements HasTable
 {
+    use InteractsWithTable;
     protected static ?string $navigationGroup = 'Operasional Lapangan';
     protected static ?string $navigationLabel = 'Monitoring Operasional';
     protected static ?string $navigationIcon  = 'heroicon-o-presentation-chart-line';
-    protected static ?int    $navigationSort  = 5;
+    protected static ?int    $navigationSort  = 20;
 
     protected static string $view = 'filament.fc.pages.mp-readiness-monitoring';
 
@@ -38,7 +45,8 @@ class MpReadinessMonitoring extends Page
     public int  $filterMonth;
     public int  $filterYear;
     public ?int $filterDepotId    = null;
-    public ?int $selectedSessionId = null;
+    public ?int    $selectedSessionId = null;
+    public string  $activeTab         = 'overview';
 
     public static function canAccess(): bool
     {
@@ -55,10 +63,9 @@ class MpReadinessMonitoring extends Page
         $depotId = $this->resolveDefaultDepotId();
 
         // ── Briefing action ───────────────────────────────────────────────────
-        // SC.3B.19: Briefings now auto-created per shipment (sendToFc).
-        // "Buat manual" is a fallback for override scenarios.
+        // Coordinator creates/edits today's briefing and attaches shipment candidates.
         $existingPendingBriefing = BriefingSession::query()
-            ->whereNotNull('shipment_id')
+            ->whereDate('date', $today)
             ->whereIn('mp_check_status', ['draft', 'on_check', 'waiting_action'])
             ->when($depotId, fn ($q) => $q->where('depot_id', $depotId))
             ->select('id')
@@ -72,7 +79,7 @@ class MpReadinessMonitoring extends Page
                 ->color('warning')
                 ->url(BriefingSessionResource::getUrl('edit', ['record' => $existingPendingBriefing->id]))
             : Action::make('create_briefing')
-                ->label('+ Buat Briefing Manual')
+                ->label('+ Buat Briefing Harian')
                 ->icon('heroicon-m-clipboard-document-check')
                 ->color('primary')
                 ->url(BriefingSessionResource::getUrl('create'));
@@ -118,6 +125,11 @@ class MpReadinessMonitoring extends Page
         $this->filterMonth   = (int) now()->format('m');
         $this->filterYear    = (int) now()->format('Y');
         $this->filterDepotId = $this->resolveDefaultDepotId();
+
+        $tab = request()->query('tab');
+        if ($tab && array_key_exists($tab, $this->getTabs())) {
+            $this->activeTab = $tab;
+        }
     }
 
     public function updatedFilterDepotId(mixed $value): void
@@ -146,6 +158,40 @@ class MpReadinessMonitoring extends Page
     public function closeDetail(): void
     {
         $this->selectedSessionId = null;
+    }
+
+    // ── Tab state ─────────────────────────────────────────────────────────────
+
+    public function setTab(string $tab): void
+    {
+        $this->activeTab = $tab;
+    }
+
+    public function getTabs(): array
+    {
+        return [
+            'overview'            => 'Overview',
+            'mp_readiness'        => 'MP Readiness',
+            'container_readiness' => 'Container Readiness',
+            'ready_loading'       => 'Ready Loading',
+            'waiting_inspection'  => 'Waiting Inspection',
+            'bermasalah'          => 'Unit Bermasalah',
+            'shipment_readiness'  => 'Shipment Readiness',
+        ];
+    }
+
+    public function table(Table $table): Table
+    {
+        return match ($this->activeTab) {
+            'ready_loading'      => $this->buildReadyLoadingTable($table),
+            'waiting_inspection' => $this->buildWaitingInspectionTable($table),
+            'bermasalah'         => $this->buildBermasalahTable($table),
+            'shipment_readiness' => $this->buildShipmentReadinessTable($table),
+            default              => $table
+                ->query(Unit::query()->whereRaw('1 = 0'))
+                ->columns([TextColumn::make('id')])
+                ->paginated(false),
+        };
     }
 
     /*
@@ -237,15 +283,8 @@ class MpReadinessMonitoring extends Page
             $gap    = $attend - $need;
             $ok     = $need > 0 ? ($attend >= $need) : null;
 
-            // Priority 1: dedicated column (new data from Filament).
-            // Priority 2: regex on notes (legacy AppSheet data — kept for transition).
-            $unit = $session->unit_masuk_yard !== null
-                ? (int) $session->unit_masuk_yard
-                : (
-                    ($session->notes && preg_match('/Unit Masuk Yard\/PDC:\s*(\d+)/i', $session->notes, $m))
-                        ? (int) $m[1]
-                        : null
-                );
+            // Dual-source via accessor: pre-cutoff uses stored/regex; post-cutoff uses Handover tracks.
+            $unit = $session->effective_unit_masuk_yard ?: null;
 
             return [
                 'session_id' => $session->id,
@@ -384,14 +423,17 @@ class MpReadinessMonitoring extends Page
         $depotId      = $this->filterDepotId;
         $branchId     = $this->resolveBranchId();
 
+        // Dual-source: pre-cutoff uses stored unit_masuk_yard; post-cutoff uses Handover tracks.
+        $effectiveUnit = BriefingSession::effectiveUnitSqlExpression();
+
         // Agregat per bulan di level sesi — JANGAN JOIN ke attendance
         $sessionData = DB::table('briefing_sessions')
-            ->selectRaw('
+            ->selectRaw("
                 EXTRACT(MONTH FROM date)::int                                     AS month_num,
                 COUNT(*)::int                                                     AS session_count,
-                COALESCE(SUM(unit_masuk_yard), 0)::int                           AS total_units,
+                COALESCE(SUM({$effectiveUnit}), 0)::int                          AS total_units,
                 SUM(CASE WHEN summary_sufficient = true THEN 1 ELSE 0 END)::int  AS ok_count
-            ')
+            ")
             ->whereYear('date', $year)
             ->when($depotId, fn ($q) => $q->where('depot_id', $depotId))
             ->when(! $depotId && $branchId, fn ($q) => $q->whereIn(
@@ -616,15 +658,8 @@ class MpReadinessMonitoring extends Page
             return null;
         }
 
-        // Priority 1: dedicated column (new data from Filament).
-        // Priority 2: regex on notes (legacy AppSheet data — kept for transition).
-        $unit = $session->unit_masuk_yard !== null
-            ? (int) $session->unit_masuk_yard
-            : (
-                ($session->notes && preg_match('/Unit Masuk Yard\/PDC:\s*(\d+)/i', $session->notes, $m))
-                    ? (int) $m[1]
-                    : null
-            );
+        // Dual-source via accessor: pre-cutoff uses stored/regex; post-cutoff uses Handover tracks.
+        $unit = $session->effective_unit_masuk_yard ?: null;
 
         $evidenceUrl = $session->briefing_evidence_path
             ? Storage::disk('public')->url($session->briefing_evidence_path)
@@ -692,5 +727,312 @@ class MpReadinessMonitoring extends Page
             'ok'         => $ok,
             'attendances'=> $attendanceRows,
         ];
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Operational table builders (SC.5D.4 — absorbed from YardDashboard)
+    | Exit-gate rules SC.5C.5-D: rack → delivery_to_port, non-rack → stuffing
+    |--------------------------------------------------------------------------
+    */
+
+    private function exitNotExistsClosure(): \Closure
+    {
+        return fn ($q) => $q
+            ->from('shipment_tracks as st_exit')
+            ->whereColumn('st_exit.shipment_id', 's.id')
+            ->whereNotNull('st_exit.tracked_at')
+            ->whereRaw("(
+                (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack') AND st_exit.status = 'delivery_to_port')
+                OR (NOT (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack')) AND st_exit.status = 'stuffing')
+            )");
+    }
+
+    private function noDepotQuery(Table $table): Table
+    {
+        return $table
+            ->query(Unit::query()->whereRaw('1 = 0'))
+            ->columns([TextColumn::make('id')])
+            ->emptyStateHeading('Depot tidak ditemukan')
+            ->emptyStateDescription('Hubungi admin untuk mengatur scope depot.');
+    }
+
+    private function buildReadyLoadingTable(Table $table): Table
+    {
+        $depotId = $this->resolveDefaultDepotId();
+        if (! $depotId) return $this->noDepotQuery($table);
+
+        $query = Unit::query()
+            ->select([
+                'units.id',
+                'units.sjkb_no',
+                'units.reg_no',
+                'units.chassis_no',
+                DB::raw('s.code AS shipment_code'),
+                DB::raw('s.voyage'),
+                DB::raw('st_h.tracked_at AS handover_at'),
+                DB::raw('(CURRENT_DATE - st_h.tracked_at::date)::int AS aging_days'),
+                DB::raw('ui.gate_decision'),
+            ])
+            ->join('shipments as s', 's.id', '=', 'units.shipment_id')
+            ->where('s.assigned_depot_id', $depotId)
+            ->join('shipment_tracks as st_h', fn ($j) =>
+                $j->on('st_h.shipment_id', '=', 's.id')
+                  ->where('st_h.status', 'handover')
+                  ->whereNotNull('st_h.tracked_at')
+            )
+            ->join('unit_inspections as ui', fn ($j) =>
+                $j->on('ui.unit_id', '=', 'units.id')
+                  ->where('ui.stage', 'handover_depot')
+                  ->whereNotNull('ui.submitted_at')
+                  ->whereIn('ui.gate_decision', ['accept', 'allow_with_remark'])
+            )
+            ->whereNotExists($this->exitNotExistsClosure());
+
+        return $table
+            ->query($query)
+            ->columns([
+                TextColumn::make('sjkb_no')->label('SJKB')->placeholder('—')->searchable(),
+                TextColumn::make('reg_no')->label('Plate Number')->placeholder('—')->searchable(),
+                TextColumn::make('chassis_no')->label('Chassis')->placeholder('—')->searchable(),
+                TextColumn::make('shipment_code')->label('Shipment')->searchable(),
+                TextColumn::make('voyage')->label('Voyage')->placeholder('—'),
+                TextColumn::make('handover_at')->label('Handover Date')
+                    ->formatStateUsing(fn ($state) => $state ? Carbon::parse($state)->translatedFormat('d M Y') : '—'),
+                TextColumn::make('aging_days')->label('Aging')
+                    ->formatStateUsing(fn ($state) => $state !== null ? $state . ' hr' : '—')
+                    ->badge()
+                    ->color(fn ($state) => match (true) {
+                        (int) $state > 7 => 'danger',
+                        (int) $state > 3 => 'warning',
+                        default          => 'success',
+                    }),
+                TextColumn::make('gate_decision')->label('Inspection')->badge()
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'accept'            => 'Accept',
+                        'allow_with_remark' => 'Allow w/ Remark',
+                        default             => (string) $state,
+                    })
+                    ->color(fn ($state) => match ($state) {
+                        'accept'            => 'success',
+                        'allow_with_remark' => 'warning',
+                        default             => 'gray',
+                    }),
+            ])
+            ->defaultSort('handover_at', 'asc')
+            ->paginated([15, 25, 50])
+            ->striped()
+            ->emptyStateIcon('heroicon-o-check-circle')
+            ->emptyStateHeading('Tidak ada unit ready loading')
+            ->emptyStateDescription('Unit muncul di sini setelah handover tracked dan inspeksi accept.');
+    }
+
+    private function buildBermasalahTable(Table $table): Table
+    {
+        $depotId = $this->resolveDefaultDepotId();
+        if (! $depotId) return $this->noDepotQuery($table);
+
+        $query = Unit::query()
+            ->select([
+                'units.id',
+                'units.sjkb_no',
+                'units.model_no',
+                DB::raw('s.code AS shipment_code'),
+                DB::raw('s.voyage'),
+                DB::raw('ui.submitted_at AS inspection_date'),
+                DB::raw('(CURRENT_DATE - ui.submitted_at::date)::int AS aging_days'),
+                DB::raw('ui.notes AS remark'),
+            ])
+            ->join('shipments as s', 's.id', '=', 'units.shipment_id')
+            ->where('s.assigned_depot_id', $depotId)
+            ->join('shipment_tracks as st_h', fn ($j) =>
+                $j->on('st_h.shipment_id', '=', 's.id')
+                  ->where('st_h.status', 'handover')
+                  ->whereNotNull('st_h.tracked_at')
+            )
+            ->join('unit_inspections as ui', fn ($j) =>
+                $j->on('ui.unit_id', '=', 'units.id')
+                  ->where('ui.stage', 'handover_depot')
+                  ->where('ui.gate_decision', 'return_to_pdc')
+            )
+            ->whereNotExists($this->exitNotExistsClosure());
+
+        return $table
+            ->query($query)
+            ->columns([
+                TextColumn::make('sjkb_no')->label('SJKB')->placeholder('—')->searchable(),
+                TextColumn::make('model_no')->label('Unit')->placeholder('—'),
+                TextColumn::make('shipment_code')->label('Shipment')->searchable(),
+                TextColumn::make('voyage')->label('Voyage')->placeholder('—'),
+                TextColumn::make('inspection_date')->label('Inspection Date')
+                    ->formatStateUsing(fn ($state) => $state ? Carbon::parse($state)->translatedFormat('d M Y H:i') : '—'),
+                TextColumn::make('aging_days')->label('Aging')
+                    ->formatStateUsing(fn ($state) => $state !== null ? $state . ' hr' : '—')
+                    ->badge()
+                    ->color(fn ($state) => match (true) {
+                        (int) $state > 7 => 'danger',
+                        (int) $state > 3 => 'warning',
+                        default          => 'success',
+                    }),
+                TextColumn::make('remark')->label('Remark')->placeholder('—')->limit(60)->wrap(),
+            ])
+            ->defaultSort('aging_days', 'desc')
+            ->paginated([15, 25, 50])
+            ->striped()
+            ->emptyStateIcon('heroicon-o-exclamation-triangle')
+            ->emptyStateHeading('Tidak ada unit bermasalah')
+            ->emptyStateDescription('Unit dengan gate decision return_to_pdc akan muncul di sini.');
+    }
+
+    private function buildWaitingInspectionTable(Table $table): Table
+    {
+        $depotId = $this->resolveDefaultDepotId();
+        if (! $depotId) return $this->noDepotQuery($table);
+
+        $query = Unit::query()
+            ->select([
+                'units.id',
+                'units.sjkb_no',
+                DB::raw('s.code AS shipment_code'),
+                DB::raw('s.voyage'),
+                DB::raw('st_h.tracked_at AS handover_at'),
+                DB::raw('(CURRENT_DATE - st_h.tracked_at::date)::int AS waiting_days'),
+            ])
+            ->join('shipments as s', 's.id', '=', 'units.shipment_id')
+            ->where('s.assigned_depot_id', $depotId)
+            ->join('shipment_tracks as st_h', fn ($j) =>
+                $j->on('st_h.shipment_id', '=', 's.id')
+                  ->where('st_h.status', 'handover')
+                  ->whereNotNull('st_h.tracked_at')
+            )
+            ->whereNotExists($this->exitNotExistsClosure())
+            ->whereNotExists(fn ($q) => $q
+                ->from('unit_inspections as ui')
+                ->whereColumn('ui.unit_id', 'units.id')
+                ->where('ui.stage', 'handover_depot')
+                ->whereNotNull('ui.submitted_at')
+            );
+
+        return $table
+            ->query($query)
+            ->columns([
+                TextColumn::make('sjkb_no')->label('SJKB')->placeholder('—')->searchable(),
+                TextColumn::make('shipment_code')->label('Shipment')->searchable(),
+                TextColumn::make('voyage')->label('Voyage')->placeholder('—'),
+                TextColumn::make('handover_at')->label('Handover Date')
+                    ->formatStateUsing(fn ($state) => $state ? Carbon::parse($state)->translatedFormat('d M Y') : '—'),
+                TextColumn::make('waiting_days')->label('Waiting Days')
+                    ->formatStateUsing(fn ($state) => $state !== null ? $state . ' hr' : '—')
+                    ->badge()
+                    ->color(fn ($state) => match (true) {
+                        (int) $state > 7 => 'danger',
+                        (int) $state > 3 => 'warning',
+                        (int) $state > 1 => 'warning',
+                        default          => 'success',
+                    }),
+            ])
+            ->defaultSort('waiting_days', 'desc')
+            ->paginated([15, 25, 50])
+            ->striped()
+            ->emptyStateIcon('heroicon-o-clock')
+            ->emptyStateHeading('Semua unit sudah diinspeksi')
+            ->emptyStateDescription('Unit menunggu inspeksi handover depot akan muncul di sini.');
+    }
+
+    private function buildShipmentReadinessTable(Table $table): Table
+    {
+        $depotId = $this->resolveDefaultDepotId();
+        if (! $depotId) {
+            return $table
+                ->query(Shipment::query()->whereRaw('1 = 0'))
+                ->columns([TextColumn::make('id')])
+                ->emptyStateHeading('Depot tidak ditemukan');
+        }
+
+        $handoverExists = "(SELECT 1 FROM shipment_tracks st_h
+            WHERE st_h.shipment_id = shipments.id
+            AND st_h.status = 'handover'
+            AND st_h.tracked_at IS NOT NULL)";
+
+        $exitExists = "(SELECT 1 FROM shipment_tracks st_exit
+            WHERE st_exit.shipment_id = shipments.id
+            AND st_exit.tracked_at IS NOT NULL
+            AND (
+                (shipments.mode IN ('sea', 'sea_freight') AND shipments.vehicle_loading IN ('rack', 'flat_rack') AND st_exit.status = 'delivery_to_port')
+                OR (NOT (shipments.mode IN ('sea', 'sea_freight') AND shipments.vehicle_loading IN ('rack', 'flat_rack')) AND st_exit.status = 'stuffing')
+            ))";
+
+        $inYard = "EXISTS {$handoverExists} AND NOT EXISTS {$exitExists}";
+
+        $query = Shipment::query()
+            ->select([
+                'shipments.id',
+                'shipments.code',
+                'shipments.voyage',
+                DB::raw("(SELECT COUNT(*) FROM units u WHERE u.shipment_id = shipments.id) AS expected_unit"),
+                DB::raw("(SELECT COUNT(*) FROM units u WHERE u.shipment_id = shipments.id AND NOT EXISTS {$exitExists}) AS masuk_yard"),
+                DB::raw("(SELECT COUNT(*) FROM units u WHERE u.shipment_id = shipments.id
+                    AND {$inYard}
+                    AND EXISTS (SELECT 1 FROM unit_inspections ui
+                        WHERE ui.unit_id = u.id AND ui.stage = 'handover_depot'
+                        AND ui.submitted_at IS NOT NULL AND ui.gate_decision IN ('accept', 'allow_with_remark'))
+                ) AS siap_loading"),
+                DB::raw("(SELECT COUNT(*) FROM units u WHERE u.shipment_id = shipments.id
+                    AND {$inYard}
+                    AND EXISTS (SELECT 1 FROM unit_inspections ui
+                        WHERE ui.unit_id = u.id AND ui.stage = 'handover_depot'
+                        AND ui.gate_decision = 'return_to_pdc')
+                ) AS bermasalah"),
+                DB::raw("(SELECT COUNT(*) FROM units u WHERE u.shipment_id = shipments.id
+                    AND {$inYard}
+                    AND NOT EXISTS (SELECT 1 FROM unit_inspections ui
+                        WHERE ui.unit_id = u.id AND ui.stage = 'handover_depot'
+                        AND ui.submitted_at IS NOT NULL)
+                ) AS waiting_inspection"),
+            ])
+            ->where('shipments.assigned_depot_id', $depotId)
+            ->whereExists(fn ($q) => $q
+                ->from('shipment_tracks as st_h')
+                ->whereColumn('st_h.shipment_id', 'shipments.id')
+                ->where('st_h.status', 'handover')
+                ->whereNotNull('st_h.tracked_at')
+            );
+
+        return $table
+            ->query($query)
+            ->columns([
+                TextColumn::make('code')->label('Shipment')->weight('bold')->searchable(),
+                TextColumn::make('voyage')->label('Voyage')->placeholder('—'),
+                TextColumn::make('expected_unit')->label('Expected')->alignCenter()->suffix(' unit'),
+                TextColumn::make('masuk_yard')->label('Masuk Yard')->alignCenter()
+                    ->color(fn ($state, $record) =>
+                        (int) $state >= (int) $record->expected_unit ? 'success' : 'warning'
+                    ),
+                TextColumn::make('siap_loading')->label('Ready Loading')->alignCenter()
+                    ->color(fn ($state) => (int) $state > 0 ? 'success' : 'gray'),
+                TextColumn::make('bermasalah')->label('Bermasalah')->alignCenter()
+                    ->color(fn ($state) => (int) $state > 0 ? 'danger' : 'gray'),
+                TextColumn::make('waiting_inspection')->label('Waiting Insp.')->alignCenter()
+                    ->color(fn ($state) => (int) $state > 0 ? 'warning' : 'gray'),
+                TextColumn::make('readiness_pct')->label('Readiness %')
+                    ->getStateUsing(fn ($record) => (int) $record->expected_unit > 0
+                        ? number_format((int) $record->siap_loading / (int) $record->expected_unit * 100, 1) . '%'
+                        : '—'
+                    )
+                    ->color(fn ($record) => match (true) {
+                        (int) $record->expected_unit === 0                                  => 'gray',
+                        (int) $record->siap_loading >= (int) $record->expected_unit         => 'success',
+                        (int) $record->siap_loading >= (int) ($record->expected_unit * 0.6) => 'warning',
+                        default                                                             => 'danger',
+                    })
+                    ->badge()
+                    ->alignCenter(),
+            ])
+            ->defaultSort('code', 'asc')
+            ->paginated([10, 25, 50])
+            ->striped()
+            ->emptyStateIcon('heroicon-o-chart-bar')
+            ->emptyStateHeading('Tidak ada shipment aktif di yard')
+            ->emptyStateDescription('Shipment akan muncul setelah handover track diinput.');
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Filament\FC\Resources\BriefingSessionResource\RelationManagers;
 
 use App\Enums\AttendanceStatus;
+use App\Models\AttendanceHealthLog;
 use App\Models\BriefingAttendance;
 use App\Models\Manpower;
 use Filament\Forms;
@@ -250,6 +251,8 @@ class AttendancesRelationManager extends RelationManager
             'APD Tidak Lengkap'       => 'amber',
             'Istirahat 30 Menit'      => 'amber',
             'Perlu Pemeriksaan Ulang' => 'amber',
+            'Berobat'                 => 'orange',
+            'Dipulangkan'             => 'rose',
             'Tidak Fit'               => 'rose',
             'Tidak Hadir'             => 'gray',
         ];
@@ -299,9 +302,20 @@ class AttendancesRelationManager extends RelationManager
                         return new HtmlString(
                             '<span class="inline-flex items-center rounded-full px-3 py-1 text-sm font-medium'
                             . ' bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">⏳&nbsp; Belum Dinilai</span>'
-                            . '<span class="ml-2 text-xs text-gray-400 dark:text-gray-500"> — dievaluasi setelah health check</span>'
+                            . '<span class="ml-2 text-xs text-gray-400 dark:text-gray-500"> — dievaluasi otomatis saat simpan</span>'
                         );
                     }),
+
+                Select::make('fit_status')
+                    ->label('Override Evaluasi')
+                    ->placeholder('— Otomatis (dari evaluator) —')
+                    ->options([
+                        'FIT'       => 'FIT',
+                        'TIDAK FIT' => 'Tidak FIT',
+                    ])
+                    ->nullable()
+                    ->visible(fn ($record) => $record !== null)
+                    ->helperText('Pilih untuk mengganti hasil evaluator otomatis. Kosongkan kembali untuk membiarkan sistem mengevaluasi ulang.'),
 
             ]);
     }
@@ -357,7 +371,9 @@ class AttendancesRelationManager extends RelationManager
                     ->color(fn ($state) => match ($state) {
                         'Siap Kerja'              => 'success',
                         'Tidak Fit'               => 'danger',
+                        'Dipulangkan'             => 'danger',
                         'APD Tidak Lengkap'       => 'warning',
+                        'Berobat'                 => 'warning',
                         'Istirahat 30 Menit'      => 'info',
                         'Perlu Pemeriksaan Ulang' => 'warning',
                         'Tidak Hadir'             => 'gray',
@@ -571,6 +587,157 @@ class AttendancesRelationManager extends RelationManager
             ])
             ->actions([
                 Tables\Actions\EditAction::make()->label('Ubah'),
+
+                // ── Tindakan Medis — muncul saat TIDAK FIT & belum ada tindakan ──
+                Tables\Actions\Action::make('tindakanMedis')
+                    ->label('Tindakan Medis')
+                    ->icon('heroicon-o-heart')
+                    ->color('warning')
+                    ->visible(fn (BriefingAttendance $record): bool => (function () use ($record) {
+                        $attVal = $record->attendance_status instanceof AttendanceStatus
+                            ? $record->attendance_status->value
+                            : (string) $record->attendance_status;
+
+                        return $attVal === 'present'
+                            && strtoupper((string) $record->fit_status) === 'TIDAK FIT'
+                            && blank($record->medical_action);
+                    })())
+                    ->modalHeading('Tindakan Medis')
+                    ->modalDescription('Pilih tindakan yang diambil untuk MP ini.')
+                    ->modalWidth('md')
+                    ->form([
+                        Select::make('medical_action')
+                            ->label('Tindakan')
+                            ->options([
+                                'Istirahat 30 menit' => 'Istirahat 30 Menit',
+                                'Berobat'            => 'Berobat (ke faskes)',
+                                'Pulang'             => 'Dipulangkan',
+                            ])
+                            ->required()
+                            ->native(false),
+
+                        Textarea::make('remark')
+                            ->label('Catatan')
+                            ->rows(2)
+                            ->maxLength(500)
+                            ->placeholder('Catatan tambahan (opsional)'),
+                    ])
+                    ->action(function (BriefingAttendance $record, array $data): void {
+                        $update = ['medical_action' => $data['medical_action']];
+
+                        if (! blank($data['remark'] ?? null)) {
+                            $update['remark'] = $data['remark'];
+                        }
+
+                        if ($data['medical_action'] === 'Istirahat 30 menit') {
+                            $update['recheck_required'] = true;
+                            $update['rest_started_at']  = now();
+                        } else {
+                            // Berobat / Pulang — terminal, tidak ada recheck
+                            $update['recheck_required'] = false;
+                        }
+
+                        $record->fill($update)->save();
+
+                        AttendanceHealthLog::create([
+                            'attendance_id'  => $record->id,
+                            'event_type'     => 'medical_action',
+                            'medical_action' => $data['medical_action'],
+                            'remark'         => $data['remark'] ?? null,
+                            'created_by'     => auth()->id(),
+                        ]);
+
+                        Notification::make()
+                            ->title('Tindakan medis dicatat')
+                            ->success()
+                            ->send();
+                    }),
+
+                // ── Hasil Recheck — vitals-based, auto-evaluated ──────────────
+                Tables\Actions\Action::make('hasilRecheck')
+                    ->label('Hasil Recheck')
+                    ->icon('heroicon-o-clipboard-document-check')
+                    ->color('info')
+                    ->visible(fn (BriefingAttendance $record): bool =>
+                        $record->recheck_required === true
+                        && blank($record->recheck_result)
+                    )
+                    ->modalHeading('Pemeriksaan Ulang (Recheck)')
+                    ->modalDescription('Input vital tanda-tanda kesehatan setelah istirahat. Sistem akan mengevaluasi otomatis.')
+                    ->modalWidth('md')
+                    ->form([
+                        TextInput::make('recheck_temperature')
+                            ->label('Suhu Recheck')
+                            ->numeric()
+                            ->minValue(35)
+                            ->maxValue(42)
+                            ->step(0.1)
+                            ->suffix('°C')
+                            ->helperText('Normal: 35.5 – 37.2 °C')
+                            ->required(),
+
+                        TextInput::make('recheck_bp_systolic')
+                            ->label('TD Sistolik Recheck')
+                            ->numeric()
+                            ->minValue(60)
+                            ->maxValue(250)
+                            ->suffix('mmHg')
+                            ->helperText('Normal: 90 – 120 mmHg')
+                            ->required(),
+
+                        TextInput::make('recheck_bp_diastolic')
+                            ->label('TD Diastolik Recheck')
+                            ->numeric()
+                            ->minValue(40)
+                            ->maxValue(150)
+                            ->suffix('mmHg')
+                            ->helperText('Normal: 60 – 80 mmHg')
+                            ->required(),
+
+                        Textarea::make('remark')
+                            ->label('Catatan')
+                            ->rows(2)
+                            ->maxLength(500)
+                            ->placeholder('Catatan hasil recheck (opsional)'),
+                    ])
+                    ->action(function (BriefingAttendance $record, array $data): void {
+                        $temp = (float) $data['recheck_temperature'];
+                        $sys  = (int)   $data['recheck_bp_systolic'];
+                        $dia  = (int)   $data['recheck_bp_diastolic'];
+
+                        $recheckResult = (
+                            $temp >= 35.5 && $temp <= 37.2 &&
+                            $sys  >= 90   && $sys  <= 120  &&
+                            $dia  >= 60   && $dia  <= 80
+                        ) ? 'FIT' : 'TIDAK FIT';
+
+                        $record->fill([
+                            'recheck_temperature'  => $temp,
+                            'recheck_bp_systolic'  => $sys,
+                            'recheck_bp_diastolic' => $dia,
+                            'recheck_result'       => $recheckResult,
+                            'recheck_at'           => now(),
+                            'remark'               => $data['remark'] ?? $record->remark,
+                        ])->save();
+
+                        AttendanceHealthLog::create([
+                            'attendance_id' => $record->id,
+                            'event_type'    => $recheckResult === 'FIT' ? 'recheck_fit' : 'recheck_not_fit',
+                            'temperature'   => $temp,
+                            'bp_systolic'   => $sys,
+                            'bp_diastolic'  => $dia,
+                            'remark'        => $data['remark'] ?? null,
+                            'created_by'    => auth()->id(),
+                        ]);
+
+                        $label = $recheckResult === 'FIT' ? 'FIT — Siap Kerja' : 'TIDAK FIT';
+
+                        Notification::make()
+                            ->title("Recheck selesai: {$label}")
+                            ->color($recheckResult === 'FIT' ? 'success' : 'danger')
+                            ->send();
+                    }),
+
                 Tables\Actions\DeleteAction::make()->label('Hapus'),
             ])
             ->bulkActions([

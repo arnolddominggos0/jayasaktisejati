@@ -319,18 +319,7 @@ class Shipment extends Model
 
     public function sendToFc(): void
     {
-        $dbStatusBefore = DB::table('shipments')->where('id', $this->id)->value('status');
-        logger()->info('[SEND_TO_FC] START', [
-            'shipment_id'      => $this->id,
-            'code'             => $this->code,
-            'memory_status'    => $this->status instanceof \BackedEnum ? $this->status->value : (string) $this->status,
-            'db_status_before' => $dbStatusBefore,
-        ]);
-
         if ($this->status !== ShipmentStatus::Draft) {
-            logger()->info('[SEND_TO_FC] EARLY_RETURN — status is not draft', [
-                'status' => $this->status instanceof \BackedEnum ? $this->status->value : (string) $this->status,
-            ]);
             return;
         }
 
@@ -343,73 +332,51 @@ class Shipment extends Model
                 $this->voyage_id
             );
 
-        logger()->info('[SEND_TO_FC] DEPOT_RESOLVED', [
-            'resolved_depot_id' => $resolvedDepotId,
-        ]);
-
         if (! $resolvedDepotId) {
             $branchName = $this->branch?->name ?? ($user?->branch?->name ?? '-');
-            $modeLabel = $this->mode?->label() ?? (string) $this->mode;
+            $modeLabel  = $this->mode?->label() ?? (string) $this->mode;
             throw new DomainException(
                 "Depot untuk cabang \"{$branchName}\" dengan moda \"{$modeLabel}\" tidak ditemukan. Pastikan depot sudah dikonfigurasi di menu Depo."
             );
         }
 
-        logger()->info('[SEND_TO_FC] PRE_SAVE', [
-            'dirty' => $this->getDirty(),
-        ]);
-
         $this->forceFill([
-            'status' => ShipmentStatus::Pending,
+            'status'            => ShipmentStatus::Pending,
             'assigned_depot_id' => $resolvedDepotId,
         ])->saveQuietly();
 
-        $dbStatusAfterSave = DB::table('shipments')->where('id', $this->id)->value('status');
-        logger()->info('[SEND_TO_FC] STATUS_PENDING_SAVED', [
-            'memory_status'    => $this->status instanceof \BackedEnum ? $this->status->value : (string) $this->status,
-            'db_status_after'  => $dbStatusAfterSave,
-        ]);
-
-        $tracksBefore = $this->tracks()->count();
         $this->ensureTrackSkeleton();
-        $tracksAfter = $this->tracks()->count();
-        $dbStatusAfterSkeleton = DB::table('shipments')->where('id', $this->id)->value('status');
-
-        logger()->info('[SEND_TO_FC] TRACK_SKELETON_DONE', [
-            'tracks_before'         => $tracksBefore,
-            'tracks_after'          => $tracksAfter,
-            'new_tracks_created'    => $tracksAfter - $tracksBefore,
-            'db_status_after_skel'  => $dbStatusAfterSkeleton,
-        ]);
-
-        // SC.3B.20 — one BriefingSession per depot per day; many shipments attached.
-        $session = BriefingSession::firstOrCreate(
-            [
-                'depot_id' => $resolvedDepotId,
-                'date'     => now()->toDateString(),
-            ],
-            [
-                'summary_headcount' => 5,
-                'mp_check_status'   => 'draft',
-            ]
-        );
-
-        logger()->info('[SEND_TO_FC] BRIEFING_SESSION', [
-            'session_id'       => $session->id,
-            'was_created'      => $session->wasRecentlyCreated,
-        ]);
-
-        $session->shipments()->syncWithoutDetaching([$this->id]);
-
-        $dbStatusFinal = DB::table('shipments')->where('id', $this->id)->value('status');
-        logger()->info('[SEND_TO_FC] DONE', [
-            'db_status_final' => $dbStatusFinal,
-        ]);
     }
 
     /**
-     * Auto-create the BriefingSession for this shipment when it is sent to FC.
-     * Idempotent — calling multiple times is safe (firstOrCreate).
+     * Shipments that are ready to be picked up by a coordinator into a Briefing Session.
+     * Criteria: already sent to FC (has assigned_depot_id) and not yet completed/cancelled.
+     */
+    public function scopeReadyForBriefing($query, ?int $depotId = null)
+    {
+        $query->whereNotNull('assigned_depot_id')
+              ->whereNotIn('status', [
+                  ShipmentStatus::Delivered,
+                  ShipmentStatus::Cancelled,
+                  ShipmentStatus::Draft,
+              ]);
+
+        if ($depotId !== null) {
+            $query->where('assigned_depot_id', $depotId);
+        }
+
+        return $query;
+    }
+
+    /**
+     * @deprecated SC.5D.0B — This method belongs to the legacy 1-shipment = 1-briefing-session model
+     * (pre-SC.3B.19). It keys on shipment_id which has a UNIQUE constraint on briefing_sessions.
+     *
+     * The active path is sendToFc(), which uses firstOrCreate(['depot_id','date']) and attaches
+     * shipments via the briefing_session_shipments pivot (BelongsToMany). One session per depot
+     * per day, many shipments per session.
+     *
+     * Do NOT call this method in new code. It is kept for reference only.
      */
     public function ensureBriefingSession(int $depotId): BriefingSession
     {
@@ -560,6 +527,8 @@ class Shipment extends Model
 
         $this->guardInvalidStatusTransition($status);
 
+        $this->ensureHandoverInspectionCleared($status);
+
         $this->ensureTrackSkeleton();
 
         if ($this->requiresMpCheck($status)) {
@@ -668,6 +637,62 @@ class Shipment extends Model
 
             throw new DomainException(
                 'Status hanya dapat dilanjutkan ke tahap berikutnya secara berurutan. Status berikutnya yang diharapkan: ' . $expectedLabel . '.'
+            );
+        }
+    }
+
+    protected function ensureHandoverInspectionCleared(TrackStatus $status): void
+    {
+        $isRack = \App\Services\LoadingSessionAutoCreate::isRackShipment($this);
+
+        $isStuffingGate     = $status === TrackStatus::Stuffing && ! $isRack;
+        $isRackDeliveryGate = $status === TrackStatus::DeliveryToPort && $isRack;
+
+        if (! $isStuffingGate && ! $isRackDeliveryGate) {
+            return;
+        }
+
+        $unitIds = $this->units()->pluck('id');
+
+        if ($unitIds->isEmpty()) {
+            return;
+        }
+
+        // Validation 1: inspection record must exist for every unit
+        $withInspection = \App\Models\UnitInspection::query()
+            ->where('stage', 'handover_depot')
+            ->whereIn('unit_id', $unitIds)
+            ->pluck('unit_id');
+
+        if ($withInspection->count() < $unitIds->count()) {
+            throw new \DomainException(
+                'Inspeksi Handover Depo belum tersedia untuk seluruh unit.'
+            );
+        }
+
+        // Validation 2: all inspections must be submitted
+        $unsubmitted = \App\Models\UnitInspection::query()
+            ->where('stage', 'handover_depot')
+            ->whereIn('unit_id', $unitIds)
+            ->whereNull('submitted_at')
+            ->count();
+
+        if ($unsubmitted > 0) {
+            throw new \DomainException(
+                'Masih ada unit yang belum menyelesaikan inspeksi Handover Depo.'
+            );
+        }
+
+        // Validation 3: no unit may have return_to_pdc decision
+        $rejected = \App\Models\UnitInspection::query()
+            ->where('stage', 'handover_depot')
+            ->whereIn('unit_id', $unitIds)
+            ->where('gate_decision', \App\Models\UnitInspection::GATE_RETURN_TO_PDC)
+            ->count();
+
+        if ($rejected > 0) {
+            throw new \DomainException(
+                'Ada unit yang ditandai Return To PDC. Selesaikan permasalahan unit terlebih dahulu.'
             );
         }
     }

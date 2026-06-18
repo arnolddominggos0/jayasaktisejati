@@ -15,18 +15,13 @@ trait RecalculatesBriefingSession
             return;
         }
 
-        $present = $session->attendances()
-            ->where('attendance_status', 'present')
-            ->count();
-
-        $target = (int) $session->summary_headcount;
-        $session->summary_sufficient = $target > 0 && $present >= $target;
+        $session->summary_sufficient = $session->isOperationallyReady();
         $session->saveQuietly();
 
         if (config('appsheet.logging_enabled', true)) {
             Log::channel('appsheet')->info("Recalculated briefing session #{$sessionId}", [
-                'present' => $present,
-                'target' => $target,
+                'ready' => $session->readyManpowerCount(),
+                'target' => $session->summary_headcount,
                 'sufficient' => $session->summary_sufficient,
             ]);
         }

@@ -29,8 +29,7 @@ class Dashboard extends Page
 
     protected static ?string $navigationIcon  = 'heroicon-m-home';
     protected static ?string $navigationLabel = 'Dashboard';
-    protected static ?string $navigationGroup = 'Operasional Lapangan';
-    protected static ?int    $navigationSort  = 1;
+    protected static ?int    $navigationSort  = 10;
 
     protected static ?string $title = 'Dashboard';
 
@@ -60,10 +59,21 @@ class Dashboard extends Page
         return $branchId ? Branch::find($branchId) : null;
     }
 
+    private ?Depot $_depotContext       = null;
+    private bool   $_depotContextLoaded = false;
+
     public function getDepotContext(): ?Depot
     {
+        if ($this->_depotContextLoaded) {
+            return $this->_depotContext;
+        }
+
+        $this->_depotContextLoaded = true;
+
         $user = Filament::auth()->user();
-        if (! $user) return null;
+        if (! $user) {
+            return $this->_depotContext = null;
+        }
 
         $depotId = app()->bound('scope.depot_id')
             ? app('scope.depot_id')
@@ -73,7 +83,7 @@ class Dashboard extends Page
             $depotId = Depot::where('coordinator_user_id', $user->id)->value('id');
         }
 
-        return $depotId ? Depot::find($depotId) : null;
+        return $this->_depotContext = ($depotId ? Depot::find($depotId) : null);
     }
 
     public function getBranchName(): string  { return $this->getBranchContext()?->name ?? 'Branch tidak diketahui'; }
@@ -134,11 +144,10 @@ class Dashboard extends Page
             return $this->_todaySession = null;
         }
 
-        // SC.3B.19: Prioritize most recent active (non-cleared) shipment briefing.
-        // Falls back to date-based query for legacy / backfill records.
+        // Today's briefing session for this depot — prefers active (non-cleared), falls back to any.
         $this->_todaySession = BriefingSession::query()
             ->where('depot_id', $depotId)
-            ->whereNotNull('shipment_id')
+            ->whereDate('date', Carbon::today())
             ->whereNotIn('mp_check_status', ['cleared', 'approved'])
             ->select('id', 'summary_headcount', 'summary_sufficient', 'unit_masuk_yard', 'mp_check_status')
             ->latest()
@@ -175,10 +184,7 @@ class Dashboard extends Page
             ];
         }
 
-        $fitCount = (int) DB::table('briefing_attendances')
-            ->where('session_id', $session->id)
-            ->where('fit_status', 'FIT')
-            ->count();
+        $fitCount = $session->readyManpowerCount();
 
         return [
             'has_briefing'   => true,
@@ -277,6 +283,129 @@ class Dashboard extends Page
             'mp_need'         => $mpNeed,
             'container_need'  => $containerNeed,
             'container_avail' => $containerAvail,
+        ];
+    }
+
+    // ── Shipment Aktif Hari Ini ───────────────────────────────────────────────
+
+    public function getTodayActiveShipments(): array
+    {
+        $depotId = $this->getDepotContext()?->id;
+        if (! $depotId) return [];
+
+        $exitExists = "(SELECT 1 FROM shipment_tracks st_exit
+            WHERE st_exit.shipment_id = shipments.id
+            AND st_exit.tracked_at IS NOT NULL
+            AND (
+                (shipments.mode IN ('sea', 'sea_freight') AND shipments.vehicle_loading IN ('rack', 'flat_rack') AND st_exit.status = 'delivery_to_port')
+                OR (NOT (shipments.mode IN ('sea', 'sea_freight') AND shipments.vehicle_loading IN ('rack', 'flat_rack')) AND st_exit.status = 'stuffing')
+            ))";
+
+        $inYard = "EXISTS (SELECT 1 FROM shipment_tracks st_h WHERE st_h.shipment_id = shipments.id AND st_h.status = 'handover' AND st_h.tracked_at IS NOT NULL) AND NOT EXISTS {$exitExists}";
+
+        $rows = DB::table('shipments')
+            ->select([
+                'shipments.code',
+                'shipments.voyage',
+                DB::raw("(SELECT COUNT(*) FROM units u WHERE u.shipment_id = shipments.id) AS total_units"),
+                DB::raw("(SELECT COUNT(*) FROM units u WHERE u.shipment_id = shipments.id AND {$inYard}) AS in_yard"),
+                DB::raw("(SELECT COUNT(*) FROM units u WHERE u.shipment_id = shipments.id AND {$inYard}
+                    AND EXISTS (SELECT 1 FROM unit_inspections ui WHERE ui.unit_id = u.id AND ui.stage = 'handover_depot' AND ui.submitted_at IS NOT NULL AND ui.gate_decision IN ('accept', 'allow_with_remark'))
+                ) AS ready"),
+                DB::raw("(SELECT COUNT(*) FROM units u WHERE u.shipment_id = shipments.id AND {$inYard}
+                    AND EXISTS (SELECT 1 FROM unit_inspections ui WHERE ui.unit_id = u.id AND ui.stage = 'handover_depot' AND ui.gate_decision = 'return_to_pdc')
+                ) AS ng"),
+                DB::raw("(SELECT COUNT(*) FROM units u WHERE u.shipment_id = shipments.id AND EXISTS {$exitExists}) AS loaded"),
+            ])
+            ->where('shipments.assigned_depot_id', $depotId)
+            ->whereExists(fn ($q) => $q
+                ->from('shipment_tracks as st_h')
+                ->whereColumn('st_h.shipment_id', 'shipments.id')
+                ->where('st_h.status', 'handover')
+                ->whereNotNull('st_h.tracked_at')
+            )
+            ->orderBy('shipments.code')
+            ->get();
+
+        return $rows->map(function ($s) {
+            $inYard  = (int) $s->in_yard;
+            $ready   = (int) $s->ready;
+            $ng      = (int) $s->ng;
+            $loaded  = (int) $s->loaded;
+            $waiting = max(0, $inYard - $ready - $ng);
+
+            if ($loaded > 0) {
+                $status = 'LOADING';
+                $color  = 'info';
+            } elseif ($ng > 0) {
+                $status = 'NG';
+                $color  = 'danger';
+            } elseif ($inYard > 0 && $ready >= $inYard) {
+                $status = 'READY';
+                $color  = 'success';
+            } else {
+                $status = 'PARTIAL';
+                $color  = 'warning';
+            }
+
+            return [
+                'code'    => $s->code,
+                'voyage'  => $s->voyage,
+                'total'   => (int) $s->total_units,
+                'in_yard' => $inYard,
+                'ready'   => $ready,
+                'ng'      => $ng,
+                'loaded'  => $loaded,
+                'waiting' => $waiting,
+                'status'  => $status,
+                'color'   => $color,
+            ];
+        })->toArray();
+    }
+
+    // ── Unit Butuh Tindakan ───────────────────────────────────────────────────
+
+    public function getUnitsNeedingAction(): array
+    {
+        $depotId = $this->getDepotContext()?->id;
+        if (! $depotId) return ['waiting' => 0, 'bermasalah' => 0, 'total' => 0];
+
+        $result = DB::table('units')
+            ->join('shipments as s', 's.id', '=', 'units.shipment_id')
+            ->where('s.assigned_depot_id', $depotId)
+            ->whereExists(fn ($q) => $q
+                ->from('shipment_tracks as st_h')
+                ->whereColumn('st_h.shipment_id', 's.id')
+                ->where('st_h.status', 'handover')
+                ->whereNotNull('st_h.tracked_at')
+            )
+            ->whereRaw("NOT EXISTS (SELECT 1 FROM shipment_tracks st_exit
+                WHERE st_exit.shipment_id = s.id
+                AND st_exit.tracked_at IS NOT NULL
+                AND (
+                    (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack') AND st_exit.status = 'delivery_to_port')
+                    OR (NOT (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack')) AND st_exit.status = 'stuffing')
+                ))"
+            )
+            ->selectRaw("
+                SUM(CASE WHEN NOT EXISTS (
+                    SELECT 1 FROM unit_inspections ui
+                    WHERE ui.unit_id = units.id AND ui.stage = 'handover_depot' AND ui.submitted_at IS NOT NULL
+                ) THEN 1 ELSE 0 END)::int AS waiting,
+                SUM(CASE WHEN EXISTS (
+                    SELECT 1 FROM unit_inspections ui
+                    WHERE ui.unit_id = units.id AND ui.stage = 'handover_depot' AND ui.gate_decision = 'return_to_pdc'
+                ) THEN 1 ELSE 0 END)::int AS bermasalah
+            ")
+            ->first();
+
+        $waiting    = (int) ($result?->waiting    ?? 0);
+        $bermasalah = (int) ($result?->bermasalah ?? 0);
+
+        return [
+            'waiting'    => $waiting,
+            'bermasalah' => $bermasalah,
+            'total'      => $waiting + $bermasalah,
         ];
     }
 }

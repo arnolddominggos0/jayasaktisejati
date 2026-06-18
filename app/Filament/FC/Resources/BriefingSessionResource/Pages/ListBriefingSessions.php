@@ -27,11 +27,10 @@ class ListBriefingSessions extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            // Manual create — for legacy / override scenarios.
-            // Normal flow: BriefingSession is auto-created by Shipment::sendToFc().
+            // Coordinator creates the daily briefing and selects shipment candidates.
             // Hidden when today's briefing for this depot already exists.
             CreateAction::make()
-                ->label('Buat Briefing Manual')
+                ->label('Buat Briefing Harian')
                 ->icon('heroicon-m-plus-circle')
                 ->visible(fn () => $this->todayBriefingMissing()),
         ];

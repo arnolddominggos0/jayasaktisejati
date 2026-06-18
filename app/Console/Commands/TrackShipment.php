@@ -4,8 +4,6 @@ namespace App\Console\Commands;
 
 use App\Enums\TrackStatus;
 use App\Models\Shipment;
-use App\Models\ShipmentTrack;
-use App\Services\MpCheckGate;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Auth;
@@ -126,14 +124,13 @@ class TrackShipment extends Command
             Auth::login($fc);
         }
 
-        // Check if track already exists
+        // Check if track already exists (informational only — appendTrack() guards duplication)
         $existingTrack = $shipment->tracks()->where('status', $trackStatus->value)->first();
         if ($existingTrack && $existingTrack->tracked_at) {
             $this->warn("Status '{$statusConfig['label']}' already recorded at {$existingTrack->tracked_at->format('d M Y H:i')}");
-            $overwrite = $this->confirm('Do you want to overwrite?');
-            if (! $overwrite) {
-                return 0;
-            }
+            $this->warn('Cannot overwrite an already-recorded status.');
+
+            return 0;
         }
 
         // Get inputs
@@ -141,51 +138,17 @@ class TrackShipment extends Command
         $location = $this->option('location') ?? $statusConfig['default_location'];
         $time = $this->option('time') ? Carbon::parse($this->option('time')) : now();
 
-        // SC.3B.20 — gate only at Pickup, via pivot-based MpCheckGate.
-        if ($trackStatus === TrackStatus::Pickup && ! $this->option('force')) {
-            try {
-                MpCheckGate::ensureApproved($shipment);
-            } catch (\DomainException $e) {
-                $this->error($e->getMessage());
-                $this->error('Use --force to skip MP Check validation.');
+        $override = $this->option('force') ? ['reason' => 'Console --force override'] : null;
 
-                return 1;
-            }
-        }
-
-        // Create or update track
+        // Create or update track — all gates enforced via appendTrack()
         try {
-            if ($existingTrack) {
-                $existingTrack->update([
-                    'tracked_at' => $time,
-                    'note' => $note,
-                    'location' => $location,
-                    'updated_by' => $fc?->id,
-                ]);
-                $track = $existingTrack;
-            } else {
-                // Use manual creation to avoid MP Check in appendTrack
-                $track = ShipmentTrack::create([
-                    'shipment_id' => $shipment->id,
-                    'status' => $trackStatus->value,
-                    'tracked_at' => $time,
-                    'note' => $note,
-                    'location' => $location,
-                    'created_by' => $fc?->id,
-                    'updated_by' => $fc?->id,
-                ]);
-            }
-
-            // Update shipment status
-            $shipment->refresh();
-            $newStatus = $trackStatus->toShipmentStatus();
-            if ($newStatus && $shipment->status !== $newStatus) {
-                $shipment->status = $newStatus;
-                if ($newStatus->value === 'delivered') {
-                    $shipment->delivered_at = $time;
-                }
-                $shipment->saveQuietly();
-            }
+            $track = $shipment->appendTrack(
+                $trackStatus,
+                $note,
+                $location,
+                null,
+                $override,
+            );
 
             // Output success
             $this->info('');

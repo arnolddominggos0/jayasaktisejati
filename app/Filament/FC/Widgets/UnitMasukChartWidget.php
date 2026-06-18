@@ -2,6 +2,7 @@
 
 namespace App\Filament\FC\Widgets;
 
+use App\Models\BriefingSession;
 use Filament\Facades\Filament;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +13,7 @@ use Illuminate\Support\Facades\DB;
  */
 class UnitMasukChartWidget extends ChartWidget
 {
-    protected static ?string $heading    = 'Unit Masuk Yard — Tren Bulanan';
+    protected static ?string $heading    = 'Actual Unit Handover — Tren Bulanan';
     protected static ?string $maxHeight  = '260px';
     protected int|string|array $columnSpan = 'full';
 
@@ -28,12 +29,13 @@ class UnitMasukChartWidget extends ChartWidget
         $depotId  = $this->resolveDepotId();
         $branchId = $this->resolveBranchId();
 
-        // Agregat unit_masuk_yard per bulan — level sesi saja, tanpa JOIN
+        // Dual-source: pre-cutoff uses stored unit_masuk_yard; post-cutoff uses Handover tracks.
+        $effectiveUnit = BriefingSession::effectiveUnitSqlExpression();
         $rows = DB::table('briefing_sessions')
-            ->selectRaw('
+            ->selectRaw("
                 EXTRACT(MONTH FROM date)::int              AS month_num,
-                COALESCE(SUM(unit_masuk_yard), 0)::int     AS total_units
-            ')
+                COALESCE(SUM({$effectiveUnit}), 0)::int    AS total_units
+            ")
             ->whereYear('date', $year)
             ->when($depotId, fn ($q) => $q->where('depot_id', $depotId))
             ->when(! $depotId && $branchId, fn ($q) => $q->whereIn(
@@ -57,7 +59,7 @@ class UnitMasukChartWidget extends ChartWidget
         return [
             'datasets' => [
                 [
-                    'label'           => 'Unit Masuk Yard',
+                    'label'           => 'Actual Unit Handover',
                     'data'            => $data,
                     'backgroundColor' => 'rgba(14, 165, 233, 0.75)',  // sky-500
                     'borderColor'     => 'rgb(2, 132, 199)',            // sky-600

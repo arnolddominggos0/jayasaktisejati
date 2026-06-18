@@ -2,6 +2,7 @@
 
 namespace App\Filament\FC\Widgets;
 
+use App\Models\BriefingSession;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget as Widget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -26,12 +27,13 @@ class OperationalStatsWidget extends Widget
         $branchId = $this->resolveBranchId();
 
         // ── 1. Agregat level sesi — JANGAN JOIN ke attendance ─────────────────
+        $effectiveUnit = BriefingSession::effectiveUnitSqlExpression();
         $sess = DB::table('briefing_sessions')
-            ->selectRaw('
+            ->selectRaw("
                 COUNT(*)::int                                                     AS total_sessions,
-                COALESCE(SUM(unit_masuk_yard), 0)::int                           AS total_units,
+                COALESCE(SUM({$effectiveUnit}), 0)::int                          AS total_units,
                 SUM(CASE WHEN summary_sufficient = true THEN 1 ELSE 0 END)::int  AS ok_sessions
-            ')
+            ")
             ->whereYear('date', $year)
             ->when($depotId, fn ($q) => $q->where('depot_id', $depotId))
             ->when(! $depotId && $branchId, fn ($q) => $q->whereIn(
@@ -72,7 +74,7 @@ class OperationalStatsWidget extends Widget
                 ->descriptionIcon('heroicon-m-clipboard-document-check')
                 ->color('primary'),
 
-            Stat::make('Total Unit Masuk Yard', number_format($totalUnits))
+            Stat::make('Total Actual Unit Handover', number_format($totalUnits))
                 ->description($yearLabel)
                 ->descriptionIcon('heroicon-m-cube')
                 ->color('info'),

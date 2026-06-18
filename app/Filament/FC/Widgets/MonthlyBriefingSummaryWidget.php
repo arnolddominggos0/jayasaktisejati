@@ -2,6 +2,7 @@
 
 namespace App\Filament\FC\Widgets;
 
+use App\Models\BriefingSession;
 use Filament\Facades\Filament;
 use Filament\Widgets\Widget;
 use Illuminate\Support\Carbon;
@@ -36,12 +37,15 @@ class MonthlyBriefingSummaryWidget extends Widget
             }
         };
 
+        // Dual-source: pre-cutoff uses stored unit_masuk_yard; post-cutoff uses Handover tracks.
+        $effectiveUnit = BriefingSession::effectiveUnitSqlExpression();
+
         // Aggregate per bulan
         $rows = DB::table('briefing_sessions')
             ->selectRaw("
                 EXTRACT(MONTH FROM date)::int                                     AS bulan,
                 COUNT(*)::int                                                      AS total_sesi,
-                COALESCE(SUM(unit_masuk_yard), 0)::int                            AS total_unit,
+                COALESCE(SUM({$effectiveUnit}), 0)::int                           AS total_unit,
                 SUM(CASE WHEN summary_sufficient = true  THEN 1 ELSE 0 END)::int  AS sesi_ready,
                 SUM(CASE WHEN summary_sufficient = false THEN 1 ELSE 0 END)::int  AS sesi_ng
             ")

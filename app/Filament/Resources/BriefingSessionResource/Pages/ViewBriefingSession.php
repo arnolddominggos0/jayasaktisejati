@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\BriefingSessionResource\Pages;
 
 use App\Enums\MPCheckStatus;
+use App\Enums\ShipmentStatus;
 use App\Filament\Resources\BriefingSessionResource;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\RepeatableEntry;
@@ -100,17 +101,105 @@ class ViewBriefingSession extends ViewRecord
                         ->label('Kebutuhan Tim SOP')
                         ->icon('heroicon-o-users'),
 
-                    TextEntry::make('unit_masuk_yard')
-                        ->label('Unit Masuk Yard/PDC')
+                    TextEntry::make('actual_unit_handover')
+                        ->label('Actual Unit Handover')
                         ->icon('heroicon-o-cube')
                         ->suffix(' unit')
-                        ->placeholder('—'),
+                        ->getStateUsing(fn ($record) => $record->actual_unit_masuk_yard),
 
                     TextEntry::make('notes')
                         ->label('Catatan / Topik')
                         ->columnSpan(2)
                         ->placeholder('-'),
                 ]),
+
+            // ─────────────────────────────────────────────────────────────────
+            // Section 1B — Ringkasan Beban Kerja
+            // ─────────────────────────────────────────────────────────────────
+            Section::make('Ringkasan Beban Kerja')
+                ->icon('heroicon-o-truck')
+                ->columns(5)
+                ->schema([
+                    TextEntry::make('shipment_count')
+                        ->label('Shipment Terpilih')
+                        ->icon('heroicon-o-document-text')
+                        ->getStateUsing(fn ($record) => $record->shipments->count() . ' SPPB'),
+
+                    TextEntry::make('expected_unit_wl')
+                        ->label('Expected Unit')
+                        ->icon('heroicon-o-cube-transparent')
+                        ->suffix(' unit')
+                        ->getStateUsing(fn ($record) => $record->expected_unit),
+
+                    TextEntry::make('actual_unit_handover_wl')
+                        ->label('Actual Unit Handover')
+                        ->icon('heroicon-o-arrow-down-tray')
+                        ->suffix(' unit')
+                        ->getStateUsing(fn ($record) => $record->actual_unit_masuk_yard),
+
+                    TextEntry::make('unit_gap_wl')
+                        ->label('Gap Unit')
+                        ->icon('heroicon-o-arrows-up-down')
+                        ->suffix(' unit')
+                        ->getStateUsing(fn ($record) => $record->unit_gap)
+                        ->color(fn ($state) => $state > 0 ? 'warning' : 'success')
+                        ->badge(),
+
+                    TextEntry::make('workload_status')
+                        ->label('Status Beban Kerja')
+                        ->badge()
+                        ->weight('bold')
+                        ->getStateUsing(fn ($record) => $record->unit_gap > 0 ? 'belum' : 'siap')
+                        ->formatStateUsing(fn ($state) => $state === 'siap'
+                            ? 'Siap Operasional'
+                            : 'Belum Semua Unit Masuk')
+                        ->color(fn ($state) => $state === 'siap' ? 'success' : 'warning'),
+                ]),
+
+            // ─────────────────────────────────────────────────────────────────
+            // Section 1C — Shipment Terpilih
+            // ─────────────────────────────────────────────────────────────────
+            Section::make('Shipment Terpilih')
+                ->icon('heroicon-o-document-text')
+                ->collapsible()
+                ->schema([
+                    RepeatableEntry::make('shipments')
+                        ->label('')
+                        ->schema([
+                            TextEntry::make('code')
+                                ->label('SPPB / Kode')
+                                ->weight('bold')
+                                ->icon('heroicon-o-document'),
+
+                            TextEntry::make('status')
+                                ->label('Status')
+                                ->badge()
+                                ->formatStateUsing(function ($state): string {
+                                    $enum = $state instanceof ShipmentStatus
+                                        ? $state
+                                        : ShipmentStatus::tryFrom((string) $state);
+                                    return $enum?->label() ?? ucwords(str_replace('_', ' ', (string) $state));
+                                })
+                                ->color(function ($state): string {
+                                    $enum = $state instanceof ShipmentStatus
+                                        ? $state
+                                        : ShipmentStatus::tryFrom((string) $state);
+                                    return $enum?->color() ?? 'gray';
+                                }),
+
+                            TextEntry::make('customer.name')
+                                ->label('Customer')
+                                ->icon('heroicon-o-building-office-2')
+                                ->placeholder('—'),
+
+                            TextEntry::make('units_count')
+                                ->label('Unit')
+                                ->suffix(' unit'),
+                        ])
+                        ->columns(4)
+                        ->placeholder('Belum ada shipment yang di-attach ke sesi ini.'),
+                ])
+                ->visible(fn ($record) => $record->shipments->isNotEmpty()),
 
             // ─────────────────────────────────────────────────────────────────
             // Section 2 — STATUS OPERASIONAL
@@ -122,11 +211,11 @@ class ViewBriefingSession extends ViewRecord
 
                     // ── Row 1 — numbers ──────────────────────────────────────
 
-                    TextEntry::make('unit_masuk_yard')
-                        ->label('Unit Masuk')
+                    TextEntry::make('actual_unit_handover_row')
+                        ->label('Actual Unit Handover')
                         ->icon('heroicon-o-cube')
-                        ->placeholder('—')
-                        ->suffix(fn ($state) => $state !== null ? ' unit' : ''),
+                        ->suffix(' unit')
+                        ->getStateUsing(fn ($record) => $record->actual_unit_masuk_yard),
 
                     TextEntry::make('summary_headcount')
                         ->label('Need Tim SOP')
@@ -330,29 +419,27 @@ class ViewBriefingSession extends ViewRecord
                 ->schema([
                     TextEntry::make('mp_hadir')
                         ->label('Hadir')
-                        ->state(fn ($record) => $record->attendances()
-                            ->where('attendance_status', 'present')
-                            ->count())
+                        ->state(fn ($record) => $record->attendances
+                            ->where('attendance_status', 'present')->count())
                         ->suffix(fn ($record) => ' / ' . (int) $record->summary_headcount)
                         ->color('success')
                         ->icon('heroicon-o-check-circle'),
 
                     TextEntry::make('mp_tidak_hadir')
                         ->label('Tidak Hadir / Sakit')
-                        ->state(fn ($record) => $record->attendances()
-                            ->where('attendance_status', '!=', 'present')
-                            ->count())
-                        ->color(fn ($record) => $record->attendances()
-                            ->where('attendance_status', '!=', 'present')
-                            ->count() > 0 ? 'danger' : 'gray')
+                        ->state(fn ($record) => $record->attendances
+                            ->where('attendance_status', '!=', 'present')->count())
+                        ->color(fn ($record) => $record->attendances
+                            ->where('attendance_status', '!=', 'present')->count() > 0
+                            ? 'danger'
+                            : 'gray')
                         ->icon('heroicon-o-x-circle'),
 
                     TextEntry::make('mp_apd_lengkap')
                         ->label('APD Lengkap')
-                        ->state(fn ($record) => $record->attendances()
+                        ->state(fn ($record) => $record->attendances
                             ->where('attendance_status', 'present')
-                            ->where('has_ppe', true)
-                            ->count())
+                            ->where('has_ppe', true)->count())
                         ->color('success')
                         ->icon('heroicon-o-shield-check'),
 
@@ -511,6 +598,17 @@ class ViewBriefingSession extends ViewRecord
                 ]),
 
         ]);
+    }
+
+    protected function resolveRecord(int|string $key): \Illuminate\Database\Eloquent\Model
+    {
+        $record = parent::resolveRecord($key);
+        $record->load(['attendances', 'stockApdChecks']);
+        $record->setRelation(
+            'shipments',
+            $record->shipments()->with('customer')->withCount('units')->get()
+        );
+        return $record;
     }
 
     // ── Header Actions ────────────────────────────────────────────────────────

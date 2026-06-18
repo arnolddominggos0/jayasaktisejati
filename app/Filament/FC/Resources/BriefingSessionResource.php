@@ -8,6 +8,7 @@ use App\Filament\FC\Resources\BriefingSessionResource\RelationManagers\Attendanc
 use App\Filament\FC\Resources\BriefingSessionResource\RelationManagers\StockApdChecksRelationManager;
 use App\Models\BriefingSession;
 use App\Models\Depot;
+use App\Models\Shipment;
 use Filament\Facades\Filament;
 use Filament\Forms\Get;
 use Filament\Forms\Components\DatePicker;
@@ -75,7 +76,7 @@ class BriefingSessionResource extends Resource
         }
 
         return $query->with(['depot:id,name', 'coordinator:id,name'])
-            ->withCount(['attendances', 'presentAttendances']);
+            ->withCount(['attendances', 'presentAttendances', 'shipments']);
     }
 
     public static function form(Form $form): Form
@@ -124,15 +125,39 @@ class BriefingSessionResource extends Resource
                                 ? $user->scope_unit_id
                                 : Depot::where('coordinator_user_id', $user?->id)->value('id');
                         })
-                        ->live(),
+                        ->live()
+                        ->afterStateUpdated(function ($state, callable $set) {
+                            // Auto-resolve coordinator from depot ownership.
+                            $coordId = $state
+                                ? Depot::where('id', $state)->value('coordinator_user_id')
+                                : null;
+                            $set('coordinator_user_id', $coordId);
+                        }),
 
-                    Select::make('coordinator_user_id')
+                    Placeholder::make('coordinator_display')
                         ->label('PIC (Koordinator)')
-                        ->relationship('coordinator', 'name')
-                        ->searchable()
-                        ->preload()
-                        ->required()
-                        ->default(fn() => Filament::auth()->user()?->id),
+                        ->content(function (Get $get): string {
+                            $depotId = $get('depot_id');
+                            if (! $depotId) {
+                                return '— (pilih depot terlebih dahulu)';
+                            }
+                            $name = Depot::with('coordinator:id,name')
+                                ->where('id', $depotId)
+                                ->first()
+                                ?->coordinator?->name;
+                            return $name ?? '— (belum ada koordinator)';
+                        }),
+
+                    \Filament\Forms\Components\Hidden::make('coordinator_user_id')
+                        ->default(function () {
+                            $user = Filament::auth()->user();
+                            $depotId = $user?->scope_unit_type === 'depot'
+                                ? $user->scope_unit_id
+                                : Depot::where('coordinator_user_id', $user?->id)->value('id');
+                            return $depotId
+                                ? Depot::where('id', $depotId)->value('coordinator_user_id')
+                                : $user?->id;
+                        }),
 
                     TextInput::make('summary_headcount')
                         ->label('Kebutuhan Tim SOP')
@@ -141,17 +166,75 @@ class BriefingSessionResource extends Resource
                         ->default(5)
                         ->helperText('SOP minimum: 1 Koordinator + 4 Operator = 5 MP'),
 
-                    TextInput::make('unit_masuk_yard')
-                        ->label('Unit Masuk Yard/PDC')
-                        ->numeric()
-                        ->minValue(0)
-                        ->suffix('unit')
-                        ->placeholder('—'),
-
                     Textarea::make('notes')
                         ->label('Catatan / Topik Briefing')
                         ->columnSpanFull()
                         ->rows(3),
+                ]),
+
+            Section::make('Shipment Kandidat')
+                ->description('Pilih shipment yang akan dikerjakan pada sesi briefing ini.')
+                ->schema([
+                    Select::make('shipments')
+                        ->label('Shipment')
+                        ->multiple()
+                        ->relationship(
+                            name: 'shipments',
+                            titleAttribute: 'code',
+                            modifyQueryUsing: function (Builder $query, Get $get) {
+                                $depotId = $get('depot_id');
+
+                                // Select only non-JSON columns so PostgreSQL DISTINCT works.
+                                // Filament's multi-select relationship adds DISTINCT internally;
+                                // shipments has JSON columns (attachments, containers, etc.)
+                                // that break DISTINCT on shipments.*.
+                                return $query
+                                    ->select([
+                                        'shipments.id',
+                                        'shipments.code',
+                                        'shipments.customer_id',
+                                        'shipments.status',
+                                        'shipments.assigned_depot_id',
+                                    ])
+                                    ->readyForBriefing($depotId ?: null)
+                                    ->orderBy('shipments.code');
+                            }
+                        )
+                        ->getOptionLabelFromRecordUsing(fn (Shipment $r) =>
+                            $r->code . ' — ' . ($r->customer?->name ?? '-')
+                        )
+                        ->searchable(['code'])
+                        ->preload(false)
+                        ->columnSpanFull(),
+                ]),
+
+            Section::make('Shipment Readiness')
+                ->columns(4)
+                ->visible(fn (?BriefingSession $record) => $record !== null)
+                ->schema([
+                    Placeholder::make('shipment_assigned')
+                        ->label('Shipment Assigned')
+                        ->content(fn (BriefingSession $record): string =>
+                            (string) $record->shipments()->count()
+                        ),
+
+                    Placeholder::make('expected_unit')
+                        ->label('Expected Unit')
+                        ->content(fn (BriefingSession $record): string =>
+                            $record->expected_unit . ' unit'
+                        ),
+
+                    Placeholder::make('actual_unit_masuk_yard')
+                        ->label('Actual Unit Handover')
+                        ->content(fn (BriefingSession $record): string =>
+                            $record->actual_unit_masuk_yard . ' unit'
+                        ),
+
+                    Placeholder::make('unit_gap')
+                        ->label('Gap (Expected − Actual)')
+                        ->content(fn (BriefingSession $record): string =>
+                            $record->unit_gap . ' unit'
+                        ),
                 ]),
 
             Section::make('Status MP Check')
@@ -195,13 +278,38 @@ class BriefingSessionResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                // ── Unit Masuk Yard/PDC ────────────────────────────────────
-                TextColumn::make('unit_masuk_yard')
-                    ->label('Unit Masuk')
-                    ->placeholder('—')
+                // ── Shipment count — from withCount('shipments') in getEloquentQuery ──
+                TextColumn::make('shipments_count')
+                    ->label('Shipment')
                     ->alignCenter()
-                    ->suffix(fn ($state) => $state !== null ? ' unit' : '')
-                    ->sortable(),
+                    ->suffix(' SPPB')
+                    ->sortable(false),
+
+                // ── Expected Unit ─────────────────────────────────────────
+                TextColumn::make('expected_unit_col')
+                    ->label('Expected')
+                    ->alignCenter()
+                    ->suffix(' unit')
+                    ->getStateUsing(fn ($record) => $record->expected_unit)
+                    ->sortable(false),
+
+                // ── Actual Unit Handover — derived post-cutoff, legacy pre-cutoff ──
+                TextColumn::make('actual_unit_handover')
+                    ->label('Actual Handover')
+                    ->alignCenter()
+                    ->suffix(' unit')
+                    ->getStateUsing(fn ($record) => $record->actual_unit_masuk_yard)
+                    ->sortable(false),
+
+                // ── Gap Unit ──────────────────────────────────────────────
+                TextColumn::make('unit_gap_col')
+                    ->label('Gap')
+                    ->alignCenter()
+                    ->getStateUsing(fn ($record) => $record->unit_gap)
+                    ->formatStateUsing(fn ($state) => $state > 0 ? "+{$state}" : (string) $state)
+                    ->color(fn ($state) => $state <= 0 ? 'success' : 'warning')
+                    ->badge()
+                    ->sortable(false),
 
                 // ── Need Tim SOP ───────────────────────────────────────────
                 TextColumn::make('summary_headcount')
@@ -236,24 +344,21 @@ class BriefingSessionResource extends Resource
                     ->alignCenter()
                     ->sortable(false),
 
-                // ── Readiness OK/NG badge ──────────────────────────────────
-                TextColumn::make('readiness_ok')
-                    ->label('Readiness')
+                // ── READY / NOT READY — FIT >= need AND mp_check cleared ──
+                TextColumn::make('mp_readiness_status')
+                    ->label('Kesiapan')
                     ->badge()
-                    ->state(fn ($record) => (int) ($record->summary_headcount ?? 0) > 0
-                        ? ((int) ($record->present_attendances_count ?? 0) >= (int) $record->summary_headcount)
-                        : null
-                    )
-                    ->formatStateUsing(fn ($state) => match (true) {
-                        $state === true  => 'OK',
-                        $state === false => 'NG',
-                        default          => '—',
+                    ->state(function ($record) {
+                        $sufficient = (bool) $record->summary_sufficient;
+                        $val        = $record->mp_check_status instanceof MPCheckStatus
+                            ? $record->mp_check_status->value
+                            : (string) $record->mp_check_status;
+                        $cleared    = $val === 'cleared';
+
+                        return ($sufficient && $cleared) ? 'ready' : 'not_ready';
                     })
-                    ->color(fn ($state) => match (true) {
-                        $state === true  => 'success',
-                        $state === false => 'danger',
-                        default          => 'gray',
-                    })
+                    ->formatStateUsing(fn ($state) => $state === 'ready' ? 'READY' : 'NOT READY')
+                    ->color(fn ($state) => $state === 'ready' ? 'success' : 'danger')
                     ->alignCenter()
                     ->sortable(false),
 

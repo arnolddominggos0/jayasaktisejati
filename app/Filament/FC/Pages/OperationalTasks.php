@@ -35,7 +35,7 @@ class OperationalTasks extends Page implements HasTable
     protected static ?string $navigationGroup = 'Operasional';
     protected static ?string $navigationLabel = 'Tugas Operasional';
     protected static ?string $navigationIcon  = 'heroicon-o-clipboard-document-list';
-    protected static ?int    $navigationSort  = 20;
+    protected static ?int    $navigationSort  = 10;
 
     protected static string $view = 'filament.fc.pages.operational-tasks';
 
@@ -594,13 +594,35 @@ class OperationalTasks extends Page implements HasTable
                             $record->latest_track_status?->value === TrackStatus::Pickup->value
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->form([
+                            \Filament\Forms\Components\TextInput::make('sjkb_no')
+                                ->label('Nomor SJKB')
+                                ->required()
+                                ->maxLength(120),
+                            \Filament\Forms\Components\TextInput::make('yard_slot')
+                                ->label('Yard Slot')
+                                ->placeholder('A-01 / B-03')
+                                ->maxLength(50),
+                            \Filament\Forms\Components\Textarea::make('note')
+                                ->label('Catatan')
+                                ->rows(3),
+                        ])
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             try {
-                                $record->appendTrack(TrackStatus::Handover, $data['note'] ?? null);
+                                // Persist SJKB to every unit on this shipment.
+                                foreach ($record->units as $unit) {
+                                    $unit->update(['sjkb_no' => $data['sjkb_no']]);
+                                }
+
+                                $record->appendTrack(
+                                    TrackStatus::Handover,
+                                    $data['note'] ?? null,
+                                    $data['yard_slot'] ?? null,  // → shipment_tracks.location
+                                );
+
                                 Notification::make()->title('Handover Depo dicatat')->success()->send();
-                            } catch (DomainException $e) {
+                            } catch (\DomainException $e) {
                                 Notification::make()->title($e->getMessage())->danger()->send();
                             }
                         }),

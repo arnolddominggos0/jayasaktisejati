@@ -74,12 +74,12 @@ class BriefingSessionResource extends Resource
                     ->sortable()
                     ->alignCenter(),
 
-                TextColumn::make('unit_masuk_yard')
-                    ->label('Unit Masuk')
-                    ->sortable()
-                    ->suffix(' unit')
+                TextColumn::make('actual_unit_handover')
+                    ->label('Actual Unit Handover')
                     ->alignCenter()
-                    ->placeholder('—'),
+                    ->suffix(' unit')
+                    ->getStateUsing(fn ($record) => $record->actual_unit_masuk_yard)
+                    ->sortable(false),
 
                 TextColumn::make('mp_check_status')
                     ->label('Status MP Check')
@@ -167,7 +167,7 @@ class BriefingSessionResource extends Resource
     {
         $query = static::getModel()::query()
             ->with(['depot:id,name', 'coordinator:id,name'])
-            ->withCount('attendances');
+            ->withCount(['attendances', 'shipments']);
 
         $branchId = app()->bound('currentBranchId') ? app('currentBranchId') : null;
         if ($branchId) {

@@ -2,6 +2,7 @@
 
 namespace App\Filament\FC\Widgets;
 
+use App\Models\BriefingSession;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget as Widget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -40,28 +41,58 @@ class DashboardOperationalWidget extends Widget
             ->select('id', 'unit_masuk_yard', 'summary_headcount', 'summary_sufficient')
             ->first();
 
-        $hasSession  = $session !== null;
-        $sessionId   = $hasSession ? $session->id : null;
-        $unitHariIni = $hasSession ? (int) ($session->unit_masuk_yard   ?? 0) : 0;
-        $needMp      = $hasSession ? (int) ($session->summary_headcount ?? 0) : 0;
+        $hasSession = $session !== null;
+        $sessionId  = $hasSession ? $session->id : null;
+        $needMp     = $hasSession ? (int) ($session->summary_headcount ?? 0) : 0;
 
-        // ── MP Hadir + MP FIT — satu query, dua kolom ────────────────────────
-        $mpHadir = 0;
-        $mpFit   = 0;
+        // Dual-source: pre-cutoff → stored value; post-cutoff → Handover track count.
+        if (! $hasSession) {
+            $unitHariIni = 0;
+        } elseif ($today < BriefingSession::YARD_CUTOFF) {
+            $unitHariIni = (int) ($session->unit_masuk_yard ?? 0);
+        } else {
+            $unitHariIni = (int) DB::table('units as u')
+                ->join('shipments as s', 's.id', '=', 'u.shipment_id')
+                ->join('shipment_tracks as st', function ($j) use ($today) {
+                    $j->on('st.shipment_id', '=', 's.id')
+                      ->where('st.status', 'handover')
+                      ->whereNotNull('st.tracked_at')
+                      ->whereDate('st.tracked_at', $today);
+                })
+                ->where('s.status', '!=', 'draft')
+                ->when($depotId, fn ($q) => $q->where('s.assigned_depot_id', $depotId))
+                ->when(! $depotId && $branchId, fn ($q) => $q->whereIn(
+                    's.assigned_depot_id',
+                    DB::table('depots')->where('branch_id', $branchId)->select('id')
+                ))
+                ->count('u.id');
+        }
+
+        // ── MP Hadir + MP Siap Kerja — satu query, dua kolom ────────────────────────
+        $mpHadir      = 0;
+        $mpSiapKerja  = 0;
         if ($sessionId) {
             $attAgg = DB::table('briefing_attendances')
                 ->where('session_id', $sessionId)
                 ->selectRaw("
                     SUM(CASE WHEN attendance_status = 'present' THEN 1 ELSE 0 END)::int AS hadir,
-                    SUM(CASE WHEN fit_status = 'FIT'            THEN 1 ELSE 0 END)::int AS fit
+                    SUM(CASE
+                        WHEN attendance_status = 'present'
+                         AND has_ppe = true
+                         AND (
+                             recheck_result = 'FIT'
+                             OR (fit_status = 'FIT' AND recheck_result IS NULL)
+                         )
+                        THEN 1 ELSE 0
+                    END)::int AS siap_kerja
                 ")
                 ->first();
-            $mpHadir = (int) ($attAgg->hadir ?? 0);
-            $mpFit   = (int) ($attAgg->fit   ?? 0);
+            $mpHadir     = (int) ($attAgg->hadir      ?? 0);
+            $mpSiapKerja = (int) ($attAgg->siap_kerja ?? 0);
         }
 
-        // ── Readiness: summary_sufficient (= FIT >= summary_headcount) ───────
-        $isReady = $hasSession && (bool) $session->summary_sufficient;
+        // ── Readiness: Siap Kerja >= Need MP ────────────────────────────────
+        $isReady = $hasSession && $needMp > 0 && $mpSiapKerja >= $needMp;
 
         if (! $hasSession) {
             $readinessLabel = 'Belum Ada Briefing';
@@ -70,21 +101,21 @@ class DashboardOperationalWidget extends Widget
         } elseif ($isReady) {
             $readinessLabel = 'SIAP';
             $readinessColor = 'success';
-            $readinessDesc  = 'FIT ≥ Need MP — operasional dapat berjalan';
+            $readinessDesc  = 'Siap Kerja ≥ Need MP — operasional dapat berjalan';
         } else {
             $readinessLabel = 'BELUM SIAP';
             $readinessColor = 'danger';
-            $readinessDesc  = 'FIT < Need MP — belum memenuhi syarat';
+            $readinessDesc  = 'Siap Kerja < Need MP — belum memenuhi syarat';
         }
 
         // ── Warna kartu MP ───────────────────────────────────────────────────
-        $hadirColor = ! $hasSession ? 'gray'
+        $hadirColor      = ! $hasSession ? 'gray'
             : ($mpHadir >= $needMp ? 'success' : ($mpHadir >= (int) ceil($needMp * 0.6) ? 'warning' : 'danger'));
-        $fitColor   = ! $hasSession ? 'gray'
-            : ($mpFit >= $needMp ? 'success' : ($mpFit >= (int) ceil($needMp * 0.6) ? 'warning' : 'danger'));
+        $siapKerjaColor  = ! $hasSession ? 'gray'
+            : ($mpSiapKerja >= $needMp ? 'success' : ($mpSiapKerja >= (int) ceil($needMp * 0.6) ? 'warning' : 'danger'));
 
         return [
-            Stat::make('Unit Masuk Hari Ini', $hasSession ? number_format($unitHariIni) . ' unit' : '—')
+            Stat::make('Actual Unit Handover Hari Ini', $hasSession ? number_format($unitHariIni) . ' unit' : '—')
                 ->description($hasSession ? now()->translatedFormat('d F Y') : 'Belum ada sesi briefing')
                 ->descriptionIcon('heroicon-m-cube')
                 ->color($hasSession ? 'info' : 'gray'),
@@ -99,10 +130,10 @@ class DashboardOperationalWidget extends Widget
                 ->descriptionIcon('heroicon-m-hand-raised')
                 ->color($hadirColor),
 
-            Stat::make('MP FIT', $hasSession ? $mpFit . ' orang' : '—')
-                ->description($hasSession ? 'fit_status = FIT' : 'Belum ada data')
+            Stat::make('MP Siap Kerja', $hasSession ? $mpSiapKerja . ' orang' : '—')
+                ->description($hasSession ? 'Hadir + APD lengkap + FIT / recheck FIT' : 'Belum ada data')
                 ->descriptionIcon('heroicon-m-heart')
-                ->color($fitColor),
+                ->color($siapKerjaColor),
 
             Stat::make('Readiness', $readinessLabel)
                 ->description($readinessDesc)

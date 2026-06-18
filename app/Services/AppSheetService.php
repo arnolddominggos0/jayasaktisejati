@@ -693,14 +693,11 @@ class AppSheetService
             return;
         }
 
-        $fitCount = $session->attendances()
-            ->where('fit_status', 'FIT')
-            ->count();
+        $readyCount = $session->readyManpowerCount();
+        $required   = (int) $session->summary_headcount;
 
-        $required = (int) $session->summary_headcount;
-
-        // Refresh factual headcount flag.
-        $session->summary_sufficient = $fitCount >= $required;
+        // Refresh factual headcount flag using Siap Kerja formula.
+        $session->summary_sufficient = $required > 0 && $readyCount >= $required;
 
         // Recalculate operational status based on live data.
         // pending operational
@@ -708,7 +705,7 @@ class AppSheetService
             $session->mp_check_status = MPCheckStatus::WaitingAction;
 
         // manpower kurang
-        } elseif ($fitCount < $required) {
+        } elseif ($readyCount < $required) {
             $session->mp_check_status = MPCheckStatus::OnCheck;
 
         // siap operasional
@@ -936,18 +933,13 @@ class AppSheetService
             return;
         }
 
-        $fit = $session->attendances()
-            ->where('fit_status', 'FIT')
-            ->count();
-
-        $target = (int) $session->summary_headcount;
-        $session->summary_sufficient = $target > 0 && $fit >= $target;
+        $session->summary_sufficient = $session->isOperationallyReady();
         $session->saveQuietly();
 
         if ($this->loggingEnabled) {
             Log::channel('appsheet')->info("Recalculated briefing session #{$sessionId}", [
-                'fit' => $fit,
-                'target' => $target,
+                'ready' => $session->readyManpowerCount(),
+                'target' => $session->summary_headcount,
                 'sufficient' => $session->summary_sufficient,
             ]);
         }

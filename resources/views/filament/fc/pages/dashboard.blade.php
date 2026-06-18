@@ -278,7 +278,128 @@
             </div>
         </div>
     </div>
+    {{-- ══════════════════════════════════════════════════════════════════════
+         SECTION 4 — Shipment Aktif di Yard
+         Status: LOADING > NG > READY > PARTIAL
+    ══════════════════════════════════════════════════════════════════════ --}}
+    @php $activeShipments = $this->getTodayActiveShipments(); @endphp
+    <div class="mb-6">
+        <div class="mb-2 flex items-center gap-2 px-1">
+            <x-heroicon-o-truck class="h-4 w-4 text-gray-400 dark:text-gray-500" />
+            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                Shipment Aktif di Yard
+            </span>
+        </div>
 
+        <div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+            @if (empty($activeShipments))
+                <div class="p-8 text-center">
+                    <x-heroicon-o-truck class="mx-auto h-10 w-10 text-gray-200 dark:text-gray-700" />
+                    <p class="mt-3 text-sm font-medium text-gray-400 dark:text-gray-500">Belum ada shipment aktif di yard</p>
+                    <p class="mt-1 text-xs text-gray-300 dark:text-gray-600">Shipment akan muncul setelah handover track diinput.</p>
+                </div>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/60">
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Shipment</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Voyage</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Di Yard</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-emerald-500">Ready</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-amber-500">Waiting</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-rose-500">NG</th>
+                                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                            @foreach ($activeShipments as $ship)
+                                <tr class="transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/40">
+                                    <td class="px-4 py-3 font-semibold text-gray-900 dark:text-white">{{ $ship['code'] }}</td>
+                                    <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ $ship['voyage'] ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-center font-medium text-gray-700 dark:text-gray-300">{{ $ship['in_yard'] }}</td>
+                                    <td class="px-4 py-3 text-center font-semibold text-emerald-700 dark:text-emerald-400">{{ $ship['ready'] }}</td>
+                                    <td class="px-4 py-3 text-center font-medium text-amber-600 dark:text-amber-400">{{ $ship['waiting'] }}</td>
+                                    <td class="px-4 py-3 text-center font-semibold {{ $ship['ng'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-300 dark:text-gray-600' }}">
+                                        {{ $ship['ng'] > 0 ? $ship['ng'] : '—' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-center">
+                                        @php
+                                            $statusCls = match ($ship['color']) {
+                                                'success' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
+                                                'danger'  => 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300',
+                                                'warning' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+                                                'info'    => 'bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300',
+                                                default   => 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300',
+                                            };
+                                        @endphp
+                                        <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold {{ $statusCls }}">
+                                            {{ $ship['status'] }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+    </div>
 
+    {{-- ══════════════════════════════════════════════════════════════════════
+         SECTION 5 — Unit Butuh Tindakan
+         Waiting Inspection + Bermasalah (return_to_pdc)
+    ══════════════════════════════════════════════════════════════════════ --}}
+    @php $needAction = $this->getUnitsNeedingAction(); @endphp
+    @if ($needAction['total'] > 0)
+    <div class="mb-6">
+        <div class="mb-2 flex items-center gap-2 px-1">
+            <x-heroicon-o-exclamation-triangle class="h-4 w-4 text-amber-400 dark:text-amber-500" />
+            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                Unit Butuh Tindakan
+            </span>
+            <span class="ml-1 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">
+                {{ $needAction['total'] }} unit
+            </span>
+        </div>
+
+        @php
+            $monitoringBase = \App\Filament\FC\Pages\MpReadinessMonitoring::getUrl();
+        @endphp
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {{-- Waiting Inspection --}}
+            <a href="{{ $monitoringBase }}?tab=waiting_inspection"
+               class="group flex items-center gap-4 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-950/5
+                      transition-shadow hover:shadow-md hover:ring-amber-200
+                      dark:bg-gray-900 dark:ring-white/10 dark:hover:ring-amber-700">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-900/20">
+                    <x-heroicon-o-clock class="h-6 w-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div class="flex-1">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Waiting Inspection</p>
+                    <p class="mt-0.5 text-3xl font-bold text-amber-600 dark:text-amber-400">{{ $needAction['waiting'] }}</p>
+                    <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">Unit dalam yard, belum diinspeksi</p>
+                </div>
+                <x-heroicon-m-arrow-right class="h-4 w-4 text-gray-300 transition-colors group-hover:text-amber-500 dark:text-gray-600" />
+            </a>
+
+            {{-- Bermasalah --}}
+            <a href="{{ $monitoringBase }}?tab=bermasalah"
+               class="group flex items-center gap-4 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-950/5
+                      transition-shadow hover:shadow-md hover:ring-rose-200
+                      dark:bg-gray-900 dark:ring-white/10 dark:hover:ring-rose-700">
+                <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-900/20">
+                    <x-heroicon-o-exclamation-triangle class="h-6 w-6 text-rose-600 dark:text-rose-400" />
+                </div>
+                <div class="flex-1">
+                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Unit Bermasalah</p>
+                    <p class="mt-0.5 text-3xl font-bold text-rose-600 dark:text-rose-400">{{ $needAction['bermasalah'] }}</p>
+                    <p class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">Gate decision: return_to_pdc</p>
+                </div>
+                <x-heroicon-m-arrow-right class="h-4 w-4 text-gray-300 transition-colors group-hover:text-rose-500 dark:text-gray-600" />
+            </a>
+        </div>
+    </div>
+    @endif
 
 </x-filament-panels::page>

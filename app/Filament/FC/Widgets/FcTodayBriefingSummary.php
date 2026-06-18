@@ -36,17 +36,17 @@ class FcTodayBriefingSummary extends Widget
             return $this->emptyState();
         }
 
-        // SC.3B.19: Shipment-based — show the most recent active (non-cleared) briefing
-        // for active shipments at this depot. Falls back to any recent session.
+        // Today's active (non-cleared) briefing for this depot.
+        // Falls back to any recent session so the widget never goes blank.
         $session = BriefingSession::query()
             ->where('depot_id', $depotId)
-            ->whereNotNull('shipment_id')
+            ->whereDate('date', today())
             ->whereIn('mp_check_status', [
                 MPCheckStatus::Draft->value,
                 MPCheckStatus::OnCheck->value,
                 MPCheckStatus::WaitingAction->value,
             ])
-            ->with(['attendances', 'stockApdChecks', 'shipment:id,code'])
+            ->with(['attendances', 'stockApdChecks'])
             ->latest()
             ->first();
 
@@ -68,8 +68,7 @@ class FcTodayBriefingSummary extends Widget
 
         $hadir        = $attendances->where('attendance_status', 'present')->count();
         $tidakHadir   = $attendances->where('attendance_status', '!=', 'present')->count();
-        // MP FIT: fit_status = 'FIT' (present + recheck yang lulus)
-        $fitCount     = $attendances->where('fit_status', 'FIT')->count();
+        $siapKerja    = $session->readyManpowerCount();
         $perluRecheck = $attendances->where('recheck_required', true)->count();
         $tidakFit     = $attendances->where('fit_status', 'UNFIT')->count();
 
@@ -86,8 +85,8 @@ class FcTodayBriefingSummary extends Widget
 
         $target = (int) $session->summary_headcount;
 
-        // Status kesiapan berdasarkan jumlah MP FIT vs kebutuhan
-        $isReady = $fitCount >= $target;
+        // Readiness: Siap Kerja (present + APD + FIT/recheck FIT) >= target
+        $isReady = $session->isOperationallyReady();
 
         return [
             'session'       => $session,
@@ -98,12 +97,11 @@ class FcTodayBriefingSummary extends Widget
             'target'        => $target,
             'hadir'         => $hadir,
             'tidak_hadir'   => $tidakHadir,
-            'fit_count'     => $fitCount,
+            'fit_count'     => $siapKerja,
             'perlu_recheck' => $perluRecheck,
             'tidak_fit'     => $tidakFit,
             'apd_total'     => $apdTotal,
             'apd_kurang'    => $apdKurang,
-            // Status readiness: FIT >= target (bukan mp_check_status cleared)
             'is_ready'      => $isReady,
         ];
     }

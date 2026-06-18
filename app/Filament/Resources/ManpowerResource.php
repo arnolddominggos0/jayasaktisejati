@@ -6,7 +6,6 @@ use App\Enums\MPDomain;
 use App\Filament\Resources\ManpowerResource\Pages;
 use App\Models\Manpower;
 use Filament\Forms;
-use Filament\Forms\Components\CheckboxList;
 use Filament\Resources\Resource;
 use Filament\Tables;
 
@@ -24,35 +23,41 @@ class ManpowerResource extends Resource
     public static function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([
+            Forms\Components\TextInput::make('name')
+                ->label('Nama')
+                ->required()
+                ->columnSpan(2),
+
+            Forms\Components\TextInput::make('phone')
+                ->tel()
+                ->label('Telepon'),
+
+            Forms\Components\Select::make('branch_id')
+                ->relationship('branch', 'name')
+                ->label('Cabang')
+                ->required()
+                ->searchable()
+                ->preload(),
+
+            Forms\Components\Select::make('depot_id')
+                ->relationship('depot', 'name')
+                ->label('Depo')
+                ->required()
+                ->searchable()
+                ->preload(),
+
+            Forms\Components\Toggle::make('active')
+                ->label('Aktif')
+                ->default(true),
+
+            // AppSheet sync key — collapsed for operators, accessible for admins.
             Forms\Components\TextInput::make('appsheet_id')
                 ->label('AppSheet ID')
-                ->helperText('Key kolom dari tabel manpower di AppSheet (UNIQUEID atau integer). Diisi saat import atau sinkronisasi AppSheet.')
+                ->helperText('Key sinkronisasi AppSheet. Jangan ubah kecuali diperlukan.')
                 ->nullable()
                 ->unique(ignoreRecord: true)
                 ->maxLength(64)
                 ->columnSpan(2),
-
-            Forms\Components\TextInput::make('name')->label('Nama')->required(),
-            Forms\Components\Select::make('domain')->label('Domain')
-                ->options(collect(MPDomain::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))->required(),
-            CheckboxList::make('skills')->label('Keahlian')->options([
-                'stuffing'   => 'Stuffing',
-                'unloading'  => 'Unloading',
-                'racking'    => 'Racking',
-                'loading'    => 'Loading',
-                'checker'    => 'Checker',
-            ])->columns(2),
-            Forms\Components\TagsInput::make('certs')->label('Sertifikasi')->suggestions([
-                'SIO Forklift',
-                'AK3 Umum',
-                'K3 Rigger',
-                'Pelatihan APD',
-            ])->splitKeys([',']),
-            Forms\Components\TextInput::make('phone')->tel()->label('Telepon'),
-            Forms\Components\TextInput::make('license_number')->label('No. SIM/Lisensi'),
-            Forms\Components\Select::make('branch_id')->relationship('branch', 'name')->label('Cabang')->required(),
-            Forms\Components\Select::make('depot_id')->relationship('depot', 'name')->label('Depo')->required(),
-            Forms\Components\Toggle::make('active')->label('Aktif')->default(true),
         ])->columns(2);
     }
 

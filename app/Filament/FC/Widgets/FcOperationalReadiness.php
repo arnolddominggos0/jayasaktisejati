@@ -22,10 +22,10 @@ class FcOperationalReadiness extends Widget
         $depotId = $this->getDepotId();
 	$today = Carbon::today();
 
-        // SC.3B.19: Shipment-based — prioritize most recent active (non-cleared) briefing.
+        // Today's active (non-cleared) briefing for this depot.
         // Falls back to any session today so the widget doesn't go blank.
         $session = BriefingSession::with(['attendances.manpower', 'stockApdChecks'])
-            ->whereNotNull('shipment_id')
+            ->whereDate('date', $today)
             ->whereIn('mp_check_status', [
                 MPCheckStatus::Draft->value,
                 MPCheckStatus::OnCheck->value,
