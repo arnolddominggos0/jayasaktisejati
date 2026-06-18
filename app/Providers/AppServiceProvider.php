@@ -17,11 +17,13 @@ use App\Models\LoadingSession;
 use App\Models\Shipment;
 use App\Models\ShipmentTrack;
 use App\Models\ShippingSchedule;
+use App\Models\Unit;
 use App\Observers\CustomerObserver;
 use App\Observers\LoadingSessionObserver;
 use App\Observers\ShipmentObserver;
 use App\Observers\ShipmentTrackObserver;
 use App\Observers\ShippingScheduleObserver;
+use App\Observers\UnitObserver;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\ServiceProvider;
@@ -44,6 +46,7 @@ class AppServiceProvider extends ServiceProvider
         Customer::observe(CustomerObserver::class);
         ShippingSchedule::observe(ShippingScheduleObserver::class);
         LoadingSession::observe(LoadingSessionObserver::class);
+        Unit::observe(UnitObserver::class);
 
         $aliases = [
             'app.filament.pages.dashboard.widgets.kpi-overview' => KpiOverview::class,

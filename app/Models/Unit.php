@@ -17,7 +17,7 @@ class Unit extends Model
         'model_no',
         'reg_no',
         'chassis_no',
-        'sjkb_no',
+        'engine_no',
         'color',
         'do_number',
         'qty',
