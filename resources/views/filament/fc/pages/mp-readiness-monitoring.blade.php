@@ -1,42 +1,63 @@
 <x-filament-panels::page>
 
-    {{-- ── Tab Navigation ─────────────────────────────────────────────────────── --}}
+    {{-- ── Tab Navigation (grouped) ───────────────────────────────────────────── --}}
+    @php
+        $allTabs = $this->getTabs();
+        $icons = [
+            'overview'            => 'heroicon-m-chart-pie',
+            'mp_readiness'        => 'heroicon-m-users',
+            'container_readiness' => 'heroicon-m-archive-box',
+            'shipment_readiness'  => 'heroicon-m-chart-bar',
+            'ready_loading'       => 'heroicon-m-check-circle',
+            'waiting_inspection'  => 'heroicon-m-clock',
+            'bermasalah'          => 'heroicon-m-exclamation-triangle',
+        ];
+        $activeColors = [
+            'overview'            => 'border-primary-500 text-primary-600 dark:text-primary-400',
+            'mp_readiness'        => 'border-blue-500 text-blue-600 dark:text-blue-400',
+            'container_readiness' => 'border-sky-500 text-sky-600 dark:text-sky-400',
+            'shipment_readiness'  => 'border-info-500 text-info-600 dark:text-info-400',
+            'ready_loading'       => 'border-success-500 text-success-600 dark:text-success-400',
+            'waiting_inspection'  => 'border-warning-500 text-warning-600 dark:text-warning-400',
+            'bermasalah'          => 'border-danger-500 text-danger-600 dark:text-danger-400',
+        ];
+        $tabGroups = [
+            'Analitik'        => ['overview', 'mp_readiness', 'container_readiness', 'shipment_readiness'],
+            'Yard Monitoring' => ['ready_loading', 'waiting_inspection', 'bermasalah'],
+        ];
+    @endphp
     <div class="mt-2">
-        <div class="flex flex-wrap gap-1 border-b border-gray-200 dark:border-gray-700">
-            @foreach ($this->getTabs() as $tabKey => $tabLabel)
-                @php
-                    $isActive = $activeTab === $tabKey;
-                    $icons = [
-                        'overview'            => 'heroicon-m-chart-pie',
-                        'mp_readiness'        => 'heroicon-m-users',
-                        'container_readiness' => 'heroicon-m-archive-box',
-                        'ready_loading'       => 'heroicon-m-check-circle',
-                        'waiting_inspection'  => 'heroicon-m-clock',
-                        'bermasalah'          => 'heroicon-m-exclamation-triangle',
-                        'shipment_readiness'  => 'heroicon-m-chart-bar',
-                    ];
-                    $activeColors = [
-                        'overview'            => 'border-primary-500 text-primary-600 dark:text-primary-400',
-                        'mp_readiness'        => 'border-blue-500 text-blue-600 dark:text-blue-400',
-                        'container_readiness' => 'border-sky-500 text-sky-600 dark:text-sky-400',
-                        'ready_loading'       => 'border-success-500 text-success-600 dark:text-success-400',
-                        'waiting_inspection'  => 'border-warning-500 text-warning-600 dark:text-warning-400',
-                        'bermasalah'          => 'border-danger-500 text-danger-600 dark:text-danger-400',
-                        'shipment_readiness'  => 'border-info-500 text-info-600 dark:text-info-400',
-                    ];
-                @endphp
-                <button
-                    wire:click="setTab('{{ $tabKey }}')"
-                    type="button"
-                    @class([
-                        'inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors duration-150 focus:outline-none',
-                        'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200' => ! $isActive,
-                        $activeColors[$tabKey] => $isActive,
-                    ])
-                >
-                    <x-dynamic-component :component="$icons[$tabKey]" class="w-4 h-4" />
-                    {{ $tabLabel }}
-                </button>
+        <div class="flex flex-wrap items-center gap-0.5 border-b border-gray-200 dark:border-gray-700">
+            @foreach ($tabGroups as $groupLabel => $groupTabs)
+                {{-- Group label --}}
+                <span class="px-2 pb-2 pt-2 text-xs font-bold uppercase tracking-widest
+                             {{ $loop->first ? 'text-gray-400 dark:text-gray-500' : 'ml-1 text-gray-400 dark:text-gray-500' }}">
+                    {{ $groupLabel }}
+                </span>
+
+                {{-- Tabs in group --}}
+                @foreach ($groupTabs as $tabKey)
+                    @if (isset($allTabs[$tabKey]))
+                        @php $isActive = $activeTab === $tabKey; @endphp
+                        <button
+                            wire:click="setTab('{{ $tabKey }}')"
+                            type="button"
+                            @class([
+                                'inline-flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors duration-150 focus:outline-none',
+                                'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200' => ! $isActive,
+                                $activeColors[$tabKey] => $isActive,
+                            ])
+                        >
+                            <x-dynamic-component :component="$icons[$tabKey]" class="w-4 h-4" />
+                            {{ $allTabs[$tabKey] }}
+                        </button>
+                    @endif
+                @endforeach
+
+                {{-- Divider between groups --}}
+                @if (! $loop->last)
+                    <span class="mx-1.5 h-5 w-px self-center bg-gray-200 dark:bg-gray-700"></span>
+                @endif
             @endforeach
         </div>
     </div>
@@ -825,25 +846,16 @@
 
         <div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
 
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4 dark:border-gray-700">
-                <div class="flex items-center gap-2">
-                    <x-heroicon-o-archive-box class="h-4 w-4 text-gray-400" />
-                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                        Container Readiness — {{ $month_label }}
-                    </h3>
-                    @if (count($container_rows) > 0)
-                        <span class="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
-                            {{ count($container_rows) }} hari
-                        </span>
-                    @endif
-                </div>
-                <a href="{{ $container_resource_url }}"
-                   class="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-semibold
-                          text-sky-700 transition-colors hover:bg-sky-100
-                          dark:bg-sky-900/20 dark:text-sky-300 dark:hover:bg-sky-900/40">
-                    <x-heroicon-m-plus class="h-3.5 w-3.5" />
-                    Input Container
-                </a>
+            <div class="flex items-center gap-2 border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+                <x-heroicon-o-archive-box class="h-4 w-4 text-gray-400" />
+                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    Container Readiness — {{ $month_label }}
+                </h3>
+                @if (count($container_rows) > 0)
+                    <span class="ml-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                        {{ count($container_rows) }} hari
+                    </span>
+                @endif
             </div>
 
             @if (count($container_rows) === 0)
@@ -851,9 +863,6 @@
                     <x-heroicon-o-archive-box class="mx-auto h-10 w-10 text-gray-200 dark:text-gray-700" />
                     <p class="mt-3 text-sm font-medium text-gray-400 dark:text-gray-500">
                         Belum ada data container readiness untuk periode ini
-                    </p>
-                    <p class="mt-1 text-xs text-gray-400 dark:text-gray-600">
-                        Klik "+ Input Container" untuk menambah data.
                     </p>
                 </div>
             @else
@@ -867,7 +876,6 @@
                                 <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-emerald-500">Available</th>
                                 <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Gap</th>
                                 <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
-                                <th class="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Aksi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
@@ -887,15 +895,6 @@
                                         @else
                                             <span class="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-bold text-rose-800 dark:bg-rose-900/30 dark:text-rose-300">NOT READY</span>
                                         @endif
-                                    </td>
-                                    <td class="px-4 py-3 text-center">
-                                        <a href="{{ $cr['edit_url'] }}"
-                                           class="inline-flex items-center gap-1 rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-semibold
-                                                  text-gray-600 ring-1 ring-gray-200 transition-colors hover:bg-gray-100
-                                                  dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700 dark:hover:bg-gray-700">
-                                            <x-heroicon-m-pencil-square class="h-3.5 w-3.5" />
-                                            Edit
-                                        </a>
                                     </td>
                                 </tr>
                             @endforeach
@@ -929,7 +928,6 @@
                                         @endif
                                     </div>
                                 </td>
-                                <td></td>
                             </tr>
                         </tfoot>
                     </table>

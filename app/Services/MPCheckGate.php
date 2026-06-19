@@ -21,7 +21,7 @@ class MpCheckGate
     public static function ensureApproved(Shipment $shipment): void
     {
         $cleared = $shipment->briefingSessions()
-            ->where('mp_check_status', 'cleared')
+            ->whereIn('mp_check_status', ['cleared', 'approved'])
             ->exists();
 
         if (! $cleared) {

@@ -2,8 +2,6 @@
 
 namespace App\Filament\FC\Pages;
 
-use App\Filament\FC\Resources\BriefingSessionResource;
-use App\Filament\FC\Resources\ContainerReadinessSessionResource;
 use App\Filament\FC\Widgets\OperationalStatsWidget;
 use App\Filament\FC\Widgets\UnitMasukChartWidget;
 use App\Models\BriefingSession;
@@ -11,7 +9,6 @@ use App\Models\ContainerReadinessSession;
 use App\Models\Depot;
 use App\Models\Shipment;
 use App\Models\Unit;
-use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Tables\Columns\TextColumn;
@@ -53,56 +50,9 @@ class MpReadinessMonitoring extends Page implements HasTable
         return Filament::auth()->user()?->hasRole('field_coordinator') ?? false;
     }
 
-    // ── Header actions — semua action operasional harian ada di sini ────────────
-    //    Dashboard hanya monitoring cepat (read only).
-    //    Monitoring Operasional adalah command center: input + analisa.
-
     protected function getHeaderActions(): array
     {
-        $today   = today()->toDateString();
-        $depotId = $this->resolveDefaultDepotId();
-
-        // ── Briefing action ───────────────────────────────────────────────────
-        // Coordinator creates/edits today's briefing and attaches shipment candidates.
-        $existingPendingBriefing = BriefingSession::query()
-            ->whereDate('date', $today)
-            ->whereIn('mp_check_status', ['draft', 'on_check', 'waiting_action'])
-            ->when($depotId, fn ($q) => $q->where('depot_id', $depotId))
-            ->select('id')
-            ->latest()
-            ->first();
-
-        $briefingAction = $existingPendingBriefing
-            ? Action::make('edit_briefing')
-                ->label('Edit Briefing Aktif')
-                ->icon('heroicon-m-pencil-square')
-                ->color('warning')
-                ->url(BriefingSessionResource::getUrl('edit', ['record' => $existingPendingBriefing->id]))
-            : Action::make('create_briefing')
-                ->label('+ Buat Briefing Harian')
-                ->icon('heroicon-m-clipboard-document-check')
-                ->color('primary')
-                ->url(BriefingSessionResource::getUrl('create'));
-
-        // ── Container action ──────────────────────────────────────────────────
-        $existingContainer = ContainerReadinessSession::query()
-            ->whereDate('session_date', $today)
-            ->select('id')
-            ->first();
-
-        $containerAction = $existingContainer
-            ? Action::make('edit_container')
-                ->label('Edit Container Hari Ini')
-                ->icon('heroicon-m-archive-box')
-                ->color('warning')
-                ->url(ContainerReadinessSessionResource::getUrl('edit', ['record' => $existingContainer->id]))
-            : Action::make('input_container')
-                ->label('+ Input Container Hari Ini')
-                ->icon('heroicon-m-archive-box-arrow-down')
-                ->color('info')
-                ->url(ContainerReadinessSessionResource::getUrl('create'));
-
-        return [$briefingAction, $containerAction];
+        return [];
     }
 
     protected function getHeaderWidgets(): array
@@ -397,10 +347,8 @@ class MpReadinessMonitoring extends Page implements HasTable
             'selected_session_id'=> $this->selectedSessionId,
             'detail'             => $this->getSelectedSessionDetail(),
 
-            // ── Container Readiness ───────────────────────────────────────────
             'container_rows'          => $containerRows,
             'operational_readiness'   => $operationalReadiness,
-            'container_resource_url'  => ContainerReadinessSessionResource::getUrl('create'),
         ];
     }
 
@@ -562,7 +510,6 @@ class MpReadinessMonitoring extends Page implements HasTable
                     'is_ready'            => $row->summary_sufficient,
                     'status'              => $row->summary_sufficient ? 'READY' : 'NOT READY',
                     'notes'               => $row->notes,
-                    'edit_url'            => ContainerReadinessSessionResource::getUrl('edit', ['record' => $row->id]),
                 ];
             });
     }

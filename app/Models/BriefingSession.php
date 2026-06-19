@@ -247,6 +247,22 @@ class BriefingSession extends Model
     }
 
     /**
+     * Returns true for statuses that must never be mutated by the evaluator
+     * or UI actions. Approved and Failed are the two terminal states.
+     */
+    public function isTerminal(): bool
+    {
+        return in_array(
+            $this->mp_check_status?->value ?? $this->mp_check_status,
+            [
+                MPCheckStatus::Approved->value,
+                MPCheckStatus::Failed->value,
+            ],
+            true
+        );
+    }
+
+    /**
      * Count MP who are operationally ready (Siap Kerja) using a DB query.
      *
      * Mirrors getFinalMpStatusAttribute() === 'Siap Kerja' without loading models:

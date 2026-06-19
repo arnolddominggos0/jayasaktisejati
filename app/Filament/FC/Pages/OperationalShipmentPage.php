@@ -2,7 +2,7 @@
 
 namespace App\Filament\FC\Pages;
 
-use App\Enums\{ShipmentMode, ServiceType, ContainerSize, DeliveryScope, CargoType};
+use App\Enums\{ShipmentMode, ServiceType, ContainerSize, DeliveryScope, CargoType, TrackStatus};
 use App\Models\Shipment;
 use Filament\Actions\Action;
 use Filament\Infolists\Components\Grid;
@@ -59,6 +59,20 @@ class OperationalShipmentPage extends Page implements HasInfolists
         return parent::makeInfolist()
             ->record($this->record)
             ->columns(2);
+    }
+
+    public function getHandoverWaitingCount(): int
+    {
+        if ($this->record->currentTrackStatus() !== TrackStatus::Handover) {
+            return 0;
+        }
+
+        return $this->record->units()
+            ->whereDoesntHave('inspections', function ($q) {
+                $q->where('stage', 'handover_depot')
+                  ->whereNotNull('submitted_at');
+            })
+            ->count();
     }
 
     protected function getHeaderActions(): array

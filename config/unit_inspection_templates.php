@@ -50,8 +50,24 @@ return [
     ],
 
     // ── Handover Depo ──────────────────────────────────────────────────────────
-    // null = inherit template dari 'pickup' — lihat UnitInspectionGenerator
-    'handover_depot' => null,
+    'handover_depot' => [
+        'DOKUMEN' => [
+            ['name' => 'Verifikasi Nomor Rangka', 'type' => 'information_only'],
+            ['name' => 'Verifikasi SJKB',          'type' => 'information_only'],
+        ],
+        'KONDISI EKSTERIOR' => [
+            ['name' => 'Kondisi Body',  'type' => 'major_damage'],
+            ['name' => 'Kondisi Lampu', 'type' => 'major_damage'],
+            ['name' => 'Kondisi Kaca',  'type' => 'major_damage'],
+            ['name' => 'Kondisi Ban',   'type' => 'major_damage'],
+        ],
+        'KELENGKAPAN' => [
+            ['name' => 'Kelengkapan Unit', 'type' => 'minor_missing'],
+        ],
+        'CATATAN KEDATANGAN' => [
+            ['name' => 'Catatan Kerusakan Saat Tiba', 'type' => 'information_only'],
+        ],
+    ],
 
     // ── Loading / Stuffing ─────────────────────────────────────────────────────
     'loading' => [

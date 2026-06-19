@@ -156,10 +156,11 @@ class StockApdChecksRelationManager extends RelationManager
 
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah APD')
-                    // Hide when all 4 types are already covered.
-                    ->visible(fn () => StockApdCheck::where(
-                        'session_id', $this->getOwnerRecord()->id
-                    )->count() < count(self::PPE_LABELS))
+                    // Hide when session is terminal or all 4 types are already covered.
+                    ->visible(fn () => ! $this->getOwnerRecord()->isTerminal()
+                        && StockApdCheck::where(
+                            'session_id', $this->getOwnerRecord()->id
+                        )->count() < count(self::PPE_LABELS))
                     ->mutateFormDataUsing(function (array $data) {
                         $session = $this->getOwnerRecord();
                         $data['session_id']        = $session->id;
@@ -173,6 +174,7 @@ class StockApdChecksRelationManager extends RelationManager
                     ->label('Generate Semua APD')
                     ->icon('heroicon-o-sparkles')
                     ->color('info')
+                    ->visible(fn () => ! $this->getOwnerRecord()->isTerminal())
                     ->requiresConfirmation()
                     ->modalHeading('Generate Stok APD')
                     ->modalDescription(
@@ -211,12 +213,18 @@ class StockApdChecksRelationManager extends RelationManager
 
             ])
             ->actions([
-                Tables\Actions\EditAction::make()->label('Ubah'),
-                Tables\Actions\DeleteAction::make()->label('Hapus'),
+                Tables\Actions\EditAction::make()
+                    ->label('Ubah')
+                    ->visible(fn () => ! $this->getOwnerRecord()->isTerminal()),
+                Tables\Actions\DeleteAction::make()
+                    ->label('Hapus')
+                    ->visible(fn () => ! $this->getOwnerRecord()->isTerminal()),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()->label('Hapus Terpilih'),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->label('Hapus Terpilih')
+                        ->visible(fn () => ! $this->getOwnerRecord()->isTerminal()),
                 ]),
             ]);
     }

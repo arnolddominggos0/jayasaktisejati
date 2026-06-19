@@ -2,12 +2,17 @@
 
 namespace App\Filament\FC\Pages;
 
+use App\Enums\MPCheckStatus;
 use App\Enums\ShipmentStatus;
 use App\Enums\TrackStatus;
 use App\Filament\FC\Pages\OperationalShipmentPage;
+use App\Filament\FC\Resources\BriefingSessionResource;
+use App\Filament\FC\Resources\ContainerReadinessSessionResource;
 use App\Filament\FC\Resources\ShipmentResource;
+use App\Models\BriefingSession;
 use App\Models\Depot;
 use App\Models\Shipment;
+use Illuminate\Support\Carbon;
 use App\Models\UnitInspection;
 use App\Models\UnitInspectionItem;
 use App\Services\InspectionDraftAutoCreate;
@@ -32,7 +37,7 @@ class OperationalTasks extends Page implements HasTable
 {
     use InteractsWithTable;
 
-    protected static ?string $navigationGroup = 'Operasional';
+    protected static ?string $navigationGroup = 'Operasional Lapangan';
     protected static ?string $navigationLabel = 'Tugas Operasional';
     protected static ?string $navigationIcon  = 'heroicon-o-clipboard-document-list';
     protected static ?int    $navigationSort  = 10;
@@ -66,6 +71,57 @@ class OperationalTasks extends Page implements HasTable
         $depot = $this->depotId();
 
         return $depot ? Depot::whereKey($depot)->value('port_id') : null;
+    }
+
+    // ── Daily Setup (Setup Hari Ini) ──────────────────────────────────────────
+
+    public function getDailySetup(): array
+    {
+        $depotId = $this->depotId();
+
+        // Briefing session hari ini untuk depot ini
+        $briefing = $depotId
+            ? BriefingSession::query()
+                ->where('depot_id', $depotId)
+                ->whereDate('date', Carbon::today())
+                ->select('id', 'mp_check_status', 'summary_sufficient', 'summary_headcount')
+                ->latest()
+                ->first()
+            : null;
+
+        // Container readiness hari ini (global, tidak ada depot scope)
+        $container = DB::table('container_readiness_sessions')
+            ->whereDate('session_date', Carbon::today())
+            ->select('id', 'summary_sufficient', 'container_need', 'container_available')
+            ->first();
+
+        // Resolve MPCheckStatus label
+        $briefingStatusLabel = null;
+        if ($briefing) {
+            $status = $briefing->mp_check_status instanceof MPCheckStatus
+                ? $briefing->mp_check_status
+                : MPCheckStatus::tryFrom((string) $briefing->mp_check_status);
+            $briefingStatusLabel = $status?->label() ?? (string) $briefing->mp_check_status;
+        }
+
+        return [
+            'briefing' => [
+                'exists'       => $briefing !== null,
+                'status_label' => $briefingStatusLabel,
+                'create_url'   => BriefingSessionResource::getUrl('create'),
+                'view_url'     => $briefing
+                    ? BriefingSessionResource::getUrl('view', ['record' => $briefing->id])
+                    : null,
+            ],
+            'container' => [
+                'exists'     => $container !== null,
+                'is_ready'   => $container ? (bool) $container->summary_sufficient : null,
+                'create_url' => ContainerReadinessSessionResource::getUrl('create'),
+                'edit_url'   => $container
+                    ? ContainerReadinessSessionResource::getUrl('edit', ['record' => $container->id])
+                    : null,
+            ],
+        ];
     }
 
     // ── Status partitions ─────────────────────────────────────────────────────
@@ -105,6 +161,8 @@ class OperationalTasks extends Page implements HasTable
         $userId  = auth()->id();
 
         return Shipment::query()
+            ->select('shipments.*')
+            ->addSelect($this->unitStatusSubqueries())
             ->where('mode', 'sea')
             ->whereNotIn('status', ['draft', 'delivered', 'cancelled'])
             ->with($this->eagerLoads())
@@ -197,6 +255,89 @@ class OperationalTasks extends Page implements HasTable
             'units:id,shipment_id',
             'latestTrack',
             'customer:id,name',
+        ];
+    }
+
+    // ── Unit-status subqueries (SC.5D.10A) ────────────────────────────────────
+
+    private function unitStatusSubqueries(): array
+    {
+        $exitGate = "EXISTS (
+            SELECT 1 FROM shipment_tracks st_exit
+            WHERE st_exit.shipment_id = shipments.id
+              AND st_exit.tracked_at IS NOT NULL
+              AND (
+                  (shipments.mode IN ('sea', 'sea_freight')
+                   AND shipments.vehicle_loading IN ('rack', 'flat_rack')
+                   AND st_exit.status = 'delivery_to_port')
+                  OR (NOT (shipments.mode IN ('sea', 'sea_freight')
+                           AND shipments.vehicle_loading IN ('rack', 'flat_rack'))
+                      AND st_exit.status = 'stuffing')
+              )
+        )";
+
+        $waitingSql = "(
+            SELECT COUNT(u.id)
+            FROM units u
+            WHERE u.shipment_id = shipments.id
+              AND EXISTS (
+                  SELECT 1 FROM shipment_tracks st_h
+                  WHERE st_h.shipment_id = shipments.id
+                    AND st_h.status = 'handover'
+                    AND st_h.tracked_at IS NOT NULL
+              )
+              AND NOT EXISTS (
+                  SELECT 1 FROM unit_inspections ui
+                  WHERE ui.unit_id = u.id
+                    AND ui.stage = 'handover_depot'
+                    AND ui.submitted_at IS NOT NULL
+              )
+              AND NOT {$exitGate}
+        )";
+
+        // Uses latest inspection per unit (MAX(id)) to match buildBermasalahTable() semantics.
+        $bermasalahSql = "(
+            SELECT COUNT(u.id)
+            FROM units u
+            WHERE u.shipment_id = shipments.id
+              AND EXISTS (
+                  SELECT 1 FROM unit_inspections ui
+                  WHERE ui.unit_id = u.id
+                    AND ui.stage = 'handover_depot'
+                    AND ui.gate_decision = 'return_to_pdc'
+                    AND ui.id = (
+                        SELECT MAX(ui2.id)
+                        FROM unit_inspections ui2
+                        WHERE ui2.unit_id = u.id
+                          AND ui2.stage = 'handover_depot'
+                    )
+              )
+              AND NOT {$exitGate}
+        )";
+
+        $readinessSql = "(
+            SELECT CASE
+                WHEN COUNT(u.id) = 0 THEN NULL
+                ELSE ROUND(
+                    100.0
+                    * SUM(CASE WHEN EXISTS (
+                        SELECT 1 FROM unit_inspections ui
+                        WHERE ui.unit_id = u.id
+                          AND ui.stage = 'handover_depot'
+                          AND ui.submitted_at IS NOT NULL
+                          AND ui.gate_decision IN ('accept', 'allow_with_remark')
+                    ) THEN 1 ELSE 0 END)
+                    / COUNT(u.id)
+                )
+            END
+            FROM units u
+            WHERE u.shipment_id = shipments.id
+        )::integer";
+
+        return [
+            DB::raw("{$waitingSql} AS waiting_inspection_count"),
+            DB::raw("{$bermasalahSql} AS bermasalah_count"),
+            DB::raw("{$readinessSql} AS readiness_pct"),
         ];
     }
 
@@ -305,6 +446,48 @@ class OperationalTasks extends Page implements HasTable
                             default                                => 'gray',
                         };
                     }),
+
+                TextColumn::make('waiting_inspection_count')
+                    ->label('Menunggu Inspeksi')
+                    ->badge()
+                    ->getStateUsing(fn(Shipment $record): int => (int) ($record->waiting_inspection_count ?? 0))
+                    ->color(fn(Shipment $record): string => match (true) {
+                        ((int) ($record->waiting_inspection_count ?? 0)) === 0 => 'success',
+                        ((int) ($record->waiting_inspection_count ?? 0)) <= 2  => 'warning',
+                        default                                                 => 'danger',
+                    })
+                    ->sortable(query: fn(Builder $query, string $direction): Builder =>
+                        $query->reorder()->orderBy('waiting_inspection_count', $direction)
+                    ),
+
+                TextColumn::make('bermasalah_count')
+                    ->label('Unit Bermasalah')
+                    ->badge()
+                    ->getStateUsing(fn(Shipment $record): int => (int) ($record->bermasalah_count ?? 0))
+                    ->color(fn(Shipment $record): string =>
+                        ((int) ($record->bermasalah_count ?? 0)) === 0 ? 'success' : 'danger'
+                    )
+                    ->sortable(query: fn(Builder $query, string $direction): Builder =>
+                        $query->reorder()->orderBy('bermasalah_count', $direction)
+                    ),
+
+                TextColumn::make('readiness_pct')
+                    ->label('Readiness')
+                    ->badge()
+                    ->getStateUsing(function (Shipment $record): string {
+                        $pct = $record->readiness_pct;
+                        return $pct === null ? '—' : "{$pct}%";
+                    })
+                    ->color(function (Shipment $record): string {
+                        $pct = $record->readiness_pct;
+                        if ($pct === null) return 'gray';
+                        if ($pct >= 100) return 'success';
+                        if ($pct >= 60) return 'warning';
+                        return 'danger';
+                    })
+                    ->sortable(query: fn(Builder $query, string $direction): Builder =>
+                        $query->reorder()->orderBy('readiness_pct', $direction)
+                    ),
 
                 TextColumn::make('voyage_no_display')
                     ->label('Voyage')
@@ -607,10 +790,9 @@ class OperationalTasks extends Page implements HasTable
                                 ->label('Catatan')
                                 ->rows(3),
                         ])
-                        ->action(function (Shipment $record, array $data) {
+                        ->action(function (Shipment $record, array $data, $livewire) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             try {
-                                // Persist SJKB to every unit on this shipment.
                                 foreach ($record->units as $unit) {
                                     $unit->update(['sjkb_no' => $data['sjkb_no']]);
                                 }
@@ -618,10 +800,16 @@ class OperationalTasks extends Page implements HasTable
                                 $record->appendTrack(
                                     TrackStatus::Handover,
                                     $data['note'] ?? null,
-                                    $data['yard_slot'] ?? null,  // → shipment_tracks.location
+                                    $data['yard_slot'] ?? null,
                                 );
 
-                                Notification::make()->title('Handover Depo dicatat')->success()->send();
+                                Notification::make()
+                                    ->title('Handover Depo dicatat')
+                                    ->body('Selesaikan inspeksi unit sebelum proses stuffing.')
+                                    ->success()
+                                    ->send();
+
+                                $livewire->redirect(OperationalShipmentPage::getUrl(['record' => $record->getKey()]));
                             } catch (\DomainException $e) {
                                 Notification::make()->title($e->getMessage())->danger()->send();
                             }
@@ -634,6 +822,8 @@ class OperationalTasks extends Page implements HasTable
                         ->visible(function (Shipment $record) {
                             if (! ShipmentOwnership::canEdit(Filament::auth()->user(), $record)) return false;
                             if ($record->latest_track_status?->value !== TrackStatus::Handover->value) return false;
+                            if (((int) ($record->waiting_inspection_count ?? 0)) > 0) return false;
+                            if (((int) ($record->bermasalah_count ?? 0)) > 0) return false;
                             return ! LoadingSessionAutoCreate::isRackShipment($record);
                         })
                         ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
@@ -654,6 +844,8 @@ class OperationalTasks extends Page implements HasTable
                         ->modalCancelActionLabel('Tutup')
                         ->visible(function (Shipment $record) {
                             if ($record->latest_track_status?->value !== TrackStatus::Handover->value) return false;
+                            if (((int) ($record->waiting_inspection_count ?? 0)) > 0) return false;
+                            if (((int) ($record->bermasalah_count ?? 0)) > 0) return false;
                             return LoadingSessionAutoCreate::isRackShipment($record);
                         })
                         ->action(fn() => null),
@@ -666,7 +858,11 @@ class OperationalTasks extends Page implements HasTable
                             if (! ShipmentOwnership::canEdit(Filament::auth()->user(), $record)) return false;
                             $last = $record->latest_track_status?->value;
                             if ($last === TrackStatus::Stuffing->value) return true;
-                            if ($last === TrackStatus::Handover->value && LoadingSessionAutoCreate::isRackShipment($record)) return true;
+                            if ($last === TrackStatus::Handover->value && LoadingSessionAutoCreate::isRackShipment($record)) {
+                                if (((int) ($record->waiting_inspection_count ?? 0)) > 0) return false;
+                                if (((int) ($record->bermasalah_count ?? 0)) > 0) return false;
+                                return true;
+                            }
                             return false;
                         })
                         ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])

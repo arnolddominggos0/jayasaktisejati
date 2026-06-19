@@ -346,11 +346,12 @@ class ViewBriefingSession extends ViewRecord
                                     ? $state
                                     : MPCheckStatus::tryFrom((string) $state);
                                 return match ($enum?->value) {
-                                    'cleared'             => 'success',
-                                    'on_check'            => 'warning',
-                                    'waiting_action',
-                                    'failed'              => 'danger',
-                                    default               => 'gray',
+                                    'cleared'        => 'success',
+                                    'approved'       => 'info',
+                                    'on_check'       => 'warning',
+                                    'waiting_action' => 'warning',
+                                    'failed'         => 'danger',
+                                    default          => 'gray',
                                 };
                             }),
                     ]),
@@ -666,7 +667,8 @@ class ViewBriefingSession extends ViewRecord
     {
         return [
             EditAction::make()
-                ->label('Ubah'),
+                ->label('Ubah')
+                ->visible(fn () => ! $this->getRecord()->isTerminal()),
         ];
     }
 }

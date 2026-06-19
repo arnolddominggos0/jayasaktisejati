@@ -508,6 +508,7 @@ class AttendancesRelationManager extends RelationManager
                 // ── Tambah MP Reguler ──────────────────────────────────────
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah MP')
+                    ->visible(fn () => ! $this->getOwnerRecord()->isTerminal())
                     ->mutateFormDataUsing(function (array $data) {
                         $data['session_id'] = $this->getOwnerRecord()->id;
                         $data['mp_type']    = 'regular';  // selalu reguler via form ini
@@ -518,6 +519,7 @@ class AttendancesRelationManager extends RelationManager
                 // ── Tambah Backup MP ───────────────────────────────────────
                 Tables\Actions\Action::make('addBackup')
                     ->label('Tambah Backup MP')
+                    ->visible(fn () => ! $this->getOwnerRecord()->isTerminal())
                     ->icon('heroicon-o-user-plus')
                     ->color('warning')
                     ->modalHeading('Tambah Backup MP')
@@ -549,6 +551,7 @@ class AttendancesRelationManager extends RelationManager
                 Tables\Actions\Action::make('generateAll')
                     ->label('Generate Semua MP Depot')
                     ->icon('heroicon-o-sparkles')
+                    ->visible(fn () => ! $this->getOwnerRecord()->isTerminal())
                     ->requiresConfirmation()
                     ->modalDescription('Buat absensi untuk semua MP aktif di depot ini?')
                     ->action(function (): void {
@@ -586,7 +589,9 @@ class AttendancesRelationManager extends RelationManager
 
             ])
             ->actions([
-                Tables\Actions\EditAction::make()->label('Ubah'),
+                Tables\Actions\EditAction::make()
+                    ->label('Ubah')
+                    ->visible(fn () => ! $this->getOwnerRecord()->isTerminal()),
 
                 // ── Tindakan Medis — muncul saat TIDAK FIT & belum ada tindakan ──
                 Tables\Actions\Action::make('tindakanMedis')
@@ -594,6 +599,10 @@ class AttendancesRelationManager extends RelationManager
                     ->icon('heroicon-o-heart')
                     ->color('warning')
                     ->visible(fn (BriefingAttendance $record): bool => (function () use ($record) {
+                        if ($this->getOwnerRecord()->isTerminal()) {
+                            return false;
+                        }
+
                         $attVal = $record->attendance_status instanceof AttendanceStatus
                             ? $record->attendance_status->value
                             : (string) $record->attendance_status;
@@ -659,7 +668,8 @@ class AttendancesRelationManager extends RelationManager
                     ->icon('heroicon-o-clipboard-document-check')
                     ->color('info')
                     ->visible(fn (BriefingAttendance $record): bool =>
-                        $record->recheck_required === true
+                        ! $this->getOwnerRecord()->isTerminal()
+                        && $record->recheck_required === true
                         && blank($record->recheck_result)
                     )
                     ->modalHeading('Pemeriksaan Ulang (Recheck)')
@@ -738,11 +748,15 @@ class AttendancesRelationManager extends RelationManager
                             ->send();
                     }),
 
-                Tables\Actions\DeleteAction::make()->label('Hapus'),
+                Tables\Actions\DeleteAction::make()
+                    ->label('Hapus')
+                    ->visible(fn () => ! $this->getOwnerRecord()->isTerminal()),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()->label('Hapus Terpilih'),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->label('Hapus Terpilih')
+                        ->visible(fn () => ! $this->getOwnerRecord()->isTerminal()),
                 ]),
             ]);
     }

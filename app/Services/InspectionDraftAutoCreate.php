@@ -154,20 +154,21 @@ class InspectionDraftAutoCreate
     /**
      * Builds UnitInspectionItem rows for a new draft inspection.
      *
-     * Template lookup mirrors UnitInspectionGenerator::buildItems():
-     *   - handover_depot → inherits pickup template (config value is null)
-     *   - all items default to result='ok' (inspector marks NG during submission)
+     * Template lookup: uses config('unit_inspection_templates')[$stage].
+     * If the stage has no template entry → logs a warning and skips item generation.
+     * No fallback to other stages.
      */
     private static function createItems(UnitInspection $inspection, string $stage): void
     {
         $templates = config('unit_inspection_templates', []);
+        $template  = $templates[$stage] ?? null;
 
-        $templateKey = ($stage === 'handover_depot') ? 'pickup' : $stage;
-        $template    = $templates[$templateKey] ?? null;
-
-        // handover_depot config value is null — explicit null → fall back to pickup
         if ($template === null) {
-            $template = $templates['pickup'] ?? [];
+            Log::warning("InspectionDraftAutoCreate: no template for stage '{$stage}' — skipping item generation", [
+                'inspection_id' => $inspection->id,
+                'stage'         => $stage,
+            ]);
+            return;
         }
 
         foreach ((array) $template as $category => $items) {

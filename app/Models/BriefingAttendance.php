@@ -295,7 +295,7 @@ class BriefingAttendance extends Model
             // ── Re-evaluate session readiness (summary_sufficient + mp_check_status) ──
             $session = $attendance->session;
 
-            if (! $session) {
+            if (! $session || $session->isTerminal()) {
                 return;
             }
 
@@ -304,7 +304,7 @@ class BriefingAttendance extends Model
 
         static::deleted(function (self $attendance) {
             $session = BriefingSession::find($attendance->session_id);
-            if ($session) {
+            if ($session && ! $session->isTerminal()) {
                 \App\Services\BriefingSessionEvaluator::evaluate($session);
             }
         });

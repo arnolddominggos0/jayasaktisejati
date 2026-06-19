@@ -161,10 +161,15 @@ class BriefingSessionResource extends Resource
 
                     TextInput::make('summary_headcount')
                         ->label('Kebutuhan Tim SOP')
+                        ->required()
                         ->numeric()
-                        ->minValue(0)
+                        ->minValue(1)
                         ->default(5)
-                        ->helperText('SOP minimum: 1 Koordinator + 4 Operator = 5 MP'),
+                        ->helperText('SOP minimum: 1 Koordinator + 4 Operator = 5 MP')
+                        ->validationMessages([
+                            'required' => 'Target manpower wajib diisi.',
+                            'min'      => 'Target manpower minimal 1 orang.',
+                        ]),
 
                     Textarea::make('notes')
                         ->label('Catatan / Topik Briefing')
@@ -178,6 +183,8 @@ class BriefingSessionResource extends Resource
                     Select::make('shipments')
                         ->label('Shipment')
                         ->multiple()
+                        ->required()
+                        ->minItems(1)
                         ->relationship(
                             name: 'shipments',
                             titleAttribute: 'code',
@@ -205,7 +212,11 @@ class BriefingSessionResource extends Resource
                         )
                         ->searchable(['code'])
                         ->preload(false)
-                        ->columnSpanFull(),
+                        ->columnSpanFull()
+                        ->validationMessages([
+                            'required' => 'Minimal 1 shipment harus dipilih.',
+                            'min'      => 'Minimal 1 shipment harus dipilih.',
+                        ]),
                 ]),
 
             Section::make('Shipment Readiness')
@@ -372,11 +383,12 @@ class BriefingSessionResource extends Resource
                     ->color(function ($state): string {
                         $val = $state instanceof MPCheckStatus ? $state->value : (string) $state;
                         return match ($val) {
-                            'cleared'             => 'success',
-                            'on_check'            => 'warning',
-                            'waiting_action',
-                            'failed'              => 'danger',
-                            default               => 'gray',
+                            'cleared'        => 'success',
+                            'approved'       => 'info',
+                            'on_check'       => 'warning',
+                            'waiting_action' => 'warning',
+                            'failed'         => 'danger',
+                            default          => 'gray',
                         };
                     })
                     ->sortable(),
@@ -416,12 +428,24 @@ class BriefingSessionResource extends Resource
                     ->icon('heroicon-o-eye'),
 
                 Tables\Actions\EditAction::make()
-                    ->label('Ubah'),
+                    ->label('Ubah')
+                    ->visible(fn ($record) => ! $record->isTerminal()),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
-                        ->label('Hapus Terpilih'),
+                        ->label('Hapus Terpilih')
+                        ->before(function (Tables\Actions\DeleteBulkAction $action, \Illuminate\Database\Eloquent\Collection $records) {
+                            $terminal = $records->filter(fn ($r) => $r->isTerminal());
+                            if ($terminal->isNotEmpty()) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title("Tidak dapat menghapus {$terminal->count()} sesi Approved/Failed")
+                                    ->body('Sesi terminal tidak dapat dihapus.')
+                                    ->danger()
+                                    ->send();
+                                $action->cancel();
+                            }
+                        }),
                 ]),
             ]);
     }

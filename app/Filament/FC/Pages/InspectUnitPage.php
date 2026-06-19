@@ -220,6 +220,40 @@ class InspectUnitPage extends Page
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('resetForReinspection')
+                ->label('Reset untuk Re-Inspeksi')
+                ->icon('heroicon-m-arrow-path')
+                ->color('warning')
+                ->visible(
+                    fn () => $this->inspection?->gate_decision === UnitInspection::GATE_RETURN_TO_PDC
+                        && auth()->user() !== null
+                        && ShipmentOwnership::canEdit(auth()->user(), $this->record)
+                )
+                ->requiresConfirmation()
+                ->modalHeading('Reset Inspeksi untuk Re-Inspeksi?')
+                ->modalDescription(
+                    'Status inspeksi unit ini akan dikembalikan ke draft. '
+                    . 'Item-item sebelumnya tetap tersimpan dan dapat diubah saat re-inspeksi.'
+                )
+                ->modalSubmitActionLabel('Ya, Reset')
+                ->action(function (): void {
+                    $this->inspection->update([
+                        'submitted_at'  => null,
+                        'gate_decision' => null,
+                        'status'        => UnitInspection::STATUS_PENDING,
+                        'checked_at'    => null,
+                        'checked_by'    => null,
+                    ]);
+
+                    Notification::make()
+                        ->title('Unit dikembalikan ke Waiting Inspection')
+                        ->body('Inspeksi dapat diisi ulang.')
+                        ->success()
+                        ->send();
+
+                    $this->redirect(request()->url());
+                }),
+
             Action::make('back')
                 ->label('Kembali ke Shipment')
                 ->url(OperationalShipmentPage::getUrl(['record' => $this->record->getKey()]))
