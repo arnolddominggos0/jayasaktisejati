@@ -292,15 +292,21 @@ class BriefingAttendance extends Model
                 $attendance->autoEvaluatedValue = null;
             }
 
-            // ── Recalculate session summary_sufficient ───────────────────────
+            // ── Re-evaluate session readiness (summary_sufficient + mp_check_status) ──
             $session = $attendance->session;
 
             if (! $session) {
                 return;
             }
 
-            $session->summary_sufficient = $session->isOperationallyReady();
-            $session->saveQuietly();
+            \App\Services\BriefingSessionEvaluator::evaluate($session);
+        });
+
+        static::deleted(function (self $attendance) {
+            $session = BriefingSession::find($attendance->session_id);
+            if ($session) {
+                \App\Services\BriefingSessionEvaluator::evaluate($session);
+            }
         });
     }
 

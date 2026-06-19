@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\MPCheckStatus;
 use App\Enums\ShipmentStatus;
+use App\Services\BriefingSessionEvaluator;
 use App\Models\AppSheetSyncLog;
 use App\Models\BriefingAttendance;
 use App\Models\BriefingAttendancePpeItem;
@@ -693,27 +694,7 @@ class AppSheetService
             return;
         }
 
-        $readyCount = $session->readyManpowerCount();
-        $required   = (int) $session->summary_headcount;
-
-        // Refresh factual headcount flag using Siap Kerja formula.
-        $session->summary_sufficient = $required > 0 && $readyCount >= $required;
-
-        // Recalculate operational status based on live data.
-        // pending operational
-        if ($session->pending_activity) {
-            $session->mp_check_status = MPCheckStatus::WaitingAction;
-
-        // manpower kurang
-        } elseif ($readyCount < $required) {
-            $session->mp_check_status = MPCheckStatus::OnCheck;
-
-        // siap operasional
-        } else {
-            $session->mp_check_status = MPCheckStatus::Cleared;
-        }
-
-        $session->saveQuietly();
+        BriefingSessionEvaluator::evaluate($session);
     }
 
     protected function validateFcScope(string $tableName, array $mappedData, int $submittedByUserId): void
@@ -933,14 +914,16 @@ class AppSheetService
             return;
         }
 
-        $session->summary_sufficient = $session->isOperationallyReady();
-        $session->saveQuietly();
+        BriefingSessionEvaluator::evaluate($session);
 
         if ($this->loggingEnabled) {
             Log::channel('appsheet')->info("Recalculated briefing session #{$sessionId}", [
-                'ready' => $session->readyManpowerCount(),
-                'target' => $session->summary_headcount,
+                'ready'      => $session->readyManpowerCount(),
+                'target'     => $session->summary_headcount,
                 'sufficient' => $session->summary_sufficient,
+                'status'     => is_object($session->mp_check_status)
+                    ? $session->mp_check_status->value
+                    : $session->mp_check_status,
             ]);
         }
     }

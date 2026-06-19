@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\AttendanceStatus;
 use App\Enums\MPBackupType;
 use App\Enums\MPCheckStatus;
+use App\Services\BriefingSessionEvaluator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -275,10 +276,13 @@ class BriefingSession extends Model
         return $target > 0 && $this->readyManpowerCount() >= $target;
     }
 
+    /**
+     * @deprecated Use BriefingSessionEvaluator::evaluate() instead.
+     * Kept for call-site compatibility; delegates to the evaluator.
+     */
     public function refreshSufficientFlag(): void
     {
-        $this->summary_sufficient = $this->isOperationallyReady();
-        $this->saveQuietly();
+        BriefingSessionEvaluator::evaluate($this);
     }
 
     /*
@@ -290,7 +294,31 @@ class BriefingSession extends Model
     protected static function booted()
     {
         static::saving(function (self $session) {
-            $session->summary_sufficient = $session->isOperationallyReady();
+            // Evaluate inline so the values are set before the INSERT/UPDATE.
+            // saveQuietly() is skipped here because Eloquent is already saving.
+            $ready    = $session->readyManpowerCount();
+            $required = (int) $session->summary_headcount;
+
+            $current = $session->mp_check_status instanceof MPCheckStatus
+                ? $session->mp_check_status
+                : MPCheckStatus::tryFrom((string) $session->mp_check_status);
+
+            // Terminal statuses are not overwritten by formula.
+            if (in_array($current, [MPCheckStatus::Failed, MPCheckStatus::Approved])) {
+                $session->summary_sufficient = $required > 0 && $ready >= $required;
+                return;
+            }
+
+            if ($session->pending_activity) {
+                $session->summary_sufficient = $required > 0 && $ready >= $required;
+                $session->mp_check_status    = MPCheckStatus::WaitingAction;
+            } elseif ($required > 0 && $ready >= $required) {
+                $session->summary_sufficient = true;
+                $session->mp_check_status    = MPCheckStatus::Cleared;
+            } else {
+                $session->summary_sufficient = false;
+                $session->mp_check_status    = MPCheckStatus::OnCheck;
+            }
         });
     }
 }
