@@ -49,11 +49,18 @@ class UnitInspection extends Model
         'submitted_at',
         'checked_at',
         'notes',
+        'signed_by',
+        'signed_at',
+        'signature_path',
+        'pdf_path',
+        'pdf_generated_at',
     ];
 
     protected $casts = [
-        'checked_at'   => 'datetime',
-        'submitted_at' => 'datetime',
+        'checked_at'      => 'datetime',
+        'submitted_at'    => 'datetime',
+        'signed_at'       => 'datetime',
+        'pdf_generated_at' => 'datetime',
     ];
 
     // ── Stage constants ───────────────────────────────────────────────────────

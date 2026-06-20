@@ -529,6 +529,10 @@ class Shipment extends Model
 
         $this->ensureHandoverInspectionCleared($status);
 
+        $this->ensureLoadingInspectionCleared($status);
+
+        $this->ensureLoadingSessionCompleted($status);
+
         $this->ensureTrackSkeleton();
 
         if ($this->requiresMpCheck($status)) {
@@ -693,6 +697,79 @@ class Shipment extends Model
         if ($rejected > 0) {
             throw new \DomainException(
                 'Ada unit yang ditandai Return To PDC. Selesaikan permasalahan unit terlebih dahulu.'
+            );
+        }
+    }
+
+    protected function ensureLoadingInspectionCleared(TrackStatus $status): void
+    {
+        $isRack = \App\Services\LoadingSessionAutoCreate::isRackShipment($this);
+
+        // Gate applies only for non-rack ships advancing to DeliveryToPort.
+        // Rack ships go Handover → DeliveryToPort (no Stuffing, no loading inspection).
+        // Handover inspection gate for rack is already handled by ensureHandoverInspectionCleared().
+        if ($status !== TrackStatus::DeliveryToPort || $isRack) {
+            return;
+        }
+
+        $unitIds = $this->units()->pluck('id');
+
+        if ($unitIds->isEmpty()) {
+            return;
+        }
+
+        // Validation 1: loading inspection record must exist for every unit
+        $withInspection = \App\Models\UnitInspection::query()
+            ->where('stage', 'loading')
+            ->whereIn('unit_id', $unitIds)
+            ->pluck('unit_id');
+
+        if ($withInspection->count() < $unitIds->count()) {
+            throw new \DomainException(
+                'Inspeksi Loading belum tersedia untuk seluruh unit.'
+            );
+        }
+
+        // Validation 2: all loading inspections must be submitted
+        $unsubmitted = \App\Models\UnitInspection::query()
+            ->where('stage', 'loading')
+            ->whereIn('unit_id', $unitIds)
+            ->whereNull('submitted_at')
+            ->count();
+
+        if ($unsubmitted > 0) {
+            throw new \DomainException(
+                'Masih ada unit yang belum menyelesaikan inspeksi Loading.'
+            );
+        }
+
+        // Validation 3: no unit may have return_to_pdc on loading inspection
+        $rejected = \App\Models\UnitInspection::query()
+            ->where('stage', 'loading')
+            ->whereIn('unit_id', $unitIds)
+            ->where('gate_decision', \App\Models\UnitInspection::GATE_RETURN_TO_PDC)
+            ->count();
+
+        if ($rejected > 0) {
+            throw new \DomainException(
+                'Ada unit yang ditandai Return To PDC pada inspeksi Loading. Selesaikan permasalahan unit terlebih dahulu.'
+            );
+        }
+    }
+
+    protected function ensureLoadingSessionCompleted(TrackStatus $status): void
+    {
+        if ($status !== TrackStatus::UnitLoading) {
+            return;
+        }
+
+        if (! \App\Services\LoadingSessionAutoCreate::isRackShipment($this)) {
+            return;
+        }
+
+        if (! \App\Services\LoadingSessionAutoCreate::canTransitionTo($this, $status)) {
+            throw new DomainException(
+                'Loading Session untuk shipment rack belum selesai. Selesaikan semua pemeriksaan loading di AppSheet terlebih dahulu.'
             );
         }
     }

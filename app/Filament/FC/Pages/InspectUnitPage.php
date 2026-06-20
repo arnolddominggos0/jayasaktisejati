@@ -8,10 +8,13 @@ use App\Models\UnitInspection;
 use App\Models\UnitInspectionItem;
 use App\Services\InspectionDraftAutoCreate;
 use App\Services\InspectionGateEvaluator;
+use App\Services\InspectionPdfGenerator;
 use App\Services\ShipmentOwnership;
 use Filament\Actions\Action;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Textarea;
@@ -79,6 +82,8 @@ class InspectUnitPage extends Page
                 'finding_type' => $item->finding_type,
                 'notes'        => $item->notes,
             ])->toArray(),
+            'signed_by'      => $this->inspection->signed_by,
+            'signature_path' => $this->inspection->signature_path,
         ]);
     }
 
@@ -151,6 +156,26 @@ class InspectUnitPage extends Page
                     ->deletable(false)
                     ->reorderable(false)
                     ->columnSpanFull(),
+
+                Section::make('Tanda Tangan Digital')
+                    ->schema([
+                        TextInput::make('signed_by')
+                            ->label('Nama PIC')
+                            ->required(! $this->isReadOnly)
+                            ->disabled($this->isReadOnly)
+                            ->maxLength(255)
+                            ->columnSpanFull(),
+
+                        FileUpload::make('signature_path')
+                            ->label('Tanda Tangan Digital')
+                            ->image()
+                            ->disk('public')
+                            ->directory('inspections/signatures')
+                            ->maxSize(5120)
+                            ->required(! $this->isReadOnly)
+                            ->disabled($this->isReadOnly)
+                            ->columnSpanFull(),
+                    ]),
             ])
             ->statePath('data');
     }
@@ -189,7 +214,24 @@ class InspectUnitPage extends Page
             'checked_by'    => auth()->id(),
             'status'        => $hasNg ? UnitInspection::STATUS_FAILED : UnitInspection::STATUS_PASSED,
             'gate_decision' => $gateDecision,
+            'signed_by'     => $formData['signed_by'],
+            'signed_at'     => now(),
+            'signature_path' => $formData['signature_path'],
         ]);
+
+        // Generate PDF evidence — non-blocking; failure logs but does not abort redirect.
+        try {
+            $pdfPath = app(InspectionPdfGenerator::class)->generate($this->inspection);
+            $this->inspection->updateQuietly([
+                'pdf_path'         => $pdfPath,
+                'pdf_generated_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('InspectionPdfGenerator failed', [
+                'inspection_id' => $this->inspection->id,
+                'error'         => $e->getMessage(),
+            ]);
+        }
 
         Notification::make()
             ->title('Inspeksi berhasil disubmit')
@@ -238,11 +280,14 @@ class InspectUnitPage extends Page
                 ->modalSubmitActionLabel('Ya, Reset')
                 ->action(function (): void {
                     $this->inspection->update([
-                        'submitted_at'  => null,
-                        'gate_decision' => null,
-                        'status'        => UnitInspection::STATUS_PENDING,
-                        'checked_at'    => null,
-                        'checked_by'    => null,
+                        'submitted_at'   => null,
+                        'gate_decision'  => null,
+                        'status'         => UnitInspection::STATUS_PENDING,
+                        'checked_at'     => null,
+                        'checked_by'     => null,
+                        'signed_by'      => null,
+                        'signed_at'      => null,
+                        'signature_path' => null,
                     ]);
 
                     Notification::make()

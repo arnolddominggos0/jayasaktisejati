@@ -13,9 +13,24 @@
         $activeStage = InspectionDraftAutoCreate::resolveStage($trackStatus);
     }
 
-    $stageLabel = $activeStage ? (UnitInspection::STAGE_LABELS[$activeStage] ?? $activeStage) : null;
-    $canEdit    = ShipmentOwnership::canEdit(auth()->user(), $shipment);
+    $stageLabel  = $activeStage ? (UnitInspection::STAGE_LABELS[$activeStage] ?? $activeStage) : null;
+    $canEdit     = ShipmentOwnership::canEdit(auth()->user(), $shipment);
     $totalStages = count(UnitInspection::STAGES);
+
+    // ── Deliverable 4: stage-level summary (in-memory, no extra query) ────────
+    $stageSummary = null;
+    if ($activeStage) {
+        $activeInspections = $units->flatMap(
+            fn($u) => $u->inspections->filter(fn($i) => $i->stage === $activeStage)
+        );
+        $stageSummary = [
+            'total'     => $units->count(),
+            'completed' => $activeInspections->filter(fn($i) => $i->submitted_at !== null)->count(),
+            'signed'    => $activeInspections->filter(fn($i) => $i->submitted_at !== null && $i->signature_path !== null)->count(),
+            'pending'   => $activeInspections->filter(fn($i) => $i->submitted_at === null)->count(),
+            'legacy'    => $activeInspections->filter(fn($i) => $i->submitted_at !== null && ! $i->signature_path)->count(),
+        ];
+    }
 @endphp
 
 <div class="space-y-2">
@@ -23,6 +38,48 @@
         <p class="text-sm text-blue-600 dark:text-blue-400 font-medium">
             Tahap Aktif: {{ $stageLabel }}
         </p>
+    @endif
+
+    {{-- ── Deliverable 4: Inspection Summary Widget ────────────────────────── --}}
+    @if ($stageSummary)
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {{-- Total --}}
+            <div class="rounded-lg bg-white px-4 py-3 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Total Unit</p>
+                <p class="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{{ $stageSummary['total'] }}</p>
+            </div>
+            {{-- Completed --}}
+            <div class="rounded-lg bg-white px-4 py-3 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-emerald-500 dark:text-emerald-400">Selesai</p>
+                <p class="mt-1 text-2xl font-bold {{ $stageSummary['completed'] > 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500' }}">
+                    {{ $stageSummary['completed'] }}
+                </p>
+            </div>
+            {{-- Signed --}}
+            <div class="rounded-lg bg-white px-4 py-3 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-sky-500 dark:text-sky-400">Ditandatangani</p>
+                <p class="mt-1 text-2xl font-bold {{ $stageSummary['signed'] > 0 ? 'text-sky-700 dark:text-sky-400' : 'text-gray-400 dark:text-gray-500' }}">
+                    {{ $stageSummary['signed'] }}
+                </p>
+            </div>
+            {{-- Pending --}}
+            <div class="rounded-lg bg-white px-4 py-3 shadow-sm ring-1 {{ $stageSummary['pending'] > 0 ? 'ring-amber-200 dark:ring-amber-900/40' : 'ring-gray-950/5' }} dark:bg-gray-900 dark:ring-white/10">
+                <p class="text-[10px] font-semibold uppercase tracking-wider {{ $stageSummary['pending'] > 0 ? 'text-amber-500 dark:text-amber-400' : 'text-gray-400 dark:text-gray-500' }}">Pending</p>
+                <p class="mt-1 text-2xl font-bold {{ $stageSummary['pending'] > 0 ? 'text-amber-700 dark:text-amber-400' : 'text-gray-400 dark:text-gray-500' }}">
+                    {{ $stageSummary['pending'] }}
+                </p>
+            </div>
+        </div>
+
+        {{-- ── Deliverable 3: Legacy signature warning ─────────────────────── --}}
+        @if ($stageSummary['legacy'] > 0)
+            <div class="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-900/20">
+                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400" />
+                <p class="text-xs text-amber-700 dark:text-amber-300">
+                    {{ $stageSummary['legacy'] }} inspeksi lama tanpa signature ditemukan.
+                </p>
+            </div>
+        @endif
     @endif
 
     <div class="divide-y divide-gray-200 dark:divide-gray-700 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -182,6 +239,47 @@
                         <span class="text-[10px] text-gray-400 dark:text-gray-500">
                             {{ $latestSubmitted->submitted_at->format('d M Y') }}
                         </span>
+                    </div>
+                @endif
+
+                {{-- Deliverable 2: Active stage evidence (PIC + timestamp + status badge + PDF link) --}}
+                @if ($isDone && $inspection)
+                    <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                        {{-- Status badge --}}
+                        <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold
+                            {{ $inspection->status === UnitInspection::STATUS_PASSED
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' }}">
+                            {{ strtoupper($inspection->status) }}
+                        </span>
+                        {{-- PIC name --}}
+                        @if ($inspection->signed_by)
+                            <span class="flex items-center gap-1">
+                                <x-heroicon-o-user-circle class="h-3 w-3 shrink-0" />
+                                {{ $inspection->signed_by }}
+                            </span>
+                        @else
+                            <span class="italic text-amber-500 dark:text-amber-400">Tanpa tanda tangan</span>
+                        @endif
+                        {{-- Submission timestamp --}}
+                        @if ($inspection->submitted_at)
+                            <span class="flex items-center gap-1">
+                                <x-heroicon-o-clock class="h-3 w-3 shrink-0" />
+                                {{ $inspection->submitted_at->format('d M Y H:i') }}
+                            </span>
+                        @endif
+                        {{-- PDF download link --}}
+                        @if ($inspection->pdf_path)
+                            <a href="{{ asset('storage/' . $inspection->pdf_path) }}"
+                               target="_blank"
+                               class="ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold
+                                      bg-primary-50 text-primary-700 hover:bg-primary-100
+                                      dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/40
+                                      transition-colors">
+                                <x-heroicon-m-arrow-down-tray class="h-3 w-3 shrink-0" />
+                                Download PDF
+                            </a>
+                        @endif
                     </div>
                 @endif
 

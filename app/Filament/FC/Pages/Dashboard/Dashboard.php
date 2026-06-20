@@ -3,20 +3,16 @@
 namespace App\Filament\FC\Pages\Dashboard;
 
 use App\Enums\MPCheckStatus;
-use App\Enums\ShipmentStatus;
 use App\Filament\FC\Pages\MpReadinessMonitoring;
 use App\Filament\FC\Resources\BriefingSessionResource;
 use App\Models\Branch;
 use App\Models\BriefingSession;
 use App\Models\Depot;
-use App\Models\Shipment;
 use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Dashboard FC — monitoring cepat harian.
@@ -92,38 +88,6 @@ class Dashboard extends Page
     public function getDepotName(): string   { return $this->getDepotContext()?->name  ?? 'Depot tidak diketahui'; }
     public function hasBranchContext(): bool { return $this->getBranchContext() !== null; }
     public function hasDepotContext(): bool  { return $this->getDepotContext()  !== null; }
-
-    // ── Shipment urgency badge ────────────────────────────────────────────────
-
-    public function getUrgencyCount(): int
-    {
-        $user = Filament::auth()->user();
-        if (! $user) return 0;
-
-        $depotId = app()->bound('scope.depot_id') ? (int) app('scope.depot_id') : null;
-        $userId  = (int) $user->id;
-
-        $query = Shipment::query()
-            ->where('mode', 'sea')
-            ->whereNotIn('status', [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value]);
-
-        if ($depotId) {
-            $query->where(function ($w) use ($depotId, $userId) {
-                $w->where('assigned_depot_id', $depotId)
-                  ->orWhere('coordinator_id', $userId);
-            });
-        } else {
-            $query->where('coordinator_id', $userId);
-        }
-
-        return $query
-            ->where(fn (Builder $q) => $q
-                ->where('priority', 'urgent')
-                ->orWhere('status', ShipmentStatus::Hold->value)
-                ->orWhere(fn (Builder $q2) => $q2->whereNotNull('eta')->where('eta', '<=', now()->addDay()))
-            )
-            ->count();
-    }
 
     // ── Briefing hari ini ─────────────────────────────────────────────────────
 
@@ -206,115 +170,200 @@ class Dashboard extends Page
         ];
     }
 
+    // ── Kesiapan Operasional Hari Ini ────────────────────────────────────────
+
     /**
-     * Readiness badge di context header — MP only (summary_sufficient).
+     * Dua komponen kesiapan harian:
+     *   mp_fit / mp_need       — dari BriefingSession hari ini
+     *   container_available    — dari ContainerReadinessSession hari ini
+     *
+     * Unit Aktif di Yard dipindah ke section tersendiri (getActiveYardUnits).
      */
-    public function getOperationalReadinessBadge(): array
+    public function getKesiapanOperasional(): array
     {
         $session = $this->getTodayBriefingSession();
 
-        if (! $session) {
-            return [
-                'label' => 'Belum Ada Sesi Briefing',
-                'color' => 'gray',
-                'icon'  => 'heroicon-m-clock',
-            ];
-        }
-
-        $isReady = (bool) $session->summary_sufficient;
-
-        return [
-            'label' => $isReady ? 'Operasional: SIAP' : 'Operasional: BELUM SIAP',
-            'color' => $isReady ? 'success' : 'danger',
-            'icon'  => $isReady ? 'heroicon-m-check-circle' : 'heroicon-m-exclamation-triangle',
-        ];
-    }
-
-    /**
-     * Operational Readiness Hari Ini — gabungan MP + Container.
-     *
-     * Rule: READY hanya jika MP READY AND Container READY.
-     * null = belum ada data untuk komponen tersebut.
-     *
-     * Return keys:
-     *   mp_ready        bool|null
-     *   container_ready bool|null
-     *   overall         bool|null
-     *   has_mp          bool
-     *   has_container   bool
-     */
-    public function getTodayOperationalReadiness(): array
-    {
-        $session    = $this->getTodayBriefingSession();
-        $mpReady    = $session !== null ? (bool) $session->summary_sufficient : null;
+        $mpFit  = $session ? $session->readyManpowerCount() : null;
+        $mpNeed = $session ? (int) ($session->summary_headcount ?? 0) : null;
 
         $cRow = DB::table('container_readiness_sessions')
             ->whereDate('session_date', Carbon::today())
-            ->select('summary_sufficient')
+            ->select('container_available', 'summary_sufficient')
             ->first();
 
-        $containerReady = $cRow !== null ? (bool) $cRow->summary_sufficient : null;
-
-        if ($mpReady === null && $containerReady === null) {
-            $overall = null;
-        } elseif ($mpReady === false || $containerReady === false) {
-            $overall = false;
-        } else {
-            $overall = true;
-        }
+        $containerAvailable = $cRow !== null ? (int) ($cRow->container_available ?? 0) : null;
+        $containerReady     = $cRow !== null ? (bool) $cRow->summary_sufficient : null;
 
         return [
-            'mp_ready'        => $mpReady,
-            'container_ready' => $containerReady,
-            'overall'         => $overall,
-            'has_mp'          => $session !== null,
-            'has_container'   => $cRow !== null,
+            'mp_fit'              => $mpFit,
+            'mp_need'             => $mpNeed,
+            'container_available' => $containerAvailable,
+            'container_ready'     => $containerReady,
         ];
     }
 
-    // ── Unit Butuh Tindakan ───────────────────────────────────────────────────
+    // ── Unit Aktif di Yard ────────────────────────────────────────────────────
 
-    public function getUnitsNeedingAction(): array
+    /**
+     * Daftar unit yang masih dalam tanggung jawab depot asal.
+     * Track status yang termasuk: pickup, handover, stuffing, delivery_to_port,
+     * stacking, unit_loading.
+     * Diurutkan berdasarkan aktivitas terbaru (latest tracked_at DESC).
+     */
+    public function getActiveYardUnits(): array
     {
         $depotId = $this->getDepotContext()?->id;
-        if (! $depotId) return ['waiting' => 0, 'bermasalah' => 0, 'total' => 0];
+        if (! $depotId) return [];
 
-        $result = DB::table('units')
-            ->join('shipments as s', 's.id', '=', 'units.shipment_id')
-            ->where('s.assigned_depot_id', $depotId)
-            ->whereExists(fn ($q) => $q
-                ->from('shipment_tracks as st_h')
-                ->whereColumn('st_h.shipment_id', 's.id')
-                ->where('st_h.status', 'handover')
-                ->whereNotNull('st_h.tracked_at')
-            )
-            ->whereRaw("NOT EXISTS (SELECT 1 FROM shipment_tracks st_exit
-                WHERE st_exit.shipment_id = s.id
-                AND st_exit.tracked_at IS NOT NULL
-                AND (
-                    (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack') AND st_exit.status = 'delivery_to_port')
-                    OR (NOT (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack')) AND st_exit.status = 'stuffing')
-                ))"
-            )
-            ->selectRaw("
-                SUM(CASE WHEN NOT EXISTS (
-                    SELECT 1 FROM unit_inspections ui
-                    WHERE ui.unit_id = units.id AND ui.stage = 'handover_depot' AND ui.submitted_at IS NOT NULL
-                ) THEN 1 ELSE 0 END)::int AS waiting,
-                SUM(CASE WHEN EXISTS (
-                    SELECT 1 FROM unit_inspections ui
-                    WHERE ui.unit_id = units.id AND ui.stage = 'handover_depot' AND ui.gate_decision = 'return_to_pdc'
-                ) THEN 1 ELSE 0 END)::int AS bermasalah
-            ")
-            ->first();
+        $rows = DB::select("
+            SELECT
+                u.sjkb_no,
+                s.code      AS shipment_code,
+                u.model_no,
+                u.chassis_no,
+                (
+                    SELECT status FROM shipment_tracks
+                    WHERE shipment_id = s.id AND tracked_at IS NOT NULL
+                    ORDER BY tracked_at DESC LIMIT 1
+                ) AS track_status,
+                s.voyage,
+                (
+                    SELECT tracked_at FROM shipment_tracks
+                    WHERE shipment_id = s.id AND tracked_at IS NOT NULL
+                    ORDER BY tracked_at DESC LIMIT 1
+                ) AS latest_tracked_at
+            FROM units u
+            JOIN shipments s ON s.id = u.shipment_id
+            WHERE s.assigned_depot_id = :depot
+              AND s.status NOT IN ('draft', 'delivered', 'cancelled')
+              AND (
+                  SELECT status FROM shipment_tracks
+                  WHERE shipment_id = s.id AND tracked_at IS NOT NULL
+                  ORDER BY tracked_at DESC LIMIT 1
+              ) IN ('pickup', 'handover', 'stuffing', 'delivery_to_port', 'stacking', 'unit_loading')
+            ORDER BY latest_tracked_at DESC
+        ", ['depot' => $depotId]);
 
-        $waiting    = (int) ($result?->waiting    ?? 0);
-        $bermasalah = (int) ($result?->bermasalah ?? 0);
+        return collect($rows)->map(function ($r) {
+            $status = \App\Enums\TrackStatus::tryFrom((string) ($r->track_status ?? ''));
+            return [
+                'sjkb_no'       => $r->sjkb_no ?? '—',
+                'shipment_code' => $r->shipment_code ?? '—',
+                'unit_label'    => trim(implode(' · ', array_filter([$r->model_no, $r->chassis_no]))) ?: '—',
+                'status_label'  => $status?->label() ?? (string) ($r->track_status ?? '—'),
+                'status_key'    => (string) ($r->track_status ?? ''),
+                'voyage'        => $r->voyage ?? '—',
+                'updated_at'    => $r->latest_tracked_at
+                    ? Carbon::parse($r->latest_tracked_at)->format('d M H:i')
+                    : '—',
+            ];
+        })->toArray();
+    }
+
+    // ── Perlu Perhatian ───────────────────────────────────────────────────────
+
+    /**
+     * Dua hitungan shipment yang memerlukan perhatian FC:
+     *   bermasalah — shipment dengan unit gate_decision = return_to_pdc (belum exit)
+     *   tertahan   — shipment yang blocked oleh track requirement aktif
+     *                (handover inspection, loading inspection, loading session rack)
+     */
+    public function getPerluPerhatian(): array
+    {
+        $depotId = $this->getDepotContext()?->id;
+        if (! $depotId) return ['bermasalah' => 0, 'tertahan' => 0];
+
+        $exitGate = "EXISTS (
+            SELECT 1 FROM shipment_tracks st_exit
+            WHERE st_exit.shipment_id = s.id
+              AND st_exit.tracked_at IS NOT NULL
+              AND (
+                  (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack') AND st_exit.status = 'delivery_to_port')
+                  OR (NOT (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack')) AND st_exit.status = 'stuffing')
+              )
+        )";
+
+        $row = DB::selectOne("
+            SELECT
+                -- Shipment Bermasalah: unit with return_to_pdc at handover_depot, not yet through exit gate
+                (SELECT COUNT(DISTINCT s.id)::int
+                 FROM shipments s
+                 WHERE s.assigned_depot_id = :depot_a
+                   AND NOT {$exitGate}
+                   AND EXISTS (
+                       SELECT 1 FROM units u
+                       JOIN unit_inspections ui ON ui.unit_id = u.id
+                       WHERE u.shipment_id = s.id
+                         AND ui.stage = 'handover_depot'
+                         AND ui.gate_decision = 'return_to_pdc'
+                   )
+                ) AS bermasalah,
+
+                -- Shipment Tertahan: blocked at any inspection/loading gate
+                (SELECT COUNT(DISTINCT s.id)::int
+                 FROM shipments s
+                 WHERE s.assigned_depot_id = :depot_b
+                   AND s.status NOT IN ('draft', 'delivered', 'cancelled')
+                   AND (
+                       -- Case 1: At Handover, handover inspection incomplete or rejected
+                       (
+                           EXISTS (SELECT 1 FROM shipment_tracks WHERE shipment_id = s.id AND status = 'handover' AND tracked_at IS NOT NULL)
+                           AND NOT {$exitGate}
+                           AND (
+                               EXISTS (
+                                   SELECT 1 FROM units u WHERE u.shipment_id = s.id
+                                   AND NOT EXISTS (
+                                       SELECT 1 FROM unit_inspections ui
+                                       WHERE ui.unit_id = u.id AND ui.stage = 'handover_depot' AND ui.submitted_at IS NOT NULL
+                                   )
+                               )
+                               OR EXISTS (
+                                   SELECT 1 FROM units u JOIN unit_inspections ui ON ui.unit_id = u.id
+                                   WHERE u.shipment_id = s.id AND ui.stage = 'handover_depot' AND ui.gate_decision = 'return_to_pdc'
+                               )
+                           )
+                       )
+                       OR
+                       -- Case 2: At Stuffing (non-rack), loading inspection incomplete or rejected
+                       (
+                           EXISTS (SELECT 1 FROM shipment_tracks WHERE shipment_id = s.id AND status = 'stuffing' AND tracked_at IS NOT NULL)
+                           AND NOT (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack'))
+                           AND NOT EXISTS (SELECT 1 FROM shipment_tracks WHERE shipment_id = s.id AND status = 'delivery_to_port' AND tracked_at IS NOT NULL)
+                           AND (
+                               EXISTS (
+                                   SELECT 1 FROM units u WHERE u.shipment_id = s.id
+                                   AND NOT EXISTS (
+                                       SELECT 1 FROM unit_inspections ui
+                                       WHERE ui.unit_id = u.id AND ui.stage = 'loading' AND ui.submitted_at IS NOT NULL
+                                   )
+                               )
+                               OR EXISTS (
+                                   SELECT 1 FROM units u JOIN unit_inspections ui ON ui.unit_id = u.id
+                                   WHERE u.shipment_id = s.id AND ui.stage = 'loading' AND ui.gate_decision = 'return_to_pdc'
+                               )
+                           )
+                       )
+                       OR
+                       -- Case 3: At Stacking (rack), loading session not completed
+                       (
+                           EXISTS (SELECT 1 FROM shipment_tracks WHERE shipment_id = s.id AND status = 'stacking' AND tracked_at IS NOT NULL)
+                           AND s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack')
+                           AND NOT EXISTS (SELECT 1 FROM shipment_tracks WHERE shipment_id = s.id AND status = 'unit_loading' AND tracked_at IS NOT NULL)
+                           AND NOT EXISTS (
+                               SELECT 1 FROM loading_sessions ls
+                               WHERE ls.shipment_id = s.id AND ls.operation_type = 'loading' AND ls.status = 'completed'
+                           )
+                       )
+                   )
+                ) AS tertahan
+        ", [
+            'depot_a' => $depotId,
+            'depot_b' => $depotId,
+        ]);
 
         return [
-            'waiting'    => $waiting,
-            'bermasalah' => $bermasalah,
-            'total'      => $waiting + $bermasalah,
+            'bermasalah' => (int) ($row?->bermasalah ?? 0),
+            'tertahan'   => (int) ($row?->tertahan   ?? 0),
         ];
     }
 
@@ -386,20 +435,25 @@ class Dashboard extends Page
                    AND NOT {$exitGateExists}
                 ) AS ready_loading,
 
-                -- C. Unit Loading Hari Ini (exit gate tracked today)
+                -- C. Unit Loading Hari Ini (Stuffing non-rack ATAU UnitLoading rack, tracked today)
                 (SELECT COUNT(u.id)
                  FROM units u
                  JOIN shipments s ON s.id = u.shipment_id
                  WHERE s.assigned_depot_id = :depot_c
-                   AND EXISTS (
-                       SELECT 1 FROM shipment_tracks st_exit
-                       WHERE st_exit.shipment_id = s.id
-                         AND st_exit.tracked_at IS NOT NULL
-                         AND st_exit.tracked_at::date = CURRENT_DATE
-                         AND (
-                             (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack') AND st_exit.status = 'delivery_to_port')
-                             OR (NOT (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack')) AND st_exit.status = 'stuffing')
-                         )
+                   AND (
+                       -- Non-rack: Stuffing dicatat hari ini
+                       (NOT (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack'))
+                        AND EXISTS (
+                            SELECT 1 FROM shipment_tracks
+                            WHERE shipment_id = s.id AND status = 'stuffing' AND tracked_at::date = CURRENT_DATE
+                        ))
+                       OR
+                       -- Rack: UnitLoading dicatat hari ini (AppSheet auto-advance)
+                       ((s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack'))
+                        AND EXISTS (
+                            SELECT 1 FROM shipment_tracks
+                            WHERE shipment_id = s.id AND status = 'unit_loading' AND tracked_at::date = CURRENT_DATE
+                        ))
                    )
                 ) AS loading_today,
 
@@ -431,100 +485,4 @@ class Dashboard extends Page
         ];
     }
 
-    /**
-     * Preview max 5 units paling lama menunggu inspeksi (untuk dashboard action panel).
-     * Menggunakan query yang sama dengan buildWaitingInspectionTable di Monitoring Operasional.
-     */
-    public function getWaitingInspectionPreview(): array
-    {
-        $depotId = $this->getDepotContext()?->id;
-        if (! $depotId) return [];
-
-        return DB::table('units')
-            ->select([
-                'units.sjkb_no',
-                DB::raw('s.code AS shipment_code'),
-                DB::raw('st_h.tracked_at AS handover_at'),
-                DB::raw('(CURRENT_DATE - st_h.tracked_at::date)::int AS waiting_days'),
-            ])
-            ->join('shipments as s', 's.id', '=', 'units.shipment_id')
-            ->where('s.assigned_depot_id', $depotId)
-            ->join('shipment_tracks as st_h', function ($j) {
-                $j->on('st_h.shipment_id', '=', 's.id')
-                  ->where('st_h.status', 'handover')
-                  ->whereNotNull('st_h.tracked_at');
-            })
-            ->whereRaw("NOT EXISTS (SELECT 1 FROM shipment_tracks st_exit
-                WHERE st_exit.shipment_id = s.id AND st_exit.tracked_at IS NOT NULL
-                AND (
-                    (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack') AND st_exit.status = 'delivery_to_port')
-                    OR (NOT (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack')) AND st_exit.status = 'stuffing')
-                ))"
-            )
-            ->whereNotExists(fn ($q) => $q
-                ->from('unit_inspections as ui')
-                ->whereColumn('ui.unit_id', 'units.id')
-                ->where('ui.stage', 'handover_depot')
-                ->whereNotNull('ui.submitted_at')
-            )
-            ->orderBy('st_h.tracked_at', 'asc')
-            ->limit(5)
-            ->get()
-            ->map(fn ($r) => [
-                'sjkb_no'       => $r->sjkb_no ?? '—',
-                'shipment_code' => $r->shipment_code ?? '—',
-                'waiting_days'  => (int) ($r->waiting_days ?? 0),
-                'waiting_label' => ((int) ($r->waiting_days ?? 0)) === 0
-                    ? 'Hari ini'
-                    : ((int) $r->waiting_days) . ' hari',
-            ])
-            ->toArray();
-    }
-
-    /**
-     * Preview max 5 unit bermasalah (gate_decision = return_to_pdc) paling tua.
-     * Menggunakan query yang sama dengan buildBermasalahTable di Monitoring Operasional.
-     */
-    public function getBermasalahPreview(): array
-    {
-        $depotId = $this->getDepotContext()?->id;
-        if (! $depotId) return [];
-
-        return DB::table('units')
-            ->select([
-                'units.sjkb_no',
-                DB::raw('s.code AS shipment_code'),
-                DB::raw('ui.notes AS remark'),
-                DB::raw('(CURRENT_DATE - ui.submitted_at::date)::int AS aging_days'),
-            ])
-            ->join('shipments as s', 's.id', '=', 'units.shipment_id')
-            ->where('s.assigned_depot_id', $depotId)
-            ->join('shipment_tracks as st_h', function ($j) {
-                $j->on('st_h.shipment_id', '=', 's.id')
-                  ->where('st_h.status', 'handover')
-                  ->whereNotNull('st_h.tracked_at');
-            })
-            ->join('unit_inspections as ui', function ($j) {
-                $j->on('ui.unit_id', '=', 'units.id')
-                  ->where('ui.stage', 'handover_depot')
-                  ->where('ui.gate_decision', 'return_to_pdc');
-            })
-            ->whereRaw("NOT EXISTS (SELECT 1 FROM shipment_tracks st_exit
-                WHERE st_exit.shipment_id = s.id AND st_exit.tracked_at IS NOT NULL
-                AND (
-                    (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack') AND st_exit.status = 'delivery_to_port')
-                    OR (NOT (s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack')) AND st_exit.status = 'stuffing')
-                ))"
-            )
-            ->orderBy('ui.submitted_at', 'asc')
-            ->limit(5)
-            ->get()
-            ->map(fn ($r) => [
-                'sjkb_no'       => $r->sjkb_no ?? '—',
-                'shipment_code' => $r->shipment_code ?? '—',
-                'remark'        => filled($r->remark) ? \Illuminate\Support\Str::limit($r->remark, 30) : 'Return to PDC',
-                'aging_days'    => (int) ($r->aging_days ?? 0),
-            ])
-            ->toArray();
-    }
 }
