@@ -23,18 +23,18 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
-            'role' => ['required', Rule::in(['super_admin', 'office_admin', 'field_coordinator', 'customer'])],
+            'role' => ['required', Rule::in(['super_admin', 'field_coordinator', 'customer'])],
             'branch_code' => [
                 'nullable',
                 'string',
                 'max:10',
-                'required_if:role,super_admin,office_admin,field_coordinator',
+                'required_if:role,super_admin,field_coordinator',
                 'prohibited_if:role,customer',
                 'exists:branches,code',
             ],
         ]);
 
-        $isInternal = in_array($data['role'], ['super_admin', 'office_admin', 'field_coordinator'], true);
+        $isInternal = in_array($data['role'], ['super_admin', 'field_coordinator'], true);
         $branchId = $isInternal
             ? Branch::where('code', $data['branch_code'])->value('id')
             : null;
@@ -77,7 +77,7 @@ class AuthController extends Controller
         $payload = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string', 'min:8'],
-            'as' => ['nullable', Rule::in(['super_admin', 'office_admin', 'field_coordinator', 'customer'])],
+            'as' => ['nullable', Rule::in(['super_admin', 'field_coordinator', 'customer'])],
         ]);
 
 
@@ -112,7 +112,6 @@ class AuthController extends Controller
             ] : null,
             'roles' => $user->getRoleNames(),
             'is_super_admin' => $user->hasRole('super_admin'),
-            'is_office_admin' => $user->hasRole('office_admin'),
             'is_field_coordinator' => $user->hasRole('field_coordinator'),
             'is_customer' => $user->hasRole('customer'),
             'token' => $token,

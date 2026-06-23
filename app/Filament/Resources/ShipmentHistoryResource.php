@@ -32,13 +32,13 @@ class ShipmentHistoryResource extends Resource
     public static function shouldRegisterNavigation(): bool
     {
         $u = Filament::auth()->user();
-        return $u?->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']) === true;
+        return $u?->hasAnyRole(['super_admin', 'field_coordinator']) === true;
     }
 
     public static function canViewAny(): bool
     {
         $u = Filament::auth()->user();
-        return $u?->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']) ?? false;
+        return $u?->hasAnyRole(['super_admin', 'field_coordinator']) ?? false;
     }
 
     public static function canView($record): bool

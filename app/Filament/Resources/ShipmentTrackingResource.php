@@ -40,7 +40,7 @@ class ShipmentTrackingResource extends Resource
     {
         $u = auth_user();
 
-        return (bool) ($u && method_exists($u, 'hasAnyRole') && $u->hasAnyRole(['super_admin', 'office_admin']));
+        return (bool) ($u && method_exists($u, 'hasRole') && $u->hasRole('super_admin'));
     }
 
     public static function getEloquentQuery(): Builder

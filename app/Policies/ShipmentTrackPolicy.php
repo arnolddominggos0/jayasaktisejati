@@ -17,7 +17,7 @@ class ShipmentTrackPolicy
 
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyRole(['office_admin', 'field_coordinator']);
+        return $user->hasRole('field_coordinator');
     }
 
     public function view(User $user, ShipmentTrack $track): bool
@@ -26,11 +26,6 @@ class ShipmentTrackPolicy
 
         if (!$shipment) {
             return false;
-        }
-
-        // Check branch ownership
-        if ($user->hasRole('office_admin') && $user->effectiveBranchId()) {
-            return $shipment->branch_id === null || $shipment->branch_id === $user->effectiveBranchId();
         }
 
         // Field coordinator can view if assigned (canonical scope or legacy coordinator_id)
@@ -47,7 +42,7 @@ class ShipmentTrackPolicy
 
     public function create(User $user): bool
     {
-        return $user->hasAnyRole(['super_admin', 'office_admin']);
+        return $user->hasRole('super_admin');
     }
 
     public function update(User $user, ShipmentTrack $track): bool

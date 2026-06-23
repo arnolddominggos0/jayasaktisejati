@@ -801,6 +801,7 @@ class ShipmentResource extends Resource
 
                                 Repeater::make('units')
                                     ->label('Unit Kendaraan (Laut)')
+                                    ->dehydrated(false)
                                     ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
                                     ->columns(12)
                                     ->defaultItems(1)
@@ -1746,7 +1747,7 @@ class ShipmentResource extends Resource
 
         return (bool) ($u
             && method_exists($u, 'hasAnyRole')
-            && $u->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']));
+            && $u->hasAnyRole(['super_admin', 'field_coordinator']));
     }
 
     public static function canView($record): bool
@@ -1781,15 +1782,7 @@ class ShipmentResource extends Resource
     {
         $u = Filament::auth()->user();
 
-        if ($u?->hasRole('super_admin')) {
-            return true;
-        }
-
-        $branchId = self::currentBranchId();
-
-        return $u
-            && $u->hasRole('office_admin')
-            && (int) $record->branch_id === (int) $branchId;
+        return $u?->hasRole('super_admin') ?? false;
     }
 
     public static function canDelete($record): bool

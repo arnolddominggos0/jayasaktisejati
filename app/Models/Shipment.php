@@ -87,7 +87,6 @@ class Shipment extends Model
         'estimated_ready_at',
         'containers',
         'lcl_items',
-        'units',
         'pol_id',
         'pod_id',
     ];
@@ -115,7 +114,6 @@ class Shipment extends Model
         'edited_fields' => 'array',
         'containers' => 'array',
         'lcl_items' => 'array',
-        'units'               => 'array',
         'pol_id' => 'integer',
         'pod_id' => 'integer',
     ];
@@ -1214,9 +1212,7 @@ class Shipment extends Model
 
         $unitRows = $this->relationLoaded('units')
             ? $this->units
-            : (is_array($this->getRawOriginal('units'))
-                ? collect($this->getRawOriginal('units'))
-                : collect());
+            : $this->units()->get();
 
         foreach ($unitRows as $row) {
             $ref = trim((string) ($row['container_no_ref'] ?? ''));

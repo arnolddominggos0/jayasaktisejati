@@ -25,7 +25,7 @@ class ShipmentTracksRelationManager extends RelationManager
     public static function canViewAny(): bool
     {
         $user = \Filament\Facades\Filament::auth()->user();
-        return $user?->hasAnyRole(['super_admin', 'office_admin', 'field_coordinator']) ?? false;
+        return $user?->hasAnyRole(['super_admin', 'field_coordinator']) ?? false;
     }
 
     /**
@@ -51,12 +51,12 @@ class ShipmentTracksRelationManager extends RelationManager
     }
 
     /**
-     * Authorization: Only office_admin and super_admin can create tracks.
+     * Authorization: Only super_admin can create tracks.
      */
     public function canCreate(): bool
     {
         $user = \Filament\Facades\Filament::auth()->user();
-        return $user?->hasAnyRole(['super_admin', 'office_admin']) ?? false;
+        return $user?->hasRole('super_admin') ?? false;
     }
 
     /**

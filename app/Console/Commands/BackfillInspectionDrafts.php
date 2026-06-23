@@ -66,8 +66,6 @@ class BackfillInspectionDrafts extends Command
         $rows         = [];
 
         foreach ($shipments as $shipment) {
-            // Use relation method directly — $shipment->units is shadowed by
-            // the legacy JSON cast on the Shipment model.
             $units = $shipment->units()->get(['id', 'shipment_id']);
 
             if ($units->isEmpty()) {

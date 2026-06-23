@@ -34,7 +34,7 @@ class CustomerResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth_user()?->hasAnyRole('super_admin', 'office_admin') ?? false;
+        return auth_user()?->hasRole('super_admin') ?? false;
     }
 
     public static function form(Form $form): Form

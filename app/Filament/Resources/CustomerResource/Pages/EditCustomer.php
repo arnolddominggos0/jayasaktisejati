@@ -18,7 +18,7 @@ class EditCustomer extends EditRecord
                 ->label('Buat Akun Portal')
                 ->icon('heroicon-o-user-plus')
                 ->visible(fn() => config('portal.auth_mode') === 'customer_monolith'
-                    && (auth_user()?->hasAnyRole(['super_admin', 'office_admin']) ?? false))
+                    && (auth_user()?->hasRole('super_admin') ?? false))
                 ->form([
                     TextInput::make('name')->label('Nama User')->required()->default(fn() => $this->record->name),
                     TextInput::make('email')->label('Email')->email()->required()->default(fn() => $this->record->email),

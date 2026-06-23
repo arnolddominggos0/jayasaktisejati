@@ -245,15 +245,25 @@ class Dashboard extends Page
         ", ['depot' => $depotId]);
 
         return collect($rows)->map(function ($r) {
-            $status = \App\Enums\TrackStatus::tryFrom((string) ($r->track_status ?? ''));
+            $status    = \App\Enums\TrackStatus::tryFrom((string) ($r->track_status ?? ''));
+            $statusKey = (string) ($r->track_status ?? '');
             return [
-                'sjkb_no'       => $r->sjkb_no ?? '—',
-                'shipment_code' => $r->shipment_code ?? '—',
-                'unit_label'    => trim(implode(' · ', array_filter([$r->model_no, $r->chassis_no]))) ?: '—',
-                'status_label'  => $status?->label() ?? (string) ($r->track_status ?? '—'),
-                'status_key'    => (string) ($r->track_status ?? ''),
-                'voyage'        => $r->voyage ?? '—',
-                'updated_at'    => $r->latest_tracked_at
+                'sjkb_no'          => $r->sjkb_no ?? '—',
+                'shipment_code'    => $r->shipment_code ?? '—',
+                'unit_label'       => trim(implode(' · ', array_filter([$r->model_no, $r->chassis_no]))) ?: '—',
+                'status_label'     => $status?->label() ?? $statusKey ?: '—',
+                'status_key'       => $statusKey,
+                'next_requirement' => match($statusKey) {
+                    'pickup'           => 'Menunggu Handover',
+                    'handover'         => 'Menunggu Inspeksi',
+                    'stuffing'         => 'Ready Loading',
+                    'delivery_to_port' => 'Menuju Pelabuhan',
+                    'stacking'         => 'Menunggu Unit Loading',
+                    'unit_loading'     => 'Menunggu On Ship',
+                    default            => '—',
+                },
+                'voyage'           => $r->voyage ?? '—',
+                'updated_at'       => $r->latest_tracked_at
                     ? Carbon::parse($r->latest_tracked_at)->format('d M H:i')
                     : '—',
             ];

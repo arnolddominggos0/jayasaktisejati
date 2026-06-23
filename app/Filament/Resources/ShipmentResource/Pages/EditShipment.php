@@ -105,10 +105,6 @@ class EditShipment extends EditRecord
 
     protected function mutateFormDataBeforeFill(array $data): array
     {
-        // Load unit records from the `units()` hasMany relation using the
-        // relation METHOD (not property) to bypass the 'units' => 'array'
-        // cast in Shipment::$casts, which intercepts property access and
-        // returns null instead of the relation collection.
         $data['units'] = $this->record->units()
             ->orderBy('id')
             ->get()

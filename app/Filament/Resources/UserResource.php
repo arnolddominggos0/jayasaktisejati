@@ -40,10 +40,9 @@ class UserResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth_user()?->hasAnyRole('super_admin', 'office_admin') ?? false;
+        return auth_user()?->hasRole('super_admin') ?? false;
     }
 
-    /** Office admin hanya melihat user di cabangnya. */
     public static function getEloquentQuery(): Builder
     {
         $q = parent::getEloquentQuery();
@@ -51,12 +50,6 @@ class UserResource extends Resource
 
         if ($u?->hasRole('super_admin')) {
             return $q;
-        }
-
-        if ($u?->hasRole('office_admin') && $u->effectiveBranchId()) {
-            $bid = $u->effectiveBranchId();
-
-            return $q->where(fn ($w) => $w->where('scope_branch_id', $bid)->orWhere(fn ($w2) => $w2->whereNull('scope_branch_id')->where('branch_id', $bid)));
         }
 
         return $q->whereRaw('1=0');
@@ -137,11 +130,7 @@ class UserResource extends Resource
                                 Select::make('role_name')
                                     ->label('Role')
                                     ->options(
-                                        fn () => $isSuper
-                                            ? Role::query()->orderBy('name')->pluck('name', 'name')
-                                            : Role::query()
-                                                ->whereIn('name', ['office_admin', 'field_coordinator', 'customer'])
-                                                ->orderBy('name')->pluck('name', 'name')
+                                        fn () => Role::query()->orderBy('name')->pluck('name', 'name')
                                     )
                                     ->searchable()
                                     ->required()
@@ -272,17 +261,8 @@ class UserResource extends Resource
         ];
     }
 
-    /** Badge mengikuti scope cabang untuk office_admin. */
     public static function getNavigationBadge(): ?string
     {
-        $q = User::query();
-        $u = auth_user();
-
-        if ($u?->hasRole('office_admin') && $u->effectiveBranchId()) {
-            $bid = $u->effectiveBranchId();
-            $q->where(fn ($w) => $w->where('scope_branch_id', $bid)->orWhere(fn ($w2) => $w2->whereNull('scope_branch_id')->where('branch_id', $bid)));
-        }
-
-        return (string) $q->count();
+        return (string) User::query()->count();
     }
 }

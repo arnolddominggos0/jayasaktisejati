@@ -306,7 +306,6 @@ class AdminDashboard extends Page implements HasForms
                     ->diffInDays($end->copy()->startOfDay());
 
                 // Each physical vehicle in this SPPB is a distinct unit at port.
-                // getRelation() bypasses the 'units'=>'array' cast.
                 $unitCount = max(1, $shipment->getRelation('units')->count());
 
                 $total   += $unitCount;
@@ -546,8 +545,6 @@ class AdminDashboard extends Page implements HasForms
             }
 
             // Count per unit — each physical vehicle is 1 KPI data point.
-            // getRelation() bypasses the 'units'=>'array' cast in Shipment::$casts
-            // that would otherwise intercept $shipment->units and return null.
             $unitCount = max(1, $shipment->getRelation('units')->count());
 
             $total += $unitCount;

@@ -25,24 +25,19 @@ class ShipmentPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyRole(['office_admin', 'field_coordinator']);
+        return $user->hasRole('field_coordinator');
     }
 
     /**
      * View a single shipment.
      *
-     * office_admin : same branch (unchanged)
+     * super_admin : all (handled by before())
      * field_coordinator : Origin FC OR Destination FC, any phase, mode = sea
      *
      * Decoupled from update() — read-only access is now independent.
      */
     public function view(User $user, Shipment $shipment): bool
     {
-        if ($user->hasRole('office_admin')) {
-            return is_null($shipment->branch_id)
-                || $shipment->branch_id === $user->effectiveBranchId();
-        }
-
         if ($user->hasRole('field_coordinator')) {
             return ShipmentOwnership::canView($user, $shipment);
         }
@@ -53,18 +48,13 @@ class ShipmentPolicy
     /**
      * Edit / track a shipment.
      *
-     * office_admin : same branch (unchanged)
+     * super_admin : all (handled by before())
      * field_coordinator : phase-gated ownership
      *   pre_transfer  → Origin FC only  (Pickup … VesselDepart)
      *   post_transfer → Destination FC only  (VesselArrival … Delivered)
      */
     public function update(User $user, Shipment $shipment): bool
     {
-        if ($user->hasRole('office_admin')) {
-            return is_null($shipment->branch_id)
-                || $shipment->branch_id === $user->effectiveBranchId();
-        }
-
         if ($user->hasRole('field_coordinator')) {
             return ShipmentOwnership::canEdit($user, $shipment);
         }
@@ -88,7 +78,7 @@ class ShipmentPolicy
      */
     public function create(User $user): bool
     {
-        return $user->hasAnyRole(['super_admin', 'office_admin']);
+        return $user->hasRole('super_admin');
     }
 
     /**
