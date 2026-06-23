@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\VesselPlan;
+use App\Supports\BusinessRouteResolver;
 use Illuminate\Support\Carbon;
 
 class WhatsappMessageBuilder
@@ -54,18 +55,9 @@ class WhatsappMessageBuilder
 
     protected function buildRouteLabel(VesselPlan $plan): ?string
     {
-        if (! empty($plan->route_code)) {
-            return $this->sanitizeText($plan->route_code);
-        }
+        $label = BusinessRouteResolver::forPlan($plan);
 
-        $pol = $plan->pol?->code ?? null;
-        $pod = $plan->pod?->code ?? null;
-
-        if ($pol && $pod) {
-            return $this->sanitizeText("{$pol}-{$pod}");
-        }
-
-        return null;
+        return $label !== '—' ? $this->sanitizeText($label) : null;
     }
 
     protected function sanitizeText(?string $value): string

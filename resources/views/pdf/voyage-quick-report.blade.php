@@ -32,7 +32,7 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<title>Quick Report Voyage {{ $voyage->voyage_no ?? '' }} – {{ $voyage->vessel?->name ?? '' }}</title>
+<title>Quick Report {{ $voyage->code ?? ('Voyage ' . ($voyage->voyage_no ?? '')) }} – {{ $voyage->vessel?->name ?? '' }}</title>
 <style>
     @page { margin: 14mm 11mm 12mm 11mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -307,8 +307,14 @@
                             <td class="val">{{ $voyage->vessel?->name ?? '&#8211;' }}</td>
                         </tr>
                         <tr>
+                            <td class="lbl">Voyage Code</td>
+                            <td class="val" style="font-weight:800;color:{{ $bgBrand }};font-size:10px;font-family:monospace;">
+                                {{ $voyage->code ?? '&#8211;' }}
+                            </td>
+                        </tr>
+                        <tr>
                             <td class="lbl">Voyage No</td>
-                            <td class="val" style="font-weight:800;color:{{ $bgBrand }};font-size:10px;">
+                            <td class="val" style="font-size:9px;color:#6b7280;">
                                 {{ $voyage->voyage_no ?? '&#8211;' }}
                             </td>
                         </tr>
@@ -753,7 +759,7 @@
             Tidak ada file evidence yang ditemukan untuk voyage ini.
             <br>
             <span style="font-size:8px;">
-                Simpan file evidence di: <code>storage/app/public/evidence_qr/{{ $voyage->voyage_no ?? '' }}/</code>
+                Simpan file evidence di: <code>storage/app/public/evidence_qr/{{ $voyage->code ?? $voyage->voyage_no ?? '' }}/</code>
             </span>
         </div>
         @endif
@@ -766,8 +772,8 @@
     <div class="section-body">
         <div style="font-size:8.5px;color:#6b7280;margin-bottom:12px;line-height:1.7;">
             Laporan ini diterbitkan sebagai Quick Report hasil evaluasi voyage
-            <strong>{{ $voyage->vessel?->name ?? '' }}</strong> Voyage
-            <strong>{{ $voyage->voyage_no ?? '' }}</strong>
+            <strong>{{ $voyage->vessel?->name ?? '' }}</strong>
+            <strong>{{ $voyage->code ?? ('Voyage ' . ($voyage->voyage_no ?? '')) }}</strong>
             periode <strong>{{ $period }}</strong>.
             Dokumen ini bersifat informatif dan digunakan sebagai bahan evaluasi kinerja lead time
             pengiriman kendaraan moda laut.

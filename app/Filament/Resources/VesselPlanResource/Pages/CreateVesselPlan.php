@@ -4,6 +4,7 @@ namespace App\Filament\Resources\VesselPlanResource\Pages;
 
 use App\Filament\Resources\VesselPlanResource;
 use App\Models\VesselPlan;
+use App\Supports\RouteCode;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Carbon;
 
@@ -17,7 +18,7 @@ class CreateVesselPlan extends CreateRecord
             ->startOfMonth()
             ->toDateString();
         $data['customer_id'] = $data['customer_id'] ?? VesselPlan::resolveTamCustomerId();
-        $data['route_code'] = $data['route_code'] ?? 'JKT-BTG';
+        $data['route_code'] = $data['route_code'] ?? RouteCode::default();
 
         $draft = new VesselPlan($data);
         $ports = $draft->resolveRoutePortIds();

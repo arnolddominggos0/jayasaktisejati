@@ -42,6 +42,13 @@ class AdminDashboard extends Page implements HasForms
 
     public string $dashboardView = 'tam';
 
+    protected function getViewData(): array
+    {
+        return [
+            'tamBusinessRoute' => \App\Supports\RouteCode::display(\App\Supports\RouteCode::default()),
+        ];
+    }
+
     public function mount(): void
     {
         $this->period_month = now()->format('Y-m');

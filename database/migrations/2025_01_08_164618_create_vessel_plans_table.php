@@ -11,7 +11,7 @@ return new class extends Migration {
             $table->id();
 
             $table->date('period_month'); 
-            $table->string('route_code', 20)->default('JKT-BTG');
+            $table->string('route_code', 20)->default('JKT-MND');
 
             $table->string('status', 20)->default('draft'); 
 

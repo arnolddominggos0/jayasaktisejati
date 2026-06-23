@@ -7,6 +7,7 @@ use App\Models\VesselPlan;
 use App\Models\VesselPlanItem;
 use App\Models\Voyage;
 use App\Models\VoyageScheduleHistory;
+use App\Supports\RouteCode;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -21,6 +22,8 @@ class VesselPlanFinalizationService
         if (! $plan->syncRoutePorts()) {
             throw new DomainException('POL/POD vessel plan belum terisi. Periksa route_code atau master port.');
         }
+
+        $this->assertAllItemsHaveVoyageNo($plan);
 
         $analysis = $plan->analyze();
 
@@ -157,11 +160,41 @@ class VesselPlanFinalizationService
         );
     }
 
+    /**
+     * Validate that every item in the plan has a real voyage_no before finalization.
+     * voyage_no must come from TAM schedule, CSV import, or user input — never generated.
+     */
+    protected function assertAllItemsHaveVoyageNo(VesselPlan $plan): void
+    {
+        $missing = $plan->items()
+            ->with('vessel')
+            ->whereNull('voyage_no')
+            ->orWhere('voyage_no', '')
+            ->orderBy('planned_etd')
+            ->get();
+
+        if ($missing->isEmpty()) {
+            return;
+        }
+
+        $details = $missing->map(fn (VesselPlanItem $it) =>
+            sprintf(
+                '- %s (ETD %s, item_id %d)',
+                $it->vessel?->name ?? 'Unknown vessel',
+                $it->planned_etd?->format('d M Y') ?? '?',
+                $it->id,
+            )
+        )->implode("\n");
+
+        throw new DomainException(
+            "Finalisasi gagal: {$missing->count()} item belum memiliki voyage_no.\n" .
+            "Isi voyage_no dari schedule TAM sebelum melanjutkan:\n{$details}"
+        );
+    }
+
     protected function syncVoyage(VesselPlan $plan, VesselPlanItem $item): Voyage
     {
         $voyage = $item->voyage()->first();
-
-        $autoVoyageNo = 'VOY-' . $item->planned_etd->format('Ym') . '-' . $item->id;
 
         $payload = [
             'vessel_plan_id'      => $plan->id,
@@ -170,7 +203,8 @@ class VesselPlanFinalizationService
             'vessel_id'           => $item->vessel_id,
             'pol_id'              => $plan->pol_id,
             'pod_id'              => $plan->pod_id,
-            'voyage_no'           => $item->voyage_no ?: ($voyage?->voyage_no ?: $autoVoyageNo),
+            'route_code'          => RouteCode::voyage((string) $plan->route_code) ?? $plan->route_code,
+            'voyage_no'           => $item->voyage_no,
             'etd'                 => $item->planned_etd,
             'etb'                 => $item->planned_etb,
             'eta'                 => $item->planned_eta,

@@ -26,6 +26,8 @@ class Voyage extends Model
         'pol_id',
         'pod_id',
 
+        'code',
+        'route_code',
         'voyage_no',
         'service',
         'etd',
@@ -70,8 +72,40 @@ class Voyage extends Model
         'cargo_actual' => 'integer',
     ];
 
+    /**
+     * Generate the canonical voyage code: VOY{voyage_no}{vessel.code}{route_code}
+     * route_code is the business route identifier (e.g. JKTMND), not derived from ports.code.
+     * Returns null when any required component is missing.
+     */
+    public static function generateCode(self $voyage): ?string
+    {
+        $voyage->loadMissing('vessel');
+
+        $voyageNo   = $voyage->voyage_no;
+        $vesselCode = $voyage->vessel?->code;
+        $routeCode  = $voyage->route_code;
+
+        if (! $voyageNo || ! $vesselCode || ! $routeCode) {
+            return null;
+        }
+
+        return sprintf('VOY%s%s%s', $voyageNo, $vesselCode, $routeCode);
+    }
+
     protected static function booted(): void
     {
+        static::creating(function (Voyage $voyage) {
+            if (empty($voyage->code)) {
+                $voyage->code = static::generateCode($voyage);
+            }
+        });
+
+        static::saving(function (Voyage $voyage) {
+            if ($voyage->exists && $voyage->isDirty(['voyage_no', 'vessel_id', 'route_code'])) {
+                $voyage->code = static::generateCode($voyage);
+            }
+        });
+
         static::updating(function (Voyage $voyage) {
 
             if (

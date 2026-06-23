@@ -58,6 +58,11 @@ class VoyageResource extends Resource
             // ── 1. Voyage Identity ───────────────────────────────
             Section::make('Identitas Voyage')
                 ->schema([
+                    Placeholder::make('voyage_code')
+                        ->label('Voyage Code')
+                        ->content(fn($record) => $record?->code ?? '—')
+                        ->visible(fn($livewire) => $livewire instanceof EditRecord),
+
                     Select::make('shipping_line_id')
                         ->label('Pelayaran')
                         ->relationship('shippingLine', 'name')
@@ -265,10 +270,13 @@ class VoyageResource extends Resource
                 Stack::make([
                     TextColumn::make('voyage_identity')
                         ->label('Voyage')
-                        ->state(fn($record) => $record->voyage_no)
+                        ->state(fn($record) => $record->code
+                            ? $record->code . ' (' . $record->voyage_no . ')'
+                            : ($record->voyage_no ?? '—'))
                         ->searchable(query: function (Builder $query, string $search): Builder {
                             return $query->where(function ($q) use ($search) {
-                                $q->where('voyage_no', 'like', "%{$search}%")
+                                $q->where('code', 'like', "%{$search}%")
+                                    ->orWhere('voyage_no', 'like', "%{$search}%")
                                     ->orWhereHas('vessel', function ($v) use ($search) {
                                         $v->where('name', 'like', "%{$search}%");
                                     });
@@ -285,7 +293,7 @@ class VoyageResource extends Resource
                     TextColumn::make('route')
                         ->label('')
                         ->state(
-                            fn($record) => ($record->pol?->code ?? '-') . ' → ' . ($record->pod?->code ?? '-')
+                            fn($record) => \App\Supports\BusinessRouteResolver::forVoyage($record)
                         )
                         ->color('gray'),
 
@@ -296,7 +304,7 @@ class VoyageResource extends Resource
                 ])
                     ->space(1)
                     ->extraAttributes([
-                        'class' => 'leading-tight min-w-[220px]',
+                        'class' => 'leading-tight min-w-[240px]',
                     ]),
 
                 // ── Schedule Column ──

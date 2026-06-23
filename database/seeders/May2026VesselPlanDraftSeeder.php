@@ -192,7 +192,7 @@ class May2026VesselPlanDraftSeeder extends Seeder
                     ->startOfMonth()
                     ->toDateString(),
 
-                'route_code' => 'JKT-BTG',
+                'route_code' => 'JKT-MND',
             ],
             [
                 'customer_id' => $tamCustomer->id,

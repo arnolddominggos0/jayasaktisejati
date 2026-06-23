@@ -857,7 +857,7 @@ class ShipmentResource extends Resource
                                             ->get()
                                             ->mapWithKeys(function ($v) {
                                                 $name = $v->vessel?->name ?: '(kapal tidak diketahui)';
-                                                if ($v->voyage_no && ! preg_match('/^VY-\d{6}-\d+$/', (string) $v->voyage_no)) {
+                                                if ($v->voyage_no) {
                                                     $name .= ' ' . $v->voyage_no;
                                                 }
                                                 return [
@@ -891,7 +891,7 @@ class ShipmentResource extends Resource
                                             ->get()
                                             ->mapWithKeys(function ($v) {
                                                 $name = $v->vessel?->name ?: '(kapal tidak diketahui)';
-                                                if ($v->voyage_no && ! preg_match('/^VY-\d{6}-\d+$/', (string) $v->voyage_no)) {
+                                                if ($v->voyage_no) {
                                                     $name .= ' ' . $v->voyage_no;
                                                 }
                                                 return [
@@ -909,7 +909,7 @@ class ShipmentResource extends Resource
                                         $v = Voyage::with(['vessel', 'pol', 'pod'])->find($value);
                                         if (! $v) return null;
                                         $name = $v->vessel?->name ?: '(kapal tidak diketahui)';
-                                        if ($v->voyage_no && ! preg_match('/^VY-\d{6}-\d+$/', (string) $v->voyage_no)) {
+                                        if ($v->voyage_no) {
                                             $name .= ' ' . $v->voyage_no;
                                         }
                                         return sprintf(

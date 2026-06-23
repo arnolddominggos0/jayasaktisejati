@@ -111,7 +111,7 @@
     <div class="space-y-6">
         <div class="rounded-xl p-6 bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md">
             <h1 class="text-2xl font-bold">Dashboard TAM</h1>
-            <p class="mt-1 text-sm opacity-80">Monitoring KPI Lead Time — Rute Jakarta → Manado (Toyota Astra Motor)</p>
+            <p class="mt-1 text-sm opacity-80">Monitoring KPI Lead Time — Rute {{ $tamBusinessRoute }} (Toyota Astra Motor)</p>
         </div>
 
         <div class="{{ $cardClass }} p-6" id="filter-section">
@@ -332,7 +332,7 @@
                         <div class="h-10 w-1 bg-red-600 rounded-full"></div>
                         <div>
                             <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Monitoring Pengiriman Unit</h1>
-                            <p class="text-sm text-gray-500 font-medium">Rute: Jakarta - Manado</p>
+                            <p class="text-sm text-gray-500 font-medium">Rute: {{ $tamBusinessRoute }}</p>
                         </div>
                     </div>
                 </div>

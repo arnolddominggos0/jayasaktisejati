@@ -68,13 +68,11 @@ class ImportTamMay2026Units extends Command
 
                 $runningNo = (int) $no;
 
+                $voyageCode = $voyage->code ?? sprintf('VOY%s', $voyage->voyage_no);
+
                 $shipment = Shipment::updateOrCreate(
                     [
-                        'code' => sprintf(
-                            'VOY%sTTSTJKTMND-%03d',
-                            $voyage->voyage_no,
-                            $runningNo
-                        ),
+                        'code' => sprintf('%s-%03d', $voyageCode, $runningNo),
                     ],
                     [
                         'customer_id' => 1,

@@ -17,7 +17,7 @@
             </div>
 
             <div class="text-xs text-gray-500 mt-1">
-                {{ $v->pol?->code }} → {{ $v->pod?->code }}
+                {{ \App\Supports\BusinessRouteResolver::forVoyage($v) }}
             </div>
 
 

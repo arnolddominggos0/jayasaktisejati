@@ -214,11 +214,8 @@ class ImportTamJanuary2026Units extends Command
                     }
                     $voyageCounters[$vKey]++;
 
-                    $shipmentCode = sprintf(
-                        'JAN2026V%sMND-%03d',
-                        $entry['voyage_no'],
-                        $voyageCounters[$vKey]
-                    );
+                    $voyageCode   = $voyage->code ?? sprintf('JAN26V%s', $entry['voyage_no']);
+                    $shipmentCode = sprintf('%s-%03d', $voyageCode, $voyageCounters[$vKey]);
 
                     $shipment = Shipment::updateOrCreate(
                         ['code' => $shipmentCode],

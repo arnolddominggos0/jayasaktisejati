@@ -119,7 +119,7 @@
                         <td class="px-2 py-1.5 sticky left-0 z-10 border-r border-gray-200/20 {{ $rowBg ?: ($zebra ?: 'bg-white') }} hover:bg-gray-50/30">
                             <button wire:click="openDrawer({{ $v->id }})" class="font-semibold text-gray-900 text-[11px] truncate leading-tight hover:text-blue-700 transition text-left w-full">{{ $v->vessel?->name }}</button>
                             <div class="text-[10px] text-gray-500 mt-0.5">{{ $v->voyage_no }}</div>
-                            <div class="text-[9px] text-gray-400 mt-0.5">{{ $v->pol?->code ?? '-' }} → {{ $v->pod?->code ?? '-' }}</div>
+                            <div class="text-[9px] text-gray-400 mt-0.5">{{ \App\Supports\BusinessRouteResolver::forVoyage($v) }}</div>
                             @if ($v->operational_status_enum !== VoyageOperationalStatus::DELAYED)
                             <div class="mt-0.5">
                                 <span class="inline-flex items-center px-1 py-0.5 rounded text-[9px] font-medium border {{ $statusBadge['class'] }}">

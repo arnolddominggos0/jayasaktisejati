@@ -10,6 +10,7 @@ use App\Services\VesselPlanFinalizationService;
 use App\Services\VesselPlanGenerator;
 use App\Services\VesselPlanSubmissionService;
 use App\Services\WhatsappMessageBuilder;
+use App\Supports\RouteCode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -117,7 +118,7 @@ class VesselPlan extends Model
             return ['pol_id' => $polId, 'pod_id' => $podId];
         }
 
-        [$routePol, $routePod] = array_pad(explode('-', (string) $this->route_code, 2), 2, null);
+        [$routePol, $routePod] = RouteCode::parts((string) $this->route_code);
 
         $polCode = $routePol ?: config('tam.route.pol_code');
         $podCode = $routePod ?: config('tam.route.pod_code');

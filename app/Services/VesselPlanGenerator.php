@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\VesselPlanStatus;
 use App\Models\Port;
 use App\Models\VesselPlan;
+use App\Supports\RouteCode;
 use Illuminate\Support\Carbon;
 
 class VesselPlanGenerator
@@ -38,7 +39,7 @@ class VesselPlanGenerator
 
             'period_month' => $nextMonth->toDateString(),
 
-            'route_code'   => $latest?->route_code ?? 'JKT-BTG',
+            'route_code'   => $latest?->route_code ?? RouteCode::default(),
 
             'pol_id'       => $latest?->pol_id
                 ?? $defaultPorts['pol_id']

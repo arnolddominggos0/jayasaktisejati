@@ -55,14 +55,18 @@ $headerBorder = OperationalUi::severityBorder($state->severity);
                             {{ $v->vessel?->name }}
                         </div>
 
-                        <div class="text-[11px] font-mono text-gray-500">
-                            {{ $v->voyage_no }}
+                        @if ($v->code)
+                            <div class="text-[13px] font-mono font-semibold text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
+                                {{ $v->code }}
+                            </div>
+                        @endif
+
+                        <div class="text-[11px] font-mono text-gray-400">
+                            ({{ $v->voyage_no }})
                         </div>
 
-                        <div class="text-[11px] text-gray-400 uppercase">
-                            {{ $v->pol?->code }}
-                            →
-                            {{ $v->pod?->code }}
+                        <div class="text-[11px] text-gray-400">
+                            {{ \App\Supports\BusinessRouteResolver::forVoyage($v) }}
                         </div>
 
                         <div class="text-[11px] text-gray-400 uppercase">

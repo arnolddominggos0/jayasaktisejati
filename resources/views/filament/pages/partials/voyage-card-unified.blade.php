@@ -22,10 +22,15 @@
                 <h3 class="font-bold text-[14px] text-gray-900 truncate">
                     {{ $v->vessel?->name }}
                 </h3>
-                <span class="text-[11px] text-gray-500 font-medium">{{ $v->voyage_no }}</span>
+                <span class="text-[11px] font-mono font-semibold text-gray-700">
+                    {{ $v->code ?? $v->voyage_no }}
+                </span>
+                @if ($v->code)
+                    <span class="text-[10px] text-gray-400 font-mono">({{ $v->voyage_no }})</span>
+                @endif
             </div>
             <div class="mt-1 text-[11px] text-gray-400">
-                {{ $v->pol?->code ?? '-' }} → {{ $v->pod?->code ?? '-' }}
+                {{ \App\Supports\BusinessRouteResolver::forVoyage($v) }}
                 @if ($v->shippingLine?->name)
                     <span class="mx-0.5 text-gray-300">·</span>
                     {{ $v->shippingLine->name }}

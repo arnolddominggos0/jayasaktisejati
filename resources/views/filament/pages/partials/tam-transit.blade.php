@@ -18,7 +18,7 @@
                         {{ $v->vessel?->name }} — {{ $v->voyage_no }}
                     </div>
                     <div class="text-sm text-gray-500">
-                        {{ $v->pol?->code }} → {{ $v->pod?->code }}
+                        {{ \App\Supports\BusinessRouteResolver::forVoyage($v) }}
                     </div>
                 </div>
 

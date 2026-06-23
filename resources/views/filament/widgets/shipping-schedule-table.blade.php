@@ -30,7 +30,7 @@
                             <td class="border px-3 py-2">{{ $r->voyage?->vessel?->name }}</td>
                             <td class="border px-3 py-2">{{ $r->voyage?->voyage_no }}</td>
                             <td class="border px-3 py-2">
-                                {{ $r->voyage?->pol?->code }} → {{ $r->voyage?->pod?->code }}
+                                {{ $r->voyage ? \App\Supports\BusinessRouteResolver::forVoyage($r->voyage) : '—' }}
                             </td>
                             <td class="border px-3 py-2">{{ optional($r->voyage?->etd)->format('d M Y H:i') }}</td>
                             <td class="border px-3 py-2">{{ optional($r->voyage?->eta)->format('d M Y H:i') }}</td>

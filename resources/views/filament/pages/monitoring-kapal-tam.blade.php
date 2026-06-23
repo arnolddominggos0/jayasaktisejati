@@ -261,7 +261,12 @@
                     <div class="space-y-3 text-sm">
                         <div>
                             <div class="text-gray-500">Voyage</div>
-                            <div class="font-semibold">{{ $selectedMilestone->voyage->voyage_no }}</div>
+                            <div class="font-semibold font-mono text-sm">
+                                {{ $selectedMilestone->voyage->code ?? $selectedMilestone->voyage->voyage_no }}
+                                @if ($selectedMilestone->voyage->code)
+                                    <span class="text-gray-400 font-normal text-[10px]">({{ $selectedMilestone->voyage->voyage_no }})</span>
+                                @endif
+                            </div>
                         </div>
                         <div>
                             <div class="text-gray-500">Kapal</div>
@@ -334,8 +339,9 @@
                             @endphp
                             <h3 class="text-sm font-semibold text-gray-800">{{ $modalTitle }}</h3>
                             @if ($drawerVoyage)
-                                <p class="text-[10px] text-gray-500 mt-0.5">
-                                    {{ $drawerVoyage->vessel?->name }} · {{ $drawerVoyage->voyage_no }}
+                                <p class="text-[10px] text-gray-500 font-mono mt-0.5">
+                                    {{ $drawerVoyage->vessel?->name }} ·
+                                    {{ $drawerVoyage->code ?? $drawerVoyage->voyage_no }}
                                 </p>
                             @endif
                         </div>
@@ -540,9 +546,14 @@
                         <div class="flex items-start justify-between px-5 py-4 border-b border-gray-100">
                             <div>
                                 <h2 class="text-sm font-bold text-gray-900">{{ $dv->vessel?->name }}</h2>
-                                <p class="text-[10px] text-gray-500 font-mono mt-0.5">{{ $dv->voyage_no }}</p>
+                                @if ($dv->code)
+                                    <p class="text-[11px] text-gray-700 font-mono font-semibold mt-0.5">{{ $dv->code }}</p>
+                                    <p class="text-[9px] text-gray-400 font-mono">({{ $dv->voyage_no }})</p>
+                                @else
+                                    <p class="text-[10px] text-gray-500 font-mono mt-0.5">{{ $dv->voyage_no }}</p>
+                                @endif
                                 <p class="text-[10px] text-gray-400 mt-0.5">
-                                    {{ $dv->pol?->code ?? '-' }} → {{ $dv->pod?->code ?? '-' }}
+                                    {{ \App\Supports\BusinessRouteResolver::forVoyage($dv) }}
                                 </p>
                             </div>
                             <button wire:click="closeDrawer" class="text-gray-400 hover:text-gray-600 mt-0.5">
