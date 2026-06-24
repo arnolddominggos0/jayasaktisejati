@@ -6,6 +6,7 @@ use App\Filament\FC\Resources\ContainerReadinessSessionResource\Pages;
 use App\Models\ContainerReadinessSession;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -89,6 +90,41 @@ class ContainerReadinessSessionResource extends Resource
                 ->label('Catatan')
                 ->rows(3)
                 ->columnSpanFull(),
+
+            Repeater::make('container_numbers')
+                ->label('Nomor Container Tersedia')
+                ->helperText('Masukkan satu nomor container per baris. Digunakan FC saat Planning Loading.')
+                ->addActionLabel('Tambah Container')
+                ->reorderable(false)
+                ->columnSpanFull()
+                ->schema([
+                    TextInput::make('number')
+                        ->label('Nomor Container')
+                        ->placeholder('TGHU1234567')
+                        ->maxLength(20)
+                        ->required()
+                        ->extraAttributes(['style' => 'font-family: monospace; text-transform: uppercase;']),
+                ])
+                ->dehydrateStateUsing(fn(array $state): array =>
+                    collect($state)
+                        ->map(fn($row) => strtoupper(trim($row['number'] ?? '')))
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all()
+                )
+                ->afterStateHydrated(function (Repeater $component, ?array $state): void {
+                    if (empty($state)) {
+                        $component->state([]);
+                        return;
+                    }
+                    $component->state(
+                        collect($state)
+                            ->map(fn($item) => is_string($item) ? ['number' => $item] : $item)
+                            ->values()
+                            ->all()
+                    );
+                }),
 
         ])->columns(2);
     }

@@ -527,6 +527,8 @@ class Shipment extends Model
 
         $this->ensureHandoverInspectionCleared($status);
 
+        $this->ensureContainerAssigned($status);
+
         $this->ensureLoadingInspectionCleared($status);
 
         $this->ensureLoadingSessionCompleted($status);
@@ -697,6 +699,37 @@ class Shipment extends Model
                 'Ada unit yang ditandai Return To PDC. Selesaikan permasalahan unit terlebih dahulu.'
             );
         }
+    }
+
+    /**
+     * Gate: Vehicle Cargo — semua unit wajib memiliki container_display sebelum Stuffing.
+     * Rack shipments skip Stuffing entirely, so this gate never fires for them.
+     */
+    protected function ensureContainerAssigned(TrackStatus $status): void
+    {
+        if ($status !== TrackStatus::Stuffing) {
+            return;
+        }
+
+        $isVehicle = ($this->cargo_type instanceof \App\Enums\CargoType)
+            ? $this->cargo_type === \App\Enums\CargoType::Vehicle
+            : $this->cargo_type === \App\Enums\CargoType::Vehicle->value;
+
+        if (! $isVehicle) {
+            return;
+        }
+
+        $totalUnits      = $this->units()->count();
+        $unassignedCount = $this->units()->whereNull('container_display')->count();
+
+        if ($totalUnits === 0 || $unassignedCount === 0) {
+            return;
+        }
+
+        throw new DomainException(
+            "Semua unit harus memiliki container assignment sebelum proses Stuffing dapat dilakukan. " .
+            "{$unassignedCount} dari {$totalUnits} unit belum memiliki container."
+        );
     }
 
     protected function ensureLoadingInspectionCleared(TrackStatus $status): void

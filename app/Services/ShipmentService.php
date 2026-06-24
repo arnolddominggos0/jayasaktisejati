@@ -216,6 +216,14 @@ class ShipmentService
             $id = $u['id'] ?? null;
 
             if ($id && $existing->has($id)) {
+                // Preserve container_display if the form did not explicitly submit it.
+                // FC assigns container_display via the Handover action — Office Admin
+                // form hides the field (cargo_type=vehicle) so it must never overwrite.
+                $existingUnit       = $existing->get($id);
+                $containerDisplay   = array_key_exists('container_display', $u)
+                    ? ($u['container_display'] ?: null)
+                    : $existingUnit?->container_display;
+
                 $shipment->units()->whereKey($id)->update([
                     'model_no'          => $u['model_no'] ?? null,
                     'reg_no'            => $u['reg_no'] ?? null,
@@ -224,7 +232,7 @@ class ShipmentService
                     'color'             => $u['color'] ?? null,
                     'do_number'         => $u['do_number'] ?? null,
                     'qty'               => isset($u['qty']) ? (int) $u['qty'] : 1,
-                    'container_display' => $u['container_display'] ?? null,
+                    'container_display' => $containerDisplay,
                     'notes'             => $u['notes'] ?? null,
                 ]);
                 $keepIds[] = $id;

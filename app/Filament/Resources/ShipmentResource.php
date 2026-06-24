@@ -621,10 +621,12 @@ class ShipmentResource extends Resource
                                     ->maxLength(20)
                                     ->visible(fn(Get $get, $record) =>
                                         $get('mode') === ShipmentMode::Sea->value
+                                        && $get('cargo_type') !== CargoType::Vehicle->value
                                         && ($record === null || empty($record->container_display))
                                     )
                                     ->required(fn(Get $get, $record) =>
                                         $get('mode') === ShipmentMode::Sea->value
+                                        && $get('cargo_type') !== CargoType::Vehicle->value
                                         && ($record === null || empty($record->container_display))
                                     )
                                     ->live(onBlur: true)
@@ -663,7 +665,10 @@ class ShipmentResource extends Resource
                                 TextInput::make('seal_no')
                                     ->label('Seal No.')
                                     ->maxLength(20)
-                                    ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value)
+                                    ->visible(fn(Get $get) =>
+                                        $get('mode') === ShipmentMode::Sea->value
+                                        && $get('cargo_type') !== CargoType::Vehicle->value
+                                    )
                                     ->required(fn(Get $get) =>
                                         $get('mode') === ShipmentMode::Sea->value
                                         && $get('cargo_type') !== CargoType::Vehicle->value
@@ -764,38 +769,23 @@ class ShipmentResource extends Resource
                                         Hidden::make('weight_total')->dehydrated(),
                                     ]),
 
+                                // vehicle_kind dan vehicle_loading ditentukan oleh FC saat Handover.
+                                // Office Admin tidak memilih metode muat — field ini disembunyikan.
                                 ToggleButtons::make('vehicle_kind')
                                     ->label('Jenis Unit')
                                     ->options(['car' => 'Mobil', 'motorcycle' => 'Motor'])
                                     ->inline()
-                                    ->live()
-                                    ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
-                                    ->required(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
+                                    ->hidden(true)
+                                    ->required(false)
                                     ->dehydrated(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
-                                    ->afterStateUpdated(function ($state, Set $set, Get $get) {
-                                        $valid = $state === 'motorcycle'
-                                            ? ['regular', 'flat_rack']
-                                            : ['regular', 'rack'];
-
-                                        if (! in_array($get('vehicle_loading'), $valid, true)) {
-                                            $set('vehicle_loading', null);
-                                        }
-                                    })
                                     ->columnSpan(6),
 
                                 ToggleButtons::make('vehicle_loading')
                                     ->label('Metode Muat Unit')
-                                    ->options(function (Get $get) {
-                                        $kind = $get('vehicle_kind') ?: 'car';
-
-                                        return $kind === 'motorcycle'
-                                            ? ['regular' => 'Reguler', 'flat_rack' => 'Flat Rack']
-                                            : ['regular' => 'Reguler', 'rack' => 'Dengan Rack'];
-                                    })
+                                    ->options(['regular' => 'Reguler', 'rack' => 'Dengan Rack', 'flat_rack' => 'Flat Rack'])
                                     ->inline()
-                                    ->live()
-                                    ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
-                                    ->required(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
+                                    ->hidden(true)
+                                    ->required(false)
                                     ->dehydrated(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
                                     ->columnSpan(6),
 
@@ -836,6 +826,7 @@ class ShipmentResource extends Resource
                                             ->label('Container No')
                                             ->maxLength(30)
                                             ->placeholder('TAKU 000000-0')
+                                            ->hidden(true)
                                             ->columnSpan(3),
                                     ])
                                     ->addActionLabel('Tambah Unit')

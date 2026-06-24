@@ -2,6 +2,7 @@
 
 namespace App\Filament\FC\Pages;
 
+use App\Enums\CargoType;
 use App\Enums\MPCheckStatus;
 use App\Enums\ShipmentStatus;
 use App\Enums\TrackStatus;
@@ -10,6 +11,7 @@ use App\Filament\FC\Resources\BriefingSessionResource;
 use App\Filament\FC\Resources\ContainerReadinessSessionResource;
 use App\Filament\FC\Resources\ShipmentResource;
 use App\Models\BriefingSession;
+use App\Models\ContainerReadinessSession;
 use App\Models\Depot;
 use App\Models\Shipment;
 use Illuminate\Support\Carbon;
@@ -22,10 +24,17 @@ use App\Services\ShipmentOperationalGateResolver;
 use App\Services\ShipmentOwnership;
 use DomainException;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\TextInput as FormTextInput;
+use Filament\Forms\Components\Textarea as FormTextarea;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -334,10 +343,21 @@ class OperationalTasks extends Page implements HasTable
             WHERE u.shipment_id = shipments.id
         )::integer";
 
+        // Vehicle cargo: units without container_display that haven't passed stuffing
+        $unassignedContainerSql = "(
+            SELECT COUNT(u.id)
+            FROM units u
+            WHERE u.shipment_id = shipments.id
+              AND u.container_display IS NULL
+              AND shipments.cargo_type = 'vehicle'
+              AND NOT {$exitGate}
+        )";
+
         return [
             DB::raw("{$waitingSql} AS waiting_inspection_count"),
             DB::raw("{$bermasalahSql} AS bermasalah_count"),
             DB::raw("{$readinessSql} AS readiness_pct"),
+            DB::raw("{$unassignedContainerSql} AS unassigned_container_count"),
         ];
     }
 
@@ -487,6 +507,31 @@ class OperationalTasks extends Page implements HasTable
                     })
                     ->sortable(query: fn(Builder $query, string $direction): Builder =>
                         $query->reorder()->orderBy('readiness_pct', $direction)
+                    ),
+
+                TextColumn::make('container_status')
+                    ->label('Container')
+                    ->badge()
+                    ->getStateUsing(function (Shipment $record): string {
+                        $isVehicle = ($record->cargo_type instanceof CargoType)
+                            ? $record->cargo_type === CargoType::Vehicle
+                            : $record->cargo_type === CargoType::Vehicle->value;
+                        if (! $isVehicle) return '';
+                        $unassigned = (int) ($record->unassigned_container_count ?? -1);
+                        if ($unassigned < 0) return '';
+                        return $unassigned === 0 ? 'Ready' : 'Belum Lengkap';
+                    })
+                    ->color(function (Shipment $record): string {
+                        $isVehicle = ($record->cargo_type instanceof CargoType)
+                            ? $record->cargo_type === CargoType::Vehicle
+                            : $record->cargo_type === CargoType::Vehicle->value;
+                        if (! $isVehicle) return 'gray';
+                        $unassigned = (int) ($record->unassigned_container_count ?? -1);
+                        if ($unassigned < 0) return 'gray';
+                        return $unassigned === 0 ? 'success' : 'warning';
+                    })
+                    ->sortable(query: fn(Builder $query, string $direction): Builder =>
+                        $query->reorder()->orderBy('unassigned_container_count', $direction)
                     ),
 
                 TextColumn::make('voyage_no_display')
@@ -777,25 +822,148 @@ class OperationalTasks extends Page implements HasTable
                             $record->latest_track_status?->value === TrackStatus::Pickup->value
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
-                        ->form([
-                            \Filament\Forms\Components\TextInput::make('sjkb_no')
-                                ->label('Nomor SJKB')
-                                ->required()
-                                ->maxLength(120),
-                            \Filament\Forms\Components\TextInput::make('yard_slot')
-                                ->label('Yard Slot')
-                                ->placeholder('A-01 / B-03')
-                                ->maxLength(50),
-                            \Filament\Forms\Components\Textarea::make('note')
-                                ->label('Catatan')
-                                ->rows(3),
-                        ])
+                        ->fillForm(function (Shipment $record): array {
+                            $isVehicle = ($record->cargo_type instanceof CargoType)
+                                ? $record->cargo_type === CargoType::Vehicle
+                                : $record->cargo_type === CargoType::Vehicle->value;
+
+                            $unitContainers = [];
+                            $containerInfo  = '';
+
+                            if ($isVehicle) {
+                                $session        = ContainerReadinessSession::whereDate('session_date', today())->first();
+                                $numbers        = $session?->container_number_list ?? [];
+                                $containerInfo  = empty($numbers)
+                                    ? '(Belum dikonfigurasi — isi nomor container secara manual)'
+                                    : implode('  ·  ', $numbers);
+
+                                $unitContainers = $record->units()->orderBy('id')->get()
+                                    ->map(fn($u) => [
+                                        'unit_id'           => $u->id,
+                                        'chassis_no'        => $u->chassis_no ?? '—',
+                                        'model_no'          => $u->model_no ?? '—',
+                                        'container_display' => $u->container_display ?? '',
+                                    ])->all();
+                            }
+
+                            return [
+                                'sjkb_no'           => '',
+                                'yard_slot'         => '',
+                                'note'              => '',
+                                'vehicle_loading'   => $record->vehicle_loading ?? '',
+                                'container_info'    => $containerInfo,
+                                'unit_containers'   => $unitContainers,
+                            ];
+                        })
+                        ->form(function (Shipment $record): array {
+                            $isVehicle = ($record->cargo_type instanceof CargoType)
+                                ? $record->cargo_type === CargoType::Vehicle
+                                : $record->cargo_type === CargoType::Vehicle->value;
+
+                            $baseFields = [
+                                Section::make('Informasi Handover')->schema([
+                                    FormTextInput::make('sjkb_no')
+                                        ->label('Nomor SJKB')
+                                        ->required()
+                                        ->maxLength(120),
+                                    FormTextInput::make('yard_slot')
+                                        ->label('Yard Slot')
+                                        ->placeholder('A-01 / B-03')
+                                        ->maxLength(50),
+                                    FormTextarea::make('note')
+                                        ->label('Catatan')
+                                        ->rows(2),
+                                ])->columns(3),
+                            ];
+
+                            if (! $isVehicle) {
+                                return $baseFields;
+                            }
+
+                            return array_merge($baseFields, [
+                                Section::make('Planning Loading')
+                                    ->description('Tentukan metode muat dan nomor container untuk setiap unit.')
+                                    ->schema([
+                                        \Filament\Forms\Components\ToggleButtons::make('vehicle_loading')
+                                            ->label('Metode Muat Unit')
+                                            ->options([
+                                                'regular'   => 'Reguler',
+                                                'rack'      => 'Rack',
+                                                'flat_rack' => 'Flat Rack',
+                                            ])
+                                            ->colors([
+                                                'regular'   => 'info',
+                                                'rack'      => 'warning',
+                                                'flat_rack' => 'warning',
+                                            ])
+                                            ->inline()
+                                            ->required()
+                                            ->columnSpanFull(),
+
+                                        Placeholder::make('container_info')
+                                            ->label('Container Tersedia Hari Ini')
+                                            ->content(fn(\Filament\Forms\Get $get): string =>
+                                                $get('container_info') ?: '(Belum dikonfigurasi)'
+                                            )
+                                            ->columnSpanFull(),
+
+                                        Repeater::make('unit_containers')
+                                            ->label('Unit Kendaraan')
+                                            ->addable(false)
+                                            ->deletable(false)
+                                            ->reorderable(false)
+                                            ->columnSpanFull()
+                                            ->schema([
+                                                Hidden::make('unit_id'),
+                                                FormTextInput::make('chassis_no')
+                                                    ->label('Chassis No')
+                                                    ->disabled()
+                                                    ->dehydrated(false)
+                                                    ->extraAttributes(['style' => 'font-family:monospace'])
+                                                    ->columnSpan(4),
+                                                FormTextInput::make('model_no')
+                                                    ->label('Model')
+                                                    ->disabled()
+                                                    ->dehydrated(false)
+                                                    ->columnSpan(4),
+                                                FormTextInput::make('container_display')
+                                                    ->label('No. Container')
+                                                    ->maxLength(20)
+                                                    ->placeholder('TGHU1234567')
+                                                    ->extraAttributes(['style' => 'font-family:monospace; text-transform:uppercase'])
+                                                    ->columnSpan(4),
+                                            ])
+                                            ->columns(12),
+                                    ]),
+                            ]);
+                        })
                         ->action(function (Shipment $record, array $data, $livewire) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             try {
-                                foreach ($record->units as $unit) {
-                                    $unit->update(['sjkb_no' => $data['sjkb_no']]);
+                                $isVehicle = ($record->cargo_type instanceof CargoType)
+                                    ? $record->cargo_type === CargoType::Vehicle
+                                    : $record->cargo_type === CargoType::Vehicle->value;
+
+                                // ── Metode Muat: simpan vehicle_loading ─────────────────
+                                if ($isVehicle && ! empty($data['vehicle_loading'])) {
+                                    $record->forceFill(['vehicle_loading' => $data['vehicle_loading']])->saveQuietly();
                                 }
+
+                                // ── Planning Loading: assign container per unit ──────────
+                                if ($isVehicle && ! empty($data['unit_containers'])) {
+                                    foreach ($data['unit_containers'] as $row) {
+                                        $unitId      = $row['unit_id'] ?? null;
+                                        $containerNo = strtoupper(trim($row['container_display'] ?? ''));
+                                        if ($unitId) {
+                                            $record->units()->whereKey($unitId)->update([
+                                                'container_display' => $containerNo ?: null,
+                                            ]);
+                                        }
+                                    }
+                                }
+
+                                // ── Bulk SJKB to all units ───────────────────────────────
+                                $record->units()->update(['sjkb_no' => $data['sjkb_no']]);
 
                                 $record->appendTrack(
                                     TrackStatus::Handover,
@@ -805,7 +973,10 @@ class OperationalTasks extends Page implements HasTable
 
                                 Notification::make()
                                     ->title('Handover Depo dicatat')
-                                    ->body('Selesaikan inspeksi unit sebelum proses stuffing.')
+                                    ->body($isVehicle
+                                        ? 'Container assignment tersimpan. Selesaikan inspeksi unit sebelum Stuffing.'
+                                        : 'Selesaikan inspeksi unit sebelum proses stuffing.'
+                                    )
                                     ->success()
                                     ->send();
 
@@ -824,7 +995,17 @@ class OperationalTasks extends Page implements HasTable
                             if ($record->latest_track_status?->value !== TrackStatus::Handover->value) return false;
                             if (((int) ($record->waiting_inspection_count ?? 0)) > 0) return false;
                             if (((int) ($record->bermasalah_count ?? 0)) > 0) return false;
-                            return ! LoadingSessionAutoCreate::isRackShipment($record);
+                            if (! LoadingSessionAutoCreate::isRackShipment($record)) {
+                                // Vehicle cargo: hide stuffing button if container assignment incomplete
+                                $isVehicle = ($record->cargo_type instanceof CargoType)
+                                    ? $record->cargo_type === CargoType::Vehicle
+                                    : $record->cargo_type === CargoType::Vehicle->value;
+                                if ($isVehicle && ((int) ($record->unassigned_container_count ?? 1)) > 0) {
+                                    return false;
+                                }
+                                return true;
+                            }
+                            return false;
                         })
                         ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
