@@ -74,6 +74,14 @@ class EvaluasiVoyage extends Page
         return $opts;
     }
 
+    // ── Branch scope helper ───────────────────────────────────────────────
+
+    protected function resolvedBranchId(): ?int
+    {
+        $user = auth_user();
+        return $user?->isOfficeAdmin() ? $user->effectiveBranchId() : null;
+    }
+
     // ── Data loaders ──────────────────────────────────────────────────────
 
     public function loadVoyageSummaries(): void
@@ -83,7 +91,7 @@ class EvaluasiVoyage extends Page
         /** @var LeadTimeAnalysisService $svc */
         $svc = app(LeadTimeAnalysisService::class);
 
-        $rows = $svc->getVoyageSummaries($start, $end, $this->voyageSearch ?: null);
+        $rows = $svc->getVoyageSummaries($start, $end, $this->voyageSearch ?: null, $this->resolvedBranchId());
 
         // Sort
         $sorted = match ($this->sortBy) {
@@ -215,7 +223,7 @@ class EvaluasiVoyage extends Page
         [$start, $end] = $this->parsePeriodRange();
 
         return \Maatwebsite\Excel\Facades\Excel::download(
-            new \App\Exports\EvaluasiVoyageExport($start, $end, $this->voyageSearch ?: null),
+            new \App\Exports\EvaluasiVoyageExport($start, $end, $this->voyageSearch ?: null, $this->resolvedBranchId()),
             'evaluasi-voyage-' . $start->format('Y-m') . '.xlsx'
         );
     }

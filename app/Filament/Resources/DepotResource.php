@@ -30,6 +30,11 @@ class DepotResource extends Resource
     protected static ?string $modelLabel      = 'Depo';
     protected static ?int    $navigationSort  = 4;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
+
     public static function form(Forms\Form $form): Forms\Form
     {
         return $form->schema([

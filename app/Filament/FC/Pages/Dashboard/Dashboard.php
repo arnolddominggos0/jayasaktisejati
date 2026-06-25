@@ -35,7 +35,7 @@ class Dashboard extends Page
 
     public static function canAccess(): bool
     {
-        return Filament::auth()->user()?->hasRole('field_coordinator') ?? false;
+        return Filament::auth()->user()?->isFieldCoordinator() ?? false;
     }
 
     public function getTitle(): string|Htmlable

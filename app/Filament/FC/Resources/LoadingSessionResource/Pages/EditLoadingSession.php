@@ -17,7 +17,7 @@ class EditLoadingSession extends EditRecord
         return [
             Actions\ViewAction::make(),
             Actions\DeleteAction::make()
-                ->visible(fn () => auth()->user()?->hasRole('super_admin')),
+                ->visible(fn () => auth()->user()?->isSuperAdmin()),
         ];
     }
 

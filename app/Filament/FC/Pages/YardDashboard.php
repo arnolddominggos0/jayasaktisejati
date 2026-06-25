@@ -47,7 +47,7 @@ class YardDashboard extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return Filament::auth()->user()?->hasRole('field_coordinator') ?? false;
+        return Filament::auth()->user()?->isFieldCoordinator() ?? false;
     }
 
     public function getHeading(): string

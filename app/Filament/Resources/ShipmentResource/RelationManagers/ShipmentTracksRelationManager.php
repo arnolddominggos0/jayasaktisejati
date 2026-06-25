@@ -24,80 +24,43 @@ class ShipmentTracksRelationManager extends RelationManager
      */
     public static function canViewAny(): bool
     {
-        $user = \Filament\Facades\Filament::auth()->user();
-        return $user?->hasAnyRole(['super_admin', 'field_coordinator']) ?? false;
+        $user = auth_user();
+        return (bool) ($user && ($user->isOfficeUser() || $user->isFieldCoordinator()));
     }
 
-    /**
-     * Authorization: Check individual track record access via parent shipment policy.
-     */
     public function canView(Model $record): bool
     {
-        $user = \Filament\Facades\Filament::auth()->user();
+        $user = auth_user();
+        if (! $user) return false;
+        if ($user->isSuperAdmin()) return true;
 
-        // Super admin bypass
-        if ($user?->hasRole('super_admin')) {
-            return true;
-        }
-
-        // Check parent shipment access via policy
         $shipment = $record->shipment;
-        if (!$shipment) {
-            return false;
-        }
-
-        // Delegate to shipment policy for branch/coordinator scoping
-        return $user?->can('view', $shipment) ?? false;
+        return $shipment && ($user->can('view', $shipment) ?? false);
     }
 
-    /**
-     * Authorization: Only super_admin can create tracks.
-     */
     public function canCreate(): bool
     {
-        $user = \Filament\Facades\Filament::auth()->user();
-        return $user?->hasRole('super_admin') ?? false;
+        return auth_user()?->isSuperAdmin() ?? false;
     }
 
-    /**
-     * Authorization: Only super_admin can edit tracks.
-     * Field coordinators update tracks via action buttons, not direct edit.
-     */
     public function canEdit(Model $record): bool
     {
-        $user = \Filament\Facades\Filament::auth()->user();
+        $user = auth_user();
+        if (! $user?->isSuperAdmin()) return false;
 
-        // Only super admin can edit
-        if (!$user?->hasRole('super_admin')) {
-            return false;
-        }
-
-        // Check parent shipment access for defense-in-depth
         $shipment = $record->shipment;
-        if (!$shipment) {
-            return false;
-        }
+        if (! $shipment) return false;
 
         return $user->can('view', $shipment);
     }
 
-    /**
-     * Authorization: Only super_admin can delete tracks.
-     */
     public function canDelete(Model $record): bool
     {
-        $user = \Filament\Facades\Filament::auth()->user();
+        $user = auth_user();
+        if (! $user?->isSuperAdmin()) return false;
 
-        // Only super admin can delete
-        if (!$user?->hasRole('super_admin')) {
-            return false;
-        }
-
-        // Check parent shipment access for defense-in-depth
         $shipment = $record->shipment;
-        if (!$shipment) {
-            return false;
-        }
+        if (! $shipment) return false;
 
         return $user->can('view', $shipment);
     }

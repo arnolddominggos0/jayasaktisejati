@@ -370,13 +370,26 @@ class MonitoringKapalTam extends Page
         }
     }
 
+    // ── Branch scope helper ───────────────────────────────────────────────
+
+    protected function resolvedBranchId(): ?int
+    {
+        $user = auth_user();
+        return $user?->isOfficeAdmin() ? $user->effectiveBranchId() : null;
+    }
+
     protected function baseQuery(Carbon $dt): Builder
     {
+        $branchId = $this->resolvedBranchId();
+
         return Voyage::query()
             ->with(['vessel', 'pol', 'pod', 'milestones', 'checkpoints', 'vesselChecks'])
             ->whereYear('period_month', $dt->year)
             ->whereMonth('period_month', $dt->month)
-            ->whereHas('shipments', fn($q) => $q->where('status', '!=', ShipmentStatus::Cancelled->value))
+            ->whereHas('shipments', fn($q) => $q
+                ->where('status', '!=', ShipmentStatus::Cancelled->value)
+                ->when($branchId, fn($sq) => $sq->where('branch_id', $branchId))
+            )
             ->when($this->search, function ($query) {
                 $query->where(function ($q) {
                     $q->where('voyage_no', 'like', "%{$this->search}%")
@@ -409,12 +422,19 @@ class MonitoringKapalTam extends Page
     // See class PHPDoc for boundary explanation.
     protected function loadCarrierReadiness(): void
     {
+        $branchId = $this->resolvedBranchId();
+
         $voyages = Voyage::query()
             ->whereNull('atd_at')
             ->whereBetween('etd', [
                 now()->addDay()->startOfDay(),
                 now()->addDays(2)->endOfDay(),
             ])
+            // office_admin: only show voyages carrying their branch's cargo
+            ->when($branchId, fn($q) => $q->whereHas('shipments', fn($sq) => $sq
+                ->where('branch_id', $branchId)
+                ->where('status', '!=', ShipmentStatus::Cancelled->value)
+            ))
             ->with(['vessel', 'vesselChecks'])
             ->orderBy('etd')
             ->get();

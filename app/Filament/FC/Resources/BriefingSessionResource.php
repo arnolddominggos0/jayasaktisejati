@@ -47,7 +47,7 @@ class BriefingSessionResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return Filament::auth()->user()?->hasRole('field_coordinator') ?? false;
+        return Filament::auth()->user()?->isFieldCoordinator() ?? false;
     }
 
     public static function getEloquentQuery(): Builder

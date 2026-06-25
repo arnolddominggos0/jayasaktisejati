@@ -1117,16 +1117,20 @@ class ShipmentResource extends Resource
 
                 $user = Filament::auth()->user();
 
-                if (! ($user && method_exists($user, 'hasRole') && $user->hasRole('super_admin'))) {
+                if ($user && ! $user->isSuperAdmin()) {
+                    $branchId = $user->effectiveBranchId();
 
-                    if ($user?->effectiveBranchId()) {
-                        $query->where(function ($w) use ($user) {
-                            $w->where('branch_id', $user->effectiveBranchId())
+                    if ($branchId) {
+                        $query->where(function ($w) use ($branchId) {
+                            $w->where('branch_id', $branchId)
                                 ->orWhereNull('branch_id');
                         });
+                    } elseif ($user->isOfficeAdmin()) {
+                        // office_admin without branch is a misconfiguration — deny all rows
+                        $query->whereRaw('1 = 0');
                     }
 
-                    if ($user && method_exists($user, 'hasRole') && $user->hasRole('field_coordinator')) {
+                    if ($user->isFieldCoordinator()) {
                         $query->where(function ($qq) use ($user) {
                             $qq->where('coordinator_id', $user->id)
                                 ->orWhereNull('coordinator_id');
@@ -1734,53 +1738,52 @@ class ShipmentResource extends Resource
 
     public static function canViewAny(): bool
     {
-        $u = Filament::auth()->user();
+        // Admin panel resource — Office Admin & Super Admin only.
+        // FC uses app/Filament/FC/Resources/ShipmentResource.php via the /fc panel.
+        return auth_user()?->isOfficeUser() ?? false;
+    }
 
-        return (bool) ($u
-            && method_exists($u, 'hasAnyRole')
-            && $u->hasAnyRole(['super_admin', 'field_coordinator']));
+    public static function canCreate(): bool
+    {
+        return auth_user()?->isOfficeUser() ?? false;
     }
 
     public static function canView($record): bool
     {
         $user = Filament::auth()->user();
+        if (! $user) return false;
 
-        if (!$user) {
-            return false;
-        }
+        if ($user->isSuperAdmin()) return true;
 
-        // Super admin bypass
-        if ($user->hasRole('super_admin')) {
-            return true;
-        }
-
-        // Check branch ownership
+        // office_admin: branch-scoped
         if ($user->effectiveBranchId() && $record->branch_id !== null) {
-            if ((int) $record->branch_id !== (int) $user->effectiveBranchId()) {
-                return false;
-            }
+            return (int) $record->branch_id === (int) $user->effectiveBranchId();
         }
 
-        // Field coordinator can view assigned shipments
-        if ($user->hasRole('field_coordinator')) {
-            return $record->coordinator_id === $user->id || $record->coordinator_id === null;
-        }
-
-        return true;
+        return $user->isOfficeAdmin();
     }
 
     public static function canEdit($record): bool
     {
-        $u = Filament::auth()->user();
+        $user = Filament::auth()->user();
+        if (! $user) return false;
 
-        return $u?->hasRole('super_admin') ?? false;
+        if ($user->isSuperAdmin()) return true;
+
+        // office_admin: can edit shipments within their own branch
+        if ($user->isOfficeAdmin()) {
+            if ($user->effectiveBranchId() && $record->branch_id !== null) {
+                return (int) $record->branch_id === (int) $user->effectiveBranchId();
+            }
+            return true;
+        }
+
+        return false;
     }
 
     public static function canDelete($record): bool
     {
-        // Only super admin can delete shipments
-        $user = Filament::auth()->user();
-        return $user?->hasRole('super_admin') ?? false;
+        return auth_user()?->isSuperAdmin() ?? false;
     }
 
 }

@@ -22,6 +22,35 @@ class VesselPlanResource extends Resource
     protected static ?int    $navigationSort  = 1;
     protected static ?string $navigationIcon  = 'heroicon-o-calendar-days';
 
+    // ── Authorization ─────────────────────────────────────────────────────────
+    // VesselPlan is global (no branch). office_admin: read-only reference.
+    // super_admin: full CRUD.
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth_user()?->isOfficeUser() ?? false;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return auth_user()?->isOfficeUser() ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
+
     public static function table(Table $table): Table
     {
         return $table

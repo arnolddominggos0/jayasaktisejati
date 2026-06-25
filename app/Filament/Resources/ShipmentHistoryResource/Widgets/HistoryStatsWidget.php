@@ -18,14 +18,16 @@ class HistoryStatsWidget extends StatsOverviewWidget
 
         $base = Shipment::query()->history();
 
-        if (! $user?->hasRole('super_admin')) {
-            if ($user?->effectiveBranchId()) {
-                $base->where(function ($w) use ($user) {
-                    $w->where('branch_id', $user->effectiveBranchId())
-                        ->orWhereNull('branch_id');
+        if ($user && ! $user->isSuperAdmin()) {
+            $branchId = $user->effectiveBranchId();
+            if ($branchId) {
+                $base->where(function ($w) use ($branchId) {
+                    $w->where('branch_id', $branchId)->orWhereNull('branch_id');
                 });
+            } elseif ($user->isOfficeAdmin()) {
+                $base->whereRaw('1 = 0');
             }
-            if ($user?->hasRole('field_coordinator')) {
+            if ($user->isFieldCoordinator()) {
                 $base->where(function ($q) use ($user) {
                     $q->where('coordinator_id', $user->id)->orWhereNull('coordinator_id');
                 });

@@ -31,54 +31,38 @@ class ShipmentHistoryResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        $u = Filament::auth()->user();
-        return $u?->hasAnyRole(['super_admin', 'field_coordinator']) === true;
+        // Admin panel only — Office Admin & Super Admin.
+        return auth_user()?->isOfficeUser() ?? false;
     }
 
     public static function canViewAny(): bool
     {
-        $u = Filament::auth()->user();
-        return $u?->hasAnyRole(['super_admin', 'field_coordinator']) ?? false;
+        return auth_user()?->isOfficeUser() ?? false;
     }
 
     public static function canView($record): bool
     {
         $user = Filament::auth()->user();
+        if (! $user) return false;
 
-        if (!$user) {
-            return false;
-        }
+        if ($user->isSuperAdmin()) return true;
 
-        // Super admin bypass
-        if ($user->hasRole('super_admin')) {
-            return true;
-        }
-
-        // Check branch ownership
+        // office_admin: branch-scoped
         if ($user->effectiveBranchId() && $record->branch_id !== null) {
             return (int) $record->branch_id === (int) $user->effectiveBranchId();
         }
 
-        // Field coordinator check
-        if ($user->hasRole('field_coordinator')) {
-            return $record->coordinator_id === $user->id || $record->coordinator_id === null;
-        }
-
-        return true;
+        return $user->isOfficeAdmin();
     }
 
     public static function canEdit($record): bool
     {
-        // Only super admin can edit historical shipments
-        $user = Filament::auth()->user();
-        return $user?->hasRole('super_admin') ?? false;
+        return auth_user()?->isSuperAdmin() ?? false;
     }
 
     public static function canDelete($record): bool
     {
-        // Only super admin can delete historical shipments
-        $user = Filament::auth()->user();
-        return $user?->hasRole('super_admin') ?? false;
+        return auth_user()?->isSuperAdmin() ?? false;
     }
 
     public static function getEloquentQuery(): Builder
@@ -89,17 +73,16 @@ class ShipmentHistoryResource extends Resource
 
         $user = Filament::auth()->user();
 
-        if (!$user?->hasRole('super_admin')) {
-            if ($user?->effectiveBranchId()) {
-                $q->where(function ($w) use ($user) {
-                    $w->where('branch_id', $user->effectiveBranchId())->orWhereNull('branch_id');
-                });
-            }
+        if ($user && ! $user->isSuperAdmin()) {
+            $branchId = $user->effectiveBranchId();
 
-            if ($user?->hasRole('field_coordinator')) {
-                $q->where(function ($qq) use ($user) {
-                    $qq->where('coordinator_id', $user->id)->orWhereNull('coordinator_id');
+            if ($branchId) {
+                $q->where(function ($w) use ($branchId) {
+                    $w->where('branch_id', $branchId)->orWhereNull('branch_id');
                 });
+            } elseif ($user->isOfficeAdmin()) {
+                // office_admin without branch is misconfiguration — deny all
+                $q->whereRaw('1 = 0');
             }
         }
 
@@ -304,7 +287,7 @@ class ShipmentHistoryResource extends Resource
                         ->label('Koreksi Data')
                         ->icon('heroicon-o-pencil-square')
                         ->color('warning')
-                        ->visible(fn() => auth_user()?->hasRole('super_admin') === true)
+                        ->visible(fn() => auth_user()?->isSuperAdmin() === true)
                         ->url(fn($record) => ShipmentResource::getUrl('edit', ['record' => $record])),
                 ])->icon('heroicon-m-ellipsis-horizontal')->color('gray'),
             ]);

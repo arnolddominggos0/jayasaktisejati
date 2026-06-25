@@ -52,6 +52,36 @@ class VoyageResource extends Resource
     protected static ?string $modelLabel      = 'Voyage';
     protected static ?int    $navigationSort  = 5;
 
+    // ── Authorization ─────────────────────────────────────────────────────────
+    // Voyage is a global master resource — no branch scoping.
+    // office_admin: read-only (needs to see voyages for shipment creation).
+    // super_admin: full CRUD.
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth_user()?->isOfficeUser() ?? false;
+    }
+
+    public static function canViewAny(): bool
+    {
+        return auth_user()?->isOfficeUser() ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([

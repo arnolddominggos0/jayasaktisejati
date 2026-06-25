@@ -32,7 +32,7 @@ class TrackingActivityTable extends BaseWidget
                     ->latest('tracked_at');
 
                 $user = Filament::auth()?->user();
-                if ($user && method_exists($user, 'hasRole') && ! $user->hasRole('super_admin')) {
+                if ($user && ! $user->isSuperAdmin()) {
                     if (Schema::hasColumn('shipments', 'branch_id') && $user->effectiveBranchId()) {
                         $q->whereHas('shipment', fn (Builder $s) => $s->where(fn ($w) => $w->where('branch_id', $user->effectiveBranchId())->orWhereNull('branch_id')));
                     } elseif (Schema::hasColumn('shipments', 'depot_id') && data_get($user, 'depot_id')) {

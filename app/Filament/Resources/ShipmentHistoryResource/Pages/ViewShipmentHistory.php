@@ -92,7 +92,7 @@ class ViewShipmentHistory extends ViewRecord
                 ->icon('heroicon-o-pencil-square')
                 ->color('warning')
                 ->url(\App\Filament\Resources\ShipmentResource::getUrl('edit', ['record' => $record]))
-                ->visible(fn() => auth_user()?->hasRole('super_admin') === true),
+                ->visible(fn() => auth_user()?->isSuperAdmin() === true),
 
             // ── Utility ───────────────────────────────────────────────────
             Action::make('copy_link')

@@ -65,7 +65,7 @@ class OperationalTasks extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->hasRole('field_coordinator') ?? false;
+        return auth()->user()?->isFieldCoordinator() ?? false;
     }
 
     // ── Scope resolution ──────────────────────────────────────────────────────
@@ -730,7 +730,7 @@ class OperationalTasks extends Page implements HasTable
                         }
 
                         $override = null;
-                        if (auth_user()?->hasRole('super_admin') && ! empty($data['override_reason'])) {
+                        if (auth_user()?->isSuperAdmin() && ! empty($data['override_reason'])) {
                             $override = ['reason' => $data['override_reason']];
                         }
 

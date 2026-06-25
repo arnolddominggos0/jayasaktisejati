@@ -39,6 +39,11 @@ class BriefingSessionResource extends Resource
 
     // ── Permissions ──────────────────────────────────────────────────────────
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
+
     public static function canCreate(): bool
     {
         return false;

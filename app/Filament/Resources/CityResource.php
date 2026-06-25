@@ -29,6 +29,11 @@ class CityResource extends Resource
     protected static ?string $modelLabel      = 'Kota';
     protected static ?int    $navigationSort  = 7;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([

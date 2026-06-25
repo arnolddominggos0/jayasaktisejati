@@ -20,6 +20,11 @@ class VesselResource extends Resource
     protected static ?string $navigationLabel = 'Kapal';
     protected static ?int $navigationSort = 3;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([

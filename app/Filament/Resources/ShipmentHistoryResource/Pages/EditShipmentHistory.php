@@ -22,7 +22,7 @@ class EditShipmentHistory extends EditRecord
         parent::authorizeAccess();
 
         $u = \Filament\Facades\Filament::auth()->user();
-        if ($this->record && $this->record->isHistorical() && ! $u?->hasRole('super_admin')) {
+        if ($this->record && $this->record->isHistorical() && ! $u?->isSuperAdmin()) {
             \Filament\Notifications\Notification::make()
                 ->title('Riwayat bersifat read-only')
                 ->body('Pengiriman sudah Terkirim/Dibatalkan. Hanya super admin yang dapat mengedit riwayat.')

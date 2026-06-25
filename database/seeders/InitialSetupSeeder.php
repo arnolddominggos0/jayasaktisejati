@@ -21,7 +21,9 @@ class InitialSetupSeeder extends Seeder
         */
 
         Role::firstOrCreate(['name' => 'super_admin']);
+        Role::firstOrCreate(['name' => 'office_admin']);
         Role::firstOrCreate(['name' => 'field_coordinator']);
+        Role::firstOrCreate(['name' => 'customer']);
 
         /*
         |--------------------------------------------------------------------------

@@ -53,9 +53,16 @@ class AdminDashboard extends Page implements HasForms
     {
         $this->period_month = now()->format('Y-m');
 
+        // Office Admin is always scoped to their branch.
+        // Super Admin defaults to unscoped (can filter to any branch via form).
+        $user = auth_user();
+        if ($user?->isOfficeAdmin()) {
+            $this->branch_id = $user->effectiveBranchId();
+        }
+
         $this->form->fill([
             'dashboardView' => 'tam',
-            'branch_id' => null,
+            'branch_id' => $this->branch_id,
             'mode' => null,
             'period' => 'this_month',
             'period_month' => $this->period_month,
@@ -105,9 +112,14 @@ class AdminDashboard extends Page implements HasForms
                         ->options($this->getBranchOptions())
                         ->reactive()
                         ->afterStateUpdated(function ($state) {
-                            $this->branch_id = $state ?: null;
-                            $this->dispatch('charts-ready');
+                            // Office Admin branch is fixed — ignore form changes.
+                            if (! auth_user()?->isOfficeAdmin()) {
+                                $this->branch_id = $state ?: null;
+                                $this->dispatch('charts-ready');
+                            }
                         })
+                        ->disabled(fn() => auth_user()?->isOfficeAdmin() ?? false)
+                        ->helperText(fn() => auth_user()?->isOfficeAdmin() ? 'Scope cabang Anda (read-only)' : null)
                         ->columnSpan(1),
 
                     Forms\Components\Select::make('mode')
@@ -138,6 +150,21 @@ class AdminDashboard extends Page implements HasForms
     protected function getBranchOptions(): array
     {
         return DB::table('branches')->orderBy('name')->pluck('name', 'id')->toArray();
+    }
+
+    /**
+     * Branch ID to use for scoping queries.
+     * office_admin: always their effectiveBranchId (fails-closed if null).
+     * super_admin: form filter value (null = global).
+     */
+    protected function resolvedBranchId(): ?int
+    {
+        $user = auth_user();
+        if ($user?->isOfficeAdmin()) {
+            return $user->effectiveBranchId();
+        }
+
+        return $this->branch_id ?: null;
     }
 
     protected function parsePeriodMonth(): Carbon
@@ -186,9 +213,22 @@ class AdminDashboard extends Page implements HasForms
 
     protected function applyFilters(Builder $q): Builder
     {
-        return $q
-            ->when($this->branch_id, fn($qq) => $qq->where('branch_id', $this->branch_id))
-            ->when($this->mode, fn($qq) => $qq->where('mode', $this->mode));
+        $user = auth_user();
+
+        // office_admin: hard-scope to their branch, fails-closed if no branch.
+        // super_admin: optional filter from form (null = global).
+        if ($user?->isOfficeAdmin()) {
+            $branchId = $user->effectiveBranchId();
+            if ($branchId) {
+                $q->where('branch_id', $branchId);
+            } else {
+                $q->whereRaw('1 = 0');
+            }
+        } else {
+            $q->when($this->branch_id, fn($qq) => $qq->where('branch_id', $this->branch_id));
+        }
+
+        return $q->when($this->mode, fn($qq) => $qq->where('mode', $this->mode));
     }
 
     protected function baseShipmentQuery(): Builder
@@ -361,20 +401,16 @@ class AdminDashboard extends Page implements HasForms
                 ShipmentStatus::Pickup->value,
             ])->count();
 
+        $resolvedBranch = $this->resolvedBranchId();
         $aktivitasPeriode = ShipmentTrack::query()
             ->when(
-                $this->branch_id,
-                fn($qq) => $qq->whereHas(
-                    'shipment',
-                    fn($s) => $s->where('branch_id', $this->branch_id)
-                )
+                $resolvedBranch,
+                fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('branch_id', $resolvedBranch)),
+                fn($qq) => auth_user()?->isOfficeAdmin() ? $qq->whereRaw('1 = 0') : $qq
             )
             ->when(
                 $this->mode,
-                fn($qq) => $qq->whereHas(
-                    'shipment',
-                    fn($s) => $s->where('mode', $this->mode)
-                )
+                fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('mode', $this->mode))
             )
             ->whereBetween('tracked_at', [$start, $end])
             ->count();
@@ -394,20 +430,16 @@ class AdminDashboard extends Page implements HasForms
         return collect(range($days, 0))->map(function ($i) use ($end) {
             $day = $end->copy()->subDays($i);
 
+            $sparkBranch = $this->resolvedBranchId();
             $count = ShipmentTrack::query()
                 ->when(
-                    $this->branch_id,
-                    fn($qq) => $qq->whereHas(
-                        'shipment',
-                        fn($s) => $s->where('branch_id', $this->branch_id)
-                    )
+                    $sparkBranch,
+                    fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('branch_id', $sparkBranch)),
+                    fn($qq) => auth_user()?->isOfficeAdmin() ? $qq->whereRaw('1 = 0') : $qq
                 )
                 ->when(
                     $this->mode,
-                    fn($qq) => $qq->whereHas(
-                        'shipment',
-                        fn($s) => $s->where('mode', $this->mode)
-                    )
+                    fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('mode', $this->mode))
                 )
                 ->whereDate('tracked_at', $day)
                 ->count();
@@ -467,11 +499,12 @@ class AdminDashboard extends Page implements HasForms
     {
         [$start, $end] = $this->getPeriodRange();
 
+        $resolvedBranch = $this->resolvedBranchId();
         $rows = Customer::query()
             ->select(['customers.id', 'customers.name'])
             ->selectRaw('COUNT(shipments.id) as total')
             ->leftJoin('shipments', 'shipments.customer_id', '=', 'customers.id')
-            ->when($this->branch_id, fn($qq) => $qq->where('shipments.branch_id', $this->branch_id))
+            ->when($resolvedBranch, fn($qq) => $qq->where('shipments.branch_id', $resolvedBranch))
             ->when($this->mode, fn($qq) => $qq->where('shipments.mode', $this->mode))
             ->whereBetween('shipments.created_at', [$start, $end])
             ->groupBy(['customers.id', 'customers.name'])
@@ -506,9 +539,14 @@ class AdminDashboard extends Page implements HasForms
     {
         [$start, $end] = $this->getPeriodRange();
 
+        $resolvedBranch = $this->resolvedBranchId();
         return ShipmentTrack::query()
             ->with(['shipment:id,code', 'user:id,name'])
-            ->when($this->branch_id, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('branch_id', $this->branch_id)))
+            ->when(
+                $resolvedBranch,
+                fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('branch_id', $resolvedBranch)),
+                fn($qq) => auth_user()?->isOfficeAdmin() ? $qq->whereRaw('1 = 0') : $qq
+            )
             ->when($this->mode, fn($qq) => $qq->whereHas('shipment', fn($s) => $s->where('mode', $this->mode)))
             ->whereBetween('tracked_at', [$start, $end])
             ->latest('tracked_at')->limit(12)->get()
@@ -819,15 +857,22 @@ class AdminDashboard extends Page implements HasForms
 
     public function getInspeksiRingkasan(): array
     {
-        $total = DB::table('units')->count();
+        $branchId = $this->resolvedBranchId();
 
-        $sudah = DB::table('units as u')
+        $base = DB::table('units as u')
+            ->join('shipments as s', 's.id', '=', 'u.shipment_id')
+            ->when($branchId, fn($q) => $q->where('s.branch_id', $branchId));
+
+        $total = (clone $base)->count('u.id');
+
+        $sudah = (clone $base)
             ->join('unit_inspections as ui', 'ui.unit_id', '=', 'u.id')
             ->distinct('u.id')
             ->count('u.id');
 
-        $ng = DB::table('unit_inspection_items as uii')
-            ->join('unit_inspections as ui', 'ui.id', '=', 'uii.unit_inspection_id')
+        $ng = (clone $base)
+            ->join('unit_inspections as ui2', 'ui2.unit_id', '=', 'u.id')
+            ->join('unit_inspection_items as uii', 'uii.unit_inspection_id', '=', 'ui2.id')
             ->where('uii.result', 'ng')
             ->count();
 

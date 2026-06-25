@@ -36,32 +36,67 @@ class ShipmentUnitsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('chassis_no')
+            ->recordTitleAttribute('sjkb_no')
             ->heading('Daftar Unit & Status Inspeksi')
             ->description(fn () => $this->buildStatsDescription())
-            ->modifyQueryUsing(fn (Builder $query) => $query->with('inspections'))
+            ->modifyQueryUsing(fn (Builder $query) => $query
+                ->with('inspections')
+                ->orderByRaw('container_display NULLS LAST')
+                ->orderBy('sjkb_no')
+            )
             ->columns([
 
-                // ── Identitas unit ────────────────────────────────────────────
+                // ── Identitas operasional (FC-facing) ─────────────────────────
 
-                TextColumn::make('chassis_no')
-                    ->label('Chassis No')
+                TextColumn::make('sjkb_no')
+                    ->label('SJKB')
                     ->searchable()
                     ->copyable()
                     ->fontFamily('mono')
-                    ->weight('bold'),
+                    ->weight('bold')
+                    ->default('—'),
 
                 TextColumn::make('model_no')
                     ->label('Model')
                     ->badge()
-                    ->color('gray'),
+                    ->color('gray')
+                    ->default('—'),
 
-                TextColumn::make('reg_no')
-                    ->label('No. Polisi')
+                TextColumn::make('container_display')
+                    ->label('Container')
+                    ->fontFamily('mono')
+                    ->badge()
+                    ->color(fn (?string $state): string => blank($state) ? 'warning' : 'info')
+                    ->formatStateUsing(fn (?string $state): string => blank($state) ? 'Belum Assigned' : $state)
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('vehicle_loading_display')
+                    ->label('Metode Muat')
+                    ->getStateUsing(fn (Unit $record): string => match ($this->ownerRecord?->vehicle_loading) {
+                        'rack'      => 'Rack',
+                        'flat_rack' => 'Flat Rack',
+                        'regular'   => 'Reguler',
+                        default     => '—',
+                    })
+                    ->badge()
+                    ->color(fn (Unit $record): string => match ($this->ownerRecord?->vehicle_loading) {
+                        'rack', 'flat_rack' => 'warning',
+                        'regular'           => 'info',
+                        default             => 'gray',
+                    }),
+
+                // ── Identitas fisik kendaraan (secondary) ─────────────────────
+
+                TextColumn::make('chassis_no')
+                    ->label('Chassis')
+                    ->fontFamily('mono')
+                    ->searchable()
+                    ->copyable()
+                    ->color('gray')
                     ->default('—'),
 
                 // ── Tahap Aktif (dari TrackStatus shipment) ───────────────────
-                // Nilai sama untuk semua unit dalam satu shipment
 
                 TextColumn::make('tahap_aktif')
                     ->label('Tahap Aktif')
@@ -315,22 +350,43 @@ class ShipmentUnitsRelationManager extends RelationManager
             ])
             ->get();
 
-        $total    = $units->count();
-        $sudah    = $units->filter(fn ($u) => $u->inspections_count > 0)->count();
-        $belum    = $total - $sudah;
-        $rtnPdc   = $units->filter(fn ($u) => $u->return_to_pdc_count > 0)->count();
-        $stage    = $this->getActiveStageLabel();
+        $total  = $units->count();
+        $sudah  = $units->filter(fn ($u) => $u->inspections_count > 0)->count();
+        $belum  = $total - $sudah;
+        $rtnPdc = $units->filter(fn ($u) => $u->return_to_pdc_count > 0)->count();
+        $stage  = $this->getActiveStageLabel();
+
         $stageHtml = $stage
             ? '<span class="text-blue-700 dark:text-blue-400">Tahap Aktif: <strong>' . e($stage) . '</strong></span>'
             : '<span class="text-gray-500 dark:text-gray-400">Tahap Aktif: <strong>—</strong></span>';
+
+        // Container summary — vehicle cargo only, in-memory from loaded $units
+        $isVehicle = ($this->ownerRecord->cargo_type instanceof \App\Enums\CargoType)
+            ? $this->ownerRecord->cargo_type === \App\Enums\CargoType::Vehicle
+            : $this->ownerRecord->cargo_type === \App\Enums\CargoType::Vehicle->value;
+
+        $containerHtml = '';
+        if ($isVehicle) {
+            $assigned   = $units->filter(fn ($u) => ! blank($u->container_display))->count();
+            $unassigned = $total - $assigned;
+            $containers = $units->pluck('container_display')->filter()->unique()->count();
+
+            $containerHtml =
+                '<span class="text-blue-700 dark:text-blue-400">Container: <strong>' . $containers . '</strong></span>' .
+                ($unassigned > 0
+                    ? '<span class="text-amber-600 dark:text-amber-400">Belum Assigned: <strong>' . $unassigned . '</strong></span>'
+                    : '<span class="text-green-700 dark:text-green-400">Semua Assigned ✓</span>'
+                );
+        }
 
         return new HtmlString(
             '<span class="flex flex-wrap gap-x-6 gap-y-1">' .
             $stageHtml .
             '<span class="text-gray-700 dark:text-gray-300">Total Unit: <strong>' . $total . '</strong></span>' .
+            $containerHtml .
             '<span class="text-green-700 dark:text-green-400">Sudah Diperiksa: <strong>' . $sudah . '</strong></span>' .
             '<span class="text-amber-700 dark:text-amber-400">Belum Diperiksa: <strong>' . $belum . '</strong></span>' .
-            '<span class="text-red-700 dark:text-red-400">Return To PDC: <strong>' . $rtnPdc . '</strong></span>' .
+            ($rtnPdc > 0 ? '<span class="text-red-700 dark:text-red-400">Return To PDC: <strong>' . $rtnPdc . '</strong></span>' : '') .
             '</span>'
         );
     }

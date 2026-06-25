@@ -21,6 +21,11 @@ class ShippingLineResource extends Resource
     protected static ?string $modelLabel      = 'Pelayaran';
     protected static ?int    $navigationSort  = 2;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form->schema([

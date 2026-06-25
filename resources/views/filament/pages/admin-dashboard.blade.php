@@ -1,4 +1,5 @@
 <x-filament-panels::page>
+
     @php
     $kpi = $this->getKpis();
     $trend = $this->getTrendSeries();
@@ -109,9 +110,57 @@
     @endphp
 
     <div class="space-y-6">
-        <div class="rounded-xl p-6 bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md">
-            <h1 class="text-2xl font-bold">Dashboard TAM</h1>
-            <p class="mt-1 text-sm opacity-80">Monitoring KPI Lead Time — Rute {{ $tamBusinessRoute }} (Toyota Astra Motor)</p>
+        @php
+            $scopeUser   = auth_user();
+            $scopeRole   = $scopeUser?->isSuperAdmin() ? 'Super Admin' : 'Office Admin';
+            $scopeBranch = $scopeUser?->isSuperAdmin()
+                ? 'Semua Cabang'
+                : (\Illuminate\Support\Facades\DB::table('branches')->where('id', $scopeUser?->effectiveBranchId())->value('name') ?? 'Cabang');
+        @endphp
+
+        {{-- ── Lingkup Administrasi — mirip FC "Lingkup Operasional" ─────────── --}}
+        <div class="rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 p-4">
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+                {{-- Kiri: ikon + role + branch --}}
+                <div class="flex items-center gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg
+                                {{ $scopeUser?->isSuperAdmin() ? 'bg-primary-50 dark:bg-primary-900/20' : 'bg-primary-50 dark:bg-primary-900/20' }}">
+                        @if ($scopeUser?->isSuperAdmin())
+                            <x-heroicon-m-globe-alt class="h-6 w-6 text-primary-600 dark:text-primary-400" />
+                        @else
+                            <x-heroicon-m-building-office class="h-6 w-6 text-primary-600 dark:text-primary-400" />
+                        @endif
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+                            Lingkup Administrasi
+                        </p>
+                        <div class="mt-0.5 flex flex-wrap items-baseline gap-2">
+                            <span class="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-primary-400">
+                                {{ $scopeRole }}
+                            </span>
+                            @if (! $scopeUser?->isSuperAdmin())
+                                <span class="text-gray-300 dark:text-gray-600 text-xs">·</span>
+                            @endif
+                            <h2 class="text-base font-bold text-gray-900 dark:text-white">
+                                {{ $scopeBranch }}
+                            </h2>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Kanan: rute + waktu --}}
+                <div class="flex items-center gap-2 shrink-0">
+                    <span class="hidden sm:inline-flex items-center rounded-full bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700">
+                        {{ $tamBusinessRoute }} (TAM)
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700">
+                        <x-heroicon-o-clock class="h-3 w-3" />
+                        {{ now()->format('H:i') }}
+                    </span>
+                </div>
+            </div>
         </div>
 
         <div class="{{ $cardClass }} p-6" id="filter-section">
@@ -325,21 +374,21 @@
 
         <div class="space-y-6"> {{-- Dashboard TAM: always visible --}}
 
-            <div
-                class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-                <div>
-                    <div class="flex items-center gap-3">
-                        <div class="h-10 w-1 bg-red-600 rounded-full"></div>
-                        <div>
-                            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Monitoring Pengiriman Unit</h1>
-                            <p class="text-sm text-gray-500 font-medium">Rute: {{ $tamBusinessRoute }}</p>
-                        </div>
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4
+                         rounded-xl bg-white px-6 py-5 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <div class="flex items-center gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50 dark:bg-primary-900/20">
+                        <x-heroicon-m-chart-bar class="h-6 w-6 text-primary-600 dark:text-primary-400" />
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Monitoring Pengiriman Unit</h1>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Rute {{ $tamBusinessRoute }} · Toyota Astra Motor</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-3">
-                    <span
-                        class="px-3 py-1 bg-gray-100 text-gray-600 text-xs font-semibold rounded-full border border-gray-200">
-                        Waktu Update: {{ now()->format('H:i') }}
+                <div class="flex items-center gap-2 shrink-0">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 ring-1 ring-primary-200 dark:bg-primary-900/20 dark:text-primary-400 dark:ring-primary-800">
+                        <x-heroicon-m-building-office class="h-3.5 w-3.5" />
+                        {{ $scopeBranch ?? 'Semua Cabang' }}
                     </span>
                 </div>
             </div>
@@ -687,4 +736,5 @@
         })();
     </script>
     @endpush
+
 </x-filament-panels::page>

@@ -149,7 +149,7 @@ class ViewShipment extends ViewRecord
                 ->label('Buat Loading Session')
                 ->icon('heroicon-o-plus')
                 ->url(fn ($record) => route('filament.fc.resources.loading-sessions.create', ['shipment_id' => $record->id]))
-                ->visible(fn () => auth()->user()?->hasRole('field_coordinator')),
+                ->visible(fn () => auth()->user()?->isFieldCoordinator()),
 
             Action::make('edit')
                 ->label('Edit')

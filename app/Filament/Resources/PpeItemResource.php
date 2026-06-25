@@ -28,6 +28,11 @@ class PpeItemResource extends Resource
     protected static ?string $navigationIcon  = 'heroicon-m-cube';
     protected static ?int    $navigationSort  = 11;
 
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
+
     private const STATUSES = [
         'in_stock' => 'Tersedia',
         'damaged'  => 'Rusak',

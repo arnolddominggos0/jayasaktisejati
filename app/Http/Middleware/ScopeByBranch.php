@@ -12,7 +12,9 @@ class ScopeByBranch
         $user = $request->user();
 
         if ($user) {
-            $currentBranchId = $user->hasRole('super_admin')
+            // Only super_admin has global (unscoped) branch view.
+            // office_admin is intentionally branch-scoped via effectiveBranchId().
+            $currentBranchId = $user->isSuperAdmin()
                 ? null
                 : $user->effectiveBranchId();
 

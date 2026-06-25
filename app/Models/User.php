@@ -95,13 +95,66 @@ class User extends Authenticatable implements FilamentUser
         });
     }
 
+    // ── Role taxonomy ─────────────────────────────────────────────────────────
+    //
+    // super_admin     → God Mode. Full system access. Manages users, roles,
+    //                   system config, global audit. Not a daily business user.
+    //
+    // office_admin    → Business Operator. Manages shipments, customers, voyage
+    //                   planning, and monitoring within their assigned branch.
+    //                   Branch-scoped. Cannot access system admin functions.
+    //
+    // field_coordinator → Field Operator. Executes physical logistics: pickup,
+    //                   handover, stuffing, loading, delivery. Depot-scoped.
+    //                   Owns the operational lifecycle of each shipment.
+    //
+    // customer        → Customer Portal only. Read-only access to their own
+    //                   shipments via /portal. Requires customer_id link.
+    //
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public function isSuperAdmin(): bool
+    {
+        return $this->hasRole('super_admin');
+    }
+
+    public function isOfficeAdmin(): bool
+    {
+        return $this->hasRole('office_admin');
+    }
+
+    /**
+     * True for any user who belongs to the "office" side of the business:
+     * super_admin (global) or office_admin (branch-scoped).
+     * Use this when a check means "can operate the admin panel".
+     */
+    public function isOfficeUser(): bool
+    {
+        return $this->hasAnyRole(['super_admin', 'office_admin']);
+    }
+
+    public function isFieldCoordinator(): bool
+    {
+        return $this->hasRole('field_coordinator');
+    }
+
+    public function isCustomer(): bool
+    {
+        return $this->hasRole('customer');
+    }
+
+    // ── Panel access ──────────────────────────────────────────────────────────
+
     public function canAccessPanel(Panel $panel): bool
     {
         return match ($panel->getId()) {
-            'admin' => $this->hasRole('super_admin'),
-            'fc'    => $this->hasAnyRole(['field_coordinator']),
-            'customer' => $this->hasRole('customer') && $this->customer_id !== null,
-            default => false,
+            // Admin panel: office operators + system admin
+            'admin'    => $this->isOfficeUser(),
+            // FC panel: field coordinators + super_admin for oversight/debug
+            'fc'       => $this->isFieldCoordinator() || $this->isSuperAdmin(),
+            // Customer portal: customers with a linked customer record
+            'customer' => $this->isCustomer() && $this->customer_id !== null,
+            default    => false,
         };
     }
 
@@ -120,7 +173,7 @@ class User extends Authenticatable implements FilamentUser
 
     public function canUpdateVesselDepart(Shipment $shipment): bool
     {
-        if (!$this->hasRole('field_coordinator')) {
+        if (! $this->isFieldCoordinator()) {
             return false;
         }
 

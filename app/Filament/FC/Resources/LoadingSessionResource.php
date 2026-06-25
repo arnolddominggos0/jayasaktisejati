@@ -47,7 +47,7 @@ class LoadingSessionResource extends Resource
     public static function canViewAny(): bool
     {
         $user = Filament::auth()->user();
-        return $user?->hasRole('field_coordinator') || $user?->hasRole('super_admin') ?? false;
+        return $user?->isFieldCoordinator() || $user?->isSuperAdmin() ?? false;
     }
 
     public static function getEloquentQuery(): Builder
@@ -348,7 +348,7 @@ class LoadingSessionResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
-                        ->visible(fn () => Filament::auth()->user()?->hasRole('super_admin')),
+                        ->visible(fn () => Filament::auth()->user()?->isSuperAdmin()),
                 ]),
             ]);
     }

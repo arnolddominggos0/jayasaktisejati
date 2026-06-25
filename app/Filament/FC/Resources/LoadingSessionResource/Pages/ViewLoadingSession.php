@@ -21,7 +21,7 @@ class ViewLoadingSession extends ViewRecord
         return [
             Actions\EditAction::make(),
             Actions\DeleteAction::make()
-                ->visible(fn () => auth()->user()?->hasRole('super_admin')),
+                ->visible(fn () => auth()->user()?->isSuperAdmin()),
             Actions\Action::make('rack_check')
                 ->label('Cek Rack Container')
                 ->icon('heroicon-o-cube')

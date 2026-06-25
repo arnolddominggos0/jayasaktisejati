@@ -32,9 +32,27 @@ class CustomerResource extends Resource
     protected static ?string $navigationGroup  = 'Master Data';
     protected static ?int    $navigationSort   = 5;
 
+    // Customer is global scope (no branch_id). Office Admin manages customer data daily.
+    // Super Admin governs. All office users can read and create; delete is super_admin only.
+
     public static function canViewAny(): bool
     {
-        return auth_user()?->hasRole('super_admin') ?? false;
+        return auth_user()?->isOfficeUser() ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth_user()?->isOfficeUser() ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth_user()?->isOfficeUser() ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
     }
 
     public static function form(Form $form): Form

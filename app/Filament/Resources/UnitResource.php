@@ -38,7 +38,12 @@ class UnitResource extends Resource
     protected static ?string $navigationLabel = 'Pemeriksaan Unit';
     protected static ?string $navigationGroup = 'Quality Assurance';
     protected static ?int    $navigationSort  = 2;
-    protected static bool    $shouldRegisterNavigation = true;
+    protected static bool    $shouldRegisterNavigation = true; // overridden below
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth_user()?->isSuperAdmin() ?? false;
+    }
     protected static ?string $modelLabel      = 'Unit';
     protected static ?string $pluralModelLabel = 'Pemeriksaan Unit';
 

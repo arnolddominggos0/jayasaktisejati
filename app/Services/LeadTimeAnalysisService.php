@@ -14,9 +14,11 @@ class LeadTimeAnalysisService
     ) {}
 
     /**
-     * Return base query for TAM shipments: same filters as AdminDashboard::tamBaseQuery()
+     * Return base query for TAM shipments.
+     * Pass $branchId to scope to a specific branch (office_admin).
+     * Null = global (super_admin).
      */
-    private function tamQuery(Carbon $start, Carbon $end): \Illuminate\Database\Eloquent\Builder
+    private function tamQuery(Carbon $start, Carbon $end, ?int $branchId = null): \Illuminate\Database\Eloquent\Builder
     {
         $cfg = config('jss_kpi.manado', []);
         $customerIds = array_map('intval', $cfg['customer_ids'] ?? []);
@@ -24,16 +26,17 @@ class LeadTimeAnalysisService
         return Shipment::query()
             ->when(! empty($customerIds), fn($q) => $q->whereIn('customer_id', $customerIds))
             ->whereNotNull('delivered_at')
-            ->whereBetween('delivered_at', [$start, $end]);
+            ->whereBetween('delivered_at', [$start, $end])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId));
     }
 
     /**
      * Voyage summary list grouped by voyage_id.
-     * Returns array of voyage rows with aggregated KPI.
+     * Pass $branchId to scope to a specific branch (office_admin). Null = global.
      */
-    public function getVoyageSummaries(Carbon $start, Carbon $end, ?string $voyageSearch = null): Collection
+    public function getVoyageSummaries(Carbon $start, Carbon $end, ?string $voyageSearch = null, ?int $branchId = null): Collection
     {
-        $shipments = $this->tamQuery($start, $end)
+        $shipments = $this->tamQuery($start, $end, $branchId)
             ->whereNotNull('voyage_id')
             ->with([
                 'voyageRecord.vessel',

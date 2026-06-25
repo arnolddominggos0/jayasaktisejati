@@ -63,7 +63,7 @@ class ShipmentResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return Filament::auth()->user()?->hasRole('field_coordinator') ?? false;
+        return Filament::auth()->user()?->isFieldCoordinator() ?? false;
     }
 
     public static function canCreate(): bool
@@ -214,7 +214,7 @@ class ShipmentResource extends Resource
                 ->label('Alasan Override MP Check')
                 ->rows(3)
                 ->visible(
-                    fn(Forms\Get $get) => auth_user()?->hasRole('super_admin') &&
+                    fn(Forms\Get $get) => auth_user()?->isSuperAdmin() &&
                         in_array($get('track_status'), [
                             TrackStatus::Stuffing->value,
                             TrackStatus::UnitLoading->value,
@@ -222,7 +222,7 @@ class ShipmentResource extends Resource
                         ], true)
                 )
                 ->required(
-                    fn(Forms\Get $get) => auth_user()?->hasRole('super_admin') &&
+                    fn(Forms\Get $get) => auth_user()?->isSuperAdmin() &&
                         in_array($get('track_status'), [
                             TrackStatus::Stuffing->value,
                             TrackStatus::UnitLoading->value,

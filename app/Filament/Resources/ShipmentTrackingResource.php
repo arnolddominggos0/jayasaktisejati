@@ -39,8 +39,13 @@ class ShipmentTrackingResource extends Resource
     public static function shouldRegisterNavigation(): bool
     {
         $u = auth_user();
+        return (bool) ($u && $u->isOfficeUser());
+    }
 
-        return (bool) ($u && method_exists($u, 'hasRole') && $u->hasRole('super_admin'));
+    public static function canViewAny(): bool
+    {
+        $u = auth_user();
+        return (bool) ($u && $u->isOfficeUser());
     }
 
     public static function getEloquentQuery(): Builder
@@ -53,12 +58,15 @@ class ShipmentTrackingResource extends Resource
             });
 
         $u = auth_user();
-        if ($u && ! $u->hasRole('super_admin') && $u->effectiveBranchId()) {
-            $bid = $u->effectiveBranchId();
-            $q->where(function ($w) use ($bid) {
-                $w->where('branch_id', $bid)
-                    ->orWhereNull('branch_id');
-            });
+        if ($u && ! $u->isSuperAdmin()) {
+            $branchId = $u->effectiveBranchId();
+            if ($branchId) {
+                $q->where(function ($w) use ($branchId) {
+                    $w->where('branch_id', $branchId)->orWhereNull('branch_id');
+                });
+            } elseif ($u->isOfficeAdmin()) {
+                $q->whereRaw('1 = 0');
+            }
         }
 
         return $q;
@@ -198,11 +206,7 @@ class ShipmentTrackingResource extends Resource
                     ->icon('heroicon-m-sparkles')
                     ->color('primary')
                     ->url(fn ($record) => static::getUrl('manage', ['record' => $record]))
-                    ->visible(function () {
-                        $u = auth_user();
-
-                        return (bool) ($u && method_exists($u, 'hasRole') && $u->hasRole('super_admin'));
-                    }),
+                    ->visible(fn () => auth_user()?->isSuperAdmin() ?? false),
             ])
             ->bulkActions([
                 Tables\Actions\BulkAction::make('export_kpi')

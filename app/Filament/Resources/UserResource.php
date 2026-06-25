@@ -40,7 +40,7 @@ class UserResource extends Resource
 
     public static function canViewAny(): bool
     {
-        return auth_user()?->hasRole('super_admin') ?? false;
+        return auth_user()?->isSuperAdmin() ?? false;
     }
 
     public static function getEloquentQuery(): Builder
@@ -48,7 +48,7 @@ class UserResource extends Resource
         $q = parent::getEloquentQuery();
         $u = auth_user();
 
-        if ($u?->hasRole('super_admin')) {
+        if ($u?->isSuperAdmin()) {
             return $q;
         }
 
@@ -57,7 +57,7 @@ class UserResource extends Resource
 
     public static function form(Form $form): Form
     {
-        $isSuper = auth_user()?->hasRole('super_admin') ?? false;
+        $isSuper = auth_user()?->isSuperAdmin() ?? false;
 
         return $form
             ->schema([
@@ -165,7 +165,7 @@ class UserResource extends Resource
                 TextColumn::make('fc_scope_status')
                     ->label('Scope FC')
                     ->getStateUsing(function (User $record): string {
-                        if (! $record->hasRole('field_coordinator')) {
+                        if (! $record->isFieldCoordinator()) {
                             return '—';
                         }
 
@@ -195,7 +195,7 @@ class UserResource extends Resource
                     })
                     ->badge()
                     ->color(function (User $record): string {
-                        if (! $record->hasRole('field_coordinator')) {
+                        if (! $record->isFieldCoordinator()) {
                             return 'gray';
                         }
 
@@ -216,7 +216,7 @@ class UserResource extends Resource
                         return $liveDepot ? 'warning' : 'danger';
                     })
                     ->tooltip(function (User $record): ?string {
-                        if (! $record->hasRole('field_coordinator')) {
+                        if (! $record->isFieldCoordinator()) {
                             return null;
                         }
                         if (! $record->scope_unit_id) {
@@ -240,8 +240,8 @@ class UserResource extends Resource
                 Tables\Actions\EditAction::make()->label('Ubah'),
                 Tables\Actions\DeleteAction::make()
                     ->label('Hapus')
-                    ->visible(fn ($record) => (auth_user()?->hasRole('super_admin') ?? false)
-                        && ! $record->hasRole('super_admin')
+                    ->visible(fn ($record) => (auth_user()?->isSuperAdmin() ?? false)
+                        && ! $record->isSuperAdmin()
                         && ($record->id !== auth_user()?->id)),
             ])
             ->bulkActions([
