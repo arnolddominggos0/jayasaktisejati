@@ -43,14 +43,14 @@ class OperationalShipmentPage extends Page implements HasInfolists
 
     public function getTitle(): string|Htmlable
     {
-        return "Detail Pengiriman · {$this->record->code}";
+        return "Workspace FC · {$this->record->code}";
     }
 
     public function getBreadcrumbs(): array
     {
         return [
             OperationalTasks::getUrl() => 'Tugas Operasional',
-            '#' => $this->getTitle(),
+            '#' => $this->record->code,
         ];
     }
 
@@ -113,55 +113,121 @@ class OperationalShipmentPage extends Page implements HasInfolists
     public function infolist(Infolist $infolist): Infolist
     {
         return $infolist->schema([
-            Section::make('Ringkasan')
+
+            // ── 1. Compact Operational Header ──────────────────────────────────
+            Section::make()
                 ->schema([
                     Grid::make(12)->schema([
+
                         TextEntry::make('code')
-                            ->label('Kode')
+                            ->label('Shipment')
                             ->badge()
                             ->extraAttributes(['class' => 'font-mono'])
                             ->columnSpan(3),
 
-                        TextEntry::make('status')
-                            ->label('Status')
+                        TextEntry::make('operational_stage')
+                            ->label('Tahap')
+                            ->getStateUsing(fn(Shipment $record): string =>
+                                $record->currentTrackStatus()?->label() ?? 'Menunggu'
+                            )
                             ->badge()
-                            ->formatStateUsing(fn($state) => $state?->label() ?? (string) $state ?: '-')
-                            ->color(fn($state) => match ($state?->label()) {
-                                'Draf' => 'gray',
-                                'Menunggu', 'Ditahan' => 'warning',
-                                'Penjemputan', 'Dalam Perjalanan' => 'info',
-                                'Terkirim' => 'success',
-                                'Dibatalkan' => 'danger',
-                                default => 'gray',
+                            ->color(fn(Shipment $record): string => match ($record->currentTrackStatus()) {
+                                TrackStatus::Pickup, TrackStatus::Handover   => 'gray',
+                                TrackStatus::Stuffing,
+                                TrackStatus::DeliveryToPort,
+                                TrackStatus::Stacking,
+                                TrackStatus::UnitLoading                     => 'warning',
+                                TrackStatus::OnShip, TrackStatus::VesselDepart => 'info',
+                                TrackStatus::VesselArrival,
+                                TrackStatus::Unloading                       => 'primary',
+                                TrackStatus::HandoverTrucking,
+                                TrackStatus::DeliveryToCustomer,
+                                TrackStatus::Delivered                       => 'success',
+                                TrackStatus::Hold, TrackStatus::Cancelled    => 'danger',
+                                default                                      => 'gray',
                             })
                             ->columnSpan(3),
+
+                        TextEntry::make('cargo_type')
+                            ->label('Muatan')
+                            ->formatStateUsing(fn($state) => $state instanceof CargoType ? $state->label() : ((string) $state ?: '—'))
+                            ->badge()
+                            ->color('gray')
+                            ->columnSpan(2),
+
+                        TextEntry::make('vehicle_loading_badge')
+                            ->label('Metode Muat')
+                            ->getStateUsing(fn(Shipment $record): string => match ($record->vehicle_loading) {
+                                'rack'      => 'Rack',
+                                'flat_rack' => 'Flat Rack',
+                                'regular'   => 'Reguler',
+                                default     => '—',
+                            })
+                            ->badge()
+                            ->color(fn(Shipment $record): string => match ($record->vehicle_loading) {
+                                'rack', 'flat_rack' => 'warning',
+                                'regular'           => 'info',
+                                default             => 'gray',
+                            })
+                            ->columnSpan(2),
+
+                        TextEntry::make('units_count_header')
+                            ->label('Total Unit')
+                            ->getStateUsing(fn(Shipment $record): string =>
+                                $record->units()->count() . ' unit'
+                            )
+                            ->badge()
+                            ->color('gray')
+                            ->columnSpan(2),
+
+                    ]),
+                    Grid::make(12)->schema([
 
                         TextEntry::make('route_label')
                             ->label('Rute')
                             ->placeholder('—')
-                            ->columnSpan(6),
+                            ->columnSpan(5),
 
-                        TextEntry::make('doc_number')
-                            ->label('No Dokumen')
-                            ->extraAttributes(['class' => 'font-mono'])
+                        TextEntry::make('voyage')
+                            ->label('Voyage')
                             ->placeholder('—')
                             ->columnSpan(4),
 
-                        TextEntry::make('request_type')
-                            ->label('Tipe')
-                            ->formatStateUsing(fn($state) => $state?->label() ?? (string) ($state ?? '—'))
+                        TextEntry::make('assignedDepot.name')
+                            ->label('Depo')
                             ->placeholder('—')
-                            ->columnSpan(4),
+                            ->columnSpan(3),
 
-                        TextEntry::make('requested_at')
-                            ->label('Tgl Permintaan')
-                            ->date('d M Y')
-                            ->placeholder('—')
-                            ->columnSpan(4),
                     ]),
                 ]),
 
+            // ── 2. Daftar Unit & Inspeksi — PRIORITAS UTAMA FC ─────────────────
+            Section::make('Daftar Unit & Inspeksi')
+                ->schema([
+                    ViewComponent::make('daftar_unit')
+                        ->view('filament.fc.shipments.partials.daftar-unit'),
+                ]),
+
+            // ── 3. Timeline Operasional ─────────────────────────────────────────
+            Section::make('Timeline Operasional')
+                ->collapsible()
+                ->schema([
+                    ViewComponent::make('timeline')
+                        ->view('filament.fc.shipments.partials.timeline')
+                        ->viewData([
+                            'items'    => fn() => $this->record
+                                ->tracks()
+                                ->with(['user:id,name'])
+                                ->orderBy('tracked_at', 'asc')
+                                ->get(['id', 'shipment_id', 'status', 'tracked_at', 'location', 'note', 'created_by', 'checkseet', 'attachments', 'check_result']),
+                            'shipment' => fn() => $this->record,
+                        ]),
+                ]),
+
+            // ── 4. Pihak Terkait (collapsed) ───────────────────────────────────
             Section::make('Pihak Terkait')
+                ->collapsed()
+                ->collapsible()
                 ->schema([
                     Grid::make(12)->schema([
                         TextEntry::make('customer.name')->label('Pengirim')->badge()->placeholder('—')->columnSpan(6),
@@ -169,7 +235,10 @@ class OperationalShipmentPage extends Page implements HasInfolists
                     ]),
                 ]),
 
+            // ── 5. Kontak Operasional (collapsed) ──────────────────────────────
             Section::make('Kontak Operasional')
+                ->collapsed()
+                ->collapsible()
                 ->schema([
                     Grid::make(12)->schema([
                         TextEntry::make('pic_name')
@@ -216,7 +285,10 @@ class OperationalShipmentPage extends Page implements HasInfolists
                     ]),
                 ]),
 
+            // ── 6. Layanan & Moda (collapsed) ──────────────────────────────────
             Section::make('Layanan & Moda')
+                ->collapsed()
+                ->collapsible()
                 ->schema([
                     Grid::make(12)->schema([
                         TextEntry::make('mode')
@@ -235,7 +307,7 @@ class OperationalShipmentPage extends Page implements HasInfolists
                         TextEntry::make('service_option')
                             ->label('Opsi')
                             ->formatStateUsing(fn(?string $state, Shipment $record) => match ($state) {
-                                'fcl' => 'FCL' . (function() use ($record) {
+                                'fcl' => 'FCL' . (function () use ($record) {
                                     $size = $record->container_size instanceof ContainerSize
                                         ? $record->container_size->label()
                                         : \App\Enums\ContainerSize::tryFrom((string) $record->container_size)?->label();
@@ -245,11 +317,11 @@ class OperationalShipmentPage extends Page implements HasInfolists
                                     }
                                     return '';
                                 })(),
-                                'lcl' => 'LCL',
-                                'truck' => 'Truck',
-                                'towing' => 'Towing',
+                                'lcl'         => 'LCL',
+                                'truck'       => 'Truck',
+                                'towing'      => 'Towing',
                                 'car_carrier' => 'Car Carrier',
-                                default => $state ?: '-',
+                                default       => $state ?: '-',
                             })
                             ->badge()
                             ->columnSpan(3),
@@ -259,17 +331,14 @@ class OperationalShipmentPage extends Page implements HasInfolists
                             ->formatStateUsing(fn($state) => $state instanceof DeliveryScope ? $state->label() : (($state !== null ? (string) $state : null) ?: '-'))
                             ->badge()
                             ->columnSpan(3),
-
-                        TextEntry::make('cargo_type')
-                            ->label('Muatan')
-                            ->formatStateUsing(fn($state) => $state instanceof CargoType ? $state->label() : ((string) $state ?: '-'))
-                            ->badge()
-                            ->columnSpan(3),
                     ]),
                 ]),
 
+            // ── 7. Informasi Kapal & Kontainer (collapsed) ─────────────────────
             Section::make('Informasi Kapal & Kontainer')
                 ->visible(fn(Shipment $record) => $record->mode === ShipmentMode::Sea)
+                ->collapsed()
+                ->collapsible()
                 ->schema([
                     Grid::make(12)->schema([
                         TextEntry::make('vessel_name')->label('Kapal')->placeholder('—')->columnSpan(4),
@@ -288,7 +357,10 @@ class OperationalShipmentPage extends Page implements HasInfolists
                     ]),
                 ]),
 
+            // ── 8. Depo & Muatan (collapsed) ───────────────────────────────────
             Section::make('Depo & Muatan')
+                ->collapsed()
+                ->collapsible()
                 ->schema([
                     Grid::make(12)->schema([
                         TextEntry::make('assignedDepot.name')->label('Depo Penugasan')->placeholder('—')->columnSpan(4),
@@ -296,10 +368,10 @@ class OperationalShipmentPage extends Page implements HasInfolists
                         TextEntry::make('vehicle_loading')
                             ->label('Tipe Muatan')
                             ->formatStateUsing(fn(?string $state) => match ($state) {
-                                'rack' => 'Rack',
+                                'rack'      => 'Rack',
                                 'flat_rack' => 'Flat Rack',
-                                'regular' => 'Reguler',
-                                default => $state ?: '—',
+                                'regular'   => 'Reguler',
+                                default     => $state ?: '—',
                             })
                             ->columnSpan(4),
 
@@ -310,13 +382,16 @@ class OperationalShipmentPage extends Page implements HasInfolists
                             ->formatStateUsing(fn(?string $state) => match ($state) {
                                 'urgent' => 'Urgent',
                                 'normal' => 'Normal',
-                                default => $state ?: '—',
+                                default  => $state ?: '—',
                             })
                             ->columnSpan(4),
                     ]),
                 ]),
 
+            // ── 9. Kuantitas & Waktu (collapsed) ───────────────────────────────
             Section::make('Kuantitas & Waktu')
+                ->collapsed()
+                ->collapsible()
                 ->schema([
                     Grid::make(12)->schema([
                         TextEntry::make('packages_total')->label('Koli')->placeholder('—')->columnSpan(3),
@@ -324,7 +399,7 @@ class OperationalShipmentPage extends Page implements HasInfolists
                         TextEntry::make('weight_total')->label('Berat (kg)')->formatStateUsing(fn($v) => $v !== null ? number_format((float) $v, 2) : '—')->columnSpan(3),
                         TextEntry::make('etd')
                             ->label('ETD')
-                            ->getStateUsing(fn (Shipment $record) => $record->etd ?? $record->voyageRecord?->etd)
+                            ->getStateUsing(fn(Shipment $record) => $record->etd ?? $record->voyageRecord?->etd)
                             ->dateTime('d M Y H:i')
                             ->placeholder('—')
                             ->columnSpan(3),
@@ -334,32 +409,36 @@ class OperationalShipmentPage extends Page implements HasInfolists
                     ]),
                 ]),
 
-            Section::make('Daftar Unit & Inspeksi')
+            // ── 10. Informasi Permintaan (collapsed) ────────────────────────────
+            Section::make('Informasi Permintaan')
+                ->collapsed()
+                ->collapsible()
                 ->schema([
-                    ViewComponent::make('daftar_unit')
-                        ->view('filament.fc.shipments.partials.daftar-unit'),
+                    Grid::make(12)->schema([
+                        TextEntry::make('doc_number')
+                            ->label('No Dokumen')
+                            ->extraAttributes(['class' => 'font-mono'])
+                            ->placeholder('—')
+                            ->columnSpan(4),
+                        TextEntry::make('request_type')
+                            ->label('Tipe')
+                            ->formatStateUsing(fn($state) => $state?->label() ?? (string) ($state ?? '—'))
+                            ->placeholder('—')
+                            ->columnSpan(4),
+                        TextEntry::make('requested_at')
+                            ->label('Tgl Permintaan')
+                            ->date('d M Y')
+                            ->placeholder('—')
+                            ->columnSpan(4),
+                    ]),
                 ]),
 
+            // ── 11. Catatan (collapsed) ─────────────────────────────────────────
             Section::make('Catatan')
                 ->collapsed()
                 ->collapsible()
                 ->schema([
                     TextEntry::make('notes')->label('Catatan Pengiriman')->placeholder('—'),
-                ]),
-
-            Section::make('Timeline Operasional')
-                ->collapsible()
-                ->schema([
-                    ViewComponent::make('timeline')
-                        ->view('filament.fc.shipments.partials.timeline')
-                        ->viewData([
-                            'items'    => fn() => $this->record
-                                ->tracks()
-                                ->with(['user:id,name'])
-                                ->orderBy('tracked_at', 'asc')
-                                ->get(['id', 'shipment_id', 'status', 'tracked_at', 'location', 'note', 'created_by', 'checkseet', 'attachments', 'check_result']),
-                            'shipment' => fn() => $this->record,
-                        ]),
                 ]),
         ]);
     }
