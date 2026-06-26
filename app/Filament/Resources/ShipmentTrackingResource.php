@@ -34,7 +34,7 @@ class ShipmentTrackingResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-m-map';
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 2;
 
     public static function shouldRegisterNavigation(): bool
     {

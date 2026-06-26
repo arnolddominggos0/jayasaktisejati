@@ -1,656 +1,578 @@
 <x-filament-panels::page>
 
     @php
-    $kpi = $this->getKpis();
-    $trend = $this->getTrendSeries();
-    $dist = $this->getStatusDistribution();
-    $top = $this->getTopCustomers();
-    $lt = $this->getLeadTimeSummary();
-    $activities = $this->getRecentActivities();
-
-    $dashboardData = [
-    'brandHex' => $this->brandHex,
-    'spark' => $kpi['sparkline'] ?? [],
-    'trend' => $trend,
-    'dist' => $dist,
-    ];
-
-    $cardClass = 'bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700';
-
-    $tamLeadTime = $this->getTamLeadTimeSeries();
-    $tamEval = $this->getTamLeadTimeEvaluation();
-    $tamKpi = $this->getTamKpiSummary();
+    $tamLeadTime  = $this->getTamLeadTimeSeries();
+    $tamKpi       = $this->getTamKpiSummary();
     $tamPortStock = $this->getTamPortStockSummary();
-    $tamMonthly = $this->getTamMonthlyBreakdown();
+    $tamMonthly   = $this->getTamMonthlyBreakdown();
+    $insp         = $this->getInspeksiRingkasan();
+    $ops          = $this->getOperationalNumbers();
 
-    function getStatusColor($val, $threshold)
-    {
-    if ($val === null) {
-    return 'text-gray-400';
-    }
-    return $val > $threshold ? 'text-red-600 font-bold bg-red-50 ring-1 ring-red-100 rounded' : 'text-gray-600';
-    }
-
-    $tamLabels = array_column($tamMonthly['rows'], 'month');
     $tamTargets = $tamMonthly['targets'];
+    $tamLabels  = array_column($tamMonthly['rows'], 'month');
 
-    $tamConfig = [
-    'labels' => $tamLabels,
-    'leadTime' => [
-    'dwelling' => array_column($tamMonthly['rows'], 'dw'),
-    'sailing' => array_column($tamMonthly['rows'], 'sl'),
-    'dooring' => array_column($tamMonthly['rows'], 'dr'),
-    'standard' => array_fill(
-    0,
-    count($tamLabels),
-    $tamTargets['dwelling'] + $tamTargets['sailing'] + $tamTargets['dooring'],
-    ),
-    ],
-    'achievement' => [
-    'labels' => ['Dwelling', 'Sailing', 'Dooring', 'Total'],
-    'ok' => [
-    $tamEval['dwelling']['ok_pct'] ?? 0,
-    $tamEval['sailing']['ok_pct'] ?? 0,
-    $tamEval['dooring']['ok_pct'] ?? 0,
-    $tamEval['total']['ok_pct'] ?? 0,
-    ],
-    'ng' => [
-    $tamEval['dwelling']['ng_pct'] ?? 0,
-    $tamEval['sailing']['ng_pct'] ?? 0,
-    $tamEval['dooring']['ng_pct'] ?? 0,
-    $tamEval['total']['ng_pct'] ?? 0,
-    ],
-    ],
-    ];
+    $dwVal    = $tamLeadTime['avg_days']['dwelling'] ?? 0;
+    $saVal    = $tamLeadTime['avg_days']['sailing']  ?? 0;
+    $doVal    = $tamLeadTime['avg_days']['dooring']  ?? 0;
+    $dwTarget = $tamTargets['dwelling'];
+    $saTarget = $tamTargets['sailing'];
+    $doTarget = $tamTargets['dooring'];
+    $dwOver   = $dwVal > $dwTarget && $dwVal > 0;
+    $saOver   = $saVal > $saTarget && $saVal > 0;
+    $doOver   = $doVal > $doTarget && $doVal > 0;
+    $dwPct    = $dwTarget > 0 ? min(100, (int) round($dwVal / $dwTarget * 100)) : 0;
+    $saPct    = $saTarget > 0 ? min(100, (int) round($saVal / $saTarget * 100)) : 0;
+    $doPct    = $doTarget > 0 ? min(100, (int) round($doVal / $doTarget * 100)) : 0;
 
-    $ongoingMetrics = [
-    [
-    'title' => 'Unit di Port',
-    'val' => $tamPortStock['total'] ?? 0,
-    'icon' => 'heroicon-o-map-pin',
-    'color' => 'text-blue-600',
-    'bg' => 'bg-blue-50',
-    ],
-    [
-    'title' => 'Rata-rata Port (Hari)',
-    'val' => number_format($tamPortStock['avg_age'] ?? 0, 1),
-    'icon' => 'heroicon-o-clock',
-    'color' => 'text-orange-600',
-    'bg' => 'bg-orange-50',
-    ],
-    [
-    'title' => 'Total Delivered',
-    'val' => $tamKpi['total'] ?? 0,
-    'icon' => 'heroicon-o-paper-airplane',
-    'color' => 'text-indigo-600',
-    'bg' => 'bg-indigo-50',
-    ],
-    [
-    'title' => 'On Time (%)',
-    'val' => number_format($tamKpi['on_time_pct'] ?? 0, 1) . '%',
-    'icon' => 'heroicon-o-check-circle',
-    'color' => 'text-emerald-600',
-    'bg' => 'bg-emerald-50',
-    ],
-    [
-    'title' => 'Late',
-    'val' => $tamKpi['late'] ?? 0,
-    'icon' => 'heroicon-o-exclamation-circle',
-    'color' => 'text-red-600',
-    'bg' => 'bg-red-50',
-    ],
-    [
-    'title' => 'Over 3 Hari di Port',
-    'val' => $tamPortStock['over_three'] ?? 0,
-    'icon' => 'heroicon-o-home-modern',
-    'color' => 'text-cyan-600',
-    'bg' => 'bg-cyan-50',
-    ],
-    ];
+    $onTimeTotal  = (int) ($tamKpi['on_time'] ?? 0);
+    $lateTotal    = (int) ($tamKpi['late']    ?? 0);
+    $kpiTotal     = $onTimeTotal + $lateTotal;
+    $onTimePct    = $kpiTotal > 0 ? (int) round($onTimeTotal / $kpiTotal * 100) : 0;
+
+    $scopeUser   = auth_user();
+    $scopeRole   = $scopeUser?->isSuperAdmin() ? 'Super Admin' : 'Office Admin';
+    $scopeBranch = $scopeUser?->isSuperAdmin()
+        ? 'Semua Cabang'
+        : (\Illuminate\Support\Facades\DB::table('branches')->where('id', $scopeUser?->effectiveBranchId())->value('name') ?? 'Cabang');
+
+    $tamBusinessRoute = \App\Supports\RouteCode::display(\App\Supports\RouteCode::default());
+
+    $overPort  = (int) ($tamPortStock['over_three'] ?? 0);
+    $ngCount   = (int) ($insp['ng'] ?? 0);
+    $holdCount = (int) ($ops['shipment_hold'] ?? 0);
     @endphp
 
-    <div class="space-y-6">
-        @php
-            $scopeUser   = auth_user();
-            $scopeRole   = $scopeUser?->isSuperAdmin() ? 'Super Admin' : 'Office Admin';
-            $scopeBranch = $scopeUser?->isSuperAdmin()
-                ? 'Semua Cabang'
-                : (\Illuminate\Support\Facades\DB::table('branches')->where('id', $scopeUser?->effectiveBranchId())->value('name') ?? 'Cabang');
-        @endphp
+    {{-- Chart data: only kpi needed now --}}
+    <div id="tam-chart-data"
+         data-kpi='@json($tamKpi)'
+         style="display:none"></div>
 
-        {{-- ── Lingkup Administrasi — mirip FC "Lingkup Operasional" ─────────── --}}
-        <div class="rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10 p-4">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div class="jss-dash">
 
-                {{-- Kiri: ikon + role + branch --}}
-                <div class="flex items-center gap-3">
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg
-                                {{ $scopeUser?->isSuperAdmin() ? 'bg-primary-50 dark:bg-primary-900/20' : 'bg-primary-50 dark:bg-primary-900/20' }}">
-                        @if ($scopeUser?->isSuperAdmin())
-                            <x-heroicon-m-globe-alt class="h-6 w-6 text-primary-600 dark:text-primary-400" />
-                        @else
-                            <x-heroicon-m-building-office class="h-6 w-6 text-primary-600 dark:text-primary-400" />
-                        @endif
+        {{-- ══════════════════════════════════════════════════════════════════
+             PAGE HEADER
+        ══════════════════════════════════════════════════════════════════ --}}
+        <div class="jss-header flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center flex-wrap gap-2">
+                <span class="jss-meta-badge bg-gray-100 text-gray-700 ring-gray-200">
+                    <x-heroicon-m-user-circle class="h-3.5 w-3.5 text-gray-400" />
+                    {{ $scopeRole }}
+                </span>
+                <span class="jss-meta-badge bg-amber-50 text-amber-700 ring-amber-200">
+                    <x-heroicon-m-building-office class="h-3.5 w-3.5 text-amber-500" />
+                    {{ $scopeBranch }}
+                </span>
+                <span class="jss-meta-badge bg-primary-50 text-primary-700 ring-primary-200">
+                    <x-heroicon-m-globe-alt class="h-3.5 w-3.5 text-primary-500" />
+                    {{ $tamBusinessRoute }} <span class="text-primary-400">· TAM</span>
+                </span>
+            </div>
+            <div class="flex items-center gap-2.5 shrink-0">
+                @if ($scopeUser?->isSuperAdmin())
+                    <div class="text-xs text-gray-400 [&_.fi-fo-field-wrp]:mb-0 [&_.fi-input-wrp]:py-1 [&_.fi-input-wrp]:text-xs">
+                        {{ $this->form }}
                     </div>
-                    <div>
-                        <p class="text-[10px] font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">
-                            Lingkup Administrasi
-                        </p>
-                        <div class="mt-0.5 flex flex-wrap items-baseline gap-2">
-                            <span class="text-xs font-semibold uppercase tracking-wider text-primary-600 dark:text-primary-400">
-                                {{ $scopeRole }}
+                @endif
+                <span class="jss-meta-badge bg-gray-100 text-gray-500 ring-gray-200">
+                    <x-heroicon-m-clock class="h-3.5 w-3.5 text-gray-400" />
+                    {{ now()->format('H:i') }} WIB
+                </span>
+            </div>
+        </div>
+
+        {{-- ══════════════════════════════════════════════════════════════════
+             ROW 1 — HERO KPI (4 cols)
+        ══════════════════════════════════════════════════════════════════ --}}
+        <section class="jss-section">
+            <div class="jss-section-head">
+                <h2 class="jss-section-title">Kondisi Operasi Saat Ini</h2>
+                <p class="jss-section-desc">Snapshot aktivitas operasional hari ini</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
+                {{-- Unit Aktif --}}
+                <div class="jss-card group p-5 flex flex-col">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="jss-iconbox bg-blue-50 ring-blue-100/60">
+                            <x-heroicon-o-cube class="w-5 h-5 text-blue-600" />
+                        </div>
+                        <span class="jss-pill bg-blue-50 text-blue-600">Aktif</span>
+                    </div>
+                    <p class="jss-kpi-num text-blue-600">{{ number_format($ops['unit_aktif']) }}</p>
+                    <p class="jss-kpi-label">Unit Aktif</p>
+                    <p class="jss-kpi-desc">Total unit dalam proses</p>
+                    <div class="jss-card-foot">
+                        <a href="{{ \App\Filament\Resources\ShipmentResource::getUrl('index') }}" class="jss-link">
+                            Lihat Detail <x-heroicon-m-arrow-right class="w-3.5 h-3.5" />
+                        </a>
+                    </div>
+                </div>
+
+                {{-- Unit Belum Assign Voyage --}}
+                <div class="jss-card group p-5 flex flex-col {{ $ops['belum_voyage'] > 0 ? 'jss-card-warn' : '' }}">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="jss-iconbox {{ $ops['belum_voyage'] > 0 ? 'bg-amber-50 ring-amber-100/60' : 'bg-gray-50 ring-gray-100/60' }}">
+                            <x-heroicon-o-rocket-launch class="w-5 h-5 {{ $ops['belum_voyage'] > 0 ? 'text-amber-600' : 'text-gray-400' }}" />
+                        </div>
+                        @if ($ops['belum_voyage'] > 0)
+                            <span class="jss-pill bg-amber-50 text-amber-600">
+                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Warning
                             </span>
-                            @if (! $scopeUser?->isSuperAdmin())
-                                <span class="text-gray-300 dark:text-gray-600 text-xs">·</span>
-                            @endif
-                            <h2 class="text-base font-bold text-gray-900 dark:text-white">
-                                {{ $scopeBranch }}
-                            </h2>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Kanan: rute + waktu --}}
-                <div class="flex items-center gap-2 shrink-0">
-                    <span class="hidden sm:inline-flex items-center rounded-full bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700">
-                        {{ $tamBusinessRoute }} (TAM)
-                    </span>
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500 ring-1 ring-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700">
-                        <x-heroicon-o-clock class="h-3 w-3" />
-                        {{ now()->format('H:i') }}
-                    </span>
-                </div>
-            </div>
-        </div>
-
-        <div class="{{ $cardClass }} p-6" id="filter-section">
-            <div class="mb-4">
-                <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Filter Operasional</h2>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">Pilih cabang, moda, dan periode untuk melihat
-                    data spesifik</p>
-            </div>
-            {{ $this->form }}
-        </div>
-
-        <div class="hidden space-y-6"> {{-- Dashboard Umum: hidden, TAM is default --}}
-            <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                <div class="p-6 rounded-xl shadow-sm border bg-white">
-                    <p class="text-sm font-medium text-gray-600">Total Shipment Aktif</p>
-                    <p class="mt-2 text-4xl font-bold text-gray-900">{{ number_format($kpi['totalAktif'] ?? 0) }}</p>
-                    <div class="mt-4 h-12">
-                        <canvas id="spark-activity"></canvas>
-                    </div>
-                </div>
-
-                <div class="p-6 rounded-xl shadow-sm border bg-white">
-                    <p class="text-sm font-medium text-gray-600">Menunggu Penjemputan</p>
-                    <p class="mt-2 text-4xl font-bold text-gray-900">{{ number_format($kpi['pendingPickup'] ?? 0) }}</p>
-                    <p class="text-xs mt-1 text-gray-500">Draft, Pending, Pickup</p>
-                </div>
-
-                <div class="p-6 rounded-xl shadow-sm border bg-white">
-                    <p class="text-sm font-medium text-gray-600">Aktivitas Tracking Hari Ini</p>
-                    <p class="mt-2 text-4xl font-bold text-gray-900">{{ number_format($kpi['aktivitasHariIni'] ?? 0) }}
-                    </p>
-                    <p class="text-xs mt-1 text-gray-500">Update tracking terbaru</p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-                <div class="{{ $cardClass }} p-6 lg:col-span-2">
-                    <div class="mb-4 flex items-center justify-between">
-                        <div>
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Tren Shipment</h3>
-                            <p class="text-sm text-gray-500">Pergerakan shipment berdasarkan periode</p>
-                        </div>
-                        <span
-                            class="inline-flex items-center rounded-full bg-blue-100 dark:bg-blue-900 px-3 py-1 text-xs font-medium text-blue-800 dark:text-blue-200">
-                            @if ($this->period === 'this_month')
-                            Bulan Ini
-                            @elseif ($this->period === 'this_year')
-                            Tahun Ini
-                            @else
-                            {{ \Carbon\Carbon::createFromFormat('Y-m', $this->period_month)->translatedFormat('F Y') }}
-                            @endif
-                        </span>
-                    </div>
-                    <div class="h-80">
-                        <canvas id="trendChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="{{ $cardClass }} p-6">
-                    <div class="mb-4">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Distribusi Status</h3>
-                        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Sebaran status shipment periode ini</p>
-                    </div>
-                    <div class="h-64">
-                        <canvas id="statusDistChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <div class="{{ $cardClass }} p-6">
-                    <div class="mb-4">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Lead Time Summary</h3>
-                        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">Rata-rata waktu pengiriman shipment</p>
-                    </div>
-
-                    <div class="flex items-end justify-between mb-4">
-                        <div>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Rata-rata Lead Time</p>
-                            <p class="mt-1 text-4xl font-bold text-gray-900 dark:text-white">{{ $lt['avg_days'] ?? 0 }}
-                                <span class="text-xl">hari</span>
-                            </p>
-                        </div>
-                        <div class="text-right">
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Target</p>
-                            <p class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                                {{ $lt['target'] ?? 0 }} hari
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
-                        <div class="h-3 rounded-full bg-gradient-to-r from-blue-500 to-blue-600"
-                            style="width: {{ $lt['progress'] ?? 0 }}%"></div>
-                    </div>
-                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Progress terhadap target lead time</p>
-                </div>
-
-                <div class="{{ $cardClass }} p-6">
-                    <div class="mb-4">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Top Customer</h3>
-                        <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">5 customer teratas periode ini</p>
-                    </div>
-
-                    @if (empty($top))
-                    <div class="flex flex-col items-center justify-center py-10 text-gray-500">
-                        <x-heroicon-o-chart-pie class="w-12 h-12 opacity-60" />
-                        <p class="mt-3 text-sm">Belum ada data customer untuk periode ini</p>
-                        @if ($this->period !== 'this_month')
-                        <button wire:click="$set('period', 'this_month')"
-                            class="mt-4 px-4 py-1.5 rounded-md bg-blue-600 text-white text-sm shadow">Tampilkan
-                            Bulan Ini</button>
                         @endif
                     </div>
-                    @else
-                    <div class="space-y-3">
-                        @foreach ($top as $index => $customer)
-                        <div class="flex items-center gap-3">
-                            <div
-                                class="flex-shrink-0 w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                                <span
-                                    class="text-sm font-bold text-blue-600 dark:text-blue-400">{{ $index + 1 }}</span>
+                    <p class="jss-kpi-num {{ $ops['belum_voyage'] > 0 ? 'text-amber-600' : 'text-gray-300' }}">{{ $ops['belum_voyage'] }}</p>
+                    <p class="jss-kpi-label">Belum Assign Voyage</p>
+                    <p class="jss-kpi-desc">Mode laut tanpa voyage</p>
+                    <div class="jss-card-foot">
+                        <a href="{{ \App\Filament\Resources\ShipmentResource::getUrl('index') }}" class="jss-link">
+                            Lihat Detail <x-heroicon-m-arrow-right class="w-3.5 h-3.5" />
+                        </a>
+                    </div>
+                </div>
+
+                {{-- Unit Menunggu Pickup --}}
+                <div class="jss-card group p-5 flex flex-col">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="jss-iconbox bg-purple-50 ring-purple-100/60">
+                            <x-heroicon-o-truck class="w-5 h-5 text-purple-600" />
+                        </div>
+                        <span class="jss-pill bg-purple-50 text-purple-600">Pickup</span>
+                    </div>
+                    <p class="jss-kpi-num text-purple-600">{{ $ops['menunggu_pickup'] }}</p>
+                    <p class="jss-kpi-label">Menunggu Pickup</p>
+                    <p class="jss-kpi-desc">Siap diambil transporter</p>
+                    <div class="jss-card-foot">
+                        <a href="{{ \App\Filament\Resources\ShipmentResource::getUrl('index') }}" class="jss-link">
+                            Lihat Detail <x-heroicon-m-arrow-right class="w-3.5 h-3.5" />
+                        </a>
+                    </div>
+                </div>
+
+                {{-- Unit Late --}}
+                <div class="jss-card group p-5 flex flex-col {{ $lateTotal > 0 ? 'jss-card-danger' : '' }}">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="jss-iconbox {{ $lateTotal > 0 ? 'bg-red-50 ring-red-100/60' : 'bg-gray-50 ring-gray-100/60' }}">
+                            <x-heroicon-o-exclamation-triangle class="w-5 h-5 {{ $lateTotal > 0 ? 'text-red-600' : 'text-gray-400' }}" />
+                        </div>
+                        @if ($lateTotal > 0)
+                            <span class="jss-pill bg-red-50 text-red-600">
+                                <span class="flex h-2 w-2 relative">
+                                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                </span>
+                                Over
+                            </span>
+                        @endif
+                    </div>
+                    <p class="jss-kpi-num {{ $lateTotal > 0 ? 'text-red-600' : 'text-gray-300' }}">{{ $lateTotal }}</p>
+                    <p class="jss-kpi-label">Unit Late</p>
+                    <p class="jss-kpi-desc">Melewati total target lead time</p>
+                    <div class="jss-card-foot">
+                        <a href="{{ \App\Filament\Resources\ShipmentTrackingResource::getUrl('index') }}" class="jss-link">
+                            Lihat Detail <x-heroicon-m-arrow-right class="w-3.5 h-3.5" />
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        {{-- ══════════════════════════════════════════════════════════════════
+             ROW 2 — Alert | Port | Performa (3 cols)
+        ══════════════════════════════════════════════════════════════════ --}}
+        <section class="jss-section">
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+
+                {{-- ══ COL 1: ALERT OPERASIONAL ══ --}}
+                <div class="jss-card p-5 flex flex-col">
+                    <div class="jss-card-head">
+                        <h3 class="jss-card-title">Alert Operasional</h3>
+                        <p class="jss-card-sub">Perlu perhatian segera</p>
+                    </div>
+
+                    <div class="flex flex-col flex-1 gap-1">
+
+                        <div class="jss-alert-row {{ $overPort > 0 ? 'is-danger' : 'is-muted' }}">
+                            <div class="jss-alert-row-icon {{ $overPort > 0 ? 'bg-red-100' : 'bg-gray-100' }}">
+                                <x-heroicon-o-exclamation-triangle class="w-4 h-4 {{ $overPort > 0 ? 'text-red-600' : 'text-gray-400' }}" />
                             </div>
                             <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                    {{ $customer['name'] }}
-                                </p>
+                                <p class="jss-alert-row-title {{ $overPort > 0 ? 'text-red-700' : 'text-gray-600' }}">Unit Over 3 Hari</p>
+                                <p class="jss-alert-row-desc {{ $overPort > 0 ? 'text-red-500' : 'text-gray-400' }}">Berisiko demurrage</p>
                             </div>
-                            <div class="flex-shrink-0">
-                                <span
-                                    class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">{{ $customer['total'] }}
-                                    shipment</span>
+                            <span class="jss-alert-row-num {{ $overPort > 0 ? 'text-red-600' : 'text-gray-300' }} tabular-nums">{{ $overPort }}</span>
+                            <x-heroicon-m-chevron-right class="w-5 h-5 {{ $overPort > 0 ? 'text-red-400' : 'text-gray-300' }} shrink-0" />
+                        </div>
+
+                        <div class="jss-alert-row {{ $ngCount > 0 ? 'is-warning' : 'is-muted' }}">
+                            <div class="jss-alert-row-icon {{ $ngCount > 0 ? 'bg-amber-100' : 'bg-gray-100' }}">
+                                <x-heroicon-o-magnifying-glass-circle class="w-4 h-4 {{ $ngCount > 0 ? 'text-amber-600' : 'text-gray-400' }}" />
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="jss-alert-row-title {{ $ngCount > 0 ? 'text-amber-700' : 'text-gray-600' }}">Temuan NG</p>
+                                <p class="jss-alert-row-desc {{ $ngCount > 0 ? 'text-amber-500' : 'text-gray-400' }}">Perlu tindakan lanjutan</p>
+                            </div>
+                            <span class="jss-alert-row-num {{ $ngCount > 0 ? 'text-amber-600' : 'text-gray-300' }} tabular-nums">{{ $ngCount }}</span>
+                            <x-heroicon-m-chevron-right class="w-5 h-5 {{ $ngCount > 0 ? 'text-amber-400' : 'text-gray-300' }} shrink-0" />
+                        </div>
+
+                        <div class="jss-alert-row jss-alert-row-last {{ $holdCount > 0 ? 'is-info' : 'is-muted' }}">
+                            <div class="jss-alert-row-icon {{ $holdCount > 0 ? 'bg-purple-100' : 'bg-gray-100' }}">
+                                <x-heroicon-o-pause-circle class="w-4 h-4 {{ $holdCount > 0 ? 'text-purple-600' : 'text-gray-400' }}" />
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="jss-alert-row-title {{ $holdCount > 0 ? 'text-purple-700' : 'text-gray-600' }}">Shipment Hold</p>
+                                <p class="jss-alert-row-desc">Menunggu release</p>
+                            </div>
+                            <span class="jss-alert-row-num {{ $holdCount > 0 ? 'text-purple-600' : 'text-gray-300' }} tabular-nums">{{ $holdCount }}</span>
+                            <x-heroicon-m-chevron-right class="w-5 h-5 {{ $holdCount > 0 ? 'text-purple-400' : 'text-gray-300' }} shrink-0" />
+                        </div>
+                    </div>
+
+                    <div class="jss-card-foot">
+                        <a href="{{ \App\Filament\Resources\ShipmentTrackingResource::getUrl('index') }}" class="jss-link">
+                            Lihat Semua Alert <x-heroicon-m-arrow-right class="w-3.5 h-3.5" />
+                        </a>
+                    </div>
+                </div>
+
+                {{-- ══ COL 2: RINGKASAN PORT ══ --}}
+                <div class="jss-card p-5 flex flex-col">
+                    <div class="jss-card-head">
+                        <h3 class="jss-card-title">Ringkasan Port</h3>
+                        <p class="jss-card-sub">Kondisi unit di port</p>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 flex-1 items-center">
+                        <div class="jss-metric text-center">
+                            <div class="jss-iconbox bg-blue-50 ring-blue-100/60 mx-auto mb-1">
+                                <x-heroicon-o-map-pin class="w-5 h-5 text-blue-600" />
+                            </div>
+                            <p class="jss-metric-num">{{ $tamPortStock['total'] ?? 0 }}</p>
+                            <p class="jss-metric-label">Unit di Port</p>
+                        </div>
+                        <div class="jss-metric text-center sm:border-x sm:border-gray-100">
+                            <div class="jss-iconbox bg-orange-50 ring-orange-100/60 mx-auto mb-1">
+                                <x-heroicon-o-clock class="w-5 h-5 text-orange-500" />
+                            </div>
+                            <p class="jss-metric-num">{{ number_format($tamPortStock['avg_age'] ?? 0, 1) }}</p>
+                            <p class="jss-metric-label">Rata-rata Hari</p>
+                        </div>
+                        <div class="jss-metric text-center">
+                            <div class="jss-iconbox {{ $overPort > 0 ? 'bg-red-50 ring-red-100/60' : 'bg-gray-50 ring-gray-100/60' }} mx-auto mb-1">
+                                <x-heroicon-o-exclamation-triangle class="w-5 h-5 {{ $overPort > 0 ? 'text-red-500' : 'text-gray-400' }}" />
+                            </div>
+                            <p class="jss-metric-num {{ $overPort > 0 ? 'text-red-600' : 'text-gray-300' }}">{{ $overPort }}</p>
+                            <p class="jss-metric-label">Over 3 Hari</p>
+                        </div>
+                    </div>
+
+                    @if (($tamPortStock['total'] ?? 0) > 0 && $overPort > 0)
+                        <div class="jss-banner-danger mt-3">
+                            <x-heroicon-o-exclamation-circle class="w-4 h-4 shrink-0" />
+                            <span>{{ $overPort }} dari {{ $tamPortStock['total'] }} unit berisiko demurrage</span>
+                        </div>
+                    @endif
+
+                    <div class="jss-card-foot">
+                        <a href="{{ \App\Filament\Resources\ShipmentTrackingResource::getUrl('index') }}" class="jss-link">
+                            Lihat Port Stock <x-heroicon-m-arrow-right class="w-3.5 h-3.5" />
+                        </a>
+                    </div>
+                </div>
+
+                {{-- ══ COL 3: PERFORMA BULAN INI ══ --}}
+                <div class="jss-card p-5 flex flex-col">
+                    <div class="jss-card-head">
+                        <h3 class="jss-card-title">Performa Bulan Ini</h3>
+                        <p class="jss-card-sub">KPI pengiriman bulan berjalan</p>
+                    </div>
+
+                    <div class="flex items-center gap-3 flex-1">
+                        <div class="relative shrink-0 w-44 h-44">
+                            <canvas id="perfChart"></canvas>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                <span id="perf-center-pct" class="text-2xl font-bold text-gray-900 tabular-nums leading-none">{{ $onTimePct }}%</span>
+                                <span class="text-[10px] font-semibold tracking-wide text-gray-400 mt-0.5">On Time</span>
                             </div>
                         </div>
-                        @endforeach
+                        <div class="flex flex-col gap-2.5 flex-1">
+                            <div class="jss-perf-item">
+                                <div class="flex items-center gap-1.5 mb-0.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
+                                    <span class="text-[11px] font-medium text-gray-500">On Time</span>
+                                </div>
+                                <p class="text-xl font-bold text-gray-900 tabular-nums leading-none">{{ number_format($onTimeTotal) }}<span class="text-[11px] font-normal text-gray-400 ml-1">Unit</span></p>
+                            </div>
+                            <div class="jss-perf-item">
+                                <div class="flex items-center gap-1.5 mb-0.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-red-400 shrink-0"></span>
+                                    <span class="text-[11px] font-medium text-gray-500">Late</span>
+                                </div>
+                                <p class="text-xl font-bold tabular-nums leading-none {{ $lateTotal > 0 ? 'text-red-600' : 'text-gray-300' }}">{{ $lateTotal }}<span class="text-[11px] font-normal text-gray-400 ml-1">Unit</span></p>
+                            </div>
+                        </div>
                     </div>
-                    @endif
+
+                    <div class="jss-card-foot">
+                        <a href="{{ \App\Filament\Resources\ShipmentHistoryResource::getUrl('index') }}" class="jss-link">
+                            Lihat Shipment Late <x-heroicon-m-arrow-right class="w-3.5 h-3.5" />
+                        </a>
+                    </div>
                 </div>
+
             </div>
+        </section>
 
-            <div class="{{ $cardClass }} p-6">
-                <div class="mb-4">
-                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Aktivitas Tracking Terbaru</h3>
-                    <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">12 aktivitas tracking terakhir</p>
-                </div>
+        {{-- ══════════════════════════════════════════════════════════════════
+             ROW 3 — Lead Time (7/12) | Pemeriksaan (5/12)
+        ══════════════════════════════════════════════════════════════════ --}}
+        <section class="jss-section">
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-12">
 
-                @if (empty($activities))
-                <div class="flex flex-col items-center justify-center py-10 text-gray-500">
-                    <x-heroicon-o-clipboard class="w-12 h-12 opacity-60" />
-                    <p class="mt-3 text-sm">Belum ada aktivitas</p>
-                    @if ($this->period !== 'this_month')
-                    <button wire:click="$set('period', 'this_month')"
-                        class="mt-4 px-4 py-1.5 rounded-md bg-blue-600 text-white text-sm shadow">Tampilkan
-                        Bulan Ini</button>
-                    @endif
-                </div>
-                @else
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                        <thead class="bg-gray-50 dark:bg-gray-900">
-                            <tr>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                    Shipment</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                    Status</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                    Catatan</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                    User</th>
-                                <th
-                                    class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                                    Waktu</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                            @foreach ($activities as $activity)
-                            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                <td
-                                    class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                                    {{ $activity['shipment_code'] }}
-                                </td>
-                                <td class="px-4 py-3 whitespace-nowrap">
-                                    <span
-                                        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
-                                        {{ strtoupper($activity['status']) }}
+                {{-- ══ COL LEFT: KESEHATAN LEAD TIME ══ --}}
+                <div class="lg:col-span-7 jss-card p-5 flex flex-col">
+                    <div class="jss-card-head">
+                        <h3 class="jss-card-title">Kesehatan Lead Time</h3>
+                        <p class="jss-card-sub">Rata-rata per tahap vs target TAM (Bulan Ini)</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-3 flex-1">
+
+                        {{-- Dwelling --}}
+                        <div class="jss-lt-card {{ $dwOver ? 'is-over' : 'is-ok' }}">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <div class="jss-lt-iconbox {{ $dwOver ? 'bg-red-100' : 'bg-blue-100' }}">
+                                    <x-heroicon-o-clock class="w-4 h-4 {{ $dwOver ? 'text-red-500' : 'text-blue-600' }}" />
+                                </div>
+                                <span class="jss-lt-label">Dwelling</span>
+                            </div>
+                            <div class="flex items-baseline gap-1 mb-0.5">
+                                <span class="jss-lt-num {{ $dwOver ? 'text-red-600' : 'text-gray-900' }}">{{ $dwVal }}</span>
+                                <span class="text-xs text-gray-400 font-medium">Hari</span>
+                            </div>
+                            <p class="jss-lt-target">Target: {{ $dwTarget }} hari</p>
+                            <div class="jss-progress mt-1.5">
+                                <div class="jss-progress-fill {{ $dwOver ? 'bg-red-500' : 'bg-emerald-500' }}" style="width: {{ $dwPct }}%"></div>
+                            </div>
+                            <div class="mt-1.5">
+                                @if ($dwVal > 0)
+                                    <span class="jss-badge {{ $dwOver ? 'jss-badge-danger' : 'jss-badge-success' }}">
+                                        {{ $dwOver ? 'OVER' : 'OK' }}
                                     </span>
-                                </td>
-                                <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                                    {{ $activity['note'] ?? '-' }}
-                                </td>
-                                <td
-                                    class="px-4 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                                    {{ $activity['who'] }}
-                                </td>
-                                <td
-                                    class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                    {{ $activity['when'] }}
-                                </td>
-                            </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                                @else
+                                    <span class="text-xs text-gray-400 font-medium">Belum ada data</span>
+                                @endif
+                            </div>
+                        </div>
+
+                        {{-- Sailing --}}
+                        <div class="jss-lt-card {{ $saOver ? 'is-over' : 'is-ok' }}">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <div class="jss-lt-iconbox {{ $saOver ? 'bg-red-100' : 'bg-indigo-100' }}">
+                                    <x-heroicon-o-lifebuoy class="w-4 h-4 {{ $saOver ? 'text-red-500' : 'text-indigo-600' }}" />
+                                </div>
+                                <span class="jss-lt-label">Sailing</span>
+                            </div>
+                            <div class="flex items-baseline gap-1 mb-0.5">
+                                <span class="jss-lt-num {{ $saOver ? 'text-red-600' : 'text-gray-900' }}">{{ $saVal }}</span>
+                                <span class="text-xs text-gray-400 font-medium">Hari</span>
+                            </div>
+                            <p class="jss-lt-target">Target: {{ $saTarget }} hari</p>
+                            <div class="jss-progress mt-1.5">
+                                <div class="jss-progress-fill {{ $saOver ? 'bg-red-500' : 'bg-emerald-500' }}" style="width: {{ $saPct }}%"></div>
+                            </div>
+                            <div class="mt-1.5">
+                                @if ($saVal > 0)
+                                    <span class="jss-badge {{ $saOver ? 'jss-badge-danger' : 'jss-badge-success' }}">
+                                        {{ $saOver ? 'OVER' : 'OK' }}
+                                    </span>
+                                @else
+                                    <span class="text-xs text-gray-400 font-medium">Belum ada data</span>
+                                @endif
+                            </div>
+                        </div>
+
+                        {{-- Dooring --}}
+                        <div class="jss-lt-card {{ $doOver ? 'is-over' : 'is-ok' }}">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                <div class="jss-lt-iconbox {{ $doOver ? 'bg-red-100' : 'bg-emerald-100' }}">
+                                    <x-heroicon-o-truck class="w-4 h-4 {{ $doOver ? 'text-red-500' : 'text-emerald-600' }}" />
+                                </div>
+                                <span class="jss-lt-label">Dooring</span>
+                            </div>
+                            <div class="flex items-baseline gap-1 mb-0.5">
+                                <span class="jss-lt-num {{ $doOver ? 'text-red-600' : 'text-gray-900' }}">{{ $doVal }}</span>
+                                <span class="text-xs text-gray-400 font-medium">Hari</span>
+                            </div>
+                            <p class="jss-lt-target">Target: {{ $doTarget }} hari</p>
+                            <div class="jss-progress mt-1.5">
+                                <div class="jss-progress-fill {{ $doOver ? 'bg-red-500' : 'bg-emerald-500' }}" style="width: {{ $doPct }}%"></div>
+                            </div>
+                            <div class="mt-1.5">
+                                @if ($doVal > 0)
+                                    <span class="jss-badge {{ $doOver ? 'jss-badge-danger' : 'jss-badge-success' }}">
+                                        {{ $doOver ? 'OVER' : 'OK' }}
+                                    </span>
+                                @else
+                                    <span class="text-xs text-gray-400 font-medium">Belum ada data</span>
+                                @endif
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="jss-card-foot">
+                        <a href="{{ \App\Filament\Resources\ShipmentTrackingResource::getUrl('index') }}" class="jss-link">
+                            Lihat Detail Lead Time <x-heroicon-m-arrow-right class="w-3.5 h-3.5" />
+                        </a>
+                    </div>
                 </div>
-                @endif
+
+{{-- ══ COL RIGHT: PEMERIKSAAN UNIT ══ --}}
+                <div class="lg:col-span-5 jss-card p-5 flex flex-col">
+                    <div class="jss-card-head">
+                        <h3 class="jss-card-title">Pemeriksaan Unit</h3>
+                        <p class="jss-card-sub">Status inspeksi sebelum pengiriman</p>
+                    </div>
+
+                    @if ($insp['ng'] === 0 && $insp['belum'] === 0)
+                        <div class="jss-banner-success mb-3">
+                            <x-heroicon-m-check-circle class="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span class="text-xs font-semibold text-emerald-800">Semua unit siap dikirim. Tidak ada temuan NG.</span>
+                        </div>
+                    @endif
+
+                    <div class="grid grid-cols-3 gap-3 flex-1">
+
+                        <div class="jss-mini-card jss-mini-warning">
+                            <div class="jss-mini-iconbox bg-amber-100">
+                                <x-heroicon-o-magnifying-glass class="w-5 h-5 text-amber-600" />
+                            </div>
+                            <p class="jss-mini-num {{ $insp['belum'] > 0 ? 'text-amber-700' : 'text-gray-300' }}">{{ number_format($insp['belum']) }}</p>
+                            <p class="jss-mini-label">Belum Periksa</p>
+                        </div>
+
+                        <div class="jss-mini-card jss-mini-success">
+                            <div class="jss-mini-iconbox bg-emerald-100">
+                                <x-heroicon-o-check-badge class="w-5 h-5 text-emerald-600" />
+                            </div>
+                            <p class="jss-mini-num text-emerald-700">{{ number_format($insp['sudah']) }}</p>
+                            <p class="jss-mini-label">Sudah Periksa</p>
+                        </div>
+
+                        <div class="jss-mini-card {{ $insp['ng'] > 0 ? 'jss-mini-danger' : 'jss-mini-neutral' }}">
+                            <div class="jss-mini-iconbox {{ $insp['ng'] > 0 ? 'bg-red-100' : 'bg-gray-100' }}">
+                                <x-heroicon-o-x-circle class="w-5 h-5 {{ $insp['ng'] > 0 ? 'text-red-600' : 'text-gray-400' }}" />
+                            </div>
+                            <p class="jss-mini-num {{ $insp['ng'] > 0 ? 'text-red-600' : 'text-gray-300' }}">{{ number_format($insp['ng']) }}</p>
+                            <p class="jss-mini-label">Temuan NG</p>
+                        </div>
+
+                    </div>
+
+                    <div class="jss-card-foot">
+                        <a href="{{ \App\Filament\Resources\ShipmentResource::getUrl('index') }}" class="jss-link">
+                            Lihat Detail Pemeriksaan <x-heroicon-m-arrow-right class="w-3.5 h-3.5" />
+                        </a>
+                    </div>
+                </div>
+
             </div>
-        </div>
+        </section>
 
-        <div class="space-y-6"> {{-- Dashboard TAM: always visible --}}
-
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4
-                         rounded-xl bg-white px-6 py-5 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-                <div class="flex items-center gap-3">
-                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-50 dark:bg-primary-900/20">
-                        <x-heroicon-m-chart-bar class="h-6 w-6 text-primary-600 dark:text-primary-400" />
-                    </div>
-                    <div>
-                        <h1 class="text-lg font-bold text-gray-900 dark:text-white tracking-tight">Monitoring Pengiriman Unit</h1>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">Rute {{ $tamBusinessRoute }} · Toyota Astra Motor</p>
-                    </div>
-                </div>
-                <div class="flex items-center gap-2 shrink-0">
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700 ring-1 ring-primary-200 dark:bg-primary-900/20 dark:text-primary-400 dark:ring-primary-800">
-                        <x-heroicon-m-building-office class="h-3.5 w-3.5" />
-                        {{ $scopeBranch ?? 'Semua Cabang' }}
-                    </span>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 xl:grid-cols-12 gap-6">
-
-                <div class="xl:col-span-7 flex flex-col gap-6">
-
-                    <div class="grid grid-cols-3 gap-4">
-                        <div
-                            class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4 relative overflow-hidden group hover:border-blue-200 transition">
-                            <div
-                                class="absolute right-0 top-0 w-24 h-full bg-gradient-to-l from-blue-50 to-transparent opacity-50">
-                            </div>
-                            <div class="p-3 bg-blue-100 text-blue-600 rounded-lg group-hover:scale-110 transition">
-                                <x-heroicon-o-cube class="w-6 h-6" />
-                            </div>
-                            <div>
-                                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Dwelling</p>
-                                <p class="text-lg font-bold text-gray-900">
-                                    {{ $tamLeadTime['avg_days']['dwelling'] ?? 0 }} <span
-                                        class="text-xs font-normal text-gray-500">/ {{ $tamTargets['dwelling'] }}
-                                        Hari</span>
-                                </p>
-                            </div>
-                        </div>
-
-                        <div
-                            class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4 relative overflow-hidden group hover:border-indigo-200 transition">
-                            <div
-                                class="absolute right-0 top-0 w-24 h-full bg-gradient-to-l from-indigo-50 to-transparent opacity-50">
-                            </div>
-                            <div class="p-3 bg-indigo-100 text-indigo-600 rounded-lg group-hover:scale-110 transition">
-                                <x-heroicon-o-lifebuoy class="w-6 h-6" />
-                            </div>
-                            <div>
-                                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Sailing</p>
-                                <p class="text-lg font-bold text-gray-900">
-                                    {{ $tamLeadTime['avg_days']['sailing'] ?? 0 }} <span
-                                        class="text-xs font-normal text-gray-500">/ {{ $tamTargets['sailing'] }}
-                                        Hari</span>
-                                </p>
-                            </div>
-                        </div>
-
-                        <div
-                            class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4 relative overflow-hidden group hover:border-emerald-200 transition">
-                            <div
-                                class="absolute right-0 top-0 w-24 h-full bg-gradient-to-l from-emerald-50 to-transparent opacity-50">
-                            </div>
-                            <div
-                                class="p-3 bg-emerald-100 text-emerald-600 rounded-lg group-hover:scale-110 transition">
-                                <x-heroicon-o-truck class="w-6 h-6" />
-                            </div>
-                            <div>
-                                <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Dooring</p>
-                                <p class="text-lg font-bold text-gray-900">
-                                    {{ $tamLeadTime['avg_days']['dooring'] ?? 0 }} <span
-                                        class="text-xs font-normal text-gray-500">/ {{ $tamTargets['dooring'] }}
-                                        Hari</span>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex-1">
-                        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-                            <h3 class="font-bold text-gray-800">Rincian Kinerja Bulanan</h3>
-                            <span class="text-xs text-gray-400 italic">*Cell yang berwarna merah berarti melebihi
-                                standar</span>
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm text-left">
-                                <thead class="bg-gray-50 text-gray-500 font-medium">
-                                    <tr>
-                                        <th class="px-6 py-3">Bulan</th>
-                                        <th class="px-6 py-3 text-center">Dwelling (Hari)</th>
-                                        <th class="px-6 py-3 text-center">Sailing (Hari)</th>
-                                        <th class="px-6 py-3 text-center">Dooring (Hari)</th>
-                                        <th class="px-6 py-3 text-right">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100">
-                                    @foreach ($tamMonthly['rows'] as $row)
-                                    <tr class="hover:bg-gray-50 transition">
-                                        <td class="px-6 py-3 font-medium text-gray-900">{{ $row['month'] }}</td>
-                                        <td class="px-6 py-3 text-center">
-                                            @if ($row['dw'] !== null)
-                                            <span
-                                                class="px-2 py-1 {{ getStatusColor($row['dw'], $tamTargets['dwelling']) }}">
-                                                {{ $row['dw'] }}
-                                            </span>
-                                            @else
-                                            <span class="text-gray-400">—</span>
-                                            @endif
-                                        </td>
-                                        <td class="px-6 py-3 text-center">
-                                            @if ($row['sl'] !== null)
-                                            <span
-                                                class="px-2 py-1 {{ getStatusColor($row['sl'], $tamTargets['sailing']) }}">
-                                                {{ $row['sl'] }}
-                                            </span>
-                                            @else
-                                            <span class="text-gray-400">—</span>
-                                            @endif
-                                        </td>
-                                        <td class="px-6 py-3 text-center">
-                                            @if ($row['dr'] !== null)
-                                            <span
-                                                class="px-2 py-1 {{ getStatusColor($row['dr'], $tamTargets['dooring']) }}">
-                                                {{ $row['dr'] }}
-                                            </span>
-                                            @else
-                                            <span class="text-gray-400">—</span>
-                                            @endif
-                                        </td>
-                                        <td class="px-6 py-3 text-right">
-                                            @if ($row['dw'] === null && $row['sl'] === null && $row['dr'] === null)
-                                            <span class="text-xs text-gray-400">—</span>
-                                            @elseif(($row['sl'] ?? 0) > $tamTargets['sailing'] || ($row['dw'] ?? 0) > $tamTargets['dwelling'])
-                                            <span
-                                                class="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
-                                                <span
-                                                    class="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></span>
-                                                Warning
-                                            </span>
-                                            @else
-                                            <span
-                                                class="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
-                                                <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                                                Sesuai Std
-                                            </span>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="xl:col-span-5 bg-white rounded-xl border border-gray-200 shadow-sm p-6 flex flex-col">
-                    <div class="mb-6">
-                        <h3 class="font-bold text-gray-800">Lead Time</h3>
-                        <p class="text-sm text-gray-500">Rata-rata lead time per bulan (6 bulan terakhir)</p>
-                    </div>
-
-                    <div class="flex flex-wrap gap-4 mb-4 text-xs font-medium text-gray-600">
-                        <div class="flex items-center gap-2">
-                            <span class="w-3 h-3 rounded-full bg-blue-400"></span> Dwelling
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="w-3 h-3 rounded-full bg-indigo-500"></span> Sailing
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="w-3 h-3 rounded-full bg-emerald-400"></span> Dooring
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="w-8 h-1 rounded-full bg-orange-400"></span> Std Limit
-                        </div>
-                    </div>
-
-                    <div class="relative flex-1 min-h-[300px]">
-                        <canvas id="tamMainChart"></canvas>
-                    </div>
-                </div>
+        {{-- ══════════════════════════════════════════════════════════════════
+             ROW 4 — AKSES CEPAT (full width grid)
+        ══════════════════════════════════════════════════════════════════ --}}
+        <section class="jss-section">
+            <div class="jss-section-head">
+                <h2 class="jss-section-title">Akses Cepat</h2>
+                <p class="jss-section-desc">Menu yang sering digunakan</p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 
-                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-gray-800 text-sm">KPI On Time</h3>
-                        <x-heroicon-o-presentation-chart-line class="w-5 h-5 text-gray-400" />
-                    </div>
-                    <div class="h-40">
-                        <canvas id="tamRackChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="font-bold text-gray-800 text-sm">Pencapaian Lead Time</h3>
-                        <x-heroicon-o-trophy class="w-5 h-5 text-gray-400" />
-                    </div>
-                    <div class="h-40">
-                        <canvas id="tamAchieveChart"></canvas>
-                    </div>
-                </div>
-
-                <div class="xl:col-span-2 grid grid-cols-2 md:grid-cols-3 gap-4">
-                    @foreach ($ongoingMetrics as $metric)
-                    <div
-                        class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col justify-between hover:shadow-md transition group">
-                        <div class="flex justify-between items-start">
-                            <div
-                                class="p-2 rounded-lg {{ $metric['bg'] }} {{ $metric['color'] }} group-hover:scale-110 transition">
-                                @svg($metric['icon'], 'w-5 h-5')
-                            </div>
-                            @if ($loop->index == 3)
-                            <span class="flex h-2 w-2 relative">
-                                <span
-                                    class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                            </span>
-                            @endif
+                <a href="{{ \App\Filament\Resources\ShipmentResource::getUrl('index') }}" class="jss-quick group">
+                    <div class="flex items-start justify-between mb-1.5">
+                        <div class="jss-quick-icon bg-blue-50 ring-blue-100/60 group-hover:bg-blue-100">
+                            <x-heroicon-o-document-text class="w-6 h-6 text-blue-600" />
                         </div>
-                        <div class="mt-3">
-                            <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                {{ $metric['title'] }}
-                            </p>
-                            <p class="text-2xl font-bold text-gray-900 mt-1">{{ $metric['val'] }}</p>
-                        </div>
+                        <x-heroicon-m-arrow-right class="w-5 h-5 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-1 transition-all" />
                     </div>
-                    @endforeach
-                </div>
-            </div>
+                    <p class="jss-quick-title">Permintaan Pengiriman</p>
+                    <p class="jss-quick-desc">Buat &amp; kelola SPPB</p>
+                </a>
 
-        </div>
+                <a href="{{ \App\Filament\Resources\ShipmentTrackingResource::getUrl('index') }}" class="jss-quick group">
+                    <div class="flex items-start justify-between mb-1.5">
+                        <div class="jss-quick-icon bg-emerald-50 ring-emerald-100/60 group-hover:bg-emerald-100">
+                            <x-heroicon-o-map class="w-6 h-6 text-emerald-600" />
+                        </div>
+                        <x-heroicon-m-arrow-right class="w-5 h-5 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-1 transition-all" />
+                    </div>
+                    <p class="jss-quick-title">Pelacakan &amp; Monitoring</p>
+                    <p class="jss-quick-desc">Monitor perjalanan unit</p>
+                </a>
 
-        {{-- ── Ringkasan Pemeriksaan Checksheet ─────────────────────────── --}}
-        @php $insp = $this->getInspeksiRingkasan(); @endphp
-        <div class="{{ $cardClass }} p-5">
-            <div class="flex items-center gap-2 mb-4">
-                <x-heroicon-m-clipboard-document-check class="w-5 h-5 text-indigo-500" />
-                <h3 class="text-base font-semibold text-gray-800 dark:text-white">Pemeriksaan Unit</h3>
+                <a href="{{ \App\Filament\Pages\MonitoringKapalTam::getUrl() }}" class="jss-quick group">
+                    <div class="flex items-start justify-between mb-1.5">
+                        <div class="jss-quick-icon bg-indigo-50 ring-indigo-100/60 group-hover:bg-indigo-100">
+                            <x-heroicon-o-globe-alt class="w-6 h-6 text-indigo-600" />
+                        </div>
+                        <x-heroicon-m-arrow-right class="w-5 h-5 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-1 transition-all" />
+                    </div>
+                    <p class="jss-quick-title">Monitoring Kapal TAM</p>
+                    <p class="jss-quick-desc">Monitoring kapal &amp; voyage</p>
+                </a>
+
+                <a href="{{ \App\Filament\Resources\VesselPlanResource::getUrl('index') }}" class="jss-quick group">
+                    <div class="flex items-start justify-between mb-1.5">
+                        <div class="jss-quick-icon bg-orange-50 ring-orange-100/60 group-hover:bg-orange-100">
+                            <x-heroicon-o-calendar class="w-6 h-6 text-orange-600" />
+                        </div>
+                        <x-heroicon-m-arrow-right class="w-5 h-5 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-1 transition-all" />
+                    </div>
+                    <p class="jss-quick-title">Perencanaan Kapal</p>
+                    <p class="jss-quick-desc">Rencana voyage &amp; kapal</p>
+                </a>
+
+                <a href="{{ \App\Filament\Pages\EvaluasiVoyage::getUrl() }}" class="jss-quick group">
+                    <div class="flex items-start justify-between mb-1.5">
+                        <div class="jss-quick-icon bg-purple-50 ring-purple-100/60 group-hover:bg-purple-100">
+                            <x-heroicon-o-chart-bar class="w-6 h-6 text-purple-600" />
+                        </div>
+                        <x-heroicon-m-arrow-right class="w-5 h-5 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-1 transition-all" />
+                    </div>
+                    <p class="jss-quick-title">Evaluasi Voyage</p>
+                    <p class="jss-quick-desc">Analisis KPI &amp; performa</p>
+                </a>
+
             </div>
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div class="text-center p-3 rounded-lg bg-gray-50 dark:bg-gray-700">
-                    <p class="text-3xl font-bold text-gray-800 dark:text-white">{{ number_format($insp['total']) }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Total Unit</p>
-                </div>
-                <div class="text-center p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/30">
-                    <p class="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{{ number_format($insp['sudah']) }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Sudah Diperiksa</p>
-                </div>
-                <div class="text-center p-3 rounded-lg {{ $insp['belum'] > 0 ? 'bg-amber-50 dark:bg-amber-900/30' : 'bg-gray-50 dark:bg-gray-700' }}">
-                    <p class="text-3xl font-bold {{ $insp['belum'] > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400' }}">{{ number_format($insp['belum']) }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Belum Diperiksa</p>
-                </div>
-                <div class="text-center p-3 rounded-lg {{ $insp['ng'] > 0 ? 'bg-rose-50 dark:bg-rose-900/30' : 'bg-gray-50 dark:bg-gray-700' }}">
-                    <p class="text-3xl font-bold {{ $insp['ng'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-400' }}">{{ number_format($insp['ng']) }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Temuan NG</p>
-                </div>
+        </section>
+
+        {{-- ══════════════════════════════════════════════════════════════════
+             FOOTER
+        ══════════════════════════════════════════════════════════════════ --}}
+        <div class="jss-footer">
+            <div class="flex items-center gap-1.5 text-xs text-gray-400">
+                <x-heroicon-m-information-circle class="w-4 h-4" />
+                <span>Terakhir diperbarui: {{ now()->translatedFormat('d M Y, H:i') }} WIB</span>
+                <span class="mx-2 text-gray-300">·</span>
+                <span>Semua waktu dalam WIB</span>
             </div>
+            <button wire:click="$refresh" class="jss-link cursor-pointer">
+                <x-heroicon-m-arrow-path class="w-4 h-4" />
+                Perbarui Data
+            </button>
         </div>
 
     </div>
 
-    {{-- Single source of truth for all chart data --}}
-    <div id="tam-chart-data"
-         data-config='@json($tamConfig)'
-         data-kpi='@json($tamKpi)'
-         style="display:none"></div>
-
     @push('scripts')
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
     <script>
         (function () {
-            /** @type {Record<string, Chart>} */
             const charts = {};
 
             function destroyAll() {
@@ -664,74 +586,39 @@
                 const el = document.getElementById('tam-chart-data');
                 if (!el) return;
 
-                const config = JSON.parse(el.dataset.config);
-                const kpi    = JSON.parse(el.dataset.kpi);
+                const kpi = JSON.parse(el.dataset.kpi);
 
-                const ctxMain = document.getElementById('tamMainChart');
-                if (ctxMain) {
-                    charts.main = new Chart(ctxMain, {
-                        type: 'bar',
-                        data: {
-                            labels: config.labels,
-                            datasets: [
-                                {
-                                    type: 'line',
-                                    label: 'Standard',
-                                    data: config.leadTime.standard,
-                                    borderColor: '#FB923C',
-                                    borderWidth: 2,
-                                    borderDash: [5, 5],
-                                    pointRadius: 0,
-                                    fill: false,
-                                },
-                                { label: 'Dooring',  data: config.leadTime.dooring,  backgroundColor: '#34D399', stack: 'lead' },
-                                { label: 'Sailing',  data: config.leadTime.sailing,  backgroundColor: '#6366F1', stack: 'lead' },
-                                { label: 'Dwelling', data: config.leadTime.dwelling, backgroundColor: '#60A5FA', stack: 'lead' },
-                            ],
-                        },
-                        options: { responsive: true, maintainAspectRatio: false },
-                    });
-                }
+                const ctxPerf = document.getElementById('perfChart');
+                if (ctxPerf) {
+                    const onTime = Number(kpi.on_time ?? 0);
+                    const late   = Number(kpi.late   ?? 0);
+                    const total  = onTime + late;
+                    const pct    = total > 0 ? Math.round(onTime / total * 100) : 0;
 
-                const ctxRack = document.getElementById('tamRackChart');
-                if (ctxRack) {
-                    charts.rack = new Chart(ctxRack, {
+                    const centerEl = document.getElementById('perf-center-pct');
+                    if (centerEl) centerEl.textContent = pct + '%';
+
+                    charts.perf = new Chart(ctxPerf, {
                         type: 'doughnut',
                         data: {
-                            labels: ['On Time', 'Late'],
                             datasets: [{
-                                data: [Number(kpi.on_time ?? 0), Number(kpi.late ?? 0)],
-                                backgroundColor: ['#10B981', '#EF4444'],
+                                data: total > 0 ? [onTime, late] : [1, 0],
+                                backgroundColor: total > 0 ? ['#10B981', '#EF4444'] : ['#E5E7EB', '#E5E7EB'],
+                                borderWidth: 0,
                             }],
                         },
-                        options: { responsive: true, maintainAspectRatio: false },
-                    });
-                }
-
-                const ctxAch = document.getElementById('tamAchieveChart');
-                if (ctxAch) {
-                    charts.achieve = new Chart(ctxAch, {
-                        type: 'bar',
-                        data: {
-                            labels: config.achievement.labels,
-                            datasets: [
-                                { label: 'NG', data: config.achievement.ng, backgroundColor: '#FECACA' },
-                                { label: 'OK', data: config.achievement.ok, backgroundColor: '#10B981' },
-                            ],
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '76%',
+                            plugins: { legend: { display: false }, tooltip: { enabled: total > 0 } },
                         },
-                        options: { responsive: true, maintainAspectRatio: false },
                     });
                 }
             }
 
-            // Initial render — fires once after full page load
             document.addEventListener('DOMContentLoaded', render);
-
-            // After Livewire re-renders (post-DOM morph) — no setTimeout needed
-            // $this->dispatch('charts-ready') in PHP fires AFTER Livewire morphs the DOM
             window.addEventListener('charts-ready', render);
-
-            // Filament SPA navigation
             document.addEventListener('livewire:navigated', render);
         })();
     </script>

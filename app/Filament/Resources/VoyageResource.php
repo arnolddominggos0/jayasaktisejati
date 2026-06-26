@@ -53,13 +53,16 @@ class VoyageResource extends Resource
     protected static ?int    $navigationSort  = 5;
 
     // ── Authorization ─────────────────────────────────────────────────────────
-    // Voyage is a global master resource — no branch scoping.
-    // office_admin: read-only (needs to see voyages for shipment creation).
-    // super_admin: full CRUD.
+    // Voyage is a core domain entity — no branch scoping, no dedicated workspace.
+    // Registry Voyage removed from navigation per Architecture Freeze (2026-06-26).
+    // Routes remain active. Resource class retained. Model unchanged.
+    // Operational input: Monitoring Kapal TAM.
+    // KPI analysis: Evaluasi Voyage.
+    // Planning origin: Perencanaan Kapal.
 
     public static function shouldRegisterNavigation(): bool
     {
-        return auth_user()?->isOfficeUser() ?? false;
+        return false;
     }
 
     public static function canViewAny(): bool

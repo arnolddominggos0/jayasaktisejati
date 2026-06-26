@@ -30,7 +30,7 @@ class CustomerResource extends Resource
     protected static ?string $pluralModelLabel = 'Pelanggan';
     protected static ?string $modelLabel       = 'Pelanggan';
     protected static ?string $navigationGroup  = 'Master Data';
-    protected static ?int    $navigationSort   = 5;
+    protected static ?int    $navigationSort   = 1;
 
     // Customer is global scope (no branch_id). Office Admin manages customer data daily.
     // Super Admin governs. All office users can read and create; delete is super_admin only.

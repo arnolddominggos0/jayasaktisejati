@@ -13,7 +13,7 @@ class EvaluasiVoyage extends Page
     protected static ?string $navigationIcon  = 'heroicon-o-magnifying-glass-circle';
     protected static ?string $navigationGroup = 'Manajemen Kapal';
     protected static ?string $navigationLabel = 'Evaluasi Voyage';
-    protected static ?int    $navigationSort  = 1;
+    protected static ?int    $navigationSort  = 3;
     protected static ?string $title           = 'Evaluasi Voyage';
 
     // ── Filters ──────────────────────────────────────────────────────────

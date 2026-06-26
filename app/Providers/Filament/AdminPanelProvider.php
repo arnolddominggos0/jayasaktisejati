@@ -65,10 +65,8 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Resources\ShipmentHistoryResource\Widgets\HistoryStatsWidget::class,
             ])
             ->navigationGroups([
-                NavigationGroup::make('Operasional')->collapsible(),
-                NavigationGroup::make('Monitoring Pengiriman')->collapsible(),
-                NavigationGroup::make('Perencanaan')->collapsible(),
-                NavigationGroup::make('Eksekusi Pengiriman')->collapsible(),
+                NavigationGroup::make('Pengiriman')->collapsible(),
+                NavigationGroup::make('Manajemen Kapal')->collapsible(),
                 NavigationGroup::make('Master Data')->collapsible(),
             ])
             ->middleware([

@@ -19,7 +19,7 @@ class VesselPlanResource extends Resource
     protected static ?string $navigationLabel = 'Perencanaan Kapal';
     protected static ?string $pluralLabel     = 'Perencanaan Kapal';
     protected static ?string $modelLabel      = 'Perencanaan Kapal';
-    protected static ?int    $navigationSort  = 1;
+    protected static ?int    $navigationSort  = 2;
     protected static ?string $navigationIcon  = 'heroicon-o-calendar-days';
 
     // ── Authorization ─────────────────────────────────────────────────────────

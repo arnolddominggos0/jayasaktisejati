@@ -26,7 +26,7 @@ class ShipmentHistoryResource extends Resource
     protected static ?string $modelLabel        = 'Riwayat Pengiriman';
     protected static ?string $pluralModelLabel  = 'Riwayat Pengiriman';
     protected static ?string $navigationIcon    = 'heroicon-m-archive-box';
-    protected static ?int    $navigationSort    = 30;
+    protected static ?int    $navigationSort    = 3;
     protected static ?string $slug              = 'shipment-histories';
 
     public static function shouldRegisterNavigation(): bool

@@ -883,4 +883,55 @@ class AdminDashboard extends Page implements HasForms
             'ng'    => $ng,
         ];
     }
+
+    // ── Operational Snapshot (today's real-time numbers) ──────────────────────
+    // Not period-filtered. Branch-scoped only. Used by the new dashboard design.
+
+    public function getOperationalNumbers(): array
+    {
+        $user     = auth_user();
+        $branchId = $user?->isOfficeAdmin()
+            ? $user->effectiveBranchId()
+            : ($this->branch_id ?: null);
+
+        $base = Shipment::query()
+            ->whereNotIn('status', [
+                ShipmentStatus::Draft->value,
+                ShipmentStatus::Delivered->value,
+                ShipmentStatus::Cancelled->value,
+            ])
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->when($user?->isOfficeAdmin() && ! $branchId, fn($q) => $q->whereRaw('1 = 0'));
+
+        // Total units in active shipments
+        $unitAktif = DB::table('units as u')
+            ->join('shipments as s', 's.id', '=', 'u.shipment_id')
+            ->whereNotIn('s.status', [ShipmentStatus::Draft->value, ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value])
+            ->when($branchId, fn($q) => $q->where('s.branch_id', $branchId))
+            ->when($user?->isOfficeAdmin() && ! $branchId, fn($q) => $q->whereRaw('1 = 0'))
+            ->count('u.id');
+
+        // Sea shipments without voyage assigned
+        $belumVoyage = (clone $base)
+            ->where('mode', 'sea')
+            ->whereNull('voyage_id')
+            ->count();
+
+        // Shipments waiting for pickup (pending status)
+        $menungguPickup = (clone $base)
+            ->where('status', ShipmentStatus::Pending->value)
+            ->count();
+
+        // Shipments currently on Hold
+        $shipmentHold = (clone $base)
+            ->whereHas('latestTrack', fn($q) => $q->where('status', 'hold')->whereNotNull('tracked_at'))
+            ->count();
+
+        return [
+            'unit_aktif'      => $unitAktif,
+            'belum_voyage'    => $belumVoyage,
+            'menunggu_pickup' => $menungguPickup,
+            'shipment_hold'   => $shipmentHold,
+        ];
+    }
 }
