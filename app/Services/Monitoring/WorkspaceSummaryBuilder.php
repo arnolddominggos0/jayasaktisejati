@@ -17,11 +17,21 @@ final class WorkspaceSummaryBuilder
         $raw = $this->queryBuilder->rawSummary($filter);
 
         return new WorkspaceSummaryData(
-            total_units: $raw['total_units'],
-            active_shipments: $raw['active_shipments'],
-            in_transit_units: $raw['in_transit_units'],
-            at_port_units: $raw['at_port_units'],
-            delivered_today: $raw['delivered_today'],
+            activeUnits: $raw['active_units'],
+            finishedUnits: $raw['finished_units'],
+            route: $this->routeLabel($raw['route']),
+            branch: $raw['branch'],
+            lastRefresh: $raw['refreshed_at'],
+            filteredUnits: $raw['filtered_units'],
         );
+    }
+
+    private function routeLabel(string $route): string
+    {
+        return match ($route) {
+            'tam' => 'TAM',
+            'all' => 'Semua',
+            default => ucfirst($route),
+        };
     }
 }

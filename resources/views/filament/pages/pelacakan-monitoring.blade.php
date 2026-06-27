@@ -27,19 +27,22 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
                         <span class="size-2 rounded-full bg-blue-500"></span>
-                        {{ $summary->active_shipments }} shipment aktif
+                        {{ $summary->activeUnits }} unit aktif
                     </span>
                     <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                        {{ $summary->total_units }} unit
+                        {{ $summary->finishedUnits }} unit selesai
                     </span>
                     <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                        {{ $summary->in_transit_units }} in transit
+                        Route: {{ $summary->route }}
                     </span>
                     <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                        {{ $summary->at_port_units }} di pelabuhan
+                        Cabang: {{ $summary->branch }}
                     </span>
                     <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                        {{ $summary->delivered_today }} terkirim hari ini
+                        Filter: {{ $summary->filteredUnits }} unit
+                    </span>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-400">
+                        Update: {{ $summary->lastRefresh->format('d M H:i') }}
                     </span>
                 </div>
             </div>
