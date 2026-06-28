@@ -1,3 +1,4 @@
+<div>{{-- Livewire root element: always present; content renders only when unit is loaded --}}
 @if ($unitDetail)
 <div class="jss-mon-detail-slide space-y-4">
 
@@ -107,3 +108,4 @@
 
 </div>
 @endif
+</div>

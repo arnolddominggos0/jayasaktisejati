@@ -1,139 +1,215 @@
 <x-filament-panels::page>
 
     @php
-    $summary = $workspaceSummary;
-    $band = $exceptionBand;
-    $pollInterval = $pollInterval ?? 60;
-    $pageSize = $pageSize ?? 50;
-    $exceptionFilter = $exceptionFilter ?? null;
-    $groupMode = $groupMode ?? 'flat';
+        $summary        = $workspaceSummary;
+        $band           = $exceptionBand;
+        $pollInterval   = $pollInterval   ?? 60;
+        $pageSize       = $pageSize       ?? 50;
+        $exceptionFilter = $exceptionFilter ?? null;
+        $groupMode      = $groupMode      ?? 'flat';
+        $activeFilters  = $activeFilterCount ?? 0;
+
+        $hasExceptions  = ($band->delay_count + $band->ng_count + $band->hold_count
+                         + $band->demurrage_count + $band->missing_voyage_count
+                         + $band->pdi_pending_count) > 0;
     @endphp
 
-    {{-- Polling: refresh exception band + summary only --}}
-    <div wire:poll.{{ $pollInterval }}s="pollRefresh"></div>
+    {{-- Poll: refresh exception band + summary only (not the full table) --}}
+    <div wire:poll.{{ $pollInterval }}s="pollRefresh" class="hidden" aria-hidden="true"></div>
 
-    <div class="jss-monitoring">
+    <div class="jss-monitoring space-y-4">
 
-        {{-- ══════════════════════════════════════════════════════════════════
-             HEADER SECTION
-             WorkspaceSummaryData + breadcrumb + last updated
-        ══════════════════════════════════════════════════════════════════ --}}
-        <section class="jss-mon-header mb-4">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div class="flex flex-col gap-1">
-                    <h1 class="text-3xl font-extrabold text-gray-900">Pelacakan & Monitoring</h1>
-                    <p class="text-lg text-gray-500">Operational Control Tower</p>
-                </div>
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                        <span class="size-2 rounded-full bg-blue-500"></span>
-                        {{ $summary->activeUnits }} unit aktif
-                    </span>
-                    <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                        {{ $summary->finishedUnits }} unit selesai
-                    </span>
-                    <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                        Route: {{ $summary->route }}
-                    </span>
-                    <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                        Cabang: {{ $summary->branch }}
-                    </span>
-                    <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                        Filter: {{ $summary->filteredUnits }} unit
-                    </span>
-                    <span class="inline-flex items-center gap-1 rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-400">
-                        Update: {{ $summary->lastRefresh->format('d M H:i') }}
-                    </span>
+        {{-- ══════════════════════════════════════════════════════════════
+             1. WORKSPACE HEADER
+             Consumes WorkspaceSummaryData only. No business logic.
+        ══════════════════════════════════════════════════════════════ --}}
+        <section class="jss-mon-header">
+            <div class="rounded-xl border border-gray-200 bg-white px-5 py-4">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+                    {{-- Title + Subtitle --}}
+                    <div class="flex flex-col gap-0.5">
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-2xl font-bold tracking-tight text-gray-900">
+                                Pelacakan &amp; Monitoring
+                            </h1>
+                            @if ($activeFilters > 0)
+                                <span class="inline-flex items-center rounded-full bg-blue-600 px-2 py-0.5 text-xs font-bold text-white">
+                                    {{ $activeFilters }} filter aktif
+                                </span>
+                            @endif
+                        </div>
+                        <p class="text-sm text-gray-500">Operational Control Tower · Route {{ $summary->route }}</p>
+                    </div>
+
+                    {{-- Metric badges --}}
+                    <div class="flex flex-wrap items-center gap-2">
+                        {{-- Active units --}}
+                        <span class="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                            <span class="inline-block size-1.5 rounded-full bg-blue-500"></span>
+                            {{ $summary->activeUnits }} aktif
+                        </span>
+
+                        {{-- Finished units --}}
+                        <span class="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-600">
+                            {{ $summary->finishedUnits }} selesai
+                        </span>
+
+                        {{-- Branch badge --}}
+                        <span class="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-500">
+                            <x-heroicon-o-building-office class="size-3 text-gray-400" />
+                            {{ $summary->branch }}
+                        </span>
+
+                        {{-- Filtered units --}}
+                        @if ($activeFilters > 0)
+                            <span class="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-medium text-amber-700">
+                                <x-heroicon-o-funnel class="size-3" />
+                                {{ $summary->filteredUnits }} hasil
+                            </span>
+                        @endif
+
+                        {{-- Last refresh --}}
+                        <span class="inline-flex items-center gap-1 rounded-full border border-gray-100 bg-gray-50 px-3 py-1 text-xs text-gray-400">
+                            <x-heroicon-o-clock class="size-3" />
+                            {{ $summary->lastRefresh->format('H:i:s') }}
+                        </span>
+                    </div>
                 </div>
             </div>
         </section>
 
-        {{-- ══════════════════════════════════════════════════════════════════
-             EXCEPTION BAND SECTION
-             6 exception chips with counts
-        ══════════════════════════════════════════════════════════════════ --}}
-        <section class="jss-mon-exception-band mb-4">
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                @php
-                $chips = [
-                    ['key' => 'delay', 'label' => 'Delay', 'count' => $band->delay_count, 'color' => 'red', 'icon' => 'heroicon-o-clock'],
-                    ['key' => 'ng', 'label' => 'NG', 'count' => $band->ng_count, 'color' => 'red', 'icon' => 'heroicon-o-x-circle'],
-                    ['key' => 'hold', 'label' => 'Hold', 'count' => $band->hold_count, 'color' => 'red', 'icon' => 'heroicon-o-pause-circle'],
-                    ['key' => 'demurrage', 'label' => 'Demurrage', 'count' => $band->demurrage_count, 'color' => 'amber', 'icon' => 'heroicon-o-exclamation-triangle'],
-                    ['key' => 'missing_voyage', 'label' => 'Missing Voyage', 'count' => $band->missing_voyage_count, 'color' => 'amber', 'icon' => 'heroicon-o-map'],
-                    ['key' => 'pdi_pending', 'label' => 'PDI Pending', 'count' => $band->pdi_pending_count, 'color' => 'amber', 'icon' => 'heroicon-o-document-text'],
-                ];
-                @endphp
+        {{-- ══════════════════════════════════════════════════════════════
+             2. EXCEPTION BAND
+             Hidden when no active exceptions.
+             Flex wrap. Clickable chips dispatch filter event.
+             No business logic.
+        ══════════════════════════════════════════════════════════════ --}}
+        @if ($hasExceptions)
+        <section class="jss-mon-exception-band">
+            @php
+            $chips = [
+                ['key' => 'delay',         'label' => 'Delay',         'count' => $band->delay_count,         'icon' => 'heroicon-o-clock',                     'color' => 'red'],
+                ['key' => 'ng',            'label' => 'NG',            'count' => $band->ng_count,            'icon' => 'heroicon-o-x-circle',                  'color' => 'red'],
+                ['key' => 'hold',          'label' => 'Hold',          'count' => $band->hold_count,          'icon' => 'heroicon-o-pause-circle',               'color' => 'red'],
+                ['key' => 'demurrage',     'label' => 'Demurrage',     'count' => $band->demurrage_count,     'icon' => 'heroicon-o-exclamation-triangle',       'color' => 'amber'],
+                ['key' => 'missing_voyage','label' => 'Missing Voyage','count' => $band->missing_voyage_count,'icon' => 'heroicon-o-paper-airplane',             'color' => 'amber'],
+                ['key' => 'pdi_pending',   'label' => 'PDI Pending',   'count' => $band->pdi_pending_count,   'icon' => 'heroicon-o-clipboard-document-check',   'color' => 'amber'],
+            ];
+            @endphp
 
+            <div class="flex flex-wrap gap-2">
                 @foreach ($chips as $chip)
+                    @if ($chip['count'] > 0)
                     <button
                         type="button"
                         wire:click="updateFilter('exception_filter', '{{ $chip['key'] }}')"
-                        class="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left transition hover:border-gray-300 hover:shadow-sm {{ $exceptionFilter === $chip['key'] ? 'ring-2 ring-blue-500' : '' }}"
+                        title="{{ $chip['label'] }}"
+                        class="group flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left transition-all
+                               {{ $exceptionFilter === $chip['key']
+                                    ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-500 ring-offset-1'
+                                    : ($chip['color'] === 'red'
+                                        ? 'border-red-200 bg-red-50 hover:border-red-300 hover:shadow-sm'
+                                        : 'border-amber-200 bg-amber-50 hover:border-amber-300 hover:shadow-sm') }}"
                     >
-                        <span class="flex size-10 items-center justify-center rounded-lg bg-{{ $chip['color'] }}-50 text-{{ $chip['color'] }}-600">
-                            <x-heroicon-o-exclamation-triangle class="size-5" />
+                        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg
+                                     {{ $chip['color'] === 'red' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600' }}">
+                            <x-dynamic-component :component="$chip['icon']" class="size-4" />
                         </span>
-                        <span class="flex flex-col">
-                            <span class="text-2xl font-bold text-gray-900">{{ $chip['count'] }}</span>
-                            <span class="text-xs font-medium text-gray-500">{{ $chip['label'] }}</span>
+                        <span class="flex flex-col leading-none">
+                            <span class="text-xl font-bold {{ $chip['color'] === 'red' ? 'text-red-700' : 'text-amber-700' }}">{{ $chip['count'] }}</span>
+                            <span class="mt-0.5 text-xs font-medium {{ $chip['color'] === 'red' ? 'text-red-500' : 'text-amber-500' }}">{{ $chip['label'] }}</span>
                         </span>
                     </button>
+                    @endif
                 @endforeach
+
+                @if ($exceptionFilter)
+                <button
+                    type="button"
+                    wire:click="updateFilter('exception_filter', null)"
+                    class="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-medium text-gray-500 transition hover:border-gray-300 hover:bg-gray-50"
+                    title="Hapus filter exception"
+                >
+                    <x-heroicon-o-x-mark class="size-3.5" />
+                    Reset
+                </button>
+                @endif
             </div>
         </section>
+        @endif
 
-        {{-- ══════════════════════════════════════════════════════════════════
-             TOOLBAR SECTION
-             Filament Form (filter, search, group, refresh)
-        ══════════════════════════════════════════════════════════════════ --}}
-        <section class="jss-mon-toolbar mb-4">
+        {{-- ══════════════════════════════════════════════════════════════
+             3. TOOLBAR
+             Filament Form bound to MonitoringFilter state.
+             Presentation only — filter behavior wires to PHP state.
+        ══════════════════════════════════════════════════════════════ --}}
+        <section class="jss-mon-toolbar">
             <div class="rounded-xl border border-gray-200 bg-white p-4">
-                <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    {{ $this->form }}
-                    <button
-                        type="button"
-                        wire:click="refresh"
-                        class="inline-flex items-center gap-2 rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-200"
-                    >
-                        <x-heroicon-o-arrow-path class="size-4" />
-                        Refresh
-                    </button>
+                <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
+
+                    {{-- Filament form (route, mode, exception, group, show_finished, search) --}}
+                    <div class="min-w-0 flex-1">
+                        {{ $this->form }}
+                    </div>
+
+                    {{-- Refresh button --}}
+                    <div class="flex shrink-0 items-center gap-2">
+                        <button
+                            type="button"
+                            wire:click="refresh"
+                            wire:loading.attr="disabled"
+                            class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
+                        >
+                            <x-heroicon-o-arrow-path class="size-4" wire:loading.class="animate-spin" wire:target="refresh" />
+                            <span wire:loading.remove wire:target="refresh">Refresh</span>
+                            <span wire:loading wire:target="refresh">Memuat...</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </section>
 
-        {{-- ══════════════════════════════════════════════════════════════════
-             TABLE SECTION
-             Custom Livewire component: monitoring-table
-        ══════════════════════════════════════════════════════════════════ --}}
+        {{-- ══════════════════════════════════════════════════════════════
+             4. MONITORING TABLE
+             Livewire component: MonitoringTable
+             Sprint 6.3A: Shell + placeholder only. Rows → Sprint 6.3B.
+        ══════════════════════════════════════════════════════════════ --}}
         <section class="jss-mon-table">
-            <livewire:monitoring.monitoring-table :rows="$rows" :group-mode="$groupMode" />
+            <livewire:monitoring.monitoring-table
+                :total-rows="$rows?->total() ?? 0"
+                :per-page="$rows?->perPage() ?? 50"
+                :current-page="$rows?->currentPage() ?? 1"
+                :last-page="$rows?->lastPage() ?? 1"
+                :group-mode="$groupMode" />
         </section>
 
-        {{-- ══════════════════════════════════════════════════════════════════
-             DETAIL SLIDE-OVER
-             Custom Livewire component: monitoring-detail-slide
-        ══════════════════════════════════════════════════════════════════ --}}
+        {{-- Detail slide-over (event-driven, no inline rendering) --}}
         <livewire:monitoring.monitoring-detail-slide />
 
-        {{-- ══════════════════════════════════════════════════════════════════
-             FOOTER SECTION
-             Metadata block
-        ══════════════════════════════════════════════════════════════════ --}}
-        <footer class="jss-mon-footer mt-6 border-t border-gray-200 pt-4">
-            <div class="flex flex-col gap-2 text-xs text-gray-400 sm:flex-row sm:items-center sm:gap-4">
-                <span>Pelacakan & Monitoring v1.0</span>
+        {{-- ══════════════════════════════════════════════════════════════
+             5. FOOTER
+             Metadata display. Consumes WorkspaceSummaryData + config.
+        ══════════════════════════════════════════════════════════════ --}}
+        <footer class="jss-mon-footer border-t border-gray-200 pt-3">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
+                <span class="font-medium text-gray-500">Pelacakan &amp; Monitoring</span>
                 <span class="hidden sm:inline">·</span>
-                <span>Read-only workspace (D1)</span>
+                <span>v1.0 · Read-only</span>
                 <span class="hidden sm:inline">·</span>
                 <span>Page size: {{ $pageSize }}</span>
                 <span class="hidden sm:inline">·</span>
                 <span>Poll: {{ $pollInterval }}s</span>
+                @if ($summary->filteredUnits > 0)
+                    <span class="hidden sm:inline">·</span>
+                    <span>{{ $summary->filteredUnits }} unit terfilter</span>
+                @endif
                 @if ($rows && $rows->hasPages())
                     <span class="hidden sm:inline">·</span>
-                    <span>Page {{ $rows->currentPage() }} of {{ $rows->lastPage() }} ({{ $rows->total() }} total)</span>
+                    <span>Hal {{ $rows->currentPage() }}/{{ $rows->lastPage() }} ({{ $rows->total() }} total)</span>
                 @endif
+                <span class="hidden sm:inline">·</span>
+                <span class="tabular-nums">Diperbarui {{ $summary->lastRefresh->format('d M Y H:i:s') }}</span>
             </div>
         </footer>
 
