@@ -3,7 +3,6 @@
 namespace App\Filament\Pages;
 
 use App\DTO\Monitoring\MonitoringFilter;
-use App\Enums\ShipmentMode;
 use App\Services\Monitoring\ExceptionCounterService;
 use App\Services\Monitoring\MonitoringQueryService;
 use App\Services\Monitoring\WorkspaceSummaryBuilder;
@@ -74,14 +73,12 @@ class PelacakanMonitoring extends Page implements HasForms
         $this->route = RouteResolver::default();
 
         $this->form->fill([
-            'branch_id' => $this->branch_id,
-            'mode' => $this->mode,
-            'route' => $this->route,
+            'branch_id'        => $this->branch_id,
+            'route'            => $this->route,
             'exception_filter' => $this->exception_filter,
-            'search' => $this->search,
-            'group_mode' => $this->group_mode,
-            'show_finished' => $this->show_finished,
-            'sort' => $this->sort,
+            'search'           => $this->search,
+            'group_mode'       => $this->group_mode,
+            'show_finished'    => $this->show_finished,
         ]);
 
         $this->generateData();
@@ -91,60 +88,42 @@ class PelacakanMonitoring extends Page implements HasForms
     {
         return [
             Grid::make()
-                ->columns(['default' => 1, 'sm' => 2, 'lg' => 6])
+                ->columns(['default' => 1, 'sm' => 2, 'lg' => 5])
                 ->schema([
                     Select::make('route')
                         ->label('Route')
-                        ->options([
-                            'tam' => 'TAM',
-                            'all' => 'Semua',
-                        ])
+                        ->options(['tam' => 'TAM', 'all' => 'Semua'])
                         ->reactive()
-                        ->afterStateUpdated(fn($state) => $this->updateFilter('route', $state))
-                        ->columnSpan(1),
-
-                    Select::make('mode')
-                        ->label('Moda')
-                        ->placeholder('Semua moda')
-                        ->options([
-                            ShipmentMode::Sea->value => 'Laut',
-                            ShipmentMode::Land->value => 'Darat',
-                        ])
-                        ->reactive()
-                        ->afterStateUpdated(fn($state) => $this->updateFilter('mode', $state))
+                        ->afterStateUpdated(fn ($state) => $this->updateFilter('route', $state))
                         ->columnSpan(1),
 
                     Select::make('exception_filter')
                         ->label('Exception')
                         ->placeholder('Semua')
                         ->options([
-                            'delay' => 'Delay',
-                            'ng' => 'NG',
-                            'hold' => 'Hold',
-                            'demurrage' => 'Demurrage',
+                            'delay'          => 'Delay',
+                            'ng'             => 'NG',
+                            'hold'           => 'Hold',
+                            'demurrage'      => 'Demurrage',
                             'missing_voyage' => 'Missing Voyage',
-                            'pdi_pending' => 'PDI Pending',
+                            'pdi_pending'    => 'PDI Pending',
                         ])
                         ->reactive()
-                        ->afterStateUpdated(fn($state) => $this->updateFilter('exception_filter', $state))
+                        ->afterStateUpdated(fn ($state) => $this->updateFilter('exception_filter', $state))
                         ->columnSpan(1),
 
                     ToggleButtons::make('group_mode')
                         ->label('Group')
-                        ->options([
-                            'flat' => 'Flat',
-                            'sppb' => 'SPPB',
-                            'voyage' => 'Voyage',
-                        ])
+                        ->options(['flat' => 'Flat', 'sppb' => 'SPPB', 'voyage' => 'Voyage'])
                         ->inline()
                         ->reactive()
-                        ->afterStateUpdated(fn($state) => $this->updateFilter('group_mode', $state))
+                        ->afterStateUpdated(fn ($state) => $this->updateFilter('group_mode', $state))
                         ->columnSpan(1),
 
                     Toggle::make('show_finished')
                         ->label('Tampilkan selesai')
                         ->reactive()
-                        ->afterStateUpdated(fn($state) => $this->updateFilter('show_finished', (bool) $state))
+                        ->afterStateUpdated(fn ($state) => $this->updateFilter('show_finished', (bool) $state))
                         ->columnSpan(1),
 
                     TextInput::make('search')
@@ -152,7 +131,7 @@ class PelacakanMonitoring extends Page implements HasForms
                         ->placeholder('Cari unit / SPPB / chassis...')
                         ->reactive()
                         ->debounce(300)
-                        ->afterStateUpdated(fn($state) => $this->updateFilter('search', $state ?? ''))
+                        ->afterStateUpdated(fn ($state) => $this->updateFilter('search', $state ?? ''))
                         ->columnSpan(1),
                 ]),
         ];

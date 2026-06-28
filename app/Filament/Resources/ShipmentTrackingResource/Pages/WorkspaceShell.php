@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\ShipmentTrackingResource\Pages;
 
 use App\DTO\Monitoring\MonitoringFilter;
-use App\Enums\ShipmentMode;
 use App\Filament\Resources\ShipmentTrackingResource;
 use App\Services\Monitoring\ExceptionCounterService;
 use App\Services\Monitoring\MonitoringQueryService;
@@ -84,13 +83,11 @@ class WorkspaceShell extends Page implements HasForms
 
         $this->form->fill([
             'branch_id'        => $this->branch_id,
-            'mode'             => $this->mode,
             'route'            => $this->route,
             'exception_filter' => $this->exception_filter,
             'search'           => $this->search,
             'group_mode'       => $this->group_mode,
             'show_finished'    => $this->show_finished,
-            'sort'             => $this->sort,
         ]);
 
         $this->generateData();
@@ -102,24 +99,13 @@ class WorkspaceShell extends Page implements HasForms
     {
         return [
             Grid::make()
-                ->columns(['default' => 1, 'sm' => 2, 'lg' => 6])
+                ->columns(['default' => 1, 'sm' => 2, 'lg' => 5])
                 ->schema([
                     Select::make('route')
                         ->label('Route')
                         ->options(['tam' => 'TAM', 'all' => 'Semua'])
                         ->reactive()
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('route', $state))
-                        ->columnSpan(1),
-
-                    Select::make('mode')
-                        ->label('Moda')
-                        ->placeholder('Semua moda')
-                        ->options([
-                            ShipmentMode::Sea->value  => 'Laut',
-                            ShipmentMode::Land->value => 'Darat',
-                        ])
-                        ->reactive()
-                        ->afterStateUpdated(fn ($state) => $this->updateFilter('mode', $state))
                         ->columnSpan(1),
 
                     Select::make('exception_filter')

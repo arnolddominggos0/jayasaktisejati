@@ -39,7 +39,11 @@
                                 </span>
                             @endif
                         </div>
-                        <p class="text-sm text-gray-500">Operational Control Tower · Route {{ $summary->route }}</p>
+                        <p class="text-sm text-gray-500">
+                            Route {{ $summary->route !== '—' ? $summary->route : 'TAM' }}
+                            <span class="mx-1 text-gray-300">·</span>
+                            Moda Laut
+                        </p>
                     </div>
 
                     {{-- Metric badges --}}
@@ -85,8 +89,8 @@
              Flex wrap. Clickable chips dispatch filter event.
              No business logic.
         ══════════════════════════════════════════════════════════════ --}}
-        @if ($hasExceptions)
         <section class="jss-mon-exception-band">
+        @if ($hasExceptions)
             @php
             $chips = [
                 ['key' => 'delay',         'label' => 'Delay',         'count' => $band->delay_count,         'icon' => 'heroicon-o-clock',                     'color' => 'red'],
@@ -136,8 +140,17 @@
                 </button>
                 @endif
             </div>
-        </section>
+
+        @else
+
+            {{-- Passive indicator when no exceptions are present --}}
+            <div class="flex items-center gap-1.5 py-0.5 text-xs text-gray-400">
+                <x-heroicon-o-check-circle class="size-3.5 text-emerald-400" />
+                Tidak ada exception aktif
+            </div>
+
         @endif
+        </section>
 
         {{-- ══════════════════════════════════════════════════════════════
              3. TOOLBAR
@@ -145,16 +158,25 @@
              Presentation only — filter behavior wires to PHP state.
         ══════════════════════════════════════════════════════════════ --}}
         <section class="jss-mon-toolbar">
-            <div class="rounded-xl border border-gray-200 bg-white p-4">
-                <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:gap-4">
+            <div class="rounded-xl border border-gray-200 bg-white px-4 py-3">
+                <div class="flex flex-col gap-3 xl:flex-row xl:items-end xl:gap-0">
 
-                    {{-- Filament form (route, mode, exception, group, show_finished, search) --}}
-                    <div class="min-w-0 flex-1">
+                    {{-- Scope: Mode locked per ADR-009 (Sea only, no selector) --}}
+                    <div class="flex shrink-0 flex-col gap-1 xl:border-r xl:border-gray-100 xl:pr-5">
+                        <span class="text-[10px] font-semibold uppercase tracking-widest text-gray-400">Scope</span>
+                        <span class="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-blue-100 bg-blue-50 px-3 py-[7px] text-sm font-medium text-blue-700">
+                            <x-heroicon-o-globe-alt class="size-3.5 text-blue-400" />
+                            Laut
+                        </span>
+                    </div>
+
+                    {{-- Filter · View · Search: Route / Exception / Group / Selesai / Cari --}}
+                    <div class="min-w-0 flex-1 xl:border-r xl:border-gray-100 xl:px-5">
                         {{ $this->form }}
                     </div>
 
-                    {{-- Refresh button --}}
-                    <div class="flex shrink-0 items-center gap-2">
+                    {{-- Refresh --}}
+                    <div class="flex shrink-0 items-end xl:pl-4">
                         <button
                             type="button"
                             wire:click="refresh"
@@ -166,6 +188,7 @@
                             <span wire:loading wire:target="refresh">Memuat...</span>
                         </button>
                     </div>
+
                 </div>
             </div>
         </section>

@@ -85,11 +85,11 @@
 
                     {{-- Empty state --}}
                     <tr>
-                        <td colspan="9" class="py-20 text-center">
-                            <div class="flex flex-col items-center gap-3">
-                                <x-heroicon-o-magnifying-glass class="size-10 text-gray-200" />
-                                <p class="text-sm font-medium text-gray-400">Tidak ada unit yang dipantau</p>
-                                <p class="text-xs text-gray-300">Coba ubah filter atau muat ulang data</p>
+                        <td colspan="9">
+                            <div class="flex h-64 flex-col items-center justify-center gap-2">
+                                <x-heroicon-o-signal-slash class="size-8 text-gray-200" />
+                                <p class="text-sm font-semibold text-gray-400">Tidak ada unit yang sedang dipantau</p>
+                                <p class="text-xs text-gray-300">Periksa filter aktif atau tekan Refresh.</p>
                             </div>
                         </td>
                     </tr>
