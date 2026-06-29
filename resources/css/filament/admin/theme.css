@@ -1,4 +1,4 @@
-@import "/vendor/filament/filament/resources/css/theme.css";
+﻿@import "/vendor/filament/filament/resources/css/theme.css";
 
 .fi-topbar {
     @apply h-16;
@@ -29,7 +29,7 @@
     }
 }
 
-/* ── Sidebar: subtle brand identity ── */
+/* â”€â”€ Sidebar: subtle brand identity â”€â”€ */
 .fi-sidebar {
     @apply bg-white;
 }
@@ -74,7 +74,7 @@
     }
 }
 
-/* ── Voyage Registry Table: Spreadsheet Feel ── */
+/* â”€â”€ Voyage Registry Table: Spreadsheet Feel â”€â”€ */
 .fi-ta-table tbody tr {
     border-bottom: 1px solid #f3f4f6;
 }
@@ -186,7 +186,7 @@
     box-shadow: inset 0 0 0 1px rgba(252, 165, 165, 0.3);
 }
 
-/* ── Voyage Registry Density & Layout ── */
+/* â”€â”€ Voyage Registry Density & Layout â”€â”€ */
 .fi-ta-table tbody tr:nth-child(even) {
     background-color: rgba(249, 250, 251, 0.35);
 }
@@ -231,10 +231,10 @@
     gap: 0.125rem;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
-   JSS Custom Dashboard — Enterprise ERP Polish (Final Pass)
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   JSS Custom Dashboard â€” Enterprise ERP Polish (Final Pass)
    Design system: SAP Fiori / Stripe / Linear / Oracle Fusion feel.
-   ═══════════════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .jss-dash {
     /* palette */
@@ -290,7 +290,7 @@
     font-feature-settings: "tnum";
 }
 
-/* ── Layout spacing ── */
+/* â”€â”€ Layout spacing â”€â”€ */
 .jss-dash { padding: 0 0 var(--sp-2); }
 .jss-header { margin-bottom: var(--sp-3); }
 
@@ -311,7 +311,7 @@
 .jss-section { margin-bottom: var(--sp-3); }
 .jss-section:last-of-type { margin-bottom: var(--sp-1); }
 
-/* ── Section header (18px, NOT uppercase) ── */
+/* â”€â”€ Section header (18px, NOT uppercase) â”€â”€ */
 .jss-section-head {
     display: flex;
     align-items: baseline;
@@ -332,7 +332,7 @@
     font-weight: 400;
 }
 
-/* ── Card base ── */
+/* â”€â”€ Card base â”€â”€ */
 .jss-card {
     background: var(--jss-card-bg);
     border: var(--jss-border-soft);
@@ -350,7 +350,7 @@
 .jss-card.jss-card-warn { border-color: rgba(245,158,11,0.30); }
 .jss-card.jss-card-danger { border-color: rgba(239,68,68,0.30); }
 
-/* ── Card footer (thin divider) ── */
+/* â”€â”€ Card footer (thin divider) â”€â”€ */
 .jss-card-foot {
     display: flex;
     align-items: center;
@@ -360,7 +360,7 @@
     border-top: 1px solid #F5F7FA;
 }
 
-/* ── Link CTA ── */
+/* â”€â”€ Link CTA â”€â”€ */
 .jss-link {
     display: inline-flex;
     align-items: center;
@@ -372,7 +372,7 @@
 }
 .jss-link:hover { color: #1D4ED8; gap: 0.375rem; }
 
-/* ── Icon box (KPI / metric) — bigger, softer ── */
+/* â”€â”€ Icon box (KPI / metric) â€” bigger, softer â”€â”€ */
 .jss-iconbox {
     display: inline-flex;
     align-items: center;
@@ -384,7 +384,7 @@
 .jss-iconbox.ring-1 { box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04); }
 .group:hover .jss-iconbox { transform: scale(1.05); transition: transform 0.25s ease; }
 
-/* ── Status pill (uppercase allowed for small badges only) ── */
+/* â”€â”€ Status pill (uppercase allowed for small badges only) â”€â”€ */
 .jss-pill {
     display: inline-flex;
     align-items: center;
@@ -397,7 +397,7 @@
     letter-spacing: 0.05em;
 }
 
-/* ── KPI hierarchy: Icon+Badge → BIG NUMBER → Title → Description → Divider → Link ── */
+/* â”€â”€ KPI hierarchy: Icon+Badge â†’ BIG NUMBER â†’ Title â†’ Description â†’ Divider â†’ Link â”€â”€ */
 .jss-kpi-num {
     font-size: 2.75rem;     /* 44px */
     font-weight: 800;
@@ -407,20 +407,20 @@
     color: var(--jss-text);
 }
 .jss-kpi-label {
-    font-size: 0.75rem;     /* 12px — Title */
+    font-size: 0.75rem;     /* 12px â€” Title */
     font-weight: 700;
     color: var(--jss-text);
     margin-bottom: 0.125rem;
     letter-spacing: -0.01em;
 }
 .jss-kpi-desc {
-    font-size: 0.6875rem;   /* 11px — Description, thinner */
+    font-size: 0.6875rem;   /* 11px â€” Description, thinner */
     font-weight: 400;
     color: var(--jss-text-muted);
     line-height: 1.3;
 }
 
-/* ── Metric (Ringkasan Port compact style) ── */
+/* â”€â”€ Metric (Ringkasan Port compact style) â”€â”€ */
 .jss-metric-num {
     font-size: 1.875rem;    /* 30px */
     font-weight: 800;
@@ -436,7 +436,7 @@
     margin-top: 0.25rem;
 }
 
-/* ── Card-level header (14px Title, NOT uppercase) ── */
+/* â”€â”€ Card-level header (14px Title, NOT uppercase) â”€â”€ */
 .jss-card-head {
     display: flex;
     align-items: baseline;
@@ -457,7 +457,7 @@
     font-weight: 400;
 }
 
-/* ── Alert rows (modern list, compact, clear arrows) ── */
+/* â”€â”€ Alert rows (modern list, compact, clear arrows) â”€â”€ */
 .jss-alert-row {
     display: flex;
     align-items: center;
@@ -483,10 +483,10 @@
 .jss-alert-row-num { font-size: 1.5rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; flex-shrink: 0; }
 .jss-alert-row:hover .x-heroicon-m-chevron-right { transform: translateX(2px); }
 
-/* ── Performance breakdown ── */
+/* â”€â”€ Performance breakdown â”€â”€ */
 .jss-perf-item { padding: 0; }
 
-/* ── Lead time cards (shorter, progress bar dominant) ── */
+/* â”€â”€ Lead time cards (shorter, progress bar dominant) â”€â”€ */
 .jss-lt-card {
     background: #FAFAFA;
     border: 1px solid var(--jss-border);
@@ -505,7 +505,7 @@
 .jss-lt-num { font-size: 1.75rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
 .jss-lt-target { font-size: 0.6875rem; color: var(--jss-text-muted); }
 
-/* progress bar — more prominent */
+/* progress bar â€” more prominent */
 .jss-progress {
     height: 10px;
     background: #E5E7EB;
@@ -518,7 +518,7 @@
     transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
 }
 
-/* status badges — higher contrast */
+/* status badges â€” higher contrast */
 .jss-badge {
     display: inline-flex; align-items: center;
     padding: 0.1875rem 0.5625rem; border-radius: 9999px;
@@ -528,7 +528,7 @@
 .jss-badge-success { background: #D1FAE5; color: #065F46; border: 1px solid #34D399; }
 .jss-badge-danger  { background: #FEE2E2; color: #991B1B; border: 1px solid #F87171; }
 
-/* ── Mini cards (Pemeriksaan — Title Case, compact) ── */
+/* â”€â”€ Mini cards (Pemeriksaan â€” Title Case, compact) â”€â”€ */
 .jss-mini-card {
     display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.25rem;
     padding: var(--sp-2) var(--sp-1);
@@ -546,7 +546,7 @@
 .jss-mini-num { font-size: 1.625rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
 .jss-mini-label { font-size: 0.625rem; font-weight: 600; color: var(--jss-text-muted); text-transform: none; letter-spacing: 0; }
 
-/* ── Quick access tiles (navigation tile feel) ── */
+/* â”€â”€ Quick access tiles (navigation tile feel) â”€â”€ */
 .jss-quick {
     display: flex; flex-direction: column;
     background: var(--jss-card-bg);
@@ -570,7 +570,7 @@
 .jss-quick:hover .jss-quick-title { color: var(--jss-primary); }
 .jss-quick-desc { font-size: 0.6875rem; color: var(--jss-text-muted); margin-top: 0.1875rem; font-weight: 400; }
 
-/* ── Banners ── */
+/* â”€â”€ Banners â”€â”€ */
 .jss-banner-danger {
     display: flex; align-items: center; gap: 0.5rem;
     background: #FEF2F2; border: 1px solid #FEE2E2;
@@ -583,20 +583,20 @@
     border-radius: 10px; padding: 0.5rem 0.75rem;
 }
 
-/* ── Footer ── */
+/* â”€â”€ Footer â”€â”€ */
 .jss-footer {
     display: flex; align-items: center; justify-content: space-between;
     padding-top: var(--sp-3); margin-top: var(--sp-1);
     border-top: 1px solid #F3F4F6;
 }
 
-/* ── Donut chart canvas centering ── */
+/* â”€â”€ Donut chart canvas centering â”€â”€ */
 .jss-dash canvas#perfChart {
     position: absolute; inset: 0;
     width: 100% !important; height: 100% !important;
 }
 
-/* ── Responsive: tablet section gaps ── */
+/* â”€â”€ Responsive: tablet section gaps â”€â”€ */
 @media (max-width: 1279px) {
     .jss-section { margin-bottom: var(--sp-2); }
     .jss-kpi-num { font-size: 2.25rem; }
@@ -605,4 +605,833 @@
     .jss-section { margin-bottom: var(--sp-2); }
     .jss-section-head { margin-bottom: var(--sp-1); }
     .jss-kpi-num { font-size: 1.875rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Operational Control Tower — Monitoring Workspace Shell (Sprint 6.3C)
+   ───────────────────────────────────────────────────────────────────────
+   Design system for the Pelacakan & Monitoring workspace.
+   Targets the SAP Fiori / Oracle Fusion SCM / Dynamics 365 feel: a calm,
+   dense-but-readable operational surface, not a CRUD admin panel.
+
+   Color hierarchy (Task 8):
+     Primary  = JSS Navy   #0F2A4A  → structure / titles / anchors
+     Accent   = Blue       #2563EB  → interactive / active / focus
+     Success  = Emerald    #10B981
+     Warning  = Amber      #F59E0B
+     Danger   = Red        #EF4444
+     Neutral  = Gray       #6B7280
+
+   Type scale (Task 1):
+     H1 36px · Subtitle 16px · Toolbar label 13px · Input 15px
+     Table header 13px · Table body 14px · Caption 13px · Footer 11px
+
+   Sprint 6.3D-R2 final polish:
+     1. Sticky table header (scroll container, max-height calc)
+     2. Denser rows: row-py 10px → 8px (target 34-36px)
+     3. Progress bar:  8px → 7px → 5px (0.3125rem)
+     4. Shadow:       0.04 → 0.03 → 0.02 opacity
+     5. Border radius: 10px → 8px (0.5rem)
+     6. Footer: 12px → 11px (0.6875rem), tighter padding
+
+   Presentation layer ONLY — no business logic, no Livewire state changes.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.jss-monitoring {
+    /* ── Color hierarchy ── */
+    --mon-navy:        #0F2A4A;
+    --mon-navy-500:    #3B556B;
+    --mon-navy-700:    #14233B;
+    --mon-navy-600:    #1E3A5F;
+    --mon-navy-400:    #4B6586;
+    --mon-accent:      #2563EB;
+    --mon-accent-50:   #EFF6FF;
+    --mon-accent-100:  #DBEAFE;
+    --mon-accent-200:  #BFDBFE;
+    --mon-accent-300:  #93C5FD;
+    --mon-accent-400:  #60A5FA;
+    --mon-accent-600:  #1D4ED8;
+    --mon-success:     #10B981;
+    --mon-success-50:  #ECFDF5;
+    --mon-success-100: #D1FAE5;
+    --mon-warning:     #F59E0B;
+    --mon-warning-50:  #FFFBEB;
+    --mon-warning-100: #FEF3C7;
+    --mon-danger:      #EF4444;
+    --mon-danger-50:   #FEF2F2;
+    --mon-danger-100:  #FEE2E2;
+    --mon-neutral:     #6B7280;
+    --mon-neutral-400: #9CA3AF;
+    --mon-neutral-200: #E5E7EB;
+
+    /* ── Surfaces ── */
+    --mon-bg:          #F8FAFC;
+    --mon-surface:     #FFFFFF;
+    --mon-toolbar:     #F8FAFC;
+    --mon-border:      #E5E7EB;
+    --mon-border-soft: #EEF2F7;
+    --mon-divider:     #F1F5F9;
+
+    /* ── Type scale (rem) ── */
+    --mon-fs-h1:    2.25rem;     /* 36 — H1 */
+    --mon-fs-sub:   1rem;        /* 16 — subtitle */
+    --mon-fs-body:  0.9375rem;   /* 15 — input / secondary */
+    --mon-fs-tb-l:  0.8125rem;   /* 13 — toolbar label / table header */
+    --mon-fs-tbl:   0.875rem;    /* 14 — table body */
+    --mon-fs-cap:   0.8125rem;   /* 13 — caption */
+    --mon-fs-foot:  0.6875rem;   /* 11 — footer (R2: was 12px) */
+
+    /* ── Density ── */
+    --mon-radius:    0.5rem;     /* 8 — R2: was 10px */
+    --mon-radius-sm: 0.5rem;     /* 8 */
+    --mon-sec-gap:   0.75rem;    /* 12 — section spacing */
+    --mon-row-px:    0.875rem;   /* 14 */
+    --mon-row-py:    0.5rem;     /* 8 — R2: was 10px, target 34-36px rows */
+    --mon-touch:     2.75rem;    /* 44 — enterprise touch target */
+
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-size: var(--mon-fs-body);
+}
+
+/* Operational surface tint behind the whole workspace */
+.fi-main:has(.jss-monitoring) {
+    background-color: var(--mon-bg);
+}
+.jss-monitoring .fi-page > section { padding-block: var(--mon-sec-gap); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 1 · Typography scale
+   ═══════════════════════════════════════════════════════════════════════ */
+.mon-h1 {
+    font-size: var(--mon-fs-h1);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    color: var(--mon-navy);
+}
+.mon-subtitle {
+    font-size: var(--mon-fs-sub);
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--mon-neutral);
+}
+.mon-caption {
+    font-size: var(--mon-fs-cap);
+    color: var(--mon-neutral);
+    line-height: 1.35;
+}
+.mon-foot {
+    font-size: var(--mon-fs-foot);
+    color: var(--mon-neutral-400);
+    line-height: 1.4;
+}
+.tabular-nums { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 3 · Header hierarchy — the visual anchor
+   ═══════════════════════════════════════════════════════════════════════ */
+.jss-mon-header {
+    border-bottom: 1px solid var(--mon-border-soft);
+    padding-bottom: 0.625rem;
+}
+/* Scope pills — workspace context (not interactive) */
+.mon-scope {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1875rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1;
+}
+.mon-scope-tam   { background: #F1F5F9; color: var(--mon-navy-400); }
+.mon-scope-laut  { background: var(--mon-accent-50); color: var(--mon-accent-600); }
+.mon-scope-active{
+    background: var(--mon-accent);
+    color: #fff;
+    border-radius: 9999px;
+    padding: 0.1875rem 0.625rem;
+    font-weight: 800;
+    box-shadow: 0 1px 2px rgba(37,99,235,0.35);
+}
+
+/* Anchor metric — the most prominent live counter */
+.mon-metric {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.3125rem;
+    line-height: 1;
+}
+.mon-metric-num {
+    font-size: 1.375rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--mon-navy);
+    font-variant-numeric: tabular-nums;
+}
+.mon-metric-label {
+    font-size: var(--mon-fs-cap);
+    font-weight: 500;
+    color: var(--mon-neutral);
+    text-transform: lowercase;
+}
+.mon-metric-sub {
+    font-size: var(--mon-fs-cap);
+    font-weight: 600;
+    color: var(--mon-navy-400);
+    font-variant-numeric: tabular-nums;
+}
+.mon-vrule {
+    width: 1px;
+    height: 1.25rem;
+    background: var(--mon-border);
+    flex-shrink: 0;
+}
+.mon-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    font-size: var(--mon-fs-cap);
+    color: var(--mon-neutral);
+    font-variant-numeric: tabular-nums;
+}
+.mon-meta svg { color: var(--mon-neutral-400); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 2 · Icon scale (+10-20%) — kept elegant, scannable
+   ═══════════════════════════════════════════════════════════════════════ */
+.mon-ic-3  { width: 0.875rem; height: 0.875rem; } /* 14  (was size-3=12) */
+.mon-ic-4  { width: 1.125rem; height: 1.125rem; } /* 18  (was size-4=16) */
+.mon-ic-5  { width: 1.25rem;  height: 1.25rem;  } /* 20 */
+.mon-ic-r  { width: 1.25rem;  height: 1.25rem;  } /* 20 refresh */
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 4 + 6 · Workspace surface — single operational plane, not stacked cards
+   ═══════════════════════════════════════════════════════════════════════ */
+.jss-monitoring { display: flex; flex-direction: column; gap: var(--mon-sec-gap); }
+
+.jss-mon-workspace .mon-surface {
+    background: var(--mon-surface);
+    border: 1px solid var(--mon-border);
+    border-radius: var(--mon-radius);
+    overflow: hidden;
+    /* R2 final: shadow reduced further from 0.03 → 0.02 */
+    box-shadow: 0 1px 2px rgba(15,23,42,0.02);
+}
+
+/* Toolbar rail — console command-bar feel, not a form card */
+.mon-toolbar {
+    background: var(--mon-toolbar);
+    border-bottom: 1px solid var(--mon-border-soft);
+    padding: 0.625rem var(--mon-row-px);
+}
+
+/* Refresh button — framed, secondary, enterprise weight */
+.mon-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375rem;
+    min-height: var(--mon-touch);
+    padding: 0 0.875rem;
+    border-radius: var(--mon-radius-sm);
+    border: 1px solid var(--mon-border);
+    background: var(--mon-surface);
+    font-size: var(--mon-fs-body);
+    font-weight: 600;
+    color: var(--mon-navy-600);
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.mon-btn:hover { border-color: var(--mon-accent-300); background: var(--mon-accent-50); color: var(--mon-accent-600); }
+.mon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Filament form override — scoped to the workspace, presentation only
+   (no schema/state changes; mostly label + input density)
+   ═══════════════════════════════════════════════════════════════════════ */
+.jss-monitoring .fi-field-label,
+.jss-monitoring .fi-form-item-label {
+    font-size: var(--mon-fs-tb-l);
+    font-weight: 600;
+    color: var(--mon-navy-600);
+    letter-spacing: 0;
+    margin-bottom: 0.25rem;
+}
+.jss-monitoring .fi-input,
+.jss-monitoring .fi-select,
+.jss-monitoring .fi-fo-select,
+.jss-monitoring select {
+    font-size: var(--mon-fs-body);
+    min-height: var(--mon-touch);
+    border-radius: var(--mon-radius-sm);
+    border-color: var(--mon-border);
+}
+.jss-monitoring .fi-input:focus,
+.jss-monitoring .fi-select:focus,
+.jss-monitoring .fi-fo-select:focus,
+.jss-monitoring select:focus {
+    border-color: var(--mon-accent);
+    box-shadow: 0 0 0 1px var(--mon-accent);
+}
+/* Make the search prefix icon navy, not gray — it''s the primary command */
+.jss-monitoring .fi-input .fi-icon,
+.jss-monitoring .fi-fo-prefix svg { color: var(--mon-navy-400); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 4 · Exception band chips — operational alert tiles
+   ═══════════════════════════════════════════════════════════════════════ */
+.mon-exception-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--mon-radius-sm);
+    border: 1px solid transparent;
+    background: var(--mon-surface);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+    text-align: left;
+    line-height: 1;
+}
+.mon-exception-chip:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(15,23,42,0.08); }
+.mon-exception-chip.is-danger  { border-color: #FCA5A5; background: var(--mon-danger-50); }
+.mon-exception-chip.is-warning { border-color: #FCD34D; background: var(--mon-warning-50); }
+.mon-exception-chip.is-active  { border-color: var(--mon-accent); box-shadow: 0 0 0 2px var(--mon-accent); }
+.mon-chip-ic {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; border-radius: 0.5rem; flex-shrink: 0;
+}
+.mon-chip-ic.is-danger  { background: var(--mon-danger-100); color: #B91C1C; }
+.mon-chip-ic.is-warning { background: var(--mon-warning-100); color: #B45309; }
+.mon-chip-count { font-size: 1.25rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.mon-chip-count.is-danger  { color: #991B1B; }
+.mon-chip-count.is-warning { color: #92400E; }
+.mon-chip-label { font-size: var(--mon-fs-cap); font-weight: 500; color: var(--mon-neutral); margin-top: 0.125rem; }
+.mon-chip-label.is-danger  { color: #B91C1C; }
+.mon-chip-label.is-warning { color: #B45309; }
+
+.mon-reset {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    min-height: var(--mon-touch);
+    padding: 0 0.75rem;
+    border-radius: var(--mon-radius-sm);
+    border: 1px solid var(--mon-border);
+    background: var(--mon-surface);
+    font-size: var(--mon-fs-cap);
+    font-weight: 600;
+    color: var(--mon-neutral);
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+.mon-reset:hover { border-color: var(--mon-neutral-400); color: var(--mon-navy-600); }
+
+.mon-allclear {
+    display: inline-flex; align-items: center; gap: 0.4375rem;
+    font-size: var(--mon-fs-cap);
+    font-weight: 500;
+    color: var(--mon-success);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 5 · Table experience — the operational focus
+   ═══════════════════════════════════════════════════════════════════════ */
+.jss-mon-table-wrap { background: var(--mon-surface); }
+
+/* R2: Sticky table header — scroll container so th:sticky works within table */
+.mon-table-scroll {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 340px);
+}
+
+.mon-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--mon-fs-tbl);
+}
+.mon-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 0.625rem var(--mon-row-px);
+    text-align: left;
+    font-size: var(--mon-fs-tb-l);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--mon-navy-600);
+    background: #F8FAFC;
+    border-bottom: 1px solid var(--mon-border);
+    white-space: nowrap;
+}
+.mon-table thead th.col-num { text-align: right; }
+.mon-table thead th.col-ctr { text-align: center; }
+
+.mon-table tbody td {
+    padding: var(--mon-row-py) var(--mon-row-px);
+    color: #374151;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--mon-divider);
+    line-height: 1.35;
+}
+.mon-table tbody tr { transition: background-color 0.12s ease, box-shadow 0.12s ease; }
+.mon-table tbody tr:nth-child(even) { background: rgba(248,250,252,0.5); }
+.mon-table tbody tr:hover {
+    background: var(--mon-accent-50);
+    box-shadow: inset 3px 0 0 var(--mon-accent);
+}
+.mon-table td.col-num { text-align: right; font-variant-numeric: tabular-nums; }
+.mon-table td.col-ctr { text-align: center; }
+
+/* Primary cell — unit identifier (anchor per row) */
+.mon-unit-code {
+    font-size: var(--mon-fs-tbl);
+    font-weight: 700;
+    color: var(--mon-navy);
+    letter-spacing: -0.005em;
+    line-height: 1.2;
+}
+.mon-unit-sub {
+    font-size: 0.75rem;
+    color: var(--mon-neutral);
+    line-height: 1.25;
+}
+
+/* Status / stage badge — consistent chip language */
+.mon-badge {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.1875rem 0.5625rem;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.25;
+}
+.mon-badge-success { background: var(--mon-success-100); color: #065F46; }
+.mon-badge-warning { background: var(--mon-warning-100); color: #92400E; }
+.mon-badge-danger  { background: var(--mon-danger-100);  color: #991B1B; }
+.mon-badge-neutral { background: #F1F5F9; color: var(--mon-navy-400); }
+.mon-badge-accent  { background: var(--mon-accent-100); color: var(--mon-accent-600); }
+
+/* Progress bar — dense, navy fill */
+/* R2 final: 7px → 5px (0.3125rem); colors and animations unchanged */
+.mon-progress {
+    height: 0.3125rem;
+    background: #E5E7EB;
+    border-radius: 9999px;
+    overflow: hidden;
+    min-width: 4.5rem;
+}
+.mon-progress-fill {
+    height: 100%;
+    border-radius: 9999px;
+    background: var(--mon-navy);
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+}
+.mon-progress-fill.is-success { background: var(--mon-success); }
+.mon-progress-fill.is-warning { background: var(--mon-warning); }
+.mon-progress-fill.is-danger  { background: var(--mon-danger); }
+
+.mon-pct { font-size: 0.75rem; font-weight: 600; color: var(--mon-navy-400); font-variant-numeric: tabular-nums; }
+
+/* Age cell — colored by threshold */
+.mon-age { font-size: var(--mon-fs-tbl); font-weight: 700; font-variant-numeric: tabular-nums; }
+.mon-age.is-old   { color: #B91C1C; }
+.mon-age.is-stale { color: #B45309; }
+.mon-age.is-fresh { color: var(--mon-neutral); }
+
+/* Skeleton rows */
+.mon-skel { animation: mon-pulse 1.6s cubic-bezier(0.4,0,0.2,1) infinite; background: #E5E7EB; border-radius: 0.25rem; }
+@keyframes mon-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+/* Empty state — enterprise-calm */
+.mon-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.5rem;
+    min-height: 13rem;
+    text-align: center;
+}
+.mon-empty-title { font-size: var(--mon-fs-body); font-weight: 600; color: var(--mon-navy-400); }
+.mon-empty-sub { font-size: var(--mon-fs-cap); color: var(--mon-neutral-400); }
+
+/* Table foot strip — pagination / count */
+.mon-table-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.5rem var(--mon-row-px);
+    border-top: 1px solid var(--mon-divider);
+    background: #FCFCFD;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 7 · Detail slide-over consistency
+   ═══════════════════════════════════════════════════════════════════════ */
+.jss-mon-detail-slide .mon-panel {
+    background: var(--mon-surface);
+    border: 1px solid var(--mon-border-soft);
+    border-radius: var(--mon-radius);
+    padding: 1rem 1.125rem;
+}
+.mon-panel-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--mon-navy);
+    letter-spacing: -0.01em;
+}
+.mon-panel-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+/* Timeline + inspection share chip language */
+.mon-timeline-node {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; border-radius: 9999px; flex-shrink: 0;
+}
+.mon-timeline-node.is-done    { background: var(--mon-success-100); color: #047857; }
+.mon-timeline-node.is-current { background: var(--mon-accent-100); color: var(--mon-accent-600); }
+.mon-timeline-node.is-pending { background: #F1F5F9; color: var(--mon-neutral-400); }
+
+/* Inspection stage row */
+.mon-insp-row {
+    display: flex; align-items: center; justify-content: space-between;
+    border: 1px solid var(--mon-border-soft);
+    border-radius: var(--mon-radius-sm);
+    padding: 0.5rem 0.75rem;
+}
+
+/* Deep link tiles */
+.mon-deeplink {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: var(--mon-radius-sm);
+    background: #F1F5F9;
+    font-size: var(--mon-fs-body);
+    font-weight: 600;
+    color: var(--mon-navy-600);
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+.mon-deeplink:hover { background: var(--mon-accent-50); color: var(--mon-accent-600); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 5/9 · Footer — metadata strip
+   R2: slightly smaller (font 11px), tighter padding
+   ═══════════════════════════════════════════════════════════════════════ */
+.jss-mon-footer {
+    border-top: 1px solid var(--mon-divider);
+    padding-top: 0.375rem;
+}
+.jss-mon-footer .foot-label { font-weight: 600; color: var(--mon-navy-400); }
+.jss-mon-footer .foot-dot { color: var(--mon-neutral-200); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Responsive — keep the table dense at 1366 / 1920, stack on mobile
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    .mon-h1 { font-size: 1.75rem; }
+    .mon-table thead th { position: static; }
+    .mon-table-scroll { max-height: none; }
+}
+@media (max-width: 640px) {
+    .mon-table-scroll { -webkit-overflow-scrolling: touch; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Sprint 6.3B — Monitoring Grid presentation additions
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Row interaction (Task 11) — clickable, keyboard-focusable, accent bar */
+.mon-table tbody tr.mon-row { cursor: pointer; }
+.mon-table tbody tr.mon-row:focus { outline: none; }
+.mon-table tbody tr.mon-row:focus-visible {
+    background: var(--mon-accent-50);
+    box-shadow: inset 3px 0 0 var(--mon-accent);
+}
+
+/* Search highlight (Task 10) — accent amber, not garish */
+.mon-hl {
+    background: #FEF3C7;
+    color: #92400E;
+    border-radius: 0.1875rem;
+    padding: 0.0625rem 0.125rem;
+    font-weight: 700;
+}
+
+/* Progress neutral variant */
+.mon-progress-fill.is-neutral { background: #D1D5DB; }
+
+/* Pagination controls (Task 13) */
+.mon-page {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0 0.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--mon-border);
+    background: var(--mon-surface);
+    font-size: var(--mon-fs-cap);
+    font-weight: 600;
+    color: var(--mon-navy-600);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.mon-page:hover { border-color: var(--mon-accent-300); background: var(--mon-accent-50); color: var(--mon-accent-600); }
+.mon-page.is-active {
+    background: var(--mon-navy);
+    border-color: var(--mon-navy);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(15,42,74,0.25);
+}
+.mon-page-dots {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 0.25rem;
+    color: var(--mon-neutral-400);
+    font-size: var(--mon-fs-cap);
+}
+
+/* Dense modifier for laptop widths (Task 14) — tighter column rhythm */
+@media (min-width: 1280px) and (max-width: 1535px) {
+    .mon-table tbody td,
+    .mon-table thead th { padding-left: 0.625rem; padding-right: 0.625rem; }
+    .mon-progress { min-width: 3.75rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Sprint 6.3C — Enterprise Interaction Layer
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Alpine cloak */
+[x-cloak] { display: none !important; }
+
+/* ── Task 1+2: Row focus / selected / hover — three distinct states ── */
+.mon-table tbody tr.mon-row {
+    transition: background-color 150ms ease, box-shadow 150ms ease, outline-color 150ms ease;
+}
+
+/* hover (mouse only) */
+.mon-table tbody tr.mon-row:hover:not(.is-focused):not(.is-selected) {
+    background: var(--mon-accent-50);
+    box-shadow: inset 3px 0 0 var(--mon-accent-400);
+}
+
+/* focused (keyboard) — accent left bar + subtle tint + faint outline */
+.mon-table tbody tr.mon-row.is-focused {
+    background: var(--mon-accent-50);
+    box-shadow: inset 3px 0 0 var(--mon-accent-600);
+    outline: 1px solid var(--mon-accent-200);
+    outline-offset: -1px;
+}
+.mon-table tbody tr.mon-row.is-focused:focus { outline: none; }
+.mon-table tbody tr.mon-row.is-focused:focus-visible {
+    outline: 2px solid var(--mon-accent-300);
+    outline-offset: -2px;
+}
+
+/* selected (opened in slide) — navy left bar, very faint background */
+.mon-table tbody tr.mon-row.is-selected {
+    background: rgba(37, 99, 235, 0.03);
+    box-shadow: inset 3px 0 0 var(--mon-navy-500, #3B556B);
+}
+.mon-table tbody tr.mon-row.is-selected.is-focused {
+    background: var(--mon-accent-50);
+    box-shadow: inset 3px 0 0 var(--mon-accent-600);
+}
+
+/* ── Task 10: Accessibility — focus-visible for all interactive elements ── */
+.mon-btn:focus-visible,
+.mon-page:focus-visible,
+.mon-reset:focus-visible,
+.mon-exception-chip:focus-visible,
+.mon-empty-cta:focus-visible,
+.mon-btn-clear:focus-visible {
+    outline: 2px solid var(--mon-accent-300);
+    outline-offset: 1px;
+}
+.mon-btn:focus:not(:focus-visible) { outline: none; }
+
+/* ── Task 4: Search clear button ── */
+.mon-clear-search {
+    position: absolute;
+    right: 0.625rem;
+    bottom: 0.625rem;
+    z-index: 5;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--mon-radius-sm);
+    border: 1px solid var(--mon-border);
+    background: var(--mon-surface);
+    color: var(--mon-neutral);
+    font-size: var(--mon-fs-cap);
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+.mon-clear-search:hover {
+    border-color: var(--mon-danger);
+    background: var(--mon-danger-100);
+    color: var(--mon-danger);
+}
+
+/* ── Task 5: Refresh success state ── */
+.mon-btn.mon-btn-success {
+    border-color: var(--mon-success);
+    background: var(--mon-success-100);
+    color: #065F46;
+}
+.mon-btn.mon-btn-success .mon-ic-r { color: var(--mon-success); }
+
+/* ── Task 6: Polling countdown ── */
+.mon-poll-countdown {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--mon-neutral-400);
+    font-variant-numeric: tabular-nums;
+    margin-left: 0.25rem;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 0.25rem;
+    background: rgba(37, 99, 235, 0.06);
+}
+.mon-refresh-meta { transition: color 200ms ease; }
+
+/* ── Task 7: Empty state ── */
+.mon-empty-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 9999px;
+    background: #F1F5F9;
+    color: var(--mon-neutral-400);
+    margin-bottom: 0.25rem;
+}
+.mon-empty-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 0.375rem;
+    padding: 0.375rem 0.875rem;
+    border-radius: var(--mon-radius-sm);
+    border: 1px solid var(--mon-border);
+    background: var(--mon-surface);
+    color: var(--mon-navy-600);
+    font-size: var(--mon-fs-cap);
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+.mon-empty-cta:hover {
+    border-color: var(--mon-accent-300);
+    background: var(--mon-accent-50);
+    color: var(--mon-accent-600);
+}
+
+/* ── Task 9: Pagination ── */
+.mon-page:focus-visible {
+    outline: 2px solid var(--mon-accent-300);
+    outline-offset: 1px;
+}
+.mon-page[aria-current="page"]:focus-visible {
+    outline-color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── Footer keyboard hints ── */
+.mon-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.25rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--mon-border);
+    background: #F8FAFC;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--mon-navy-400);
+    font-family: ui-monospace, monospace;
+    line-height: 1;
+}
+
+/* ── Task 8: Exception chip transition ── */
+.mon-exception-chip {
+    transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+.mon-exception-chip:active {
+    transform: scale(0.97);
+}
+.mon-exception-chip.is-active {
+    border-width: 2px;
+    box-shadow: 0 1px 3px rgba(15, 42, 74, 0.15);
+}
+
+/* ── Task 11: Micro animations (150–220ms) ── */
+
+/* Row entrance — staggered fade-in */
+.mon-row-fadein {
+    animation: mon-row-in 180ms ease-out both;
+    animation-delay: calc(var(--row-idx, 0) * 12ms);
+}
+@keyframes mon-row-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Skeleton fade-in */
+.mon-skel-tbody {
+    animation: mon-fade-in 200ms ease-out;
+}
+@keyframes mon-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Progress bar grow — 220ms */
+.mon-progress-anim {
+    transform-origin: left center;
+    animation: mon-progress-grow 220ms ease-out;
+}
+@keyframes mon-progress-grow {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+}
+
+/* Badge pop — 180ms */
+.mon-badge-anim {
+    animation: mon-badge-pop 180ms ease-out both;
+}
+@keyframes mon-badge-pop {
+    0%   { transform: scale(0.85); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Badge transition on hover/state changes */
+.mon-badge {
+    transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+}
+
+/* Deep link enter hover micro-animation */
+.mon-deeplink {
+    transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
+}
+.mon-deeplink:active { transform: scale(0.98); }
+
+@media (prefers-reduced-motion: reduce) {
+    .mon-row-fadein,
+    .mon-skel-tbody,
+    .mon-progress-anim,
+    .mon-badge-anim,
+    .mon-skel {
+        animation: none !important;
+        transition: none !important;
+    }
+    .mon-table tbody tr.mon-row { transition: none !important; }
 }

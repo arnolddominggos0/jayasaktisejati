@@ -1,210 +1,384 @@
 <x-filament-panels::page>
 
     @php
-        $summary         = $workspaceSummary;
-        $band            = $exceptionBand;
-        $pollInterval    = $pollInterval    ?? 60;
-        $pageSize        = $pageSize        ?? 50;
+        $summary = $workspaceSummary;
+        $band = $exceptionBand;
+        $pollInterval = $pollInterval ?? 60;
+        $pageSize = $pageSize ?? 50;
         $exceptionFilter = $exceptionFilter ?? null;
-        $groupMode       = $groupMode       ?? 'flat';
-        $activeFilters   = $activeFilterCount ?? 0;
+        $groupMode = $groupMode ?? 'flat';
+        $activeFilters = $activeFilterCount ?? 0;
 
-        $hasExceptions = ($band->delay_count + $band->ng_count + $band->hold_count
-                        + $band->demurrage_count + $band->missing_voyage_count
-                        + $band->pdi_pending_count) > 0;
+        $hasExceptions =
+            $band->delay_count +
+                $band->ng_count +
+                $band->hold_count +
+                $band->demurrage_count +
+                $band->missing_voyage_count +
+                $band->pdi_pending_count >
+            0;
+
+        $lastRefreshFormatted = $summary->lastRefresh->format('H:i:s');
     @endphp
 
     {{-- Poll: refresh exception band + summary only (not the full table) --}}
     <div wire:poll.{{ $pollInterval }}s="pollRefresh" class="hidden" aria-hidden="true"></div>
 
-    <div class="jss-monitoring space-y-3">
+    <script>
+        if (typeof window.monWorkspace !== 'function') {
+            window.monWorkspace = function(pollInterval) {
+                return {
+                    focusedIndex: -1,
+                    selectedRowIndex: -1,
+                    slideOpen: false,
+                    pollCountdown: pollInterval - 1,
+                    refreshFlash: false,
+                    pollInterval: pollInterval,
+                    _pollTimer: null,
+                    _listeners: [],
+
+                    init() {
+                        const self = this;
+                        this._pollTimer = setInterval(function() {
+                            self.pollCountdown--;
+                            if (self.pollCountdown <= 0) self.pollCountdown = self.pollInterval - 1;
+                        }, 1000);
+
+                        Livewire.on('open-unit-detail', function(data) {
+                            self.slideOpen = true;
+                            if (data && data.unitId) {
+                                var row = document.querySelector('[data-unit-id="' + data.unitId + '"]');
+                                if (row) {
+                                    self.selectedRowIndex = parseInt(row.dataset.rowIndex || '-1');
+                                    self.focusedIndex = self.selectedRowIndex;
+                                }
+                            }
+                        });
+
+                        Livewire.on('detail-closed', function() {
+                            self.slideOpen = false;
+                            self.$nextTick(function() {
+                                var row = document.querySelector('[data-row-index="' + self
+                                    .focusedIndex + '"]');
+                                if (row) row.focus();
+                            });
+                        });
+
+                        Livewire.on('refresh-complete', function() {
+                            self.refreshFlash = true;
+                            setTimeout(function() {
+                                self.refreshFlash = false;
+                            }, 1500);
+                        });
+
+                        Livewire.on('poll-complete', function() {
+                            self.pollCountdown = self.pollInterval - 1;
+                        });
+                    },
+
+                    handleKey(e) {
+                        var tag = e.target.tagName;
+                        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+                            if (e.key === 'Escape') e.target.blur();
+                            return;
+                        }
+
+                        if (e.key === 'ArrowDown' || e.key === 'j') {
+                            e.preventDefault();
+                            this.moveFocus(1);
+                        } else if (e.key === 'ArrowUp' || e.key === 'k') {
+                            e.preventDefault();
+                            this.moveFocus(-1);
+                        } else if (e.key === 'Escape') {
+                            this.handleEscape();
+                        } else if (e.key === '/') {
+                            e.preventDefault();
+                            this.focusSearch();
+                        }
+
+                        if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
+                            e.preventDefault();
+                            this.$wire.call('refresh');
+                        }
+                    },
+
+                    moveFocus(dir) {
+                        var wrap = document.querySelector('.jss-mon-table-wrap');
+                        var total = wrap ? parseInt(wrap.dataset.totalRows || '0') : 0;
+                        if (total === 0) return;
+
+                        var currentRow = document.querySelector('[data-row-index="' + this.focusedIndex + '"]');
+                        if (!currentRow && this.focusedIndex !== -1) {
+                            this.focusedIndex = -1;
+                        }
+
+                        if (this.focusedIndex === -1) {
+                            this.focusedIndex = dir > 0 ? 0 : total - 1;
+                        } else {
+                            this.focusedIndex = Math.max(0, Math.min(total - 1, this.focusedIndex + dir));
+                        }
+
+                        this.$nextTick(function() {
+                            var row = document.querySelector('[data-row-index="' + this.focusedIndex + '"]');
+                            if (row) {
+                                row.focus();
+                                row.scrollIntoView({
+                                    block: 'nearest'
+                                });
+                            }
+                        }.bind(this));
+                    },
+
+                    handleEscape() {
+                        if (this.slideOpen) {
+                            this.$wire.call('closeDetail');
+                        } else {
+                            this.focusedIndex = -1;
+                            if (document.activeElement && document.activeElement.blur) {
+                                document.activeElement.blur();
+                            }
+                        }
+                    },
+
+                    focusSearch() {
+                        var input = document.querySelector('.jss-monitoring input[name="data[search]"]');
+                        if (input) {
+                            input.focus();
+                            input.select();
+                        }
+                    },
+
+                    clearSearch() {
+                        this.$wire.call('updateFilter', 'search', '');
+                    }
+                };
+            };
+        }
+    </script>
+
+    <div class="jss-monitoring" x-data="monWorkspace({{ $pollInterval }})" @keydown.window="handleKey($event)" role="application"
+        aria-label="Pelacakan dan Monitoring workspace">
 
         {{-- ══════════════════════════════════════════════════════════════
-             1. WORKSPACE HEADER — compact bar, no card
-             Identity + locked scope pills + compact status metrics.
-             Scope (TAM · Laut) is workspace metadata, NOT a filter.
+             1. WORKSPACE HEADER — the visual anchor (Task 3)
+             Compact bar, no card. Identity + locked scope pills +
+             compact live metrics. Scope (TAM · Laut) is workspace metadata,
+             not an interactive filter.
         ══════════════════════════════════════════════════════════════ --}}
         <section class="jss-mon-header">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
 
                 {{-- Left: Identity + scope context --}}
-                <div>
+                <div class="flex flex-col gap-1.5">
                     <div class="flex flex-wrap items-center gap-2">
-                        <h1 class="text-xl font-bold leading-tight text-gray-900">
-                            Pelacakan &amp; Monitoring
-                        </h1>
-                        {{-- Locked scope pills — workspace context, not interactive --}}
-                        <span class="rounded bg-gray-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-                            TAM
-                        </span>
-                        <span class="rounded bg-blue-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-600">
-                            Laut
-                        </span>
+                        <h1 class="mon-h1">Pelacakan &amp; Monitoring</h1>
+                        <span class="mon-scope mon-scope-tam" title="Mode workspace">TAM</span>
+                        <span class="mon-scope mon-scope-laut" title="Mode workspace">Laut</span>
                         @if ($activeFilters > 0)
-                            <span class="rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-bold text-white">
-                                {{ $activeFilters }} filter aktif
-                            </span>
+                            <span class="mon-scope mon-scope-active" title="Filter aktif">{{ $activeFilters }} filter
+                                aktif</span>
                         @endif
                     </div>
-                    <p class="mt-0.5 text-xs text-gray-400">Operational Control Tower</p>
+                    <p class="mon-subtitle">Operational Control Tower — pemantauan unit realtime lintas cabang</p>
                 </div>
 
-                {{-- Right: compact status metrics --}}
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 sm:shrink-0">
-                    {{-- Active units: most prominent --}}
-                    <div class="flex items-center gap-1.5">
-                        <span class="inline-block size-1.5 rounded-full bg-blue-500"></span>
-                        <span class="text-sm font-bold text-gray-800">{{ $summary->activeUnits }}</span>
-                        <span class="text-xs text-gray-400">aktif</span>
-                    </div>
+                {{-- Right: compact live status metrics (hierarchy via weight, not card) --}}
+                <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:shrink-0">
+                    {{-- Active units: most prominent (anchor metric) --}}
+                    <span class="mon-metric">
+                        <span class="size-2 rounded-full bg-blue-500"></span>
+                        <span class="mon-metric-num">{{ $summary->activeUnits }}</span>
+                        <span class="mon-metric-label">aktif</span>
+                    </span>
 
-                    <div class="h-3.5 w-px bg-gray-200"></div>
+                    <span class="mon-vrule"></span>
 
                     {{-- Finished --}}
-                    <div class="flex items-center gap-1.5">
-                        <span class="text-sm font-medium text-gray-500">{{ $summary->finishedUnits }}</span>
-                        <span class="text-xs text-gray-400">selesai</span>
-                    </div>
+                    <span class="mon-metric">
+                        <span class="mon-metric-sub">{{ $summary->finishedUnits }}</span>
+                        <span class="mon-metric-label">selesai</span>
+                    </span>
 
                     @if ($activeFilters > 0)
-                        <div class="h-3.5 w-px bg-gray-200"></div>
-                        <div class="flex items-center gap-1 text-xs text-amber-600">
-                            <x-heroicon-o-funnel class="size-3" />
+                        <span class="mon-vrule"></span>
+                        <span class="mon-meta text-amber-600">
+                            <x-heroicon-o-funnel class="mon-ic-3" />
                             {{ $summary->filteredUnits }} hasil
-                        </div>
+                        </span>
                     @endif
 
-                    <div class="h-3.5 w-px bg-gray-200"></div>
+                    <span class="mon-vrule"></span>
 
                     {{-- Branch --}}
-                    <div class="flex items-center gap-1 text-xs text-gray-400">
-                        <x-heroicon-o-building-office class="size-3" />
+                    <span class="mon-meta">
+                        <x-heroicon-o-building-office class="mon-ic-3" />
                         {{ $summary->branch }}
-                    </div>
+                    </span>
 
-                    <div class="h-3.5 w-px bg-gray-200"></div>
+                    <span class="mon-vrule"></span>
 
-                    {{-- Last refresh --}}
-                    <div class="flex items-center gap-1 tabular-nums text-xs text-gray-400">
-                        <x-heroicon-o-clock class="size-3" />
-                        {{ $summary->lastRefresh->format('H:i:s') }}
-                    </div>
+                    {{-- Last refresh + polling countdown --}}
+                    <span class="mon-meta mon-refresh-meta">
+                        <x-heroicon-o-arrow-path class="mon-ic-3" ::class="{ 'text-emerald-500 animate-spin': refreshFlash }" wire:loading.class="animate-spin"
+                            wire:target="refresh" />
+                        <span x-show="!refreshFlash">{{ $lastRefreshFormatted }}</span>
+                        <span class="text-emerald-600" x-show="refreshFlash" x-cloak
+                            x-transition.opacity.duration.200ms>Diperbarui</span>
+                        <span class="mon-poll-countdown" x-show="!refreshFlash" x-cloak
+                            x-text="'\u21F5 ' + pollCountdown + 's'" title="Polling berikutnya"></span>
+                    </span>
                 </div>
             </div>
         </section>
 
         {{-- ══════════════════════════════════════════════════════════════
-             2. EXCEPTION BAND
-             Shows clickable alert chips when exceptions exist.
-             Passive single-line indicator when all clear.
+             2. EXCEPTION BAND (Task 4 / Task 8)
+             Clickable alert tiles when exceptions exist; passive single-line
+             "all clear" indicator otherwise. Color carries operational meaning.
         ══════════════════════════════════════════════════════════════ --}}
-        <section class="jss-mon-exception-band">
-        @if ($hasExceptions)
-            @php
-            $chips = [
-                ['key' => 'delay',         'label' => 'Delay',         'count' => $band->delay_count,         'icon' => 'heroicon-o-clock',                   'color' => 'red'],
-                ['key' => 'ng',            'label' => 'NG',            'count' => $band->ng_count,            'icon' => 'heroicon-o-x-circle',                'color' => 'red'],
-                ['key' => 'hold',          'label' => 'Hold',          'count' => $band->hold_count,          'icon' => 'heroicon-o-pause-circle',             'color' => 'red'],
-                ['key' => 'demurrage',     'label' => 'Demurrage',     'count' => $band->demurrage_count,     'icon' => 'heroicon-o-exclamation-triangle',    'color' => 'amber'],
-                ['key' => 'missing_voyage','label' => 'Missing Voyage','count' => $band->missing_voyage_count,'icon' => 'heroicon-o-paper-airplane',           'color' => 'amber'],
-                ['key' => 'pdi_pending',   'label' => 'PDI Pending',   'count' => $band->pdi_pending_count,  'icon' => 'heroicon-o-clipboard-document-check', 'color' => 'amber'],
-            ];
-            @endphp
+        <section class="jss-mon-exception-band" aria-label="Exception summary">
+            @if ($hasExceptions)
+                @php
+                    $chips = [
+                        [
+                            'key' => 'delay',
+                            'label' => 'Delay',
+                            'count' => $band->delay_count,
+                            'icon' => 'heroicon-o-clock',
+                            'tier' => 'danger',
+                        ],
+                        [
+                            'key' => 'ng',
+                            'label' => 'NG',
+                            'count' => $band->ng_count,
+                            'icon' => 'heroicon-o-x-circle',
+                            'tier' => 'danger',
+                        ],
+                        [
+                            'key' => 'hold',
+                            'label' => 'Hold',
+                            'count' => $band->hold_count,
+                            'icon' => 'heroicon-o-pause-circle',
+                            'tier' => 'danger',
+                        ],
+                        [
+                            'key' => 'demurrage',
+                            'label' => 'Demurrage',
+                            'count' => $band->demurrage_count,
+                            'icon' => 'heroicon-o-exclamation-triangle',
+                            'tier' => 'warning',
+                        ],
+                        [
+                            'key' => 'missing_voyage',
+                            'label' => 'Missing Voyage',
+                            'count' => $band->missing_voyage_count,
+                            'icon' => 'heroicon-o-arrow-uturn-right',
+                            'tier' => 'warning',
+                        ],
+                        [
+                            'key' => 'pdi_pending',
+                            'label' => 'PDI Pending',
+                            'count' => $band->pdi_pending_count,
+                            'icon' => 'heroicon-o-clipboard-document-check',
+                            'tier' => 'warning',
+                        ],
+                    ];
+                @endphp
 
-            <div class="flex flex-wrap gap-2">
-                @foreach ($chips as $chip)
-                    @if ($chip['count'] > 0)
-                    <button
-                        type="button"
-                        wire:click="updateFilter('exception_filter', '{{ $chip['key'] }}')"
-                        title="{{ $chip['label'] }}"
-                        class="group flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left transition-all
-                               {{ $exceptionFilter === $chip['key']
-                                    ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-500 ring-offset-1'
-                                    : ($chip['color'] === 'red'
-                                        ? 'border-red-200 bg-red-50 hover:border-red-300 hover:shadow-sm'
-                                        : 'border-amber-200 bg-amber-50 hover:border-amber-300 hover:shadow-sm') }}"
-                    >
-                        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg
-                                     {{ $chip['color'] === 'red' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600' }}">
-                            <x-dynamic-component :component="$chip['icon']" class="size-4" />
-                        </span>
-                        <span class="flex flex-col leading-none">
-                            <span class="text-xl font-bold {{ $chip['color'] === 'red' ? 'text-red-700' : 'text-amber-700' }}">{{ $chip['count'] }}</span>
-                            <span class="mt-0.5 text-xs font-medium {{ $chip['color'] === 'red' ? 'text-red-500' : 'text-amber-500' }}">{{ $chip['label'] }}</span>
-                        </span>
-                    </button>
+                <div class="flex flex-wrap gap-2.5" role="group" aria-label="Filter berdasarkan exception">
+                    @foreach ($chips as $chip)
+                        @if ($chip['count'] > 0)
+                            <button type="button" wire:click="updateFilter('exception_filter', '{{ $chip['key'] }}')"
+                                title="{{ $chip['label'] }}"
+                                class="mon-exception-chip {{ $exceptionFilter === $chip['key'] ? 'is-active' : 'is-' . $chip['tier'] }}"
+                                aria-pressed="{{ $exceptionFilter === $chip['key'] ? 'true' : 'false' }}">
+                                <span class="mon-chip-ic is-{{ $chip['tier'] }}">
+                                    <x-dynamic-component :component="$chip['icon']" class="mon-ic-4" />
+                                </span>
+                                <span class="flex flex-col leading-none">
+                                    <span class="mon-chip-count is-{{ $chip['tier'] }}">{{ $chip['count'] }}</span>
+                                    <span class="mon-chip-label is-{{ $chip['tier'] }}">{{ $chip['label'] }}</span>
+                                </span>
+                            </button>
+                        @endif
+                    @endforeach
+
+                    @if ($exceptionFilter)
+                        <button type="button" wire:click="updateFilter('exception_filter', null)" class="mon-reset"
+                            title="Hapus filter exception" aria-label="Hapus filter exception">
+                            <x-heroicon-o-x-mark class="mon-ic-3" />
+                            Reset
+                        </button>
                     @endif
-                @endforeach
+                </div>
+            @else
+                <span class="mon-allclear" role="status" aria-label="Tidak ada exception aktif">
+                    <x-heroicon-o-check-circle class="mon-ic-4 text-emerald-500" />
+                    Tidak ada exception aktif — semua unit dalam status normal
+                </span>
 
-                @if ($exceptionFilter)
-                <button
-                    type="button"
-                    wire:click="updateFilter('exception_filter', null)"
-                    class="flex items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-medium text-gray-500 transition hover:border-gray-300 hover:bg-gray-50"
-                    title="Hapus filter exception"
-                >
-                    <x-heroicon-o-x-mark class="size-3.5" />
-                    Reset
-                </button>
-                @endif
-            </div>
-
-        @else
-
-            <div class="flex items-center gap-1.5 py-0.5 text-xs text-gray-400">
-                <x-heroicon-o-check-circle class="size-3.5 text-emerald-400" />
-                Tidak ada exception aktif
-            </div>
-
-        @endif
+            @endif
         </section>
 
         {{-- ══════════════════════════════════════════════════════════════
-             3+4. WORKSPACE CARD — Toolbar bar + Monitoring Table unified.
-             Single card eliminates the visual gap between filter controls
-             and data rows. The operator reads top-to-bottom without
-             crossing two card boundaries.
-             Toolbar: bg-gray-50/50 bar with border-b — feels like a
-             console toolbar rail, not a standalone form card.
+             3+4. WORKSPACE SURFACE (Task 6) — single operational plane.
+             One surface unifies toolbar + table; the operator reads
+             top-to-bottom without crossing two card boundaries.
+             Toolbar (Task 4): Search (primary) → Exception → View →
+             Show Finished → Clear → Refresh — visual weight descends left-to-right.
         ══════════════════════════════════════════════════════════════ --}}
         <section class="jss-mon-workspace">
-            <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
+            <div class="mon-surface">
 
                 {{-- ── Toolbar rail ── --}}
-                <div class="border-b border-gray-100 bg-gray-50/50 px-4 py-2.5">
+                <div class="mon-toolbar">
                     <div class="flex items-end gap-3">
 
                         {{-- Form: Search (primary) · Exception · Tampilan · Selesai --}}
-                        <div class="min-w-0 flex-1">
+                        <div class="min-w-0 flex-1 mon-search-wrap">
                             {{ $this->form }}
+                            {{-- Search clear button (Alpine) --}}
+                            <button type="button" x-show="$wire.search && $wire.search.length > 0" x-cloak
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 scale-95"
+                                x-transition:enter-end="opacity-100 scale-100"
+                                x-transition:leave="transition ease-in duration-100"
+                                x-transition:leave-start="opacity-100 scale-100"
+                                x-transition:leave-end="opacity-0 scale-95" wire:click="updateFilter('search', '')"
+                                class="mon-clear-search" aria-label="Hapus pencarian" title="Hapus pencarian">
+                                <x-heroicon-o-x-mark class="w-4 h-4" />
+                            </button>
                         </div>
 
-                        {{-- Refresh: compact, aligned to input baseline --}}
+                        {{-- Refresh: framed, aligned to input baseline --}}
                         <div class="flex shrink-0 self-end">
-                            <button
-                                type="button"
-                                wire:click="refresh"
-                                wire:loading.attr="disabled"
-                                title="Refresh data"
-                                class="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-600 transition hover:border-gray-300 hover:bg-gray-50 disabled:opacity-50"
-                            >
-                                <x-heroicon-o-arrow-path class="size-4 text-gray-400" wire:loading.class="animate-spin" wire:target="refresh" />
-                                <span class="hidden sm:inline" wire:loading.remove wire:target="refresh">Refresh</span>
-                                <span class="hidden sm:inline" wire:loading wire:target="refresh">Memuat…</span>
+                            <button type="button" wire:click="refresh" wire:loading.attr="disabled"
+                                title="Refresh data (Ctrl+R)" class="mon-btn"
+                                :class="{ 'mon-btn-success': refreshFlash }" aria-label="Refresh data workspace">
+                                <x-heroicon-o-arrow-path class="mon-ic-r" wire:loading.class="animate-spin"
+                                    wire:target="refresh" />
+                                <span class="hidden sm:inline" wire:loading.remove.delay wire:target="refresh"
+                                    x-show="!refreshFlash">Refresh</span>
+                                <span class="hidden sm:inline" wire:loading.delay wire:target="refresh">Memuat…</span>
+                                <span class="hidden sm:inline text-emerald-600" x-show="refreshFlash" x-cloak
+                                    x-transition.opacity.duration.200ms>Diperbarui</span>
                             </button>
                         </div>
 
                     </div>
                 </div>
 
-                {{-- ── Monitoring Table (no inner card — inherits workspace card) ── --}}
-                <livewire:monitoring.monitoring-table
-                    :total-rows="$rows?->total() ?? 0"
-                    :per-page="$rows?->perPage() ?? 50"
-                    :current-page="$rows?->currentPage() ?? 1"
-                    :last-page="$rows?->lastPage() ?? 1"
-                    :group-mode="$groupMode" />
+                {{-- ── Monitoring Table (inherits workspace surface) ──
+                     Pure Blade partial bound to MonitoringRowData objects from
+                     the paginator. Lives in the parent Livewire component's
+                     template, so wire:* directives here dispatch on WorkspaceShell. --}}
+                @include('livewire.monitoring.monitoring-table', [
+                    'rows' => $rows?->items() ?? [],
+                    'paginator' => $rows,
+                    'search' => $this->search ?? '',
+                    'pageSize' => $pageSize ?? 50,
+                    'groupMode' => $groupMode ?? 'flat',
+                ])
 
             </div>
         </section>
@@ -213,27 +387,33 @@
         <livewire:monitoring.monitoring-detail-slide />
 
         {{-- ══════════════════════════════════════════════════════════════
-             5. FOOTER — metadata strip
+             5. FOOTER (Task 1 / Task 5) — metadata strip
         ══════════════════════════════════════════════════════════════ --}}
-        <footer class="jss-mon-footer border-t border-gray-100 pt-2">
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
-                <span class="font-medium text-gray-500">Pelacakan &amp; Monitoring</span>
-                <span class="hidden sm:inline">·</span>
+        <footer class="jss-mon-footer" aria-label="Workspace metadata">
+            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 mon-foot">
+                <span class="foot-label">Pelacakan &amp; Monitoring</span>
+                <span class="foot-dot">·</span>
                 <span>v1.0 · Read-only</span>
-                <span class="hidden sm:inline">·</span>
-                <span>Page size: {{ $pageSize }}</span>
-                <span class="hidden sm:inline">·</span>
-                <span>Poll: {{ $pollInterval }}s</span>
+                <span class="foot-dot">·</span>
+                <span>Page size {{ $pageSize }}</span>
+                <span class="foot-dot">·</span>
+                <span>Poll {{ $pollInterval }}s</span>
                 @if ($summary->filteredUnits > 0)
-                    <span class="hidden sm:inline">·</span>
+                    <span class="foot-dot">·</span>
                     <span>{{ $summary->filteredUnits }} unit terfilter</span>
                 @endif
                 @if ($rows && $rows->hasPages())
-                    <span class="hidden sm:inline">·</span>
+                    <span class="foot-dot">·</span>
                     <span>Hal {{ $rows->currentPage() }}/{{ $rows->lastPage() }} ({{ $rows->total() }} total)</span>
                 @endif
-                <span class="hidden sm:inline">·</span>
-                <span class="tabular-nums">Diperbarui {{ $summary->lastRefresh->format('d M Y H:i:s') }}</span>
+                <span class="foot-dot">·</span>
+                <span class="tabular-nums">Diperbarui {{ $lastRefreshFormatted }}</span>
+                <span class="foot-dot">·</span>
+                <kbd class="mon-kbd">&#8593;&#8595;</kbd> <span>nav</span>
+                <span class="foot-dot">·</span>
+                <kbd class="mon-kbd">Enter</kbd> <span>detail</span>
+                <span class="foot-dot">·</span>
+                <kbd class="mon-kbd">/</kbd> <span>cari</span>
             </div>
         </footer>
 
