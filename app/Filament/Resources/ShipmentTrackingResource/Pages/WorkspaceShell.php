@@ -98,7 +98,7 @@ class WorkspaceShell extends Page implements HasForms
             Grid::make()
                 ->columns(['default' => 1, 'sm' => 2, 'lg' => 12])
                 ->schema([
-                    // Search: PRIMARY — wide, icon prefix, first in visual order
+                    // Search: PRIMARY — widest (lg:6), icon prefix, first in visual order
                     TextInput::make('search')
                         ->label('Cari')
                         ->prefixIcon('heroicon-o-magnifying-glass')
@@ -106,9 +106,9 @@ class WorkspaceShell extends Page implements HasForms
                         ->reactive()
                         ->debounce(300)
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('search', $state ?? ''))
-                        ->columnSpan(['default' => 1, 'sm' => 2, 'lg' => 5]),
+                        ->columnSpan(['default' => 1, 'sm' => 2, 'lg' => 6]),
 
-                    // Exception: SECONDARY — compact dropdown
+                    // Exception: SECONDARY — compact dropdown (lg:2)
                     Select::make('exception_filter')
                         ->label('Exception')
                         ->placeholder('Semua')
@@ -122,7 +122,7 @@ class WorkspaceShell extends Page implements HasForms
                         ])
                         ->reactive()
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('exception_filter', $state))
-                        ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 3]),
+                        ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 2]),
 
                     // Group: TERTIARY — Select dropdown (ToggleButtons removed: rarely
                     // changed, not a primary action; dropdown is compact + extensible)
@@ -138,7 +138,7 @@ class WorkspaceShell extends Page implements HasForms
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('group_mode', $state ?? 'flat'))
                         ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 2]),
 
-                    // Show Finished: compact toggle
+                    // Show Finished: compact toggle — single word fits lg:2 without wrap
                     Toggle::make('show_finished')
                         ->label('Selesai')
                         ->reactive()

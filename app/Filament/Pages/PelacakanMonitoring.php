@@ -94,7 +94,7 @@ class PelacakanMonitoring extends Page implements HasForms
                         ->reactive()
                         ->debounce(300)
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('search', $state ?? ''))
-                        ->columnSpan(['default' => 1, 'sm' => 2, 'lg' => 5]),
+                        ->columnSpan(['default' => 1, 'sm' => 2, 'lg' => 6]),
 
                     Select::make('exception_filter')
                         ->label('Exception')
@@ -109,7 +109,7 @@ class PelacakanMonitoring extends Page implements HasForms
                         ])
                         ->reactive()
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('exception_filter', $state))
-                        ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 3]),
+                        ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 2]),
 
                     Select::make('group_mode')
                         ->label('Tampilan')

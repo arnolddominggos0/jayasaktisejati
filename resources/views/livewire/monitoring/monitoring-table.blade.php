@@ -84,12 +84,11 @@
 
                 @else
 
-                    {{-- Empty state --}}
+                    {{-- Empty state: enterprise-calm, no decorative icon --}}
                     <tr>
                         <td colspan="9">
-                            <div class="flex h-64 flex-col items-center justify-center gap-2">
-                                <x-heroicon-o-signal-slash class="size-8 text-gray-200" />
-                                <p class="text-sm font-semibold text-gray-400">Tidak ada unit yang sedang dipantau</p>
+                            <div class="flex h-48 flex-col items-center justify-center gap-1">
+                                <p class="text-sm text-gray-400">Tidak ada unit yang sedang dipantau</p>
                                 <p class="text-xs text-gray-300">Periksa filter aktif atau tekan Refresh.</p>
                             </div>
                         </td>

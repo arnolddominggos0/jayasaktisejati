@@ -50,7 +50,7 @@
                 </div>
 
                 {{-- Right: compact status metrics --}}
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-1 sm:shrink-0">
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 sm:shrink-0">
                     {{-- Active units: most prominent --}}
                     <div class="flex items-center gap-1.5">
                         <span class="inline-block size-1.5 rounded-full bg-blue-500"></span>
@@ -172,7 +172,7 @@
             <div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
 
                 {{-- ── Toolbar rail ── --}}
-                <div class="border-b border-gray-100 bg-gray-50/50 px-4 py-3">
+                <div class="border-b border-gray-100 bg-gray-50/50 px-4 py-2.5">
                     <div class="flex items-end gap-3">
 
                         {{-- Form: Search (primary) · Exception · Tampilan · Selesai --}}
