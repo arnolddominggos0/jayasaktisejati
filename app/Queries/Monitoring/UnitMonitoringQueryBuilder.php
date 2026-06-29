@@ -91,7 +91,7 @@ final class UnitMonitoringQueryBuilder
     {
         // TODO Sprint 6.2: full eager loading with column selection
         $q->with([
-            'latestTrack:id,shipment_id,status,tracked_at',
+            'latestTrack:shipment_tracks.id,shipment_tracks.shipment_id,shipment_tracks.status,shipment_tracks.tracked_at',
             'customer:id,name',
             'branch:id,name',
             'originCity:id,name',
