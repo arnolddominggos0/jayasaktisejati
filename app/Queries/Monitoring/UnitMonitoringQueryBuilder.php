@@ -285,14 +285,7 @@ final class UnitMonitoringQueryBuilder
     private function applyEagerLoading(Builder $q): void
     {
         $q->with([
-            // latestOfMany() generates a self-join; PostgreSQL requires table-qualified
-            // column names to avoid "ambiguous column" errors on shipment_id.
-            'latestTrack' => fn ($tq) => $tq->select([
-                'shipment_tracks.id',
-                'shipment_tracks.shipment_id',
-                'shipment_tracks.status',
-                'shipment_tracks.tracked_at',
-            ]),
+            'latestTrack:shipment_tracks.id,shipment_tracks.shipment_id,shipment_tracks.status,shipment_tracks.tracked_at',
             'customer:id,name',
             'branch:id,name',
             'originCity:id,name',

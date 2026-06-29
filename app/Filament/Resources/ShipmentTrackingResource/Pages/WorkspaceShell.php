@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Filament\Pages;
+namespace App\Filament\Resources\ShipmentTrackingResource\Pages;
 
 use App\DTO\Monitoring\MonitoringFilter;
+use App\Filament\Resources\ShipmentTrackingResource;
 use App\Services\Monitoring\ExceptionCounterService;
 use App\Services\Monitoring\MonitoringQueryService;
 use App\Services\Monitoring\WorkspaceSummaryBuilder;
@@ -15,25 +16,31 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Pages\Page;
+use Filament\Resources\Pages\Page;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
-class PelacakanMonitoring extends Page implements HasForms
+class WorkspaceShell extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    // Navigation handled by ShipmentTrackingResource/WorkspaceShell (Sprint 6.3A).
-    protected static bool $shouldRegisterNavigation = false;
-
-    protected static ?string $navigationIcon = 'heroicon-o-rocket-launch';
+    protected static string $resource = ShipmentTrackingResource::class;
 
     protected static string $view = 'filament.pages.pelacakan-monitoring';
 
-    protected static ?string $title = 'Pelacakan & Monitoring';
-
     protected ?string $maxContentWidth = 'full';
 
-    // ── Public state (Livewire) ─────────────────────────────────────────────
+    public function getTitle(): string|\Illuminate\Contracts\Support\Htmlable
+    {
+        return 'Pelacakan & Monitoring';
+    }
+
+    public function getHeading(): string|\Illuminate\Contracts\Support\Htmlable
+    {
+        // Heading is rendered inside the custom workspace header card.
+        return '';
+    }
+
+    // ── Public Livewire state ──────────────────────────────────────────────
 
     public ?int $branch_id = null;
 
@@ -53,13 +60,15 @@ class PelacakanMonitoring extends Page implements HasForms
 
     public int $page = 1;
 
-    // ── Computed data (protected — Livewire 3 cannot serialize LengthAwarePaginator) ──
+    // ── Computed data (all protected — Livewire 3 cannot serialize these types) ──
 
     protected ?LengthAwarePaginator $rows = null;
 
     protected ?ExceptionBandData $exceptionBand = null;
 
     protected ?WorkspaceSummaryData $workspaceSummary = null;
+
+    // ── Lifecycle ──────────────────────────────────────────────────────────
 
     public function mount(): void
     {
@@ -81,14 +90,15 @@ class PelacakanMonitoring extends Page implements HasForms
         $this->generateData();
     }
 
+    // ── Form schema ────────────────────────────────────────────────────────
+
     protected function getFormSchema(): array
     {
-        // v1 domain: sea-mode TAM only. Mode select is removed — see ADR-009.
-        // Exception options match Sprint 6.2B (stuck replaces pdi_pending).
         return [
             Grid::make()
                 ->columns(['default' => 1, 'sm' => 2, 'lg' => 12])
                 ->schema([
+                    // Search: PRIMARY — widest (lg:6), icon prefix, first in visual order
                     TextInput::make('search')
                         ->label('Cari')
                         ->prefixIcon('heroicon-o-magnifying-glass')
@@ -98,6 +108,7 @@ class PelacakanMonitoring extends Page implements HasForms
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('search', $state ?? ''))
                         ->columnSpan(['default' => 1, 'sm' => 2, 'lg' => 6]),
 
+                    // Exception: SECONDARY — compact dropdown (lg:2)
                     Select::make('exception_filter')
                         ->label('Exception')
                         ->placeholder('Semua')
@@ -113,6 +124,8 @@ class PelacakanMonitoring extends Page implements HasForms
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('exception_filter', $state))
                         ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 2]),
 
+                    // Group: TERTIARY — Select dropdown (ToggleButtons removed: rarely
+                    // changed, not a primary action; dropdown is compact + extensible)
                     Select::make('group_mode')
                         ->label('Tampilan')
                         ->placeholder('Flat')
@@ -125,6 +138,7 @@ class PelacakanMonitoring extends Page implements HasForms
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('group_mode', $state ?? 'flat'))
                         ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 2]),
 
+                    // Show Finished: compact toggle — single word fits lg:2 without wrap
                     Toggle::make('show_finished')
                         ->label('Selesai')
                         ->reactive()
@@ -133,6 +147,8 @@ class PelacakanMonitoring extends Page implements HasForms
                 ]),
         ];
     }
+
+    // ── Actions ────────────────────────────────────────────────────────────
 
     public function updateFilter(string $field, mixed $value): void
     {
@@ -149,27 +165,28 @@ class PelacakanMonitoring extends Page implements HasForms
     public function pollRefresh(): void
     {
         $filter = $this->buildFilter();
-
-        $this->exceptionBand = app(ExceptionCounterService::class)->count($filter);
+        $this->exceptionBand    = app(ExceptionCounterService::class)->count($filter);
         $this->workspaceSummary = app(WorkspaceSummaryBuilder::class)->build($filter);
     }
+
+    // ── Data generation ────────────────────────────────────────────────────
 
     protected function generateData(): void
     {
         $filter = $this->buildFilter();
 
         try {
-            $this->rows = app(MonitoringQueryService::class)->paginate($filter);
-            $this->exceptionBand = app(ExceptionCounterService::class)->count($filter);
+            $this->rows             = app(MonitoringQueryService::class)->paginate($filter);
+            $this->exceptionBand    = app(ExceptionCounterService::class)->count($filter);
             $this->workspaceSummary = app(WorkspaceSummaryBuilder::class)->build($filter);
         } catch (\Throwable $e) {
-            logger()->error('[PELACAKAN_MONITORING] data generation failed', [
+            logger()->error('[WORKSPACE_SHELL] data generation failed', [
                 'filter' => $filter->toArray(),
-                'error' => $e->getMessage(),
+                'error'  => $e->getMessage(),
             ]);
 
-            $this->rows = new \Illuminate\Pagination\LengthAwarePaginator([], 0, config('monitoring.page_size', 50));
-            $this->exceptionBand = ExceptionBandData::empty();
+            $this->rows             = new \Illuminate\Pagination\LengthAwarePaginator([], 0, config('monitoring.page_size', 50));
+            $this->exceptionBand    = ExceptionBandData::empty();
             $this->workspaceSummary = WorkspaceSummaryData::empty();
         }
     }
@@ -177,21 +194,23 @@ class PelacakanMonitoring extends Page implements HasForms
     protected function buildFilter(): MonitoringFilter
     {
         return new MonitoringFilter(
-            branch_id: $this->branch_id,
-            mode: $this->mode ?: null,
-            route: $this->route ?: null,
+            branch_id:        $this->branch_id,
+            mode:             $this->mode ?: null,
+            route:            $this->route ?: null,
             exception_filter: $this->exception_filter ?: null,
-            search: $this->search ?? '',
-            group_mode: $this->group_mode ?: 'flat',
-            show_finished: $this->show_finished,
-            sort: $this->sort ?: 'exception-first',
-            page: $this->page,
+            search:           $this->search ?? '',
+            group_mode:       $this->group_mode ?: 'flat',
+            show_finished:    $this->show_finished,
+            sort:             $this->sort ?: 'exception-first',
+            page:             $this->page,
         );
     }
 
+    // ── View data ──────────────────────────────────────────────────────────
+
     protected function getViewData(): array
     {
-        // Recompute any protected data lost across Livewire round-trips
+        // Recompute any protected data that was lost across Livewire round-trips
         if ($this->rows === null || $this->exceptionBand === null || $this->workspaceSummary === null) {
             $filter = $this->buildFilter();
             $this->rows             ??= app(MonitoringQueryService::class)->paginate($filter);

@@ -20,13 +20,19 @@ final class ProgressCalculator
             return 0;
         }
 
-        $normalized = $currentStage->toNormalizedValue();
+        if ($currentStage === TrackStatus::Delivered) {
+            return 100;
+        }
 
-        // Hold and Cancelled are sentinel values (≥900), not real stage positions
-        if ($normalized >= 900) {
+        $order = TrackStatus::orderSea();
+        $total = count($order) - 1;
+
+        $index = array_search($currentStage, $order, true);
+
+        if ($index === false || $total <= 0) {
             return 0;
         }
 
-        return (int) min(100, max(0, round(($normalized / 120.0) * 100)));
+        return (int) round(($index / $total) * 100);
     }
 }

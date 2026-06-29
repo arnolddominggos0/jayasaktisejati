@@ -259,7 +259,7 @@ class ShipmentTrackingResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ListShipmentTrackings::route('/'),
+            'index'  => Pages\WorkspaceShell::route('/'),
             'manage' => Pages\ManageShipmentTracking::route('/{record}/manage'),
         ];
     }

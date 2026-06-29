@@ -11,7 +11,8 @@ use Livewire\Component;
 
 class MonitoringDetailSlide extends Component
 {
-    public ?UnitDetailData $unitDetail = null;
+    // Protected to avoid Livewire serialization of complex readonly ViewModel
+    protected ?UnitDetailData $unitDetail = null;
 
     public ?int $unitId = null;
 
@@ -46,6 +47,8 @@ class MonitoringDetailSlide extends Component
 
     public function render(): \Illuminate\View\View
     {
-        return view('livewire.monitoring.monitoring-detail-slide');
+        return view('livewire.monitoring.monitoring-detail-slide', [
+            'unitDetail' => $this->unitDetail,
+        ]);
     }
 }

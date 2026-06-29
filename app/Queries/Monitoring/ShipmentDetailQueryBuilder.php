@@ -3,6 +3,7 @@
 namespace App\Queries\Monitoring;
 
 use App\Models\Shipment;
+use App\Models\Unit;
 use Illuminate\Database\Eloquent\Builder;
 
 final class ShipmentDetailQueryBuilder
@@ -26,10 +27,22 @@ final class ShipmentDetailQueryBuilder
         return $shipment;
     }
 
+    public function buildForUnit(int $unitId, ?int $branchId = null): ?Shipment
+    {
+        $shipmentId = Unit::where('id', $unitId)->value('shipment_id');
+
+        if (!$shipmentId) {
+            return null;
+        }
+
+        return $this->build((int) $shipmentId, $branchId);
+    }
+
     private function applyEagerLoading(Builder $q): void
     {
         $q->with([
-            'tracks' => fn($tq) => $tq->orderBy('tracked_at', 'asc'),
+            'latestTrack',
+            'tracks' => fn($tq) => $tq->orderBy('status_normalized', 'asc')->orderBy('tracked_at', 'asc'),
             'units',
             'units.inspections',
             'units.inspections.items',

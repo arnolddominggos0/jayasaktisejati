@@ -2,8 +2,8 @@
 
 namespace App\Services\Monitoring;
 
-use App\ViewModels\Monitoring\AgeData;
 use Illuminate\Support\Carbon;
+use App\ViewModels\Monitoring\AgeData;
 
 final class AgeCalculator
 {
@@ -21,27 +21,31 @@ final class AgeCalculator
         ?Carbon $lastTrackedAt,
         ?Carbon $requestedAt,
     ): AgeData {
-        $stuckDays = (int) config('monitoring.stuck_days', 3);
+        $stuckDays = config('monitoring.stuck_days', 3);
+        $fallbackUsed = false;
 
-        if ($requestedAt === null && $lastTrackedAt === null) {
+        $from = $lastTrackedAt;
+
+        if ($from === null && $requestedAt !== null) {
+            $from = $requestedAt;
+            $fallbackUsed = true;
+        }
+
+        if ($from === null) {
             return AgeData::empty();
         }
 
-        $fallbackUsed = ($lastTrackedAt === null);
-        $ageDays      = $requestedAt !== null
-            ? (int) $requestedAt->diffInDays(now())
-            : null;
+        $days = (int) Carbon::parse($from)->startOfDay()->diffInDays(now()->startOfDay());
+        $isStuck = $days >= $stuckDays;
 
-        $isStuck = $lastTrackedAt !== null
-            ? $lastTrackedAt->diffInDays(now()) > $stuckDays
-            : ($ageDays !== null && $ageDays > $stuckDays);
-
-        $label = $ageDays !== null
-            ? ('D' . $ageDays . ($fallbackUsed ? ' (est)' : ''))
-            : '—';
+        $label = match (true) {
+            $days === 0 => 'Hari ini',
+            $days === 1 => 'Kemarin',
+            default => "D+{$days}",
+        };
 
         return new AgeData(
-            days: $ageDays,
+            days: $days,
             label: $label,
             is_stuck: $isStuck,
             fallback_used: $fallbackUsed,
