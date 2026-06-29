@@ -50,36 +50,32 @@
 
         {{-- ══════════════════════════════════════════════════════════════════
              EXCEPTION BAND SECTION
-             6 exception chips with counts
+             Chips ordered by priority; 0-count chips excluded by ExceptionEvaluator.
         ══════════════════════════════════════════════════════════════════ --}}
         <section class="jss-mon-exception-band mb-4">
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                @php
-                $chips = [
-                    ['key' => 'delay', 'label' => 'Delay', 'count' => $band->delay_count, 'color' => 'red', 'icon' => 'heroicon-o-clock'],
-                    ['key' => 'ng', 'label' => 'NG', 'count' => $band->ng_count, 'color' => 'red', 'icon' => 'heroicon-o-x-circle'],
-                    ['key' => 'hold', 'label' => 'Hold', 'count' => $band->hold_count, 'color' => 'red', 'icon' => 'heroicon-o-pause-circle'],
-                    ['key' => 'demurrage', 'label' => 'Demurrage', 'count' => $band->demurrage_count, 'color' => 'amber', 'icon' => 'heroicon-o-exclamation-triangle'],
-                    ['key' => 'missing_voyage', 'label' => 'Missing Voyage', 'count' => $band->missing_voyage_count, 'color' => 'amber', 'icon' => 'heroicon-o-map'],
-                    ['key' => 'pdi_pending', 'label' => 'PDI Pending', 'count' => $band->pdi_pending_count, 'color' => 'amber', 'icon' => 'heroicon-o-document-text'],
-                ];
-                @endphp
-
-                @foreach ($chips as $chip)
+            <div class="flex flex-wrap gap-3">
+                @foreach ($band->chips as $chip)
                     <button
                         type="button"
-                        wire:click="updateFilter('exception_filter', '{{ $chip['key'] }}')"
-                        class="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left transition hover:border-gray-300 hover:shadow-sm {{ $exceptionFilter === $chip['key'] ? 'ring-2 ring-blue-500' : '' }}"
+                        wire:click="updateFilter('exception_filter', '{{ $chip->type }}')"
+                        class="flex items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left transition hover:border-gray-300 hover:shadow-sm {{ $exceptionFilter === $chip->type ? 'ring-2 ring-blue-500' : '' }}"
                     >
-                        <span class="flex size-10 items-center justify-center rounded-lg bg-{{ $chip['color'] }}-50 text-{{ $chip['color'] }}-600">
-                            <x-heroicon-o-exclamation-triangle class="size-5" />
+                        <span class="flex size-10 items-center justify-center rounded-lg bg-{{ $chip->color }}-50 text-{{ $chip->color }}-600">
+                            <x-dynamic-component :component="$chip->icon ?? 'heroicon-o-exclamation-triangle'" class="size-5" />
                         </span>
                         <span class="flex flex-col">
-                            <span class="text-2xl font-bold text-gray-900">{{ $chip['count'] }}</span>
-                            <span class="text-xs font-medium text-gray-500">{{ $chip['label'] }}</span>
+                            <span class="text-2xl font-bold text-gray-900">{{ $chip->count }}</span>
+                            <span class="text-xs font-medium text-gray-500">{{ $chip->label }}</span>
                         </span>
                     </button>
                 @endforeach
+
+                @if (empty($band->chips))
+                    <div class="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-400">
+                        <x-heroicon-o-check-circle class="size-5 text-green-500" />
+                        Tidak ada exception aktif
+                    </div>
+                @endif
             </div>
         </section>
 

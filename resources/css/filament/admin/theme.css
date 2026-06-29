@@ -279,11 +279,16 @@
 /* Remove ALL Filament default page width restrictions so dashboard uses full post-sidebar area */
 .jss-dash .fi-page > div > div { max-width: none; }
 .jss-dash .fi-page > section { padding-inline: var(--sp-2); max-width: 100%; }
-.fi-main > .fi-page { max-width: 100%; }
-.fi-main > .fi-page > section { padding-inline: var(--sp-2); }
-.fi-main:has(.jss-dash) > .fi-main-ctn { max-width: 100%; }
-.fi-main:has(.jss-dash) .fi-main-ctn > div { max-width: 100%; }
-.fi-main:has(.jss-dash) .fi-main-ctn > div > main { max-width: none; }
+/* main.fi-main is the <main> element and is a DIRECT child of .fi-main-ctn.
+   It carries Filament's max-w-* container class — force it full width. */
+.fi-main.fi-main:has(.jss-dash) {
+    width: 100%;
+    max-width: 100% !important;
+}
+/* Comfortable but bounded gutters so content breathes on 1440–1600px desktops */
+.fi-main.fi-main:has(.jss-dash) {
+    padding-inline: clamp(1.5rem, 3vw, 3rem);
+}
 
 .jss-dash .tabular-nums {
     font-variant-numeric: tabular-nums;
@@ -292,8 +297,27 @@
 
 /* ── Layout spacing ── */
 .jss-dash { padding: 0 0 var(--sp-2); }
-.jss-header { margin-bottom: var(--sp-3); }
+.jss-header { margin-bottom: var(--sp-4); }
 
+/* ── Page title hierarchy (Dashboard / Dashboard Operasional) ──
+   Typography spec: H1 36px / subhead 24px */
+.jss-page-titles { display: flex; flex-direction: column; gap: 0.125rem; }
+.jss-page-titles .jss-h1 {
+    font-size: 2.25rem;          /* 36px */
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    color: var(--jss-text);
+    margin: 0;
+}
+.jss-page-titles .jss-subhead {
+    font-size: 1.5rem;           /* 24px */
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: -0.012em;
+    color: var(--jss-text-muted);
+    margin: 0;
+}
 .jss-meta-badge {
     display: inline-flex;
     align-items: center;
@@ -308,15 +332,15 @@
     box-shadow: var(--tw-ring-offset-shadow), 0 0 0 0 transparent, var(--tw-ring-shadow);
 }
 
-.jss-section { margin-bottom: var(--sp-3); }
-.jss-section:last-of-type { margin-bottom: var(--sp-1); }
+.jss-section { margin-bottom: var(--sp-5); }
+.jss-section:last-of-type { margin-bottom: var(--sp-2); }
 
 /* ── Section header (18px, NOT uppercase) ── */
 .jss-section-head {
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
-    margin-bottom: var(--sp-2);
+    margin-bottom: var(--sp-3);
 }
 .jss-section-title {
     font-size: 1.125rem;     /* 18px */
@@ -338,8 +362,8 @@
     border: var(--jss-border-soft);
     border-radius: var(--jss-radius);
     box-shadow: var(--jss-shadow);
-    transition: box-shadow 0.3s cubic-bezier(0.4,0,0.2,1),
-                border-color 0.3s ease,
+    transition: box-shadow 0.25s cubic-bezier(0.4,0,0.2,1),
+                border-color 0.25s ease,
                 transform 0.2s cubic-bezier(0.4,0,0.2,1);
 }
 .jss-card:hover {
@@ -355,12 +379,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: var(--sp-2);
-    padding-top: var(--sp-1);
+    margin-top: var(--sp-3);
+    padding-top: var(--sp-2);
     border-top: 1px solid #F5F7FA;
 }
 
-/* ── Link CTA ── */
+/* ── Link CTA — arrow shifts 4px on hover ── */
 .jss-link {
     display: inline-flex;
     align-items: center;
@@ -370,9 +394,14 @@
     color: var(--jss-primary);
     transition: color 0.2s ease, gap 0.2s ease;
 }
-.jss-link:hover { color: #1D4ED8; gap: 0.375rem; }
+.jss-link:hover { color: #1D4ED8; gap: 0.5rem; }
+/* arrow slide for card links & quick access */
+.jss-link .x-heroicon-m-arrow-right,
+.jss-card-foot .x-heroicon-m-arrow-right { transition: transform 0.2s ease; }
+.jss-link:hover .x-heroicon-m-arrow-right,
+.jss-card-foot a.jss-link:hover .x-heroicon-m-arrow-right { transform: translateX(4px); }
 
-/* ── Icon box (KPI / metric) — bigger, softer ── */
+/* ── Icon box (KPI / metric) — consistent radius 12px ── */
 .jss-iconbox {
     display: inline-flex;
     align-items: center;
@@ -397,27 +426,29 @@
     letter-spacing: 0.05em;
 }
 
-/* ── KPI hierarchy: Icon+Badge → BIG NUMBER → Title → Description → Divider → Link ── */
+/* ── KPI hierarchy: Icon+Badge → BIG NUMBER → Title → Description → Divider → Link ──
+   Typography spec: Card Title 14 / Description 12 / Number = largest element */
 .jss-kpi-num {
-    font-size: 2.75rem;     /* 44px */
+    font-size: 2.75rem;     /* 44px — always the largest element */
     font-weight: 800;
     line-height: 1;
     letter-spacing: -0.04em;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.375rem; /* 6px — tight but readable */
     color: var(--jss-text);
 }
 .jss-kpi-label {
-    font-size: 0.75rem;     /* 12px — Title */
+    font-size: 0.875rem;    /* 14px — Title, NEVER smaller than description */
     font-weight: 700;
     color: var(--jss-text);
     margin-bottom: 0.125rem;
     letter-spacing: -0.01em;
+    line-height: 1.25;
 }
 .jss-kpi-desc {
-    font-size: 0.6875rem;   /* 11px — Description, thinner */
+    font-size: 0.75rem;     /* 12px — Description */
     font-weight: 400;
     color: var(--jss-text-muted);
-    line-height: 1.3;
+    line-height: 1.35;
 }
 
 /* ── Metric (Ringkasan Port compact style) ── */
@@ -441,7 +472,7 @@
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
-    margin-bottom: var(--sp-2);
+    margin-bottom: var(--sp-3);
 }
 .jss-card-title {
     font-size: 0.875rem;   /* 14px */
@@ -457,15 +488,17 @@
     font-weight: 400;
 }
 
-/* ── Alert rows (modern list, compact, clear arrows) ── */
+/* ── Alert rows (modern list, clickable feel) ──
+   Number = focal point. Hover = actionable. */
 .jss-alert-row {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    padding: 0.5rem 0.5rem;
+    padding: 0.625rem 0.75rem;
     border-radius: 10px;
     border-bottom: 1px solid #F3F4F6;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
+    border-left: 2px solid transparent;
+    transition: background-color 0.15s ease, border-color 0.15s ease, border-left-color 0.15s ease;
 }
 .jss-alert-row:last-child, .jss-alert-row.jss-alert-row-last { border-bottom: none; }
 .jss-alert-row:hover { background-color: #F9FAFB; }
@@ -473,15 +506,19 @@
 .jss-alert-row.is-warning { background: #FFFBEB; }
 .jss-alert-row.is-info    { background: #F5F3FF; }
 .jss-alert-row.is-muted   { background: transparent; }
+.jss-alert-row.is-danger:hover  { border-left-color: var(--jss-danger); }
+.jss-alert-row.is-warning:hover { border-left-color: var(--jss-warning); }
+.jss-alert-row.is-info:hover    { border-left-color: var(--jss-info); }
 
 .jss-alert-row-icon {
     display: inline-flex; align-items: center; justify-content: center;
     padding: 0.5rem; border-radius: 10px; flex-shrink: 0;
 }
-.jss-alert-row-title { font-size: 0.75rem; font-weight: 700; }
-.jss-alert-row-desc { font-size: 0.6875rem; color: var(--jss-text-muted); margin-top: 0.125rem; }
-.jss-alert-row-num { font-size: 1.5rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; flex-shrink: 0; }
-.jss-alert-row:hover .x-heroicon-m-chevron-right { transform: translateX(2px); }
+.jss-alert-row-title { font-size: 0.75rem; font-weight: 700; line-height: 1.2; }
+.jss-alert-row-desc { font-size: 0.6875rem; color: var(--jss-text-muted); margin-top: 0.125rem; line-height: 1.25; }
+.jss-alert-row-num { font-size: 1.5rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; flex-shrink: 0; min-width: 1.5rem; text-align: right; }
+.jss-alert-row .x-heroicon-m-chevron-right { transition: transform 0.18s ease; }
+.jss-alert-row:hover .x-heroicon-m-chevron-right { transform: translateX(3px); }
 
 /* ── Performance breakdown ── */
 .jss-perf-item { padding: 0; }
@@ -491,11 +528,11 @@
     background: #FAFAFA;
     border: 1px solid var(--jss-border);
     border-radius: 14px;
-    padding: var(--sp-2);
+    padding: var(--sp-3);
     transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.25s ease;
 }
-.jss-lt-card:hover { box-shadow: var(--jss-shadow); transform: translateY(-1px); }
-.jss-lt-card.is-over { background: #FEF2F2; border-color: rgba(239,68,68,0.20); }
+.jss-lt-card:hover { box-shadow: var(--jss-shadow); transform: translateY(-2px); }
+.jss-lt-card.is-over { background: #FEF2F2; border-color: rgba(239,68,68,0.22); }
 
 .jss-lt-iconbox {
     display: inline-flex; align-items: center; justify-content: center;
@@ -528,23 +565,28 @@
 .jss-badge-success { background: #D1FAE5; color: #065F46; border: 1px solid #34D399; }
 .jss-badge-danger  { background: #FEE2E2; color: #991B1B; border: 1px solid #F87171; }
 
-/* ── Mini cards (Pemeriksaan — Title Case, compact) ── */
+/* ── Mini cards (Pemeriksaan — Title Case, compact, lively) ── */
 .jss-mini-card {
-    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.25rem;
-    padding: var(--sp-2) var(--sp-1);
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.375rem;
+    padding: var(--sp-3) var(--sp-1);
     border-radius: 14px;
     border: 1px solid var(--jss-border);
-    transition: box-shadow 0.3s ease, transform 0.25s ease;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.25s ease;
 }
-.jss-mini-card:hover { transform: translateY(-1px); box-shadow: var(--jss-shadow); }
-.jss-mini-warning  { background: #FFFBEB; border-color: rgba(245,158,11,0.18); }
-.jss-mini-success  { background: #ECFDF5; border-color: rgba(16,185,129,0.18); }
-.jss-mini-danger   { background: #FEF2F2; border-color: rgba(239,68,68,0.18); }
+.jss-mini-card:hover { transform: translateY(-2px); box-shadow: var(--jss-shadow-hover); }
+.jss-mini-card:hover .jss-mini-iconbox { transform: scale(1.08); transition: transform 0.25s ease; }
+.jss-mini-warning  { background: #FFFBEB; border-color: rgba(245,158,11,0.22); }
+.jss-mini-success  { background: #ECFDF5; border-color: rgba(16,185,129,0.22); }
+.jss-mini-danger   { background: #FEF2F2; border-color: rgba(239,68,68,0.22); }
 .jss-mini-neutral  { background: #F9FAFB; border-color: var(--jss-border); }
 
-.jss-mini-iconbox { display: inline-flex; align-items: center; justify-content: center; padding: var(--sp-1); border-radius: 10px; }
-.jss-mini-num { font-size: 1.625rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
-.jss-mini-label { font-size: 0.625rem; font-weight: 600; color: var(--jss-text-muted); text-transform: none; letter-spacing: 0; }
+.jss-mini-iconbox {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0.625rem; border-radius: 12px;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5);
+}
+.jss-mini-num { font-size: 1.875rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+.jss-mini-label { font-size: 0.6875rem; font-weight: 600; color: var(--jss-text-muted); text-transform: none; letter-spacing: 0; }
 
 /* ── Quick access tiles (navigation tile feel) ── */
 .jss-quick {
@@ -565,7 +607,7 @@
     transition: background-color 0.25s ease, transform 0.2s ease;
     flex-shrink: 0;
 }
-.jss-quick:hover .jss-quick-icon { transform: scale(1.05); }
+.jss-quick:hover .jss-quick-icon { transform: scale(1.04); }
 .jss-quick-title { font-size: 0.875rem; font-weight: 700; color: var(--jss-text); transition: color 0.2s ease; line-height: 1.3; }
 .jss-quick:hover .jss-quick-title { color: var(--jss-primary); }
 .jss-quick-desc { font-size: 0.6875rem; color: var(--jss-text-muted); margin-top: 0.1875rem; font-weight: 400; }
@@ -574,21 +616,29 @@
 .jss-banner-danger {
     display: flex; align-items: center; gap: 0.5rem;
     background: #FEF2F2; border: 1px solid #FEE2E2;
-    border-radius: 10px; padding: 0.5rem 0.75rem;
+    border-radius: 10px; padding: 0.625rem 0.75rem;
     font-size: 0.6875rem; font-weight: 500; color: #B91C1C;
 }
 .jss-banner-success {
     display: flex; align-items: center; gap: 0.5rem;
     background: #ECFDF5; border: 1px solid #A7F3D0;
-    border-radius: 10px; padding: 0.5rem 0.75rem;
+    border-radius: 10px; padding: 0.625rem 0.75rem;
 }
 
-/* ── Footer ── */
+/* ── Footer (ERP-style metadata block) ── */
 .jss-footer {
     display: flex; align-items: center; justify-content: space-between;
-    padding-top: var(--sp-3); margin-top: var(--sp-1);
+    padding-top: var(--sp-3); margin-top: var(--sp-2);
     border-top: 1px solid #F3F4F6;
 }
+.jss-footer-meta { display: flex; flex-direction: column; gap: 0.125rem; }
+.jss-footer-label {
+    font-size: 0.625rem; font-weight: 700; letter-spacing: 0.04em;
+    text-transform: uppercase; color: var(--jss-text-dim);
+}
+.jss-footer-value { font-size: 0.75rem; font-weight: 500; color: var(--jss-text-muted); }
+.jss-footer-note { font-size: 0.6875rem; color: var(--jss-text-dim); margin-top: 0.125rem; }
+.jss-footer-refresh { margin-bottom: 0.25rem; }
 
 /* ── Donut chart canvas centering ── */
 .jss-dash canvas#perfChart {
@@ -605,4 +655,6 @@
     .jss-section { margin-bottom: var(--sp-2); }
     .jss-section-head { margin-bottom: var(--sp-1); }
     .jss-kpi-num { font-size: 1.875rem; }
+    .jss-page-titles .jss-h1 { font-size: 1.75rem; }       /* 28px */
+    .jss-page-titles .jss-subhead { font-size: 1.125rem; } /* 18px */
 }

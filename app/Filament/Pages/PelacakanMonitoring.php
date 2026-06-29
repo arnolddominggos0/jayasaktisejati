@@ -3,7 +3,6 @@
 namespace App\Filament\Pages;
 
 use App\DTO\Monitoring\MonitoringFilter;
-use App\Enums\ShipmentMode;
 use App\Services\Monitoring\ExceptionCounterService;
 use App\Services\Monitoring\MonitoringQueryService;
 use App\Services\Monitoring\WorkspaceSummaryBuilder;
@@ -92,9 +91,11 @@ class PelacakanMonitoring extends Page implements HasForms
 
     protected function getFormSchema(): array
     {
+        // v1 domain: sea-mode TAM only. Mode select is removed — see ADR-009.
+        // Exception options match Sprint 6.2B (stuck replaces pdi_pending).
         return [
             Grid::make()
-                ->columns(['default' => 1, 'sm' => 2, 'lg' => 6])
+                ->columns(['default' => 1, 'sm' => 2, 'lg' => 5])
                 ->schema([
                     Select::make('route')
                         ->label('Route')
@@ -106,27 +107,16 @@ class PelacakanMonitoring extends Page implements HasForms
                         ->afterStateUpdated(fn($state) => $this->updateFilter('route', $state))
                         ->columnSpan(1),
 
-                    Select::make('mode')
-                        ->label('Moda')
-                        ->placeholder('Semua moda')
-                        ->options([
-                            ShipmentMode::Sea->value => 'Laut',
-                            ShipmentMode::Land->value => 'Darat',
-                        ])
-                        ->reactive()
-                        ->afterStateUpdated(fn($state) => $this->updateFilter('mode', $state))
-                        ->columnSpan(1),
-
                     Select::make('exception_filter')
                         ->label('Exception')
                         ->placeholder('Semua')
                         ->options([
-                            'delay' => 'Delay',
-                            'ng' => 'NG',
-                            'hold' => 'Hold',
-                            'demurrage' => 'Demurrage',
+                            'hold'          => 'Hold',
+                            'ng'            => 'NG',
+                            'demurrage'     => 'Demurrage',
+                            'delay'         => 'Delay',
+                            'stuck'         => 'Stuck',
                             'missing_voyage' => 'Missing Voyage',
-                            'pdi_pending' => 'PDI Pending',
                         ])
                         ->reactive()
                         ->afterStateUpdated(fn($state) => $this->updateFilter('exception_filter', $state))
@@ -135,8 +125,8 @@ class PelacakanMonitoring extends Page implements HasForms
                     ToggleButtons::make('group_mode')
                         ->label('Group')
                         ->options([
-                            'flat' => 'Flat',
-                            'sppb' => 'SPPB',
+                            'flat'   => 'Flat',
+                            'sppb'   => 'SPPB',
                             'voyage' => 'Voyage',
                         ])
                         ->inline()
@@ -152,7 +142,7 @@ class PelacakanMonitoring extends Page implements HasForms
 
                     TextInput::make('search')
                         ->label('Cari')
-                        ->placeholder('Cari unit / SPPB / chassis...')
+                        ->placeholder('Cari unit / SPPB / chassis / voyage...')
                         ->reactive()
                         ->debounce(300)
                         ->afterStateUpdated(fn($state) => $this->updateFilter('search', $state ?? ''))

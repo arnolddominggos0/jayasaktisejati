@@ -52,20 +52,26 @@
         {{-- ══════════════════════════════════════════════════════════════════
              PAGE HEADER
         ══════════════════════════════════════════════════════════════════ --}}
-        <div class="jss-header flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div class="flex items-center flex-wrap gap-2">
-                <span class="jss-meta-badge bg-gray-100 text-gray-700 ring-gray-200">
-                    <x-heroicon-m-user-circle class="h-3.5 w-3.5 text-gray-400" />
-                    {{ $scopeRole }}
-                </span>
-                <span class="jss-meta-badge bg-amber-50 text-amber-700 ring-amber-200">
-                    <x-heroicon-m-building-office class="h-3.5 w-3.5 text-amber-500" />
-                    {{ $scopeBranch }}
-                </span>
-                <span class="jss-meta-badge bg-primary-50 text-primary-700 ring-primary-200">
-                    <x-heroicon-m-globe-alt class="h-3.5 w-3.5 text-primary-500" />
-                    {{ $tamBusinessRoute }} <span class="text-primary-400">· TAM</span>
-                </span>
+        <div class="jss-header flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div class="flex flex-col gap-3">
+                <div class="jss-page-titles">
+                    <h1 class="jss-h1">Dashboard</h1>
+                    <p class="jss-subhead">Dashboard Operasional</p>
+                </div>
+                <div class="flex items-center flex-wrap gap-2">
+                    <span class="jss-meta-badge bg-gray-100 text-gray-700 ring-gray-200">
+                        <x-heroicon-m-user-circle class="h-3.5 w-3.5 text-gray-400" />
+                        {{ $scopeRole }}
+                    </span>
+                    <span class="jss-meta-badge bg-amber-50 text-amber-700 ring-amber-200">
+                        <x-heroicon-m-building-office class="h-3.5 w-3.5 text-amber-500" />
+                        {{ $scopeBranch }}
+                    </span>
+                    <span class="jss-meta-badge bg-primary-50 text-primary-700 ring-primary-200">
+                        <x-heroicon-m-globe-alt class="h-3.5 w-3.5 text-primary-500" />
+                        {{ $tamBusinessRoute }} <span class="text-primary-400">· TAM</span>
+                    </span>
+                </div>
             </div>
             <div class="flex items-center gap-2.5 shrink-0">
                 @if ($scopeUser?->isSuperAdmin())
@@ -123,7 +129,7 @@
                     </div>
                     <p class="jss-kpi-num {{ $ops['belum_voyage'] > 0 ? 'text-amber-600' : 'text-gray-300' }}">{{ $ops['belum_voyage'] }}</p>
                     <p class="jss-kpi-label">Belum Assign Voyage</p>
-                    <p class="jss-kpi-desc">Mode laut tanpa voyage</p>
+                    <p class="jss-kpi-desc">Unit yang belum diassign ke voyage</p>
                     <div class="jss-card-foot">
                         <a href="{{ \App\Filament\Resources\ShipmentResource::getUrl('index') }}" class="jss-link">
                             Lihat Detail <x-heroicon-m-arrow-right class="w-3.5 h-3.5" />
@@ -166,7 +172,7 @@
                         @endif
                     </div>
                     <p class="jss-kpi-num {{ $lateTotal > 0 ? 'text-red-600' : 'text-gray-300' }}">{{ $lateTotal }}</p>
-                    <p class="jss-kpi-label">Unit Late</p>
+                    <p class="jss-kpi-label">Unit Terlambat</p>
                     <p class="jss-kpi-desc">Melewati total target lead time</p>
                     <div class="jss-card-foot">
                         <a href="{{ \App\Filament\Resources\ShipmentTrackingResource::getUrl('index') }}" class="jss-link">
@@ -293,22 +299,22 @@
                         <div class="relative shrink-0 w-44 h-44">
                             <canvas id="perfChart"></canvas>
                             <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span id="perf-center-pct" class="text-2xl font-bold text-gray-900 tabular-nums leading-none">{{ $onTimePct }}%</span>
-                                <span class="text-[10px] font-semibold tracking-wide text-gray-400 mt-0.5">On Time</span>
+                                <span id="perf-center-pct" class="text-3xl font-extrabold text-gray-900 tabular-nums leading-none">{{ $onTimePct }}%</span>
+                                <span class="text-[10px] font-semibold tracking-wide text-gray-400 mt-1">On Time</span>
                             </div>
                         </div>
-                        <div class="flex flex-col gap-2.5 flex-1">
+                        <div class="flex flex-col gap-3 flex-1">
                             <div class="jss-perf-item">
-                                <div class="flex items-center gap-1.5 mb-0.5">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
-                                    <span class="text-[11px] font-medium text-gray-500">On Time</span>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                                    <span class="text-[11px] font-medium text-gray-400">On Time</span>
                                 </div>
                                 <p class="text-xl font-bold text-gray-900 tabular-nums leading-none">{{ number_format($onTimeTotal) }}<span class="text-[11px] font-normal text-gray-400 ml-1">Unit</span></p>
                             </div>
                             <div class="jss-perf-item">
-                                <div class="flex items-center gap-1.5 mb-0.5">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-red-400 shrink-0"></span>
-                                    <span class="text-[11px] font-medium text-gray-500">Late</span>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="w-2 h-2 rounded-full bg-red-400 shrink-0"></span>
+                                    <span class="text-[11px] font-medium text-gray-400">Late</span>
                                 </div>
                                 <p class="text-xl font-bold tabular-nums leading-none {{ $lateTotal > 0 ? 'text-red-600' : 'text-gray-300' }}">{{ $lateTotal }}<span class="text-[11px] font-normal text-gray-400 ml-1">Unit</span></p>
                             </div>

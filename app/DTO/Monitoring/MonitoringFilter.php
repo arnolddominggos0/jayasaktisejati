@@ -6,6 +6,12 @@ final readonly class MonitoringFilter
 {
     public function __construct(
         public readonly ?int $branch_id,
+        /**
+         * v2 extension point — not applied by v1 query builders.
+         * In v1 the mode is hard-pinned to 'sea' via MonitoringDomain.
+         * Re-enable in query builders and expose in the UI when land mode is added.
+         * See ADR-009.
+         */
         public readonly ?string $mode,
         public readonly ?string $route,
         public readonly ?string $exception_filter,
@@ -33,9 +39,10 @@ final readonly class MonitoringFilter
 
     public function cacheKey(): string
     {
+        // `mode` is excluded — v1 hard-pins sea mode in all query builders
+        // so varying on mode would produce duplicate cache entries. See ADR-009.
         return md5(serialize([
             $this->branch_id,
-            $this->mode,
             $this->route,
             $this->show_finished,
         ]));
@@ -44,15 +51,15 @@ final readonly class MonitoringFilter
     public function toArray(): array
     {
         return [
-            'branch_id' => $this->branch_id,
-            'mode' => $this->mode,
-            'route' => $this->route,
+            'branch_id'        => $this->branch_id,
+            'mode'             => $this->mode,
+            'route'            => $this->route,
             'exception_filter' => $this->exception_filter,
-            'search' => $this->search,
-            'group_mode' => $this->group_mode,
-            'show_finished' => $this->show_finished,
-            'sort' => $this->sort,
-            'page' => $this->page,
+            'search'           => $this->search,
+            'group_mode'       => $this->group_mode,
+            'show_finished'    => $this->show_finished,
+            'sort'             => $this->sort,
+            'page'             => $this->page,
         ];
     }
 }

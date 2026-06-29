@@ -28,7 +28,9 @@ class AdminDashboard extends Page implements HasForms
 
     protected static string $view = 'filament.pages.admin-dashboard';
 
-    protected static ?string $title = 'Dashboard';
+    protected static ?string $title = '';
+
+    protected ?string $maxContentWidth = 'full';
 
     public ?int $branch_id = null;
 
@@ -46,7 +48,7 @@ class AdminDashboard extends Page implements HasForms
     {
         return [
             'tamBusinessRoute' => \App\Supports\RouteCode::display(\App\Supports\RouteCode::default()),
-        ];
+        ];  
     }
 
     public function mount(): void

@@ -6,6 +6,7 @@ use App\DTO\Monitoring\MonitoringFilter;
 use App\Enums\ShipmentStatus;
 use App\Models\Branch;
 use App\Models\Shipment;
+use App\Support\Monitoring\MonitoringDomain;
 use App\Support\Monitoring\RouteResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -34,11 +35,11 @@ final class WorkspaceSummaryQueryBuilder
             $activeUnits = (int) ($counts->active_units ?? 0);
 
             return [
-                'active_units' => $activeUnits,
+                'active_units'   => $activeUnits,
                 'finished_units' => (int) ($counts->finished_units ?? 0),
-                'route' => $filter->route ?? 'all',
-                'branch' => $this->branchName($filter->branch_id),
-                'refreshed_at' => Carbon::now(),
+                'route'          => $filter->route ?? 'all',
+                'branch'         => $this->branchName($filter->branch_id),
+                'refreshed_at'   => Carbon::now(),
                 'filtered_units' => $activeUnits,
             ];
         });
@@ -50,16 +51,15 @@ final class WorkspaceSummaryQueryBuilder
 
         $query->whereNotIn('status', [ShipmentStatus::Draft->value]);
 
+        // v1 domain constraint: sea mode only. See ADR-009 and MonitoringDomain.
+        MonitoringDomain::applyTo($query);
+
         if ($filter->branch_id) {
             $query->where('branch_id', $filter->branch_id);
         }
 
-        if ($filter->mode) {
-            $query->where('mode', $filter->mode);
-        }
-
         $customerIds = RouteResolver::customerIdsForRoute($filter->route);
-        if ($filter->route && $filter->route !== 'all' && !empty($customerIds)) {
+        if ($filter->route && $filter->route !== 'all' && ! empty($customerIds)) {
             $query->whereIn('customer_id', $customerIds);
         }
 
@@ -68,7 +68,7 @@ final class WorkspaceSummaryQueryBuilder
 
     private function branchName(?int $branchId): string
     {
-        if (!$branchId) {
+        if (! $branchId) {
             return 'Semua Cabang';
         }
 
