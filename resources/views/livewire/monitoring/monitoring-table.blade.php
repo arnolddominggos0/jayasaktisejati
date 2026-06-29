@@ -1,5 +1,6 @@
 <div class="jss-mon-table-wrap">
-    <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+    {{-- No inner card: table renders inside the unified workspace card in pelacakan-monitoring.blade.php --}}
+    <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
 
             {{-- ── Table Header ── --}}
@@ -102,14 +103,14 @@
 
     {{-- Pagination indicator (Sprint 6.3B will add $rows->links()) --}}
     @if ($totalRows > 0 && $lastPage > 1)
-        <div class="mt-3">
+        <div class="px-4 pb-3 pt-2">
             <p class="text-xs text-gray-400">Hal {{ $currentPage }}/{{ $lastPage }}</p>
         </div>
     @endif
 
     {{-- Row count indicator --}}
     @if ($totalRows > 0)
-        <p class="mt-2 text-right text-xs text-gray-400">
+        <p class="px-4 pb-3 text-right text-xs text-gray-400">
             {{ $totalRows }} unit tersedia · rendering Sprint 6.3B
         </p>
     @endif

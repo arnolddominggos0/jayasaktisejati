@@ -14,7 +14,6 @@ use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Resources\Pages\Page;
@@ -82,8 +81,6 @@ class WorkspaceShell extends Page implements HasForms
         $this->route = RouteResolver::default();
 
         $this->form->fill([
-            'branch_id'        => $this->branch_id,
-            'route'            => $this->route,
             'exception_filter' => $this->exception_filter,
             'search'           => $this->search,
             'group_mode'       => $this->group_mode,
@@ -99,15 +96,19 @@ class WorkspaceShell extends Page implements HasForms
     {
         return [
             Grid::make()
-                ->columns(['default' => 1, 'sm' => 2, 'lg' => 5])
+                ->columns(['default' => 1, 'sm' => 2, 'lg' => 12])
                 ->schema([
-                    Select::make('route')
-                        ->label('Route')
-                        ->options(['tam' => 'TAM', 'all' => 'Semua'])
+                    // Search: PRIMARY — wide, icon prefix, first in visual order
+                    TextInput::make('search')
+                        ->label('Cari')
+                        ->prefixIcon('heroicon-o-magnifying-glass')
+                        ->placeholder('Unit, SPPB, chassis, voyage...')
                         ->reactive()
-                        ->afterStateUpdated(fn ($state) => $this->updateFilter('route', $state))
-                        ->columnSpan(1),
+                        ->debounce(300)
+                        ->afterStateUpdated(fn ($state) => $this->updateFilter('search', $state ?? ''))
+                        ->columnSpan(['default' => 1, 'sm' => 2, 'lg' => 5]),
 
+                    // Exception: SECONDARY — compact dropdown
                     Select::make('exception_filter')
                         ->label('Exception')
                         ->placeholder('Semua')
@@ -121,29 +122,28 @@ class WorkspaceShell extends Page implements HasForms
                         ])
                         ->reactive()
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('exception_filter', $state))
-                        ->columnSpan(1),
+                        ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 3]),
 
-                    ToggleButtons::make('group_mode')
-                        ->label('Group')
-                        ->options(['flat' => 'Flat', 'sppb' => 'SPPB', 'voyage' => 'Voyage'])
-                        ->inline()
+                    // Group: TERTIARY — Select dropdown (ToggleButtons removed: rarely
+                    // changed, not a primary action; dropdown is compact + extensible)
+                    Select::make('group_mode')
+                        ->label('Tampilan')
+                        ->placeholder('Flat')
+                        ->options([
+                            'flat'   => 'Flat',
+                            'sppb'   => 'Per SPPB',
+                            'voyage' => 'Per Voyage',
+                        ])
                         ->reactive()
-                        ->afterStateUpdated(fn ($state) => $this->updateFilter('group_mode', $state))
-                        ->columnSpan(1),
+                        ->afterStateUpdated(fn ($state) => $this->updateFilter('group_mode', $state ?? 'flat'))
+                        ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 2]),
 
+                    // Show Finished: compact toggle
                     Toggle::make('show_finished')
-                        ->label('Tampilkan selesai')
+                        ->label('Selesai')
                         ->reactive()
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('show_finished', (bool) $state))
-                        ->columnSpan(1),
-
-                    TextInput::make('search')
-                        ->label('Cari')
-                        ->placeholder('Cari unit / SPPB / chassis...')
-                        ->reactive()
-                        ->debounce(300)
-                        ->afterStateUpdated(fn ($state) => $this->updateFilter('search', $state ?? ''))
-                        ->columnSpan(1),
+                        ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 2]),
                 ]),
         ];
     }
