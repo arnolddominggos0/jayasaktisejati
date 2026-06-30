@@ -1,46 +1,26 @@
 {
   "resources/css/app.css": {
-<<<<<<< HEAD
-    "file": "assets/app-C1rX5q0o.css",
-=======
-    "file": "assets/app-1YpXqkxh.css",
->>>>>>> e56d391 (feat(monitoring): complete enterprise monitoring workspace (Sprint 6.3))
+    "file": "assets/app-Dw0PFDgh.css",
     "src": "resources/css/app.css",
     "isEntry": true
   },
   "resources/css/filament/admin/theme.css": {
-<<<<<<< HEAD
-    "file": "assets/theme-DcHD5t2j.css",
-=======
-    "file": "assets/theme-CFQsWqVf.css",
->>>>>>> e56d391 (feat(monitoring): complete enterprise monitoring workspace (Sprint 6.3))
+    "file": "assets/theme-BmeD79oM.css",
     "src": "resources/css/filament/admin/theme.css",
     "isEntry": true
   },
   "resources/css/filament/fc/theme.css": {
-<<<<<<< HEAD
-    "file": "assets/theme-BwTvnDKr.css",
-=======
-    "file": "assets/theme-GUyUsiKb.css",
->>>>>>> e56d391 (feat(monitoring): complete enterprise monitoring workspace (Sprint 6.3))
+    "file": "assets/theme-DHs24PNd.css",
     "src": "resources/css/filament/fc/theme.css",
     "isEntry": true
   },
   "resources/js/app.js": {
-<<<<<<< HEAD
-    "file": "assets/app-BM_uDD46.js",
-=======
-    "file": "assets/app-EzZwkuZq.js",
->>>>>>> e56d391 (feat(monitoring): complete enterprise monitoring workspace (Sprint 6.3))
+    "file": "assets/app-BK4GZPnP.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
     "css": [
-<<<<<<< HEAD
-      "assets/app-C1rX5q0o.css"
-=======
-      "assets/app-1YpXqkxh.css"
->>>>>>> e56d391 (feat(monitoring): complete enterprise monitoring workspace (Sprint 6.3))
+      "assets/app-Dw0PFDgh.css"
     ]
   }
 }

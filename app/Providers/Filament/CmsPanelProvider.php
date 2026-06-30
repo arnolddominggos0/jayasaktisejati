@@ -1,0 +1,68 @@
+<?php
+
+namespace App\Providers\Filament;
+
+use App\Http\Middleware\EnsurePanelRole;
+use Filament\Http\Middleware\Authenticate;
+use Filament\Http\Middleware\AuthenticateSession;
+use Filament\Http\Middleware\DisableBladeIconComponents;
+use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Pages;
+use Filament\Panel;
+use Filament\PanelProvider;
+use Filament\Support\Colors\Color;
+use Filament\Widgets;
+use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
+use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Routing\Middleware\SubstituteBindings;
+use Illuminate\Session\Middleware\StartSession;
+use Illuminate\View\Middleware\ShareErrorsFromSession;
+
+class CmsPanelProvider extends PanelProvider
+{
+    public function panel(Panel $panel): Panel
+    {
+        return $panel
+            ->id('cms')
+            ->path('cms')
+            ->login()
+            ->authGuard('web')
+            ->brandName('JSL Website CMS')
+            ->brandLogo(fn() => view('filament.logo'))
+            ->favicon(asset('images/favicon/favicon.ico'))
+            ->sidebarCollapsibleOnDesktop()
+            ->colors(['primary' => Color::hex('#0137A1')])
+            ->viteTheme('resources/css/filament/admin/theme.css')
+            ->darkMode(false)
+            ->discoverResources(in: app_path('Filament/Cms/Resources'), for: 'App\\Filament\\Cms\\Resources')
+            ->discoverPages(in: app_path('Filament/Cms/Pages'), for: 'App\\Filament\\Cms\\Pages')
+            ->discoverWidgets(in: app_path('Filament/Cms/Widgets'), for: 'App\\Filament\\Cms\\Widgets')
+            ->pages([
+                Pages\Dashboard::class,
+            ])
+            ->widgets([
+                Widgets\AccountWidget::class,
+            ])
+            ->navigationGroups([
+                'Website Content',
+                'Vessel Listings',
+                'Inquiries',
+            ])
+            ->middleware([
+                EncryptCookies::class,
+                AddQueuedCookiesToResponse::class,
+                StartSession::class,
+                AuthenticateSession::class,
+                ShareErrorsFromSession::class,
+                VerifyCsrfToken::class,
+                SubstituteBindings::class,
+                DisableBladeIconComponents::class,
+                DispatchServingFilamentEvent::class,
+            ])
+            ->authMiddleware([
+                Authenticate::class,
+                EnsurePanelRole::class,
+            ]);
+    }
+}
