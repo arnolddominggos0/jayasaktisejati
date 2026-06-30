@@ -32,6 +32,14 @@ class MonitoringDetailSlide extends Component
         }
     }
 
+    #[On('close-detail')]
+    public function closeDetail(): void
+    {
+        $this->unmountAction();
+        $this->unitId = null;
+        $this->dispatch('detail-closed');
+    }
+
     public function viewDetailAction(): Action
     {
         return Action::make('viewDetail')

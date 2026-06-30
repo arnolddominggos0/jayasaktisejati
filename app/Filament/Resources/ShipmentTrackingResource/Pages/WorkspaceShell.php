@@ -18,6 +18,7 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Resources\Pages\Page;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\On;
 
 class WorkspaceShell extends Page implements HasForms
 {
@@ -102,7 +103,7 @@ class WorkspaceShell extends Page implements HasForms
                     TextInput::make('search')
                         ->label('Cari')
                         ->prefixIcon('heroicon-o-magnifying-glass')
-                        ->placeholder('Unit, SPPB, chassis, voyage...')
+                        ->placeholder('Cari unit, SPPB, chassis, voyage…')
                         ->reactive()
                         ->debounce(300)
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('search', $state ?? ''))
@@ -160,6 +161,13 @@ class WorkspaceShell extends Page implements HasForms
     public function refresh(): void
     {
         $this->generateData();
+        $this->dispatch('refresh-complete');
+    }
+
+    #[On('close-detail')]
+    public function closeDetail(): void
+    {
+        $this->dispatch('close-detail')->to(\App\Livewire\Monitoring\MonitoringDetailSlide::class);
     }
 
     public function pollRefresh(): void
@@ -167,6 +175,20 @@ class WorkspaceShell extends Page implements HasForms
         $filter = $this->buildFilter();
         $this->exceptionBand    = app(ExceptionCounterService::class)->count($filter);
         $this->workspaceSummary = app(WorkspaceSummaryBuilder::class)->build($filter);
+        $this->dispatch('poll-complete');
+    }
+
+    /**
+     * Pagination binding — small Livewire action so the monitoring-table
+     * partial can request page changes. Presentation only; no query rule.
+     */
+    public function gotoPage(int $page): void
+    {
+        if ($page < 1) {
+            $page = 1;
+        }
+        $this->page = $page;
+        $this->generateData();
     }
 
     // ── Data generation ────────────────────────────────────────────────────
