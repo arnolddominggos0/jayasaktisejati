@@ -8,15 +8,21 @@
      * directives dispatch on the parent (WorkspaceShell).
      *
      * View variables:
-     *  - $rows      : array<int, MonitoringRowData>
-     *  - $paginator : LengthAwarePaginator<MonitoringRowData>|null
-     *  - $search    : string  (active search term, for highlight only)
-     *  - $pageSize  : int
-     *  - $groupMode : string
+     *  - $rows             : array<int, MonitoringRowData>
+     *  - $paginator        : LengthAwarePaginator<MonitoringRowData>|null
+     *  - $search           : string  (active search term, for highlight only)
+     *  - $pageSize         : int
+     *  - $groupMode        : string
+     *  - $hasActiveFilters : bool (Sprint 6.4.1 — distinguishes "filtered empty"
+     *                        from "database empty" in the empty state)
+     *  - $exceptionFilter  : ?string (Sprint 6.4.3-R1 — drives the exception-
+     *                        specific empty state copy; null when "Semua")
+     *  - $exceptionLabel   : ?string (human-readable label, e.g. "Delay")
      */
 
     use App\ViewModels\Monitoring\MonitoringRowData;
     use App\ViewModels\Monitoring\ExceptionChipData;
+    use App\Support\Monitoring\SearchHighlighter;
 
     /** Map StageResolver flow_zone → mon-badge colour (presentation only). */
     $flowZoneBadge = [
@@ -31,27 +37,21 @@
 
     /** Exception priority per Task 7 spec (highest first). */
     $exceptionPriority = [
-        'hold', 'ng', 'demurrage', 'delay', 'stuck', 'missing_voyage', 'pdi_pending',
+        'hold', 'ng', 'demurrage', 'delay', 'stuck', 'missing_voyage',
     ];
 
     $activeSearch = is_string($search ?? null) && trim($search ?? '') !== '';
     $term = $activeSearch ? trim($search) : '';
 
-    /** Highlight helper — case-insensitive, escaped, multi-occurrence. */
-    if (! function_exists('_mon_highlight')) {
-        function _mon_highlight(?string $text, string $term): \Illuminate\Support\HtmlString
-        {
-            $text ??= '';
-            if ($term === '') {
-                return new \Illuminate\Support\HtmlString(e($text));
-            }
-            $escaped = e($text);
-            $escapedTerm = preg_quote(e($term), '/');
-            return new \Illuminate\Support\HtmlString(
-                preg_replace('/(' . $escapedTerm . ')/iu', '<mark class="mon-hl">$1</mark>', $escaped) ?: $escaped
-            );
-        }
-    }
+    // Sprint 6.4.3-R1: KPI vs Table consistency UX — empty state explains
+    // *why* the table is empty (search vs exception vs both) instead of a
+    // generic "no unit" message, since the KPI above intentionally doesn't
+    // reflect these two drill-down filters. Presentation only — no query change.
+    $exceptionFilter = $exceptionFilter ?? null;
+    $exceptionActive = filled($exceptionFilter);
+    $exceptionLabel = $exceptionLabel ?? null;
+
+    /** Sprint 6.4.3: reusable highlight helper (app/Support/Monitoring/SearchHighlighter). */
 
     $visibleRows = is_array($rows) ? $rows : [];
     $total = $paginator?->total() ?? count($visibleRows);
@@ -179,14 +179,14 @@
                             {{-- Unit (Task 2 + Task 10 highlight) --}}
                             <td role="cell">
                                 <div class="flex flex-col gap-0.5">
-                                    <span class="mon-unit-code">{!! _mon_highlight($unitPrimary, $term) !!}</span>
-                                    <span class="mon-unit-sub">{!! _mon_highlight($unitSecondary, $term) !!}</span>
+                                    <span class="mon-unit-code">{!! SearchHighlighter::highlight($unitPrimary, $term) !!}</span>
+                                    <span class="mon-unit-sub">{!! SearchHighlighter::highlight($unitSecondary, $term) !!}</span>
                                 </div>
                             </td>
 
                             {{-- SPPB (Task 10 highlight) --}}
                             <td role="cell">
-                                <span class="mon-unit-code text-[13px]">{!! _mon_highlight($row->doc_number, $term) !!}</span>
+                                <span class="mon-unit-code text-[13px]">{!! SearchHighlighter::highlight($row->doc_number, $term) !!}</span>
                             </td>
 
                             {{-- Route (Task 3) — simple with icon --}}
@@ -223,7 +223,7 @@
                                     <div class="flex flex-wrap gap-1" role="list" aria-label="Exceptions">
                                         @foreach ($sortedExceptions as $ex)
                                             @php
-                                                $exClass = $ex->severity === 'danger'
+                                                $exClass = $ex->severity === 'critical'
                                                     ? 'mon-badge-danger'
                                                     : ($ex->severity === 'warning' ? 'mon-badge-warning' : 'mon-badge-neutral');
                                                 $exLabel = $ex->count ? $ex->label . ' · ' . $ex->count : $ex->label;
@@ -242,9 +242,9 @@
                             <td role="cell">
                                 @if ($hasVoyage)
                                     <div class="flex flex-col gap-0.5">
-                                        <span class="mon-unit-code text-[13px]">{!! _mon_highlight($row->voyage_no, $term) !!}</span>
+                                        <span class="mon-unit-code text-[13px]">{!! SearchHighlighter::highlight($row->voyage_no, $term) !!}</span>
                                         @if (filled($row->vessel_name))
-                                            <span class="mon-unit-sub">{!! _mon_highlight($row->vessel_name, $term) !!}</span>
+                                            <span class="mon-unit-sub">{!! SearchHighlighter::highlight($row->vessel_name, $term) !!}</span>
                                         @endif
                                     </div>
                                 @else
@@ -261,25 +261,102 @@
 
                 @else
 
-                    {{-- ── Empty state (Task 7) — enterprise-calm with CTA ── --}}
+                    {{-- ── Empty state (Task 7 / Sprint 6.4.1) — enterprise-calm with CTA.
+                         Distinguishes "no filter matches" from "database genuinely empty". ── --}}
+                    @php $filtersActive = $hasActiveFilters ?? false; @endphp
                     <tr role="row">
                         <td colspan="9" role="cell">
-                            <div class="mon-empty" role="status" aria-label="Tidak ada unit yang sedang dipantau">
-                                <div class="mon-empty-icon">
-                                    <x-heroicon-o-inbox class="w-8 h-8" />
+                            @if ($activeSearch && $exceptionActive)
+                                {{-- Sprint 6.4.3-R1: search + exception both active —
+                                     combined message, no need to spell out both values
+                                     here since the context bar above already shows them. --}}
+                                <div class="mon-empty" role="status" aria-label="Tidak ada shipment yang cocok dengan filter yang dipilih">
+                                    <div class="mon-empty-icon">
+                                        <x-heroicon-o-funnel class="w-8 h-8" />
+                                    </div>
+                                    <p class="mon-empty-title">Tidak ada shipment yang cocok</p>
+                                    <p class="mon-empty-sub">dengan filter yang dipilih.</p>
+                                    <button
+                                        type="button"
+                                        wire:click="resetFilters"
+                                        class="mon-empty-cta"
+                                        aria-label="Reset semua filter"
+                                    >
+                                        <x-heroicon-o-x-mark class="w-4 h-4" />
+                                        Reset Filter
+                                    </button>
                                 </div>
-                                <p class="mon-empty-title">Tidak ada unit yang sedang dipantau</p>
-                                <p class="mon-empty-sub">Periksa filter aktif atau tekan Refresh untuk memuat ulang data</p>
-                                <button
-                                    type="button"
-                                    wire:click="refresh"
-                                    class="mon-empty-cta"
-                                    aria-label="Muat ulang data workspace"
-                                >
-                                    <x-heroicon-o-arrow-path class="w-4 h-4" />
-                                    Refresh
-                                </button>
-                            </div>
+                            @elseif ($activeSearch)
+                                <div class="mon-empty mon-empty-search" role="status" aria-label="Tidak ditemukan hasil pencarian untuk {{{ $term }}}">
+                                    <div class="mon-empty-icon">
+                                        <x-heroicon-o-magnifying-glass class="w-8 h-8" />
+                                    </div>
+                                    <p class="mon-empty-title">Tidak ditemukan hasil pencarian</p>
+                                    <p class="mon-empty-sub">Tidak ada shipment yang cocok dengan:</p>
+                                    <p class="mon-empty-term">{{{ $term }}}</p>
+                                    <button
+                                        type="button"
+                                        wire:click="updateFilter('search', '')"
+                                        class="mon-empty-cta"
+                                        aria-label="Hapus pencarian"
+                                    >
+                                        <x-heroicon-o-x-mark class="w-4 h-4" />
+                                        Hapus pencarian
+                                    </button>
+                                </div>
+                            @elseif ($exceptionActive)
+                                {{-- Sprint 6.4.3-R1: exception-only empty state (new). --}}
+                                <div class="mon-empty" role="status" aria-label="Tidak ada shipment dengan exception {{ $exceptionLabel }}">
+                                    <div class="mon-empty-icon">
+                                        <x-heroicon-o-funnel class="w-8 h-8" />
+                                    </div>
+                                    <p class="mon-empty-title">Tidak ada shipment dengan exception:</p>
+                                    <p class="mon-empty-term">{{ $exceptionLabel }}</p>
+                                    <button
+                                        type="button"
+                                        wire:click="updateFilter('exception_filter', null)"
+                                        class="mon-empty-cta"
+                                        aria-label="Hapus filter exception"
+                                    >
+                                        <x-heroicon-o-x-mark class="w-4 h-4" />
+                                        Hapus filter
+                                    </button>
+                                </div>
+                            @elseif ($filtersActive)
+                                <div class="mon-empty" role="status" aria-label="Tidak ada unit yang sesuai dengan filter">
+                                    <div class="mon-empty-icon">
+                                        <x-heroicon-o-funnel class="w-8 h-8" />
+                                    </div>
+                                    <p class="mon-empty-title">Tidak ada unit yang sesuai dengan filter.</p>
+                                    <p class="mon-empty-sub">Coba ubah atau hapus filter yang sedang aktif</p>
+                                    <button
+                                        type="button"
+                                        wire:click="resetFilters"
+                                        class="mon-empty-cta"
+                                        aria-label="Reset semua filter"
+                                    >
+                                        <x-heroicon-o-x-mark class="w-4 h-4" />
+                                        Reset Filter
+                                    </button>
+                                </div>
+                            @else
+                                <div class="mon-empty" role="status" aria-label="Tidak ada unit yang sedang dipantau">
+                                    <div class="mon-empty-icon">
+                                        <x-heroicon-o-inbox class="w-8 h-8" />
+                                    </div>
+                                    <p class="mon-empty-title">Tidak ada unit yang sedang dipantau</p>
+                                    <p class="mon-empty-sub">Periksa filter aktif atau tekan Refresh untuk memuat ulang data</p>
+                                    <button
+                                        type="button"
+                                        wire:click="refresh"
+                                        class="mon-empty-cta"
+                                        aria-label="Muat ulang data workspace"
+                                    >
+                                        <x-heroicon-o-arrow-path class="w-4 h-4" />
+                                        Refresh
+                                    </button>
+                                </div>
+                            @endif
                         </td>
                     </tr>
 

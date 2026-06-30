@@ -6,6 +6,7 @@ use App\DTO\Monitoring\MonitoringFilter;
 use App\Services\Monitoring\ExceptionCounterService;
 use App\Services\Monitoring\MonitoringQueryService;
 use App\Services\Monitoring\WorkspaceSummaryBuilder;
+use App\Support\Monitoring\PeriodResolver;
 use App\Support\Monitoring\RouteResolver;
 use App\ViewModels\Monitoring\ExceptionBandData;
 use App\ViewModels\Monitoring\WorkspaceSummaryData;
@@ -17,6 +18,7 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Pages\Page;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Livewire\Attributes\Url;
 
 class PelacakanMonitoring extends Page implements HasForms
 {
@@ -33,25 +35,41 @@ class PelacakanMonitoring extends Page implements HasForms
 
     protected ?string $maxContentWidth = 'full';
 
-    // ── Public state (Livewire) ─────────────────────────────────────────────
+    // ── Public state (Livewire) — Sprint 6.4.1: URL-stateable filters ──────
 
+    #[Url(as: 'branch', except: null)]
     public ?int $branch_id = null;
 
     public ?string $mode = null;
 
+    #[Url(except: '')]
     public ?string $route = null;
 
+    #[Url(as: 'exception', except: null)]
     public ?string $exception_filter = null;
 
+    #[Url(except: '')]
     public string $search = '';
 
+    #[Url(as: 'view', except: 'flat')]
     public string $group_mode = 'flat';
 
-    public bool $show_finished = false;
+    /** 'active' | 'finished' | 'all'. Replaces the old boolean show_finished. */
+    #[Url(except: 'active')]
+    public string $status = 'active';
 
+    #[Url(except: 'exception-first')]
     public string $sort = 'exception-first';
 
+    #[Url(except: 1)]
     public int $page = 1;
+
+    #[Url(as: 'per_page', except: 50)]
+    public int $page_size = 50;
+
+    /** Sprint 6.4.2: workspace period context, format 'YYYY-MM'. */
+    #[Url(as: 'period')]
+    public string $period = '';
 
     // ── Computed data (protected — Livewire 3 cannot serialize LengthAwarePaginator) ──
 
@@ -65,17 +83,19 @@ class PelacakanMonitoring extends Page implements HasForms
     {
         $user = auth_user();
 
+        $this->period    = PeriodResolver::normalize($this->period ?: null);
+        $this->page_size = $this->normalizePageSize($this->page_size);
+        $this->route   ??= RouteResolver::default();
+
         if ($user?->isOfficeAdmin()) {
             $this->branch_id = $user->effectiveBranchId();
         }
-
-        $this->route = RouteResolver::default();
 
         $this->form->fill([
             'exception_filter' => $this->exception_filter,
             'search'           => $this->search,
             'group_mode'       => $this->group_mode,
-            'show_finished'    => $this->show_finished,
+            'show_finished'    => $this->status === 'all',
         ]);
 
         $this->generateData();
@@ -102,12 +122,12 @@ class PelacakanMonitoring extends Page implements HasForms
                         ->label('Exception')
                         ->placeholder('Semua')
                         ->options([
-                            'delay'          => 'Delay',
-                            'ng'             => 'NG',
                             'hold'           => 'Hold',
+                            'ng'             => 'NG',
                             'demurrage'      => 'Demurrage',
+                            'delay'          => 'Delay',
+                            'stuck'          => 'Stuck',
                             'missing_voyage' => 'Missing Voyage',
-                            'pdi_pending'    => 'PDI Pending',
                         ])
                         ->reactive()
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('exception_filter', $state))
@@ -128,7 +148,7 @@ class PelacakanMonitoring extends Page implements HasForms
                     Toggle::make('show_finished')
                         ->label('Selesai')
                         ->reactive()
-                        ->afterStateUpdated(fn ($state) => $this->updateFilter('show_finished', (bool) $state))
+                        ->afterStateUpdated(fn ($state) => $this->updateFilter('status', $state ? 'all' : 'active'))
                         ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 2]),
                 ]),
         ];
@@ -138,6 +158,39 @@ class PelacakanMonitoring extends Page implements HasForms
     {
         $this->{$field} = $value;
         $this->page = 1;
+        $this->generateData();
+    }
+
+    public function updateBranch(string $value): void
+    {
+        $this->branch_id = $value === '' ? null : (int) $value;
+        $this->page = 1;
+        $this->generateData();
+    }
+
+    public function updatePageSize(int $size): void
+    {
+        $this->page_size = $this->normalizePageSize($size);
+        $this->page = 1;
+        $this->generateData();
+    }
+
+    public function resetFilters(): void
+    {
+        $this->search = '';
+        $this->exception_filter = null;
+        $this->status = 'active';
+        $this->group_mode = 'flat';
+        $this->sort = 'exception-first';
+        $this->page = 1;
+
+        $this->form->fill([
+            'exception_filter' => null,
+            'search'           => '',
+            'group_mode'       => 'flat',
+            'show_finished'    => false,
+        ]);
+
         $this->generateData();
     }
 
@@ -154,6 +207,15 @@ class PelacakanMonitoring extends Page implements HasForms
         $this->workspaceSummary = app(WorkspaceSummaryBuilder::class)->build($filter);
     }
 
+    public function gotoPage(int $page): void
+    {
+        if ($page < 1) {
+            $page = 1;
+        }
+        $this->page = $page;
+        $this->generateData();
+    }
+
     protected function generateData(): void
     {
         $filter = $this->buildFilter();
@@ -168,7 +230,7 @@ class PelacakanMonitoring extends Page implements HasForms
                 'error' => $e->getMessage(),
             ]);
 
-            $this->rows = new \Illuminate\Pagination\LengthAwarePaginator([], 0, config('monitoring.page_size', 50));
+            $this->rows = new \Illuminate\Pagination\LengthAwarePaginator([], 0, $filter->page_size);
             $this->exceptionBand = ExceptionBandData::empty();
             $this->workspaceSummary = WorkspaceSummaryData::empty();
         }
@@ -183,9 +245,11 @@ class PelacakanMonitoring extends Page implements HasForms
             exception_filter: $this->exception_filter ?: null,
             search: $this->search ?? '',
             group_mode: $this->group_mode ?: 'flat',
-            show_finished: $this->show_finished,
+            status: $this->normalizeStatus($this->status),
             sort: $this->sort ?: 'exception-first',
             page: $this->page,
+            page_size: $this->page_size,
+            period: PeriodResolver::normalize($this->period),
         );
     }
 
@@ -199,27 +263,106 @@ class PelacakanMonitoring extends Page implements HasForms
             $this->workspaceSummary ??= app(WorkspaceSummaryBuilder::class)->build($filter);
         }
 
+        $isOfficeAdmin = (bool) auth_user()?->isOfficeAdmin();
+
         return [
-            'rows'             => $this->rows,
-            'exceptionBand'    => $this->exceptionBand,
-            'workspaceSummary' => $this->workspaceSummary,
-            'pollInterval'     => config('monitoring.poll_interval', 60),
-            'pageSize'         => config('monitoring.page_size', 50),
-            'exceptionFilter'  => $this->exception_filter,
-            'groupMode'        => $this->group_mode,
-            'activeFilterCount' => $this->countActiveFilters(),
+            'rows'              => $this->rows,
+            'exceptionBand'     => $this->exceptionBand,
+            'workspaceSummary'  => $this->workspaceSummary,
+            'pollInterval'      => config('monitoring.poll_interval', 60),
+            'pageSize'          => $this->page_size,
+            'exceptionFilter'   => $this->exception_filter,
+            'groupMode'         => $this->group_mode,
+            'activeFilterCount' => $this->countActiveFilters($isOfficeAdmin),
+            'hasActiveFilters'  => $this->countActiveFilters($isOfficeAdmin) > 0,
+            'activeFilterChips' => $this->activeFilterChips(),
+            'period'            => $this->period,
+            'periodOptions'     => PeriodResolver::options(),
+            'isOfficeAdmin'     => $isOfficeAdmin,
+            'branchId'          => $this->branch_id,
+            'branchOptions'     => $isOfficeAdmin ? [] : Branch::query()->orderBy('name')->pluck('name', 'id')->all(),
         ];
     }
 
-    private function countActiveFilters(): int
+    private function countActiveFilters(bool $isOfficeAdmin): int
     {
         return collect([
             $this->mode                                                 ? 1 : 0,
             ($this->route && $this->route !== RouteResolver::default()) ? 1 : 0,
             $this->exception_filter                                     ? 1 : 0,
             strlen($this->search) > 0                                   ? 1 : 0,
-            $this->show_finished                                        ? 1 : 0,
+            $this->status !== 'active'                                  ? 1 : 0,
             ($this->sort && $this->sort !== 'exception-first')          ? 1 : 0,
+            (! $isOfficeAdmin && $this->branch_id)                      ? 1 : 0,
+            ($this->period !== PeriodResolver::default())               ? 1 : 0,
         ])->sum();
+    }
+
+    private function activeFilterChips(): array
+    {
+        $chips = [];
+
+        if (strlen($this->search) > 0) {
+            $chips[] = [
+                'field' => 'search',
+                'label' => 'Cari',
+                'value' => $this->search,
+                'clear' => '',
+            ];
+        }
+
+        if ($this->status !== 'active') {
+            $statusLabels = ['finished' => 'Selesai', 'all' => 'Semua Status'];
+            $chips[] = [
+                'field' => 'status',
+                'label' => 'Status',
+                'value' => $statusLabels[$this->status] ?? $this->status,
+                'clear' => 'active',
+            ];
+        }
+
+        if ($this->group_mode !== 'flat') {
+            $groupLabels = ['sppb' => 'Per SPPB', 'voyage' => 'Per Voyage'];
+            $chips[] = [
+                'field' => 'group_mode',
+                'label' => 'Tampilan',
+                'value' => $groupLabels[$this->group_mode] ?? $this->group_mode,
+                'clear' => 'flat',
+            ];
+        }
+
+        if ($this->sort !== 'exception-first') {
+            $chips[] = [
+                'field' => 'sort',
+                'label' => 'Urutan',
+                'value' => $this->sort,
+                'clear' => 'exception-first',
+            ];
+        }
+
+        if ($this->route && $this->route !== RouteResolver::default()) {
+            $chips[] = [
+                'field' => 'route',
+                'label' => 'Route',
+                'value' => strtoupper($this->route),
+                'clear' => RouteResolver::default(),
+            ];
+        }
+
+        return $chips;
+    }
+
+    private function normalizeStatus(string $status): string
+    {
+        return in_array($status, config('monitoring.status_options', ['active', 'finished', 'all']), true)
+            ? $status
+            : 'active';
+    }
+
+    private function normalizePageSize(int $size): int
+    {
+        $allowed = config('monitoring.page_size_options', [25, 50, 100, 200]);
+
+        return in_array($size, $allowed, true) ? $size : (int) config('monitoring.page_size', 50);
     }
 }

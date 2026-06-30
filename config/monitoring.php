@@ -31,8 +31,29 @@ return [
         'exception-first',
         'age-desc',
         'age-asc',
+        'progress-desc',
+        'progress-asc',
+        'eta-asc',
+        'eta-desc',
+        'voyage-asc',
+        'voyage-desc',
+        'customer-asc',
+        'customer-desc',
         'stage-asc',
         'stage-desc',
+    ],
+
+    'status_options' => [
+        'active',
+        'finished',
+        'all',
+    ],
+
+    'page_size_options' => [
+        25,
+        50,
+        100,
+        200,
     ],
 
     'default_route' => 'tam',

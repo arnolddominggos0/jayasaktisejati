@@ -1,4 +1,4 @@
-﻿@import "/vendor/filament/filament/resources/css/theme.css";
+@import "/vendor/filament/filament/resources/css/theme.css";
 
 .fi-topbar {
     @apply h-16;
@@ -279,16 +279,11 @@
 /* Remove ALL Filament default page width restrictions so dashboard uses full post-sidebar area */
 .jss-dash .fi-page > div > div { max-width: none; }
 .jss-dash .fi-page > section { padding-inline: var(--sp-2); max-width: 100%; }
-/* main.fi-main is the <main> element and is a DIRECT child of .fi-main-ctn.
-   It carries Filament's max-w-* container class — force it full width. */
-.fi-main.fi-main:has(.jss-dash) {
-    width: 100%;
-    max-width: 100% !important;
-}
-/* Comfortable but bounded gutters so content breathes on 1440–1600px desktops */
-.fi-main.fi-main:has(.jss-dash) {
-    padding-inline: clamp(1.5rem, 3vw, 3rem);
-}
+.fi-main > .fi-page { max-width: 100%; }
+.fi-main > .fi-page > section { padding-inline: var(--sp-2); }
+.fi-main:has(.jss-dash) > .fi-main-ctn { max-width: 100%; }
+.fi-main:has(.jss-dash) .fi-main-ctn > div { max-width: 100%; }
+.fi-main:has(.jss-dash) .fi-main-ctn > div > main { max-width: none; }
 
 .jss-dash .tabular-nums {
     font-variant-numeric: tabular-nums;
@@ -297,27 +292,8 @@
 
 /* â”€â”€ Layout spacing â”€â”€ */
 .jss-dash { padding: 0 0 var(--sp-2); }
-.jss-header { margin-bottom: var(--sp-4); }
+.jss-header { margin-bottom: var(--sp-3); }
 
-/* ── Page title hierarchy (Dashboard / Dashboard Operasional) ──
-   Typography spec: H1 36px / subhead 24px */
-.jss-page-titles { display: flex; flex-direction: column; gap: 0.125rem; }
-.jss-page-titles .jss-h1 {
-    font-size: 2.25rem;          /* 36px */
-    font-weight: 800;
-    line-height: 1.1;
-    letter-spacing: -0.025em;
-    color: var(--jss-text);
-    margin: 0;
-}
-.jss-page-titles .jss-subhead {
-    font-size: 1.5rem;           /* 24px */
-    font-weight: 500;
-    line-height: 1.25;
-    letter-spacing: -0.012em;
-    color: var(--jss-text-muted);
-    margin: 0;
-}
 .jss-meta-badge {
     display: inline-flex;
     align-items: center;
@@ -332,15 +308,15 @@
     box-shadow: var(--tw-ring-offset-shadow), 0 0 0 0 transparent, var(--tw-ring-shadow);
 }
 
-.jss-section { margin-bottom: var(--sp-5); }
-.jss-section:last-of-type { margin-bottom: var(--sp-2); }
+.jss-section { margin-bottom: var(--sp-3); }
+.jss-section:last-of-type { margin-bottom: var(--sp-1); }
 
 /* â”€â”€ Section header (18px, NOT uppercase) â”€â”€ */
 .jss-section-head {
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
-    margin-bottom: var(--sp-3);
+    margin-bottom: var(--sp-2);
 }
 .jss-section-title {
     font-size: 1.125rem;     /* 18px */
@@ -362,8 +338,8 @@
     border: var(--jss-border-soft);
     border-radius: var(--jss-radius);
     box-shadow: var(--jss-shadow);
-    transition: box-shadow 0.25s cubic-bezier(0.4,0,0.2,1),
-                border-color 0.25s ease,
+    transition: box-shadow 0.3s cubic-bezier(0.4,0,0.2,1),
+                border-color 0.3s ease,
                 transform 0.2s cubic-bezier(0.4,0,0.2,1);
 }
 .jss-card:hover {
@@ -379,12 +355,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-top: var(--sp-3);
-    padding-top: var(--sp-2);
+    margin-top: var(--sp-2);
+    padding-top: var(--sp-1);
     border-top: 1px solid #F5F7FA;
 }
 
-/* ── Link CTA — arrow shifts 4px on hover ── */
+/* â”€â”€ Link CTA â”€â”€ */
 .jss-link {
     display: inline-flex;
     align-items: center;
@@ -394,14 +370,9 @@
     color: var(--jss-primary);
     transition: color 0.2s ease, gap 0.2s ease;
 }
-.jss-link:hover { color: #1D4ED8; gap: 0.5rem; }
-/* arrow slide for card links & quick access */
-.jss-link .x-heroicon-m-arrow-right,
-.jss-card-foot .x-heroicon-m-arrow-right { transition: transform 0.2s ease; }
-.jss-link:hover .x-heroicon-m-arrow-right,
-.jss-card-foot a.jss-link:hover .x-heroicon-m-arrow-right { transform: translateX(4px); }
+.jss-link:hover { color: #1D4ED8; gap: 0.375rem; }
 
-/* ── Icon box (KPI / metric) — consistent radius 12px ── */
+/* â”€â”€ Icon box (KPI / metric) â€” bigger, softer â”€â”€ */
 .jss-iconbox {
     display: inline-flex;
     align-items: center;
@@ -426,29 +397,27 @@
     letter-spacing: 0.05em;
 }
 
-/* ── KPI hierarchy: Icon+Badge → BIG NUMBER → Title → Description → Divider → Link ──
-   Typography spec: Card Title 14 / Description 12 / Number = largest element */
+/* â”€â”€ KPI hierarchy: Icon+Badge â†’ BIG NUMBER â†’ Title â†’ Description â†’ Divider â†’ Link â”€â”€ */
 .jss-kpi-num {
-    font-size: 2.75rem;     /* 44px — always the largest element */
+    font-size: 2.75rem;     /* 44px */
     font-weight: 800;
     line-height: 1;
     letter-spacing: -0.04em;
-    margin-bottom: 0.375rem; /* 6px — tight but readable */
+    margin-bottom: 0.25rem;
     color: var(--jss-text);
 }
 .jss-kpi-label {
-    font-size: 0.875rem;    /* 14px — Title, NEVER smaller than description */
+    font-size: 0.75rem;     /* 12px â€” Title */
     font-weight: 700;
     color: var(--jss-text);
     margin-bottom: 0.125rem;
     letter-spacing: -0.01em;
-    line-height: 1.25;
 }
 .jss-kpi-desc {
-    font-size: 0.75rem;     /* 12px — Description */
+    font-size: 0.6875rem;   /* 11px â€” Description, thinner */
     font-weight: 400;
     color: var(--jss-text-muted);
-    line-height: 1.35;
+    line-height: 1.3;
 }
 
 /* â”€â”€ Metric (Ringkasan Port compact style) â”€â”€ */
@@ -472,7 +441,7 @@
     display: flex;
     align-items: baseline;
     gap: var(--sp-2);
-    margin-bottom: var(--sp-3);
+    margin-bottom: var(--sp-2);
 }
 .jss-card-title {
     font-size: 0.875rem;   /* 14px */
@@ -488,17 +457,15 @@
     font-weight: 400;
 }
 
-/* ── Alert rows (modern list, clickable feel) ──
-   Number = focal point. Hover = actionable. */
+/* â”€â”€ Alert rows (modern list, compact, clear arrows) â”€â”€ */
 .jss-alert-row {
     display: flex;
     align-items: center;
     gap: var(--sp-2);
-    padding: 0.625rem 0.75rem;
+    padding: 0.5rem 0.5rem;
     border-radius: 10px;
     border-bottom: 1px solid #F3F4F6;
-    border-left: 2px solid transparent;
-    transition: background-color 0.15s ease, border-color 0.15s ease, border-left-color 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 .jss-alert-row:last-child, .jss-alert-row.jss-alert-row-last { border-bottom: none; }
 .jss-alert-row:hover { background-color: #F9FAFB; }
@@ -506,19 +473,15 @@
 .jss-alert-row.is-warning { background: #FFFBEB; }
 .jss-alert-row.is-info    { background: #F5F3FF; }
 .jss-alert-row.is-muted   { background: transparent; }
-.jss-alert-row.is-danger:hover  { border-left-color: var(--jss-danger); }
-.jss-alert-row.is-warning:hover { border-left-color: var(--jss-warning); }
-.jss-alert-row.is-info:hover    { border-left-color: var(--jss-info); }
 
 .jss-alert-row-icon {
     display: inline-flex; align-items: center; justify-content: center;
     padding: 0.5rem; border-radius: 10px; flex-shrink: 0;
 }
-.jss-alert-row-title { font-size: 0.75rem; font-weight: 700; line-height: 1.2; }
-.jss-alert-row-desc { font-size: 0.6875rem; color: var(--jss-text-muted); margin-top: 0.125rem; line-height: 1.25; }
-.jss-alert-row-num { font-size: 1.5rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; flex-shrink: 0; min-width: 1.5rem; text-align: right; }
-.jss-alert-row .x-heroicon-m-chevron-right { transition: transform 0.18s ease; }
-.jss-alert-row:hover .x-heroicon-m-chevron-right { transform: translateX(3px); }
+.jss-alert-row-title { font-size: 0.75rem; font-weight: 700; }
+.jss-alert-row-desc { font-size: 0.6875rem; color: var(--jss-text-muted); margin-top: 0.125rem; }
+.jss-alert-row-num { font-size: 1.5rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; flex-shrink: 0; }
+.jss-alert-row:hover .x-heroicon-m-chevron-right { transform: translateX(2px); }
 
 /* â”€â”€ Performance breakdown â”€â”€ */
 .jss-perf-item { padding: 0; }
@@ -528,11 +491,11 @@
     background: #FAFAFA;
     border: 1px solid var(--jss-border);
     border-radius: 14px;
-    padding: var(--sp-3);
+    padding: var(--sp-2);
     transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.25s ease;
 }
-.jss-lt-card:hover { box-shadow: var(--jss-shadow); transform: translateY(-2px); }
-.jss-lt-card.is-over { background: #FEF2F2; border-color: rgba(239,68,68,0.22); }
+.jss-lt-card:hover { box-shadow: var(--jss-shadow); transform: translateY(-1px); }
+.jss-lt-card.is-over { background: #FEF2F2; border-color: rgba(239,68,68,0.20); }
 
 .jss-lt-iconbox {
     display: inline-flex; align-items: center; justify-content: center;
@@ -565,28 +528,23 @@
 .jss-badge-success { background: #D1FAE5; color: #065F46; border: 1px solid #34D399; }
 .jss-badge-danger  { background: #FEE2E2; color: #991B1B; border: 1px solid #F87171; }
 
-/* ── Mini cards (Pemeriksaan — Title Case, compact, lively) ── */
+/* â”€â”€ Mini cards (Pemeriksaan â€” Title Case, compact) â”€â”€ */
 .jss-mini-card {
-    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.375rem;
-    padding: var(--sp-3) var(--sp-1);
+    display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.25rem;
+    padding: var(--sp-2) var(--sp-1);
     border-radius: 14px;
     border: 1px solid var(--jss-border);
-    transition: box-shadow 0.3s ease, border-color 0.3s ease, transform 0.25s ease;
+    transition: box-shadow 0.3s ease, transform 0.25s ease;
 }
-.jss-mini-card:hover { transform: translateY(-2px); box-shadow: var(--jss-shadow-hover); }
-.jss-mini-card:hover .jss-mini-iconbox { transform: scale(1.08); transition: transform 0.25s ease; }
-.jss-mini-warning  { background: #FFFBEB; border-color: rgba(245,158,11,0.22); }
-.jss-mini-success  { background: #ECFDF5; border-color: rgba(16,185,129,0.22); }
-.jss-mini-danger   { background: #FEF2F2; border-color: rgba(239,68,68,0.22); }
+.jss-mini-card:hover { transform: translateY(-1px); box-shadow: var(--jss-shadow); }
+.jss-mini-warning  { background: #FFFBEB; border-color: rgba(245,158,11,0.18); }
+.jss-mini-success  { background: #ECFDF5; border-color: rgba(16,185,129,0.18); }
+.jss-mini-danger   { background: #FEF2F2; border-color: rgba(239,68,68,0.18); }
 .jss-mini-neutral  { background: #F9FAFB; border-color: var(--jss-border); }
 
-.jss-mini-iconbox {
-    display: inline-flex; align-items: center; justify-content: center;
-    padding: 0.625rem; border-radius: 12px;
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5);
-}
-.jss-mini-num { font-size: 1.875rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
-.jss-mini-label { font-size: 0.6875rem; font-weight: 600; color: var(--jss-text-muted); text-transform: none; letter-spacing: 0; }
+.jss-mini-iconbox { display: inline-flex; align-items: center; justify-content: center; padding: var(--sp-1); border-radius: 10px; }
+.jss-mini-num { font-size: 1.625rem; font-weight: 800; line-height: 1; letter-spacing: -0.02em; }
+.jss-mini-label { font-size: 0.625rem; font-weight: 600; color: var(--jss-text-muted); text-transform: none; letter-spacing: 0; }
 
 /* â”€â”€ Quick access tiles (navigation tile feel) â”€â”€ */
 .jss-quick {
@@ -607,7 +565,7 @@
     transition: background-color 0.25s ease, transform 0.2s ease;
     flex-shrink: 0;
 }
-.jss-quick:hover .jss-quick-icon { transform: scale(1.04); }
+.jss-quick:hover .jss-quick-icon { transform: scale(1.05); }
 .jss-quick-title { font-size: 0.875rem; font-weight: 700; color: var(--jss-text); transition: color 0.2s ease; line-height: 1.3; }
 .jss-quick:hover .jss-quick-title { color: var(--jss-primary); }
 .jss-quick-desc { font-size: 0.6875rem; color: var(--jss-text-muted); margin-top: 0.1875rem; font-weight: 400; }
@@ -616,29 +574,21 @@
 .jss-banner-danger {
     display: flex; align-items: center; gap: 0.5rem;
     background: #FEF2F2; border: 1px solid #FEE2E2;
-    border-radius: 10px; padding: 0.625rem 0.75rem;
+    border-radius: 10px; padding: 0.5rem 0.75rem;
     font-size: 0.6875rem; font-weight: 500; color: #B91C1C;
 }
 .jss-banner-success {
     display: flex; align-items: center; gap: 0.5rem;
     background: #ECFDF5; border: 1px solid #A7F3D0;
-    border-radius: 10px; padding: 0.625rem 0.75rem;
+    border-radius: 10px; padding: 0.5rem 0.75rem;
 }
 
-/* ── Footer (ERP-style metadata block) ── */
+/* â”€â”€ Footer â”€â”€ */
 .jss-footer {
     display: flex; align-items: center; justify-content: space-between;
-    padding-top: var(--sp-3); margin-top: var(--sp-2);
+    padding-top: var(--sp-3); margin-top: var(--sp-1);
     border-top: 1px solid #F3F4F6;
 }
-.jss-footer-meta { display: flex; flex-direction: column; gap: 0.125rem; }
-.jss-footer-label {
-    font-size: 0.625rem; font-weight: 700; letter-spacing: 0.04em;
-    text-transform: uppercase; color: var(--jss-text-dim);
-}
-.jss-footer-value { font-size: 0.75rem; font-weight: 500; color: var(--jss-text-muted); }
-.jss-footer-note { font-size: 0.6875rem; color: var(--jss-text-dim); margin-top: 0.125rem; }
-.jss-footer-refresh { margin-bottom: 0.25rem; }
 
 /* â”€â”€ Donut chart canvas centering â”€â”€ */
 .jss-dash canvas#perfChart {
@@ -655,6 +605,1048 @@
     .jss-section { margin-bottom: var(--sp-2); }
     .jss-section-head { margin-bottom: var(--sp-1); }
     .jss-kpi-num { font-size: 1.875rem; }
-    .jss-page-titles .jss-h1 { font-size: 1.75rem; }       /* 28px */
-    .jss-page-titles .jss-subhead { font-size: 1.125rem; } /* 18px */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Operational Control Tower — Monitoring Workspace Shell (Sprint 6.3C)
+   ───────────────────────────────────────────────────────────────────────
+   Design system for the Pelacakan & Monitoring workspace.
+   Targets the SAP Fiori / Oracle Fusion SCM / Dynamics 365 feel: a calm,
+   dense-but-readable operational surface, not a CRUD admin panel.
+
+   Color hierarchy (Task 8):
+     Primary  = JSS Navy   #0F2A4A  → structure / titles / anchors
+     Accent   = Blue       #2563EB  → interactive / active / focus
+     Success  = Emerald    #10B981
+     Warning  = Amber      #F59E0B
+     Danger   = Red        #EF4444
+     Neutral  = Gray       #6B7280
+
+   Type scale (Task 1):
+     H1 36px · Subtitle 16px · Toolbar label 13px · Input 15px
+     Table header 13px · Table body 14px · Caption 13px · Footer 11px
+
+   Sprint 6.3D-R2 final polish:
+     1. Sticky table header (scroll container, max-height calc)
+     2. Denser rows: row-py 10px → 8px (target 34-36px)
+     3. Progress bar:  8px → 7px → 5px (0.3125rem)
+     4. Shadow:       0.04 → 0.03 → 0.02 opacity
+     5. Border radius: 10px → 8px (0.5rem)
+     6. Footer: 12px → 11px (0.6875rem), tighter padding
+
+   Sprint 6.3F-final — Header & Footer Polish (layout untouched):
+     1. KPI chips: stacked number-over-label (was inline), live dot moved
+        to a corner badge — number is the focal point, label is secondary
+     2. Header: more breathing room around title/subtitle/TAM-LAUT badges
+        via Tailwind-gap-class overrides (no Blade structural change)
+     3. TAM/LAUT badges: more compact padding, crisper line-box
+     4. Footer: metadata grouped into identity/config/status/keyboard
+        clusters with a divider (was one flat run of separators) — the
+        one Blade edit this sprint (semantic <span> wrapping, zero
+        content/order change)
+     5. Empty state: clearer title, higher-contrast subtitle, more
+        proportional icon badge
+     Table, toolbar, sticky header, progress bar, table badges: untouched.
+
+   Sprint 6.3E — Enterprise Visual Polish (FINAL visual pass):
+     Layout, hierarchy, and components UNCHANGED — typography/contrast/
+     motion refinement only, baselined on 6.3D-R2.
+     1. Typography: subtitle +1px/darker, KPI number 22→24px, toolbar
+        labels +0.5px, table header +0.5px/darker navy
+     2. Surface hierarchy: toolbar #F1F5F9 → table header #F7F9FB →
+        body #FFFFFF (2-3% steps, was flat #F8FAFC throughout)
+     3. Table: clearer hover/selected/focus states, badges get inset
+        border + heavier weight (no size change)
+     4. Inputs: consistent 1px border, softer focus halo, soft placeholder
+     5. Toolbar: every field (incl. Toggle) bottom-aligned on one baseline
+     6. Motion: hover/button/badge retimed to 120ms, focus kept at 150ms
+        — no new animations, only smoothing existing transitions
+
+   Presentation layer ONLY — no business logic, no Livewire state changes.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.jss-monitoring {
+    /* ── Color hierarchy ── */
+    --mon-navy:        #0F2A4A;
+    --mon-navy-500:    #3B556B;
+    --mon-navy-700:    #14233B;
+    --mon-navy-600:    #1E3A5F;
+    --mon-navy-400:    #4B6586;
+    --mon-accent:      #2563EB;
+    --mon-accent-50:   #EFF6FF;
+    --mon-accent-100:  #DBEAFE;
+    --mon-accent-200:  #BFDBFE;
+    --mon-accent-300:  #93C5FD;
+    --mon-accent-400:  #60A5FA;
+    --mon-accent-600:  #1D4ED8;
+    --mon-success:     #10B981;
+    --mon-success-50:  #ECFDF5;
+    --mon-success-100: #D1FAE5;
+    --mon-warning:     #F59E0B;
+    --mon-warning-50:  #FFFBEB;
+    --mon-warning-100: #FEF3C7;
+    --mon-danger:      #EF4444;
+    --mon-danger-50:   #FEF2F2;
+    --mon-danger-100:  #FEE2E2;
+    --mon-neutral:     #6B7280;
+    --mon-neutral-400: #9CA3AF;
+    --mon-neutral-200: #E5E7EB;
+
+    /* ── Surfaces ── */
+    --mon-bg:          #F8FAFC;
+    --mon-surface:     #FFFFFF;
+    --mon-toolbar:     #F8FAFC;
+    --mon-border:      #E5E7EB;
+    --mon-border-soft: #EEF2F7;
+    --mon-divider:     #F1F5F9;
+
+    /* ── Type scale (rem) ── */
+    --mon-fs-h1:    2.25rem;     /* 36 — H1 */
+    --mon-fs-sub:   1rem;        /* 16 — subtitle */
+    --mon-fs-body:  0.9375rem;   /* 15 — input / secondary */
+    --mon-fs-tb-l:  0.8125rem;   /* 13 — toolbar label / table header */
+    --mon-fs-tbl:   0.875rem;    /* 14 — table body */
+    --mon-fs-cap:   0.8125rem;   /* 13 — caption */
+    --mon-fs-foot:  0.6875rem;   /* 11 — footer (R2: was 12px) */
+
+    /* ── Density ── */
+    --mon-radius:    0.5rem;     /* 8 — R2: was 10px */
+    --mon-radius-sm: 0.5rem;     /* 8 */
+    --mon-sec-gap:   0.75rem;    /* 12 — section spacing */
+    --mon-row-px:    0.875rem;   /* 14 */
+    --mon-row-py:    0.5rem;     /* 8 — R2: was 10px, target 34-36px rows */
+    --mon-touch:     2.75rem;    /* 44 — enterprise touch target */
+
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-size: var(--mon-fs-body);
+}
+
+/* Operational surface tint behind the whole workspace */
+.fi-main:has(.jss-monitoring) {
+    background-color: var(--mon-bg);
+}
+.jss-monitoring .fi-page > section { padding-block: var(--mon-sec-gap); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 1 · Typography scale
+   ═══════════════════════════════════════════════════════════════════════ */
+.mon-h1 {
+    font-size: var(--mon-fs-h1);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.025em;
+    color: var(--mon-navy);
+}
+.mon-subtitle {
+    /* 6.3E: +1px readability, slightly stronger weight, darker without being loud */
+    font-size: 1.0625rem;     /* was 1rem (16px) → 17px */
+    font-weight: 600;          /* was 500 */
+    line-height: 1.4;
+    color: #57606B;            /* was var(--mon-neutral) #6B7280 */
+}
+.mon-caption {
+    font-size: var(--mon-fs-cap);
+    color: var(--mon-neutral);
+    line-height: 1.35;
+}
+.mon-foot {
+    font-size: var(--mon-fs-foot);
+    color: #8B95A3;       /* 6.3E: was var(--mon-neutral-400) — marginally darker for all-day legibility (Rule 7) */
+    line-height: 1.4;
+}
+.tabular-nums { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 3 · Header hierarchy — the visual anchor
+   ═══════════════════════════════════════════════════════════════════════ */
+.jss-mon-header {
+    border-bottom: 1px solid var(--mon-border-soft);
+    padding-bottom: 0.625rem;
+}
+/* 6.3F-final: header breathing space — target the existing Tailwind gap
+   utilities directly (no Blade change). Compound class selectors beat the
+   bare single-class Tailwind utility on specificity regardless of order. */
+.jss-mon-header .gap-1\.5 { gap: 0.5rem; }   /* was 0.375rem — title row ↔ subtitle */
+.jss-mon-header .gap-2    { gap: 0.625rem; } /* was 0.5rem — H1 ↔ TAM/LAUT badges */
+
+/* Scope pills — workspace context (not interactive) */
+.mon-scope {
+    display: inline-flex;
+    align-items: center;
+    /* 6.3F-final: slightly more compact, crisper line-box for precise alignment */
+    padding: 0.15625rem 0.4375rem;
+    border-radius: 0.375rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    line-height: 1.3;
+}
+.mon-scope-tam   { background: #F1F5F9; color: var(--mon-navy-400); }
+.mon-scope-laut  { background: var(--mon-accent-50); color: var(--mon-accent-600); }
+.mon-scope-active{
+    background: var(--mon-accent);
+    color: #fff;
+    border-radius: 9999px;
+    padding: 0.1875rem 0.625rem;
+    font-weight: 800;
+    box-shadow: 0 1px 2px rgba(37,99,235,0.35);
+}
+
+/* 6.3F-final: Anchor metric — stacked number-over-label "mini stat chip".
+   Number is the focal point, label becomes a small secondary caption.
+   Same DOM order as before (dot, number, label) — the live-status dot is
+   pulled out of flow via position:absolute below, so flex-column naturally
+   stacks number above label without any Blade change. */
+.mon-metric {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.05;
+    gap: 0.0625rem;
+    padding: 0.3125rem 0.875rem;
+    border-radius: 0.625rem;
+    min-width: 3.25rem;
+}
+/* Priority KPI — accent tint, the number an operator should see first */
+.mon-metric:has(.mon-metric-num) {
+    background: var(--mon-accent-50);
+}
+/* Secondary KPI (finished) — neutral tint, clearly a twin chip but quieter */
+.mon-metric:has(.mon-metric-sub) {
+    background: #F1F5F9;
+}
+/* Live-status dot — repositioned to a small corner badge instead of inline */
+.mon-metric:has(.mon-metric-num) .rounded-full.bg-blue-500 {
+    position: absolute;
+    top: 0.3125rem;
+    right: 0.4375rem;
+    width: 0.375rem;
+    height: 0.375rem;
+}
+.mon-metric-num {
+    font-size: 1.625rem;       /* was 1.875rem — slightly reduced to suit the stacked chip */
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--mon-navy);
+    font-variant-numeric: tabular-nums;
+}
+.mon-metric-sub {
+    font-size: 1.25rem;        /* was var(--mon-fs-cap) 13px — now a real number, not a tiny suffix */
+    font-weight: 800;
+    letter-spacing: -0.015em;
+    color: var(--mon-navy-400);
+    font-variant-numeric: tabular-nums;
+}
+.mon-metric-label {
+    font-size: 0.625rem;       /* was var(--mon-fs-cap) 13px — now a secondary caption under the number */
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--mon-navy-400);
+}
+.mon-vrule {
+    width: 1px;
+    height: 2.25rem;            /* was 1.25rem — matches the taller stacked KPI chips */
+    background: var(--mon-border);
+    flex-shrink: 0;
+}
+.mon-meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;           /* 6.3E: was 0.3125rem (Rule 7: tidy metadata spacing) */
+    font-size: var(--mon-fs-cap);
+    color: var(--mon-neutral);
+    font-variant-numeric: tabular-nums;
+}
+.mon-meta svg { color: var(--mon-neutral-400); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 2 · Icon scale (+10-20%) — kept elegant, scannable
+   ═══════════════════════════════════════════════════════════════════════ */
+.mon-ic-3  { width: 0.875rem; height: 0.875rem; } /* 14  (was size-3=12) */
+.mon-ic-4  { width: 1.125rem; height: 1.125rem; } /* 18  (was size-4=16) */
+.mon-ic-5  { width: 1.25rem;  height: 1.25rem;  } /* 20 */
+.mon-ic-r  { width: 1.25rem;  height: 1.25rem;  } /* 20 refresh */
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 4 + 6 · Workspace surface — single operational plane, not stacked cards
+   ═══════════════════════════════════════════════════════════════════════ */
+.jss-monitoring { display: flex; flex-direction: column; gap: var(--mon-sec-gap); }
+
+.jss-mon-workspace .mon-surface {
+    background: var(--mon-surface);
+    border: 1px solid var(--mon-border);
+    border-radius: var(--mon-radius);
+    overflow: hidden;
+    /* R2 final: shadow reduced further from 0.03 → 0.02 */
+    box-shadow: 0 1px 2px rgba(15,23,42,0.02);
+}
+
+/* Toolbar rail — console command-bar feel, not a form card */
+.mon-toolbar {
+    /* 6.3E Rule 3: distinct recessed rail (was var(--mon-toolbar) = same as page bg,
+       i.e. zero contrast against the white surface card). ~2% step. */
+    background: #F1F5F9;
+    border-bottom: 1px solid var(--mon-border-soft);
+    padding: 0.625rem var(--mon-row-px);
+}
+
+/* Refresh button — framed, secondary, enterprise weight */
+.mon-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375rem;
+    min-height: var(--mon-touch);
+    padding: 0 0.875rem;
+    border-radius: var(--mon-radius-sm);
+    border: 1px solid var(--mon-border);
+    background: var(--mon-surface);
+    font-size: var(--mon-fs-body);
+    font-weight: 600;
+    color: var(--mon-navy-600);
+    /* 6.3E Rule 8: button=120ms, focus outline=150ms */
+    transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease, outline-color 150ms ease;
+}
+.mon-btn:hover { border-color: var(--mon-accent-300); background: var(--mon-accent-50); color: var(--mon-accent-600); }
+.mon-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Filament form override — scoped to the workspace, presentation only
+   (no schema/state changes; mostly label + input density)
+   ═══════════════════════════════════════════════════════════════════════ */
+.jss-monitoring .fi-field-label,
+.jss-monitoring .fi-form-item-label {
+    /* 6.3E: +0.5px and a touch of tracking — easier to scan, still light (Rule 2) */
+    font-size: 0.84375rem;     /* was var(--mon-fs-tb-l) 13px → 13.5px */
+    font-weight: 600;
+    color: var(--mon-navy-600);
+    letter-spacing: 0.01em;     /* was 0 */
+    margin-bottom: 0.3125rem;   /* was 0.25rem */
+}
+.jss-monitoring .fi-input,
+.jss-monitoring .fi-select,
+.jss-monitoring .fi-fo-select,
+.jss-monitoring select {
+    font-size: var(--mon-fs-body);
+    min-height: var(--mon-touch);
+    border-radius: var(--mon-radius-sm);
+    border-width: 1px;          /* 6.3E: explicit — guarantees consistent border across control types (Rule 5) */
+    border-style: solid;
+    border-color: var(--mon-border);
+    transition: border-color 120ms ease, box-shadow 120ms ease; /* 6.3E: Rule 8 smoothing */
+}
+.jss-monitoring .fi-input:focus,
+.jss-monitoring .fi-select:focus,
+.jss-monitoring .fi-fo-select:focus,
+.jss-monitoring select:focus {
+    border-color: var(--mon-accent);
+    /* 6.3E: softer focus ring — translucent halo + crisp inner line (Rule 5) */
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.12), 0 0 0 1px var(--mon-accent);
+}
+.jss-monitoring .fi-input::placeholder {
+    color: var(--mon-neutral-400);  /* 6.3E: softer placeholder than browser default (Rule 5) */
+    opacity: 1;
+}
+/* Make the search prefix icon navy, not gray — it''s the primary command */
+.jss-monitoring .fi-input .fi-icon,
+.jss-monitoring .fi-fo-prefix svg { color: var(--mon-navy-400); }
+
+/* 6.3E Rule 6: bottom-align every toolbar field (Search/Exception/Tampilan/Selesai)
+   on one shared baseline, regardless of control type (input/select/toggle all
+   differ in intrinsic height). Relies on the grid row's default stretch — each
+   field-wrapper cell is the same height, so end-justifying its content
+   (label + control) bottom-aligns every control without resizing any of them. */
+.jss-monitoring .mon-toolbar .fi-fo-field-wrp {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    height: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Sprint 6.4.1 · Active Filter chips — removable, compact, reuses the
+   established pill/chip language (border-radius-full, navy/accent palette,
+   120ms transitions) rather than introducing a new visual pattern.
+   ═══════════════════════════════════════════════════════════════════════ */
+.mon-active-filters-label {
+    font-size: var(--mon-fs-cap);
+    font-weight: 600;
+    color: var(--mon-neutral);
+}
+.mon-active-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.3125rem 0.6875rem;
+    border-radius: 9999px;
+    border: 1px solid var(--mon-border);
+    background: var(--mon-surface);
+    font-size: var(--mon-fs-cap);
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+.mon-active-filter-chip:hover {
+    border-color: var(--mon-accent-300);
+    background: var(--mon-accent-50);
+}
+.mon-active-filter-chip:focus-visible {
+    outline: 2px solid var(--mon-accent-300);
+    outline-offset: 1px;
+}
+.mon-active-filter-label {
+    font-weight: 600;
+    color: var(--mon-navy-400);
+}
+.mon-active-filter-value {
+    color: var(--mon-navy-600);
+    font-weight: 500;
+    max-width: 12rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.mon-active-filter-chip .mon-ic-3 {
+    color: var(--mon-neutral-400);
+    transition: color 120ms ease;
+}
+.mon-active-filter-chip:hover .mon-ic-3 {
+    color: var(--mon-danger);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Sprint 6.4.3-R1 · KPI vs Table consistency UX — presentation only.
+   KPI = workspace summary (period/branch/route/mode); table = KPI scope
+   + drill-down (search/exception/status). These two elements explain that
+   gap to the operator instead of looking like a bug. No new card: the
+   helper is an inline caption in the existing metrics row, and the context
+   bar is a thin rail matching .mon-toolbar / .mon-table-foot, not a boxed
+   container.
+   ═══════════════════════════════════════════════════════════════════════ */
+.mon-kpi-helper {
+    font-size: var(--mon-fs-foot);
+    font-weight: 600;
+    color: var(--mon-neutral-400);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+
+.mon-context-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem var(--mon-row-px);
+    border-bottom: 1px solid var(--mon-border-soft);
+    font-size: var(--mon-fs-cap);
+}
+.mon-context-label {
+    font-weight: 600;
+    color: var(--mon-navy-600);
+}
+.mon-context-value {
+    color: var(--mon-neutral);
+}
+.mon-context-value strong {
+    color: var(--mon-navy);
+    font-weight: 700;
+}
+.mon-context-sep {
+    margin: 0 0.25rem;
+    color: var(--mon-neutral-400);
+}
+.mon-context-count {
+    margin-left: auto;
+    font-weight: 600;
+    color: var(--mon-accent-600);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Empty-state term/label line (search term or exception name) — sits
+   between .mon-empty-sub and the CTA button, slightly stronger than both. */
+.mon-empty-term {
+    font-size: var(--mon-fs-body);
+    font-weight: 700;
+    color: var(--mon-navy);
+}
+
+/* 6.3F: Filament's Grid defaults to gap-6 (24px) regardless of column count.
+   Across a 12-column toolbar grid that's 11 gaps × 24px ≈ 264px eaten before
+   any field gets its share — the real cause of the "dead space" before
+   Refresh. Confirmed via rendered DOM inspection, not a layout redesign. */
+.jss-monitoring .mon-toolbar .fi-fo-component-ctn {
+    gap: 0.75rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 4 · Exception band chips — operational alert tiles
+   ═══════════════════════════════════════════════════════════════════════ */
+.mon-exception-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.625rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--mon-radius-sm);
+    border: 1px solid transparent;
+    background: var(--mon-surface);
+    transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease, outline-color 150ms ease; /* 6.3E Rule 8 */
+    text-align: left;
+    line-height: 1;
+}
+.mon-exception-chip:hover { transform: translateY(-1px); box-shadow: 0 2px 6px rgba(15,23,42,0.08); }
+.mon-exception-chip.is-danger  { border-color: #FCA5A5; background: var(--mon-danger-50); }
+.mon-exception-chip.is-warning { border-color: #FCD34D; background: var(--mon-warning-50); }
+.mon-exception-chip.is-active  { border-color: var(--mon-accent); box-shadow: 0 0 0 2px var(--mon-accent); }
+.mon-chip-ic {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; border-radius: 0.5rem; flex-shrink: 0;
+}
+.mon-chip-ic.is-danger  { background: var(--mon-danger-100); color: #B91C1C; }
+.mon-chip-ic.is-warning { background: var(--mon-warning-100); color: #B45309; }
+.mon-chip-count { font-size: 1.25rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.mon-chip-count.is-danger  { color: #991B1B; }
+.mon-chip-count.is-warning { color: #92400E; }
+.mon-chip-label { font-size: var(--mon-fs-cap); font-weight: 500; color: var(--mon-neutral); margin-top: 0.125rem; }
+.mon-chip-label.is-danger  { color: #B91C1C; }
+.mon-chip-label.is-warning { color: #B45309; }
+
+.mon-reset {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    min-height: var(--mon-touch);
+    padding: 0 0.75rem;
+    border-radius: var(--mon-radius-sm);
+    border: 1px solid var(--mon-border);
+    background: var(--mon-surface);
+    font-size: var(--mon-fs-cap);
+    font-weight: 600;
+    color: var(--mon-neutral);
+    transition: border-color 120ms ease, color 120ms ease, outline-color 150ms ease; /* 6.3E Rule 8 */
+}
+.mon-reset:hover { border-color: var(--mon-neutral-400); color: var(--mon-navy-600); }
+
+.mon-allclear {
+    display: inline-flex; align-items: center; gap: 0.4375rem;
+    font-size: var(--mon-fs-cap);
+    font-weight: 500;
+    color: var(--mon-success);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 5 · Table experience — the operational focus
+   ═══════════════════════════════════════════════════════════════════════ */
+.jss-mon-table-wrap { background: var(--mon-surface); }
+
+/* R2: Sticky table header — scroll container so th:sticky works within table */
+.mon-table-scroll {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 340px);
+}
+
+.mon-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: var(--mon-fs-tbl);
+}
+.mon-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 0.625rem var(--mon-row-px);
+    text-align: left;
+    /* 6.3E Rule 2 + 6.3F: +0.5px, tighter tracking, darker navy — reads stronger
+       without growing the row or outweighing 14px body text */
+    font-size: 0.875rem;          /* 6.3F: was 0.84375rem (13.5px) → 14px */
+    font-weight: 800;             /* 6.3F: was 700 — stronger scan-weight */
+    letter-spacing: 0.03em;       /* 6.3F: was 0.035em — slightly tighter now weight is up */
+    text-transform: uppercase;
+    color: var(--mon-navy);       /* was var(--mon-navy-600) — stronger contrast */
+    /* 6.3E Rule 3: subtle step between toolbar (#F1F5F9) and white body */
+    background: #F7F9FB;          /* was #F8FAFC */
+    border-bottom: 1px solid var(--mon-border);
+    white-space: nowrap;
+}
+.mon-table thead th.col-num { text-align: right; }
+.mon-table thead th.col-ctr { text-align: center; }
+
+.mon-table tbody td {
+    padding: var(--mon-row-py) var(--mon-row-px);
+    color: #374151;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--mon-divider);
+    line-height: 1.35;
+}
+.mon-table tbody tr { transition: background-color 0.12s ease, box-shadow 0.12s ease; }
+.mon-table tbody tr:nth-child(even) { background: rgba(248,250,252,0.5); }
+.mon-table tbody tr:hover {
+    background: var(--mon-accent-50);
+    box-shadow: inset 3px 0 0 var(--mon-accent);
+}
+.mon-table td.col-num { text-align: right; font-variant-numeric: tabular-nums; }
+.mon-table td.col-ctr { text-align: center; }
+
+/* Primary cell — unit identifier (anchor per row) */
+.mon-unit-code {
+    font-size: var(--mon-fs-tbl);
+    font-weight: 700;
+    color: var(--mon-navy);
+    letter-spacing: -0.005em;
+    line-height: 1.2;
+}
+.mon-unit-sub {
+    font-size: 0.75rem;
+    color: var(--mon-neutral);
+    line-height: 1.25;
+}
+
+/* Status / stage badge — consistent chip language */
+.mon-badge {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    /* 6.3E Rule 4: slightly more premium padding — not a significant size change */
+    padding: 0.25rem 0.625rem;     /* was 0.1875rem 0.5625rem */
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 800;               /* was 700 */
+    letter-spacing: 0.03em;
+    line-height: 1.25;
+}
+/* 6.3E Rule 4: thin inset border per variant for a "framed" premium feel.
+   inset box-shadow (not `border`) so box dimensions are unaffected. */
+.mon-badge-success { background: var(--mon-success-100); color: #065F46; box-shadow: inset 0 0 0 1px rgba(16,185,129,0.18); }
+.mon-badge-warning { background: var(--mon-warning-100); color: #92400E; box-shadow: inset 0 0 0 1px rgba(245,158,11,0.18); }
+.mon-badge-danger  { background: var(--mon-danger-100);  color: #991B1B; box-shadow: inset 0 0 0 1px rgba(239,68,68,0.18); }
+.mon-badge-neutral { background: #F1F5F9; color: var(--mon-navy-400); box-shadow: inset 0 0 0 1px rgba(75,101,134,0.12); }
+.mon-badge-accent  { background: var(--mon-accent-100); color: var(--mon-accent-600); box-shadow: inset 0 0 0 1px rgba(37,99,235,0.18); }
+
+/* Progress bar — dense, navy fill */
+/* R2 final: 7px → 5px (0.3125rem); colors and animations unchanged */
+.mon-progress {
+    height: 0.3125rem;
+    background: #E5E7EB;
+    border-radius: 9999px;
+    overflow: hidden;
+    min-width: 4.5rem;
+}
+.mon-progress-fill {
+    height: 100%;
+    border-radius: 9999px;
+    background: var(--mon-navy);
+    transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
+}
+.mon-progress-fill.is-success { background: var(--mon-success); }
+.mon-progress-fill.is-warning { background: var(--mon-warning); }
+.mon-progress-fill.is-danger  { background: var(--mon-danger); }
+
+.mon-pct { font-size: 0.75rem; font-weight: 600; color: var(--mon-navy-400); font-variant-numeric: tabular-nums; }
+
+/* Age cell — colored by threshold */
+.mon-age { font-size: var(--mon-fs-tbl); font-weight: 700; font-variant-numeric: tabular-nums; }
+.mon-age.is-old   { color: #B91C1C; }
+.mon-age.is-stale { color: #B45309; }
+.mon-age.is-fresh { color: var(--mon-neutral); }
+
+/* Skeleton rows */
+.mon-skel { animation: mon-pulse 1.6s cubic-bezier(0.4,0,0.2,1) infinite; background: #E5E7EB; border-radius: 0.25rem; }
+@keyframes mon-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+
+/* Empty state — enterprise-calm */
+.mon-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 0.5rem;
+    min-height: 13rem;
+    text-align: center;
+}
+.mon-empty-title { font-size: var(--mon-fs-body); font-weight: 700; color: var(--mon-navy-600); } /* 6.3F-final: clearer (was 600/navy-400) */
+.mon-empty-sub { font-size: var(--mon-fs-cap); color: var(--mon-neutral); } /* 6.3F-final: more contrast (was neutral-400) */
+
+/* Table foot strip — pagination / count */
+.mon-table-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.5rem var(--mon-row-px);
+    border-top: 1px solid var(--mon-divider);
+    background: #FCFCFD;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 7 · Detail slide-over consistency
+   ═══════════════════════════════════════════════════════════════════════ */
+.jss-mon-detail-slide .mon-panel {
+    background: var(--mon-surface);
+    border: 1px solid var(--mon-border-soft);
+    border-radius: var(--mon-radius);
+    padding: 1rem 1.125rem;
+}
+.mon-panel-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--mon-navy);
+    letter-spacing: -0.01em;
+}
+.mon-panel-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    margin-bottom: 0.75rem;
+}
+/* Timeline + inspection share chip language */
+.mon-timeline-node {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2rem; height: 2rem; border-radius: 9999px; flex-shrink: 0;
+}
+.mon-timeline-node.is-done    { background: var(--mon-success-100); color: #047857; }
+.mon-timeline-node.is-current { background: var(--mon-accent-100); color: var(--mon-accent-600); }
+.mon-timeline-node.is-pending { background: #F1F5F9; color: var(--mon-neutral-400); }
+
+/* Inspection stage row */
+.mon-insp-row {
+    display: flex; align-items: center; justify-content: space-between;
+    border: 1px solid var(--mon-border-soft);
+    border-radius: var(--mon-radius-sm);
+    padding: 0.5rem 0.75rem;
+}
+
+/* Deep link tiles */
+.mon-deeplink {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    padding: 0.5rem 0.875rem;
+    border-radius: var(--mon-radius-sm);
+    background: #F1F5F9;
+    font-size: var(--mon-fs-body);
+    font-weight: 600;
+    color: var(--mon-navy-600);
+    transition: background-color 120ms ease, color 120ms ease; /* 6.3E Rule 8 */
+}
+.mon-deeplink:hover { background: var(--mon-accent-50); color: var(--mon-accent-600); }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Task 5/9 · Footer — metadata strip
+   R2: slightly smaller (font 11px), tighter padding
+   ═══════════════════════════════════════════════════════════════════════ */
+.jss-mon-footer {
+    border-top: 1px solid var(--mon-divider);
+    padding-top: 0.375rem;
+}
+.jss-mon-footer .foot-label { font-weight: 600; color: var(--mon-navy-400); }
+.jss-mon-footer .foot-dot { color: var(--mon-neutral-200); opacity: 0.8; }  /* 6.3E: separators recede further (Rule 7) */
+
+/* 6.3F-final: group related metadata so the footer scans as clusters
+   (identity / config / status / keyboard) instead of one flat run of dots. */
+.jss-mon-footer .foot-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4375rem;
+}
+.jss-mon-footer .foot-group:not(:first-child) {
+    padding-left: 0.625rem;
+    border-left: 1px solid var(--mon-divider);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Responsive — keep the table dense at 1366 / 1920, stack on mobile
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    .mon-h1 { font-size: 1.75rem; }
+    .mon-table thead th { position: static; }
+    .mon-table-scroll { max-height: none; }
+}
+@media (max-width: 640px) {
+    .mon-table-scroll { -webkit-overflow-scrolling: touch; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Sprint 6.3B — Monitoring Grid presentation additions
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Row interaction (Task 11) — clickable, keyboard-focusable, accent bar */
+.mon-table tbody tr.mon-row { cursor: pointer; }
+.mon-table tbody tr.mon-row:focus { outline: none; }
+.mon-table tbody tr.mon-row:focus-visible {
+    background: var(--mon-accent-50);
+    box-shadow: inset 3px 0 0 var(--mon-accent);
+}
+
+/* Search highlight (Task 10) — accent amber, not garish */
+.mon-hl {
+    background: #FEF3C7;
+    color: #92400E;
+    border-radius: 0.1875rem;
+    padding: 0.0625rem 0.125rem;
+    font-weight: 700;
+}
+
+/* Progress neutral variant */
+.mon-progress-fill.is-neutral { background: #D1D5DB; }
+
+/* Pagination controls (Task 13) */
+.mon-page {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0 0.5rem;
+    border-radius: 0.375rem;
+    border: 1px solid var(--mon-border);
+    background: var(--mon-surface);
+    font-size: var(--mon-fs-cap);
+    font-weight: 600;
+    color: var(--mon-navy-600);
+    cursor: pointer;
+    /* 6.3E Rule 8: button=120ms, focus outline=150ms */
+    transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease, outline-color 150ms ease;
+}
+.mon-page:hover { border-color: var(--mon-accent-300); background: var(--mon-accent-50); color: var(--mon-accent-600); }
+.mon-page.is-active {
+    background: var(--mon-navy);
+    border-color: var(--mon-navy);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(15,42,74,0.25);
+}
+.mon-page-dots {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 0.25rem;
+    color: var(--mon-neutral-400);
+    font-size: var(--mon-fs-cap);
+}
+
+/* Dense modifier for laptop widths (Task 14) — tighter column rhythm */
+@media (min-width: 1280px) and (max-width: 1535px) {
+    .mon-table tbody td,
+    .mon-table thead th { padding-left: 0.625rem; padding-right: 0.625rem; }
+    .mon-progress { min-width: 3.75rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Sprint 6.3C — Enterprise Interaction Layer
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Alpine cloak */
+[x-cloak] { display: none !important; }
+
+/* ── Task 1+2: Row focus / selected / hover — three distinct states ── */
+.mon-table tbody tr.mon-row {
+    transition: background-color 150ms ease, box-shadow 150ms ease, outline-color 150ms ease;
+}
+
+/* hover (mouse only) — 6.3E Rule 4: bolder bar (was accent-400) + faster timing (Rule 8) */
+.mon-table tbody tr.mon-row:hover:not(.is-focused):not(.is-selected) {
+    background: var(--mon-accent-50);
+    box-shadow: inset 3px 0 0 var(--mon-accent);
+    transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+/* focused (keyboard) — accent left bar + subtle tint + clearer outline (Rule 4) */
+.mon-table tbody tr.mon-row.is-focused {
+    background: var(--mon-accent-50);
+    box-shadow: inset 3px 0 0 var(--mon-accent-600);
+    outline: 1px solid var(--mon-accent-300);  /* was accent-200 — clearer per Rule 4 */
+    outline-offset: -1px;
+}
+.mon-table tbody tr.mon-row.is-focused:focus { outline: none; }
+.mon-table tbody tr.mon-row.is-focused:focus-visible {
+    outline: 2px solid var(--mon-accent-300);
+    outline-offset: -2px;
+}
+
+/* selected (opened in slide) — navy left bar, slightly stronger tint (Rule 4) */
+.mon-table tbody tr.mon-row.is-selected {
+    background: rgba(37, 99, 235, 0.05);   /* was 0.03 — "selected lebih jelas" */
+    box-shadow: inset 3px 0 0 var(--mon-navy-500, #3B556B);
+}
+.mon-table tbody tr.mon-row.is-selected.is-focused {
+    background: var(--mon-accent-50);
+    box-shadow: inset 3px 0 0 var(--mon-accent-600);
+}
+
+/* ── Task 10: Accessibility — focus-visible for all interactive elements ── */
+.mon-btn:focus-visible,
+.mon-page:focus-visible,
+.mon-reset:focus-visible,
+.mon-exception-chip:focus-visible,
+.mon-empty-cta:focus-visible,
+.mon-btn-clear:focus-visible {
+    outline: 2px solid var(--mon-accent-300);
+    outline-offset: 1px;
+}
+.mon-btn:focus:not(:focus-visible) { outline: none; }
+
+/* ── Sprint 6.4.3: Search result count (near active filter chips) ── */
+.mon-result-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: 9999px;
+    background: var(--mon-accent-50, #EFF6FF);
+    color: var(--mon-accent-600, #2563EB);
+    font-size: var(--mon-fs-cap, 0.8125rem);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+/* ── Task 5: Refresh success state ── */
+.mon-btn.mon-btn-success {
+    border-color: var(--mon-success);
+    background: var(--mon-success-100);
+    color: #065F46;
+}
+.mon-btn.mon-btn-success .mon-ic-r { color: var(--mon-success); }
+
+/* ── Task 6: Polling countdown ── */
+.mon-poll-countdown {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--mon-neutral-400);
+    font-variant-numeric: tabular-nums;
+    margin-left: 0.3125rem;   /* 6.3E: was 0.25rem — matches new .mon-meta gap (Rule 7) */
+    padding: 0.0625rem 0.375rem;
+    border-radius: 0.25rem;
+    background: rgba(37, 99, 235, 0.06);
+}
+.mon-refresh-meta { transition: color 200ms ease; }
+
+/* ── Task 7: Empty state ── */
+.mon-empty-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;          /* 6.3F-final: was 3rem — more proportional badge */
+    height: 3.5rem;
+    border-radius: 9999px;
+    background: #F1F5F9;
+    color: var(--mon-neutral-400);
+    margin-bottom: 0.25rem;
+}
+.mon-empty-icon svg {
+    width: 1.75rem;          /* 6.3F-final: was Tailwind w-8/h-8 (32px) — more breathing room in the badge */
+    height: 1.75rem;
+}
+.mon-empty-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 0.375rem;
+    padding: 0.375rem 0.875rem;
+    border-radius: var(--mon-radius-sm);
+    border: 1px solid var(--mon-border);
+    background: var(--mon-surface);
+    color: var(--mon-navy-600);
+    font-size: var(--mon-fs-cap);
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease, outline-color 150ms ease; /* 6.3E Rule 8 */
+}
+.mon-empty-cta:hover {
+    border-color: var(--mon-accent-300);
+    background: var(--mon-accent-50);
+    color: var(--mon-accent-600);
+}
+
+/* ── Task 9: Pagination ── */
+.mon-page:focus-visible {
+    outline: 2px solid var(--mon-accent-300);
+    outline-offset: 1px;
+}
+.mon-page[aria-current="page"]:focus-visible {
+    outline-color: rgba(255, 255, 255, 0.5);
+}
+
+/* ── Footer keyboard hints ── */
+.mon-kbd {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.25rem;
+    border-radius: 0.25rem;
+    border: 1px solid var(--mon-border);
+    background: #F8FAFC;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--mon-navy-400);
+    font-family: ui-monospace, monospace;
+    line-height: 1;
+}
+
+/* ── Task 8: Exception chip transition — 6.3E Rule 8: button-class timing (120ms) ── */
+.mon-exception-chip {
+    transition: border-color 120ms ease, background-color 120ms ease, box-shadow 120ms ease, transform 120ms ease, outline-color 150ms ease;
+}
+.mon-exception-chip:active {
+    transform: scale(0.97);
+}
+.mon-exception-chip.is-active {
+    border-width: 2px;
+    box-shadow: 0 1px 3px rgba(15, 42, 74, 0.15);
+}
+
+/* ── Task 11: Micro animations (150–220ms) ── */
+
+/* Row entrance — staggered fade-in */
+.mon-row-fadein {
+    animation: mon-row-in 180ms ease-out both;
+    animation-delay: calc(var(--row-idx, 0) * 12ms);
+}
+@keyframes mon-row-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Skeleton fade-in */
+.mon-skel-tbody {
+    animation: mon-fade-in 200ms ease-out;
+}
+@keyframes mon-fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Progress bar grow — 220ms */
+.mon-progress-anim {
+    transform-origin: left center;
+    animation: mon-progress-grow 220ms ease-out;
+}
+@keyframes mon-progress-grow {
+    from { transform: scaleX(0); }
+    to   { transform: scaleX(1); }
+}
+
+/* Badge pop — 180ms */
+.mon-badge-anim {
+    animation: mon-badge-pop 180ms ease-out both;
+}
+@keyframes mon-badge-pop {
+    0%   { transform: scale(0.85); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* Badge transition on hover/state changes — 6.3E Rule 8: badge=120ms.
+   box-shadow replaces border-color since badges now use inset box-shadow framing (Rule 4). */
+.mon-badge {
+    transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+/* Deep link enter hover micro-animation — 6.3E Rule 8: button-class timing (120ms) */
+.mon-deeplink {
+    transition: background-color 120ms ease, color 120ms ease, transform 120ms ease;
+}
+.mon-deeplink:active { transform: scale(0.98); }
+
+@media (prefers-reduced-motion: reduce) {
+    .mon-row-fadein,
+    .mon-skel-tbody,
+    .mon-progress-anim,
+    .mon-badge-anim,
+    .mon-skel {
+        animation: none !important;
+        transition: none !important;
+    }
+    .mon-table tbody tr.mon-row { transition: none !important; }
 }

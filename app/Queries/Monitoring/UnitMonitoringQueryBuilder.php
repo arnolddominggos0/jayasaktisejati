@@ -7,20 +7,56 @@ use App\Enums\ShipmentStatus;
 use App\Models\Shipment;
 use App\Support\Monitoring\LatestTrackSubquery;
 use App\Support\Monitoring\MonitoringDomain;
+use App\Support\Monitoring\PeriodResolver;
 use App\Support\Monitoring\RouteResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 final class UnitMonitoringQueryBuilder
 {
+    /**
+     * SQL CASE mirroring TrackStatus::toNormalizedValue() — static enum metadata,
+     * not Stage Engine business logic. Used only to make stage/progress sorting
+     * numerically meaningful instead of alphabetical-by-string-value.
+     */
+    private const STAGE_ORDER_CASE = "
+        CASE lt.lt_status
+            WHEN 'pickup' THEN 10
+            WHEN 'handover' THEN 20
+            WHEN 'stuffing' THEN 30
+            WHEN 'delivery_to_port' THEN 40
+            WHEN 'stacking' THEN 50
+            WHEN 'unit_loading' THEN 60
+            WHEN 'onship' THEN 70
+            WHEN 'vessel_depart' THEN 80
+            WHEN 'vessel_arrival' THEN 90
+            WHEN 'unloading' THEN 100
+            WHEN 'handover_trucking' THEN 105
+            WHEN 'delivery_to_customer' THEN 110
+            WHEN 'delivered' THEN 120
+            WHEN 'hold' THEN 900
+            WHEN 'cancelled' THEN 999
+            ELSE 10
+        END
+    ";
+
+    /**
+     * Sprint 6.4.2: Branch and Period moved to the front of the pipeline —
+     * they're the workspace's primary context, typically the most selective
+     * filters, and don't need the lt JOIN, so applying them first keeps the
+     * query efficient. Pipeline: Branch → Period → Route → Status → [JOIN]
+     * → Exception → Search → Sort.
+     */
     public function build(MonitoringFilter $filter): Builder
     {
         $query = Shipment::query();
 
-        $this->applyBaseScope($query, $filter);
-        $this->applyModeFilter($query, $filter);
+        $this->applyBaseScope($query);
+        $this->applyModeFilter($query);
+        $this->applyBranch($query, $filter);
+        $this->applyPeriod($query, $filter);
         $this->applyRouteFilter($query, $filter);
-        $this->applyShowFinished($query, $filter);
+        $this->applyStatusFilter($query, $filter);
         // JOIN must precede any clause that references lt.* (exception filter, sort)
         $this->joinLatestTrack($query);
         $this->applyComputedColumns($query);
@@ -34,23 +70,39 @@ final class UnitMonitoringQueryBuilder
 
     // ── Scope filters ─────────────────────────────────────────────────────────
 
-    private function applyBaseScope(Builder $q, MonitoringFilter $f): void
+    private function applyBaseScope(Builder $q): void
     {
         // Table-qualified to prevent ambiguity after the lt LEFT JOIN
         $q->whereNotIn('shipments.status', [ShipmentStatus::Draft->value]);
+    }
 
+    /**
+     * Hard-pins the v1 domain constraint: sea mode only.
+     * See ADR-009 — this is a domain gate, not a user-facing filter, so it
+     * runs before Branch/Period regardless of how those are configured.
+     */
+    private function applyModeFilter(Builder $q): void
+    {
+        MonitoringDomain::applyTo($q);
+    }
+
+    /** Sprint 6.4.2: workspace branch context. */
+    private function applyBranch(Builder $q, MonitoringFilter $f): void
+    {
         if ($f->branch_id) {
             $q->where('shipments.branch_id', $f->branch_id);
         }
     }
 
     /**
-     * Hard-pins the v1 domain constraint: sea mode only.
-     * The $f parameter is retained for future v2 extension (see ADR-009).
+     * Sprint 6.4.2: workspace period context — restricts to the calendar
+     * month identified by $f->period. See PeriodResolver::applyTo() — shared
+     * with ExceptionCountQueryBuilder/WorkspaceSummaryQueryBuilder so the
+     * table and the header KPIs can never disagree about "this period".
      */
-    private function applyModeFilter(Builder $q, MonitoringFilter $f): void
+    private function applyPeriod(Builder $q, MonitoringFilter $f): void
     {
-        MonitoringDomain::applyTo($q);
+        PeriodResolver::applyTo($q, $f->period);
     }
 
     private function applyRouteFilter(Builder $q, MonitoringFilter $f): void
@@ -61,14 +113,21 @@ final class UnitMonitoringQueryBuilder
         }
     }
 
-    private function applyShowFinished(Builder $q, MonitoringFilter $f): void
+    /**
+     * Sprint 6.4.1: three-state status filter (was a boolean show_finished).
+     * 'active'   — hide delivered/cancelled (default)
+     * 'finished' — delivered/cancelled only
+     * 'all'      — no restriction
+     */
+    private function applyStatusFilter(Builder $q, MonitoringFilter $f): void
     {
-        if (! $f->show_finished) {
-            $q->whereNotIn('shipments.status', [
-                ShipmentStatus::Delivered->value,
-                ShipmentStatus::Cancelled->value,
-            ]);
-        }
+        $finishedStatuses = [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value];
+
+        match ($f->status) {
+            'finished' => $q->whereIn('shipments.status', $finishedStatuses),
+            'all'      => null,
+            default    => $q->whereNotIn('shipments.status', $finishedStatuses), // 'active'
+        };
     }
 
     // ── Latest-track JOIN ─────────────────────────────────────────────────────
@@ -172,7 +231,10 @@ final class UnitMonitoringQueryBuilder
     // ── Search ────────────────────────────────────────────────────────────────
 
     /**
-     * Filter rows by search term (SPPB code, doc number, voyage snapshot, unit reg_no / chassis_no).
+     * Sprint 6.4.1: full operational-field search.
+     * Shipment-level: code, doc_number (SPPB), voyage no, vessel name, container no.
+     * Unit-level: reg_no (no polisi), chassis_no, engine_no, sjkb_no, container_display.
+     * Customer-level: customer name (via whereExists — customer isn't joined for WHERE).
      * Adds is_search_match computed column so the Blade can highlight matched rows.
      * When no search term, is_search_match is always false.
      */
@@ -191,14 +253,25 @@ final class UnitMonitoringQueryBuilder
                 ->where('shipments.code', 'ilike', $term)
                 ->orWhere('shipments.doc_number', 'ilike', $term)
                 ->orWhere('shipments.voyage', 'ilike', $term)
+                ->orWhere('shipments.vessel_name', 'ilike', $term)
+                ->orWhere('shipments.container_no', 'ilike', $term)
                 ->orWhereExists(function ($sub) use ($term) {
                     $sub->select(DB::raw(1))
                         ->from('units')
                         ->whereColumn('units.shipment_id', 'shipments.id')
                         ->where(function ($q2) use ($term) {
                             $q2->where('units.reg_no', 'ilike', $term)
-                               ->orWhere('units.chassis_no', 'ilike', $term);
+                               ->orWhere('units.chassis_no', 'ilike', $term)
+                               ->orWhere('units.engine_no', 'ilike', $term)
+                               ->orWhere('units.sjkb_no', 'ilike', $term)
+                               ->orWhere('units.container_display', 'ilike', $term);
                         });
+                })
+                ->orWhereExists(function ($sub) use ($term) {
+                    $sub->select(DB::raw(1))
+                        ->from('customers')
+                        ->whereColumn('customers.id', 'shipments.customer_id')
+                        ->where('customers.name', 'ilike', $term);
                 });
         });
 
@@ -211,6 +284,14 @@ final class UnitMonitoringQueryBuilder
      * Default sort (exception-first): Hold → NG → Demurrage → Delay → Stuck →
      * Missing Voyage → Age DESC.
      * All thresholds come from config; integer interpolation is safe (no user input).
+     *
+     * Sprint 6.4.1 additions: progress, eta, voyage, customer sorts; stage sort
+     * fixed to use TrackStatus's numeric order instead of alphabetical string
+     * order (STAGE_ORDER_CASE — static enum metadata, not Stage Engine logic).
+     * Progress sort reuses the same stage scale since progress is a monotonic
+     * function of stage for the 10–120 range; cancelled/hold collapse to 0 to
+     * match ProgressCalculator's displayed percentage, not duplicated here
+     * beyond ranking order.
      */
     private function applySort(Builder $q, MonitoringFilter $f): void
     {
@@ -255,25 +336,51 @@ final class UnitMonitoringQueryBuilder
             return;
         }
 
+        $ageFallback = 'COALESCE(shipments.requested_at, shipments.created_at)';
+        $stageOrder  = self::STAGE_ORDER_CASE;
+        // Stage-derived progress: cancelled/hold rank as 0 (matches ProgressCalculator's
+        // displayed 0%); everything else uses the same 10–120 stage scale (monotonic
+        // with the displayed percentage, so ranking order is identical).
+        $progressOrder = "
+            CASE
+                WHEN shipments.status = 'cancelled' THEN 0
+                WHEN lt.lt_status = 'hold' THEN 0
+                ELSE {$stageOrder}
+            END
+        ";
+
         match ($f->sort) {
-            'age-desc'   => $q->orderByRaw(
-                'COALESCE(shipments.requested_at, shipments.created_at) DESC'
-            ),
-            'age-asc'    => $q->orderByRaw(
-                'COALESCE(shipments.requested_at, shipments.created_at) ASC'
-            ),
-            'stage-asc'  => $q->orderByRaw(
-                "COALESCE(lt.lt_status, 'pickup') ASC, "
-                . 'COALESCE(shipments.requested_at, shipments.created_at) DESC'
-            ),
-            'stage-desc' => $q->orderByRaw(
-                "COALESCE(lt.lt_status, 'pickup') DESC, "
-                . 'COALESCE(shipments.requested_at, shipments.created_at) DESC'
-            ),
-            default      => $q->orderByRaw(
-                'COALESCE(shipments.requested_at, shipments.created_at) DESC'
-            ),
+            'age-desc'      => $q->orderByRaw("{$ageFallback} DESC"),
+            'age-asc'       => $q->orderByRaw("{$ageFallback} ASC"),
+
+            'progress-desc' => $q->orderByRaw("{$progressOrder} DESC, {$ageFallback} DESC"),
+            'progress-asc'  => $q->orderByRaw("{$progressOrder} ASC, {$ageFallback} DESC"),
+
+            'eta-asc'       => $q->orderByRaw('shipments.eta ASC NULLS LAST'),
+            'eta-desc'      => $q->orderByRaw('shipments.eta DESC NULLS LAST'),
+
+            'voyage-asc'    => $q->orderByRaw('shipments.voyage ASC NULLS LAST'),
+            'voyage-desc'   => $q->orderByRaw('shipments.voyage DESC NULLS LAST'),
+
+            'customer-asc', 'customer-desc' => $this->applyCustomerSort($q, $f->sort),
+
+            'stage-asc'     => $q->orderByRaw("{$stageOrder} ASC, {$ageFallback} DESC"),
+            'stage-desc'    => $q->orderByRaw("{$stageOrder} DESC, {$ageFallback} DESC"),
+
+            default         => $q->orderByRaw("{$ageFallback} DESC"),
         };
+    }
+
+    /**
+     * Customer sort needs a real JOIN (ORDER BY can't reach into a WHERE-only
+     * subquery), added only when this sort is actually requested.
+     */
+    private function applyCustomerSort(Builder $q, string $sort): void
+    {
+        $q->leftJoin('customers', 'customers.id', '=', 'shipments.customer_id');
+
+        $direction = $sort === 'customer-desc' ? 'DESC' : 'ASC';
+        $q->orderByRaw("customers.name {$direction} NULLS LAST");
     }
 
     // ── Eager loading ─────────────────────────────────────────────────────────

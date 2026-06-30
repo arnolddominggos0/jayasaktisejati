@@ -4,8 +4,8 @@
 
 **Project:** Jaya Sakti App
 **Document:** PRD-001 — Jaya Sakti Line Website MVP
-**Version:** 1.0.0
-**Status:** ✅ FROZEN
+**Version:** 1.1.0
+**Status:** ✅ FROZEN (amended via approved Change Requests)
 **Document Owner:** Product Team
 **Last Updated:** 2026-06-30
 **Next Phase:** ARD-001 — Architecture Design Document
@@ -22,6 +22,7 @@
 | Version | Date | Author | Description |
 |----------|------------|-------------|---------------------------|
 | 1.0.0 | 2026-06-30 | Product Team | Initial MVP baseline (Frozen) |
+| 1.1.0 | 2026-06-30 | Product Team | Added FR-12 CMS — Vessel Certificate Management per approved [CR-001-001](CR-001-001-Internal-Vessel-Certificate-Management.md) (Internal Vessel Certificate Management). |
 
 ---
 
@@ -32,6 +33,12 @@ This PRD is frozen.
 Any feature request, enhancement, or business change must be documented as a Change Request (CR) before implementation.
 
 The development team must not modify MVP scope directly.
+
+### Change Request Log
+
+| CR ID | Title | Status | Affects |
+|-------|-------|--------|---------|
+| [CR-001-001](CR-001-001-Internal-Vessel-Certificate-Management.md) | Internal Vessel Certificate Management | ✅ Approved | PRD v1.1.0, DBD v1.1.0, UX-001 v1.1.0 |
 
 ---
 
@@ -193,6 +200,13 @@ Each vessel listing must offer three inquiry channels:
 - Fully responsive: mobile, tablet, desktop.
 - Mobile-first design given the target audience behavior.
 
+### FR-12 CMS — Vessel Certificate Management [CONFIRMED] — *Added via [CR-001-001](CR-001-001-Internal-Vessel-Certificate-Management.md)*
+- Admin can manage one or more certificates per vessel listing (e.g., Certificate of Registry, Classification Certificate, Safety Management Certificate, IOPP Certificate, Other).
+- Each certificate record captures: certificate type, certificate number, issuing authority, issue date, expiry date, an optional uploaded document (PDF/image scan), and internal notes.
+- Certificates are for **internal CMS use only** and must **never** be exposed on the public website, public API, public HTML, or any public-facing network response — this extends the existing sensitive-data rule for certificates (§15.2).
+- Certificate documents are stored on private (non-public) storage only.
+- CMS highlights certificates nearing or past expiry, to support compliance follow-up. [RECOMMENDATION]
+
 ---
 
 ## 7. Non-Functional Requirements
@@ -232,6 +246,7 @@ Each vessel listing must offer three inquiry channels:
 11. CMS for Gallery.
 12. CMS Inquiry Inbox (form submissions).
 13. Responsive design — mobile-first.
+14. CMS Vessel Certificate Management — internal-only, per vessel listing, never public. *Added via [CR-001-001](CR-001-001-Internal-Vessel-Certificate-Management.md).*
 
 ### 8.2 Out of Scope (NOT in this MVP)
 **[FUTURE]** — must NOT be built in this phase:
@@ -267,6 +282,7 @@ Each vessel listing must offer three inquiry channels:
 | Inquiry Inbox | View submissions per vessel | Status flags, email notification |
 | Performance | Responsive, mobile-first | LCP targets, lazy loading |
 | SEO | Clean URLs | OG tags, sitemap.xml, GA4 |
+| Vessel Certificates *(CR-001-001)* | CRUD certificates per vessel, internal-only, document upload | Expiry highlighting |
 
 ---
 
@@ -292,7 +308,8 @@ Admin (CMS) — not public
 ├── Services manager
 ├── Vessel Listings manager
 │   ├── Create / Edit / Delete
-│   └── Toggle Open/Closed
+│   ├── Toggle Open/Closed
+│   └── Certificates tab (internal only) — per vessel, never public *(CR-001-001)*
 ├── Gallery manager
 └── Inquiries inbox
 ```
@@ -328,7 +345,8 @@ Admin (CMS) — not public
 1. Admin logs in.
 2. Opens Vessel Listings manager.
 3. Creates new listing → fills general info, uploads ≤ 6 images, sets status.
-   - Sensitive data (vessel name, IMO, owner, certificates) entered into internal-only fields. [RECOMMENDATION: capture but never display]
+   - Sensitive data (vessel name, IMO, owner) entered into internal-only fields. [RECOMMENDATION: capture but never display]
+   - Certificates added/managed on the Certificates tab (type, number, issuing authority, dates, document, notes), internal only. *(FR-12, CR-001-001)*
 4. Saves → listing appears publicly (if status = Open).
 5. Later toggles status Open ↔ Closed as needed.
 
@@ -361,6 +379,7 @@ Admin (CMS) — not public
 | CRUD for Services. | [CONFIRMED] |
 | CRUD for Vessel Listings, incl. image upload (max 6) + ordering. | [CONFIRMED] |
 | Toggle Vessel Status Open/Closed. | [CONFIRMED] |
+| CRUD for Vessel Certificates per listing (type, number, issuing authority, dates, document, notes); internal only, never public. *(FR-12, CR-001-001)* | [CONFIRMED] |
 | CRUD for Gallery. | [CONFIRMED] |
 | Inquiry inbox (list, view, search/filter). | [CONFIRMED] |
 | Mark inquiry read/contacted/archived. | [RECOMMENDATION] |
@@ -418,7 +437,7 @@ The following must **never** appear in any public page, API response, HTML sourc
 - Vessel Name (real)
 - IMO Number
 - Owner / ownership details
-- Full certificates
+- Full certificates — managed as structured certificate records (type, number, issuing authority, issue/expiry dates, document) per FR-12. *Formalized via [CR-001-001](CR-001-001-Internal-Vessel-Certificate-Management.md).*
 - Price / commercial terms [RECOMMENDATION to also treat as sensitive]
 
 These fields may be captured in the CMS for internal use (e.g., broker reference), but only the **broker/admin** sees them.
@@ -487,6 +506,7 @@ The MVP is accepted when ALL of the following are true:
 - [AC-11] Admin can CRUD vessel listings, upload ≤ 6 images, reorder them, and toggle Open/Closed. [CONFIRMED]
 - [AC-12] Admin can view inquiry submissions linked to vessels. [CONFIRMED]
 - [AC-13] Admin can mark inquiries as read/contacted/archived. [RECOMMENDATION]
+- [AC-17] Admin can CRUD certificates per vessel listing (type, number, issuing authority, dates, document, notes); certificate data and documents never appear in any public-facing output. [CONFIRMED] *(FR-12, CR-001-001)*
 
 ### NFR
 - [AC-14] Site served over HTTPS; admin routes protected; login rate-limited. [CONFIRMED]
@@ -605,14 +625,16 @@ These need business decisions before/while kicking off development. None should 
 - **Sensitive Information** — vessel name, IMO, owner, full certificates (never public).
 - **Open / Closed** — lifecycle status of a listing.
 - **CMS** — Content Management System for admins to manage site content.
+- **Vessel Certificate** — an internal-only certificate record (e.g., Certificate of Registry, Classification Certificate) attached to a vessel listing. Never public. See FR-12.
 
 ## Appendix B — Related Documents
 - `docs/01-business/` — Business Requirement Document (to be created, if required).
 - `docs/03-architecture/ARD-001` — Architecture Design Document (next phase).
 - `docs/PRD.md` — Operational Logistics & Distribution System PRD (separate product, do NOT mix scopes).
 - `prd.md` — Concise execution PRD for the operational branch.
+- [`docs/02-product/CR-001-001-Internal-Vessel-Certificate-Management.md`](CR-001-001-Internal-Vessel-Certificate-Management.md) — Change Request that introduced FR-12 (v1.1.0).
 
 ---
 
-**End of PRD — Jaya Sakti Line Website MVP (PRD-001, v1.0.0, Frozen).**
+**End of PRD — Jaya Sakti Line Website MVP (PRD-001, v1.1.0, Frozen).**
 This document is the single source of truth for the MVP. Any change in scope must be raised as a Change Request (CR) and re-approved by business stakeholders.

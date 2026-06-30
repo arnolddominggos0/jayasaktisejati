@@ -4,7 +4,9 @@ namespace App\Services\Monitoring;
 
 use App\DTO\Monitoring\MonitoringFilter;
 use App\Queries\Monitoring\WorkspaceSummaryQueryBuilder;
+use App\Support\Monitoring\PeriodResolver;
 use App\ViewModels\Monitoring\WorkspaceSummaryData;
+use Illuminate\Support\Carbon;
 
 final class WorkspaceSummaryBuilder
 {
@@ -23,7 +25,15 @@ final class WorkspaceSummaryBuilder
             branch: $raw['branch'],
             lastRefresh: $raw['refreshed_at'],
             filteredUnits: $raw['filtered_units'],
+            period: $this->periodLabel($raw['period']),
         );
+    }
+
+    private function periodLabel(string $period): string
+    {
+        [$start] = PeriodResolver::bounds($period);
+
+        return ucfirst(Carbon::instance($start)->translatedFormat('F Y'));
     }
 
     private function routeLabel(string $route): string

@@ -55,10 +55,17 @@ No implementation begins until the PRD is frozen and the ARD is completed.
 
 | Document ID | Title | Location | Version | Status |
 |-------------|-------|----------|---------|--------|
-| PRD-001 | Jaya Sakti Line Website MVP | `02-product/PRD-001-JSL-Website-MVP.md` | 1.0.0 | ✅ FROZEN |
+| PRD-001 | Jaya Sakti Line Website MVP | `02-product/PRD-001-JSL-Website-MVP.md` | 1.1.0 | ✅ FROZEN (amended via approved Change Requests) |
+| CR-001-001 | Internal Vessel Certificate Management | `02-product/CR-001-001-Internal-Vessel-Certificate-Management.md` | 1.0.1 | ✅ APPROVED — Change Request |
+| ARCH-REVIEW | Architecture Review (precursor to ADR) | `03-architecture/ARCHITECTURE_REVIEW.md` | 0.1.0 | ✅ Accepted by ARB |
+| ADR-001 | Architecture Decision Records (ADR-001→ADR-010) | `03-architecture/ADR-001.md` | 1.0.0 | ✅ ACCEPTED — Architectural Baseline |
+| ARD-001 | Architecture Design Document (Implementation Blueprint) | `03-architecture/ARD-001-JSL-Website-MVP.md` | 1.0.0 | ✅ APPROVED — Implementation Blueprint |
+| ARCH-WALK | Architecture Walkthrough (Audit Report) | `03-architecture/ARCHITECTURE_WALKTHROUGH.md` | 1.0.0 | ✅ Complete — ⚠ Approved with Notes |
+| DBD-001 | Database Design Document | `04-database/DBD-001-JSL-Website-MVP.md` | 1.1.0 | ✅ APPROVED — Database Blueprint |
+| UX-001 | UI/UX Specification | `05-uiux/UX-001-JSL-Website-MVP.md` | 1.1.0 | ✅ APPROVED — UI/UX Specification |
 
 ### Next phase
-- **ARD-001 — Architecture Design Document** → to be created under `03-architecture/`.
+- **Sprint Planning** → to be created under `06-sprint/`.
 
 ---
 
@@ -99,3 +106,4 @@ Those documents are **NOT part of the Jaya Sakti Line Website MVP**. Do not mix 
 | Version | Date | Author | Description |
 |---------|------|---------|-------------|
 | 1.0.0 | 2026-06-30 | Product Team | Initial documentation foundation (PRD-001 frozen). |
+| 1.1.0 | 2026-06-30 | Product Team | Applied approved [CR-001-001](02-product/CR-001-001-Internal-Vessel-Certificate-Management.md) (Internal Vessel Certificate Management). PRD-001 → v1.1.0, DBD-001 → v1.1.0, UX-001 → v1.1.0. |

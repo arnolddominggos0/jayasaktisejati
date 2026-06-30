@@ -24,6 +24,7 @@ class InitialSetupSeeder extends Seeder
         Role::firstOrCreate(['name' => 'office_admin']);
         Role::firstOrCreate(['name' => 'field_coordinator']);
         Role::firstOrCreate(['name' => 'customer']);
+        Role::firstOrCreate(['name' => 'cms']);
 
         /*
         |--------------------------------------------------------------------------
@@ -61,6 +62,23 @@ class InitialSetupSeeder extends Seeder
         );
 
         $superAdmin->syncRoles(['super_admin']);
+
+        /*
+        |--------------------------------------------------------------------------
+        | CMS Editor
+        |--------------------------------------------------------------------------
+        */
+
+        $cmsEditor = User::updateOrCreate(
+            ['email' => 'cms@jss.local'],
+            [
+                'name' => 'CMS Editor',
+                'password' => Hash::make('password'),
+                'branch_id' => null,
+            ]
+        );
+
+        $cmsEditor->syncRoles(['cms']);
 
         /*
         |--------------------------------------------------------------------------

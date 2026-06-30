@@ -30,6 +30,12 @@ class EnsurePanelRole
                 }
             }
 
+            if ($panel->getId() === 'cms') {
+                if (! $user->hasAnyRole(['cms', 'super_admin'])) {
+                    abort(403, 'Panel ini khusus untuk CMS Editor.');
+                }
+            }
+
             return $next($request);
         }
 
@@ -44,6 +50,12 @@ class EnsurePanelRole
         if (str_starts_with($path, 'customer')) {
             if (! $user->hasRole('customer')) {
                 abort(403, 'Panel ini khusus untuk Customer.');
+            }
+        }
+
+        if (str_starts_with($path, 'cms')) {
+            if (! $user->hasAnyRole(['cms', 'super_admin'])) {
+                abort(403, 'Panel ini khusus untuk CMS Editor.');
             }
         }
 

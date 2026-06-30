@@ -7,6 +7,7 @@ use App\Enums\ShipmentStatus;
 use App\Models\Branch;
 use App\Models\Shipment;
 use App\Support\Monitoring\MonitoringDomain;
+use App\Support\Monitoring\PeriodResolver;
 use App\Support\Monitoring\RouteResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -41,6 +42,7 @@ final class WorkspaceSummaryQueryBuilder
                 'branch'         => $this->branchName($filter->branch_id),
                 'refreshed_at'   => Carbon::now(),
                 'filtered_units' => $activeUnits,
+                'period'         => $filter->period,
             ];
         });
     }
@@ -54,9 +56,14 @@ final class WorkspaceSummaryQueryBuilder
         // v1 domain constraint: sea mode only. See ADR-009 and MonitoringDomain.
         MonitoringDomain::applyTo($query);
 
+        // Sprint 6.4.2: branch + period context — same filters as the table,
+        // so the active/finished counts in the header always match what's
+        // shown below, not the whole database.
         if ($filter->branch_id) {
             $query->where('branch_id', $filter->branch_id);
         }
+
+        PeriodResolver::applyTo($query, $filter->period);
 
         $customerIds = RouteResolver::customerIdsForRoute($filter->route);
         if ($filter->route && $filter->route !== 'all' && ! empty($customerIds)) {

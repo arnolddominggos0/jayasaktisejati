@@ -7,4 +7,5 @@ return [
     App\Providers\Filament\AdminPanelProvider::class,
     App\Providers\Filament\FieldCoordinatorPanelProvider::class,
     App\Providers\Filament\CustomerPanelProvider::class,
+    App\Providers\Filament\CmsPanelProvider::class,
 ];

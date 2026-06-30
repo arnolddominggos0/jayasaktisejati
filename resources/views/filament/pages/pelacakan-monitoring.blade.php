@@ -8,6 +8,8 @@
         $exceptionFilter = $exceptionFilter ?? null;
         $groupMode = $groupMode ?? 'flat';
         $activeFilters = $activeFilterCount ?? 0;
+        $hasActiveFilters = $hasActiveFilters ?? ($activeFilters > 0);
+        $filterChips = $activeFilterChips ?? [];
 
         $hasExceptions =
             $band->delay_count +
@@ -15,10 +17,32 @@
                 $band->hold_count +
                 $band->demurrage_count +
                 $band->missing_voyage_count +
-                $band->pdi_pending_count >
+                $band->stuck_count >
             0;
 
         $lastRefreshFormatted = $summary->lastRefresh->format('H:i:s');
+
+        // Sprint 6.4.3-R1: KPI vs Table consistency UX — presentation-only.
+        // KPI (workspace summary) deliberately ignores search/exception by
+        // design (see audit Sprint 6.4.3); these two booleans drive a small
+        // explanatory context bar + empty-state copy so that's visible to
+        // the operator instead of looking like a bug. No query/filter logic
+        // here — both values already exist on the page (search, exception_filter).
+        $exceptionLabels = [
+            'hold'           => 'Hold',
+            'ng'             => 'NG',
+            'demurrage'      => 'Demurrage',
+            'delay'          => 'Delay',
+            'stuck'          => 'Stuck',
+            'missing_voyage' => 'Missing Voyage',
+        ];
+        $searchActive = strlen(trim($this->search ?? '')) > 0;
+        $exceptionActive = filled($exceptionFilter);
+        $exceptionLabel = $exceptionActive
+            ? ($exceptionLabels[$exceptionFilter] ?? ucfirst(str_replace('_', ' ', $exceptionFilter)))
+            : null;
+        $drilldownActive = $searchActive || $exceptionActive;
+        $resultCount = $rows?->total() ?? 0;
     @endphp
 
     {{-- Poll: refresh exception band + summary only (not the full table) --}}
@@ -79,7 +103,14 @@
                     handleKey(e) {
                         var tag = e.target.tagName;
                         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
-                            if (e.key === 'Escape') e.target.blur();
+                            if (e.key === 'Escape') {
+                                if (tag === 'INPUT' && e.target.name === 'data[search]') {
+                                    e.preventDefault();
+                                    this.clearSearch();
+                                } else {
+                                    e.target.blur();
+                                }
+                            }
                             return;
                         }
 
@@ -184,6 +215,16 @@
 
                 {{-- Right: compact live status metrics (hierarchy via weight, not card) --}}
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:shrink-0">
+                    {{-- Sprint 6.4.3-R1: explains the KPI is a workspace-wide
+                         summary (period/branch/route/mode only), not affected
+                         by search/exception — only shown while one of those
+                         drill-down filters is active, so the default view is
+                         untouched (Acceptance: "KPI tidak berubah saat search"). --}}
+                    @if ($drilldownActive)
+                        <span class="mon-kpi-helper" title="KPI menghitung seluruh periode terpilih, tidak dipengaruhi oleh pencarian atau filter exception">Ringkasan Workspace</span>
+                        <span class="mon-vrule"></span>
+                    @endif
+
                     {{-- Active units: most prominent (anchor metric) --}}
                     <span class="mon-metric">
                         <span class="size-2 rounded-full bg-blue-500"></span>
@@ -198,14 +239,6 @@
                         <span class="mon-metric-sub">{{ $summary->finishedUnits }}</span>
                         <span class="mon-metric-label">selesai</span>
                     </span>
-
-                    @if ($activeFilters > 0)
-                        <span class="mon-vrule"></span>
-                        <span class="mon-meta text-amber-600">
-                            <x-heroicon-o-funnel class="mon-ic-3" />
-                            {{ $summary->filteredUnits }} hasil
-                        </span>
-                    @endif
 
                     <span class="mon-vrule"></span>
 
@@ -276,10 +309,10 @@
                             'tier' => 'warning',
                         ],
                         [
-                            'key' => 'pdi_pending',
-                            'label' => 'PDI Pending',
-                            'count' => $band->pdi_pending_count,
-                            'icon' => 'heroicon-o-clipboard-document-check',
+                            'key' => 'stuck',
+                            'label' => 'Stuck',
+                            'count' => $band->stuck_count,
+                            'icon' => 'heroicon-o-arrow-path',
                             'tier' => 'warning',
                         ],
                     ];
@@ -321,11 +354,47 @@
         </section>
 
         {{-- ══════════════════════════════════════════════════════════════
+             2.5 ACTIVE FILTER CHIPS (Sprint 6.4.1)
+             Removable chips for non-default filters (search/status/view/
+             sort/route). Exception is intentionally excluded — it already
+             has its own chip+reset in the exception band above.
+             Only renders when a filter is actually active — the result
+             count pill is contextual to "this is what your filters
+             produced", not a permanent fixture (Sprint 6.4.2-R1 cleanup;
+             that count would otherwise duplicate the header's aktif/selesai
+             metrics on the default, unfiltered view).
+        ══════════════════════════════════════════════════════════════ --}}
+        @if (! empty($filterChips))
+            <section class="jss-mon-active-filters" aria-label="Hasil dan filter aktif">
+                <div class="flex flex-wrap items-center gap-2">
+                    {{-- Sprint 6.4.3: Result count — from paginator total, no extra query --}}
+                    @if ($rows && $rows->total() > 0)
+                        <span class="mon-result-count" aria-live="polite" role="status">
+                            {{ $rows->total() }} hasil
+                        </span>
+                    @endif
+
+                    <span class="mon-active-filters-label">Filter:</span>
+                    @foreach ($filterChips as $chip)
+                        <button type="button"
+                            wire:click="updateFilter('{{ $chip['field'] }}', '{{ $chip['clear'] }}')"
+                            class="mon-active-filter-chip"
+                            title="Hapus filter {{ $chip['label'] }}"
+                            aria-label="Hapus filter {{ $chip['label'] }}: {{ $chip['value'] }}">
+                            <span class="mon-active-filter-label">{{ $chip['label'] }}:</span>
+                            <span class="mon-active-filter-value">{{ $chip['value'] }}</span>
+                            <x-heroicon-o-x-mark class="mon-ic-3" />
+                        </button>
+                    @endforeach
+                </div>
+            </section>
+        @endif
+
+        {{-- ══════════════════════════════════════════════════════════════
              3+4. WORKSPACE SURFACE (Task 6) — single operational plane.
              One surface unifies toolbar + table; the operator reads
              top-to-bottom without crossing two card boundaries.
-             Toolbar (Task 4): Search (primary) → Exception → View →
-             Show Finished → Clear → Refresh — visual weight descends left-to-right.
+             Toolbar (Task 4): Periode → Cari (primary) → Exception → Tampilan → Selesai → Refresh — visual weight descends left-to-right.
         ══════════════════════════════════════════════════════════════ --}}
         <section class="jss-mon-workspace">
             <div class="mon-surface">
@@ -334,20 +403,14 @@
                 <div class="mon-toolbar">
                     <div class="flex items-end gap-3">
 
-                        {{-- Form: Search (primary) · Exception · Tampilan · Selesai --}}
-                        <div class="min-w-0 flex-1 mon-search-wrap">
+                        {{-- Form: Periode · Cari (primary) · Exception · Tampilan · Selesai --}}
+                        {{-- Search clear button + loading spinner are native Filament
+                             affixes on the 'search' field itself (suffixAction +
+                             wire:target loading indicator) — see getFormSchema()
+                             in WorkspaceShell. No manual absolute-positioned
+                             overlay needed here. --}}
+                        <div class="min-w-0 flex-1">
                             {{ $this->form }}
-                            {{-- Search clear button (Alpine) --}}
-                            <button type="button" x-show="$wire.search && $wire.search.length > 0" x-cloak
-                                x-transition:enter="transition ease-out duration-150"
-                                x-transition:enter-start="opacity-0 scale-95"
-                                x-transition:enter-end="opacity-100 scale-100"
-                                x-transition:leave="transition ease-in duration-100"
-                                x-transition:leave-start="opacity-100 scale-100"
-                                x-transition:leave-end="opacity-0 scale-95" wire:click="updateFilter('search', '')"
-                                class="mon-clear-search" aria-label="Hapus pencarian" title="Hapus pencarian">
-                                <x-heroicon-o-x-mark class="w-4 h-4" />
-                            </button>
                         </div>
 
                         {{-- Refresh: framed, aligned to input baseline --}}
@@ -368,6 +431,38 @@
                     </div>
                 </div>
 
+                {{-- ── Sprint 6.4.3-R1: Drill-down context bar ──
+                     "Tepat di atas tabel" — tells the operator the table
+                     below is a filtered view (search/exception), distinct
+                     from the workspace-wide KPI above. Presentation only;
+                     $resultCount comes from the existing paginator total,
+                     no extra query. Disappears the instant search/exception
+                     is cleared (chip X, empty-state CTA, or the field itself)
+                     since it's purely derived from $this->search /
+                     $exceptionFilter — same reactive state Livewire already
+                     re-renders on every filter change. --}}
+                @if ($drilldownActive)
+                    <div class="mon-context-bar" role="status" aria-live="polite">
+                        @if ($searchActive && $exceptionActive)
+                            <span class="mon-context-label">Filter aktif</span>
+                            <span class="mon-context-value">
+                                Cari: <strong>{{ $this->search }}</strong>
+                                <span class="mon-context-sep">&middot;</span>
+                                Exception: <strong>{{ $exceptionLabel }}</strong>
+                            </span>
+                        @elseif ($searchActive)
+                            <span class="mon-context-label">Menampilkan hasil pencarian</span>
+                            <span class="mon-context-value">Cari: <strong>{{ $this->search }}</strong></span>
+                        @else
+                            <span class="mon-context-label">Filter aktif</span>
+                            <span class="mon-context-value">Exception: <strong>{{ $exceptionLabel }}</strong></span>
+                        @endif
+                        <span class="mon-context-count">
+                            {{ $resultCount }} {{ $searchActive ? 'hasil ditemukan' : 'shipment' }}
+                        </span>
+                    </div>
+                @endif
+
                 {{-- ── Monitoring Table (inherits workspace surface) ──
                      Pure Blade partial bound to MonitoringRowData objects from
                      the paginator. Lives in the parent Livewire component's
@@ -378,6 +473,9 @@
                     'search' => $this->search ?? '',
                     'pageSize' => $pageSize ?? 50,
                     'groupMode' => $groupMode ?? 'flat',
+                    'hasActiveFilters' => $hasActiveFilters,
+                    'exceptionFilter' => $exceptionFilter,
+                    'exceptionLabel' => $exceptionLabel,
                 ])
 
             </div>
@@ -391,29 +489,37 @@
         ══════════════════════════════════════════════════════════════ --}}
         <footer class="jss-mon-footer" aria-label="Workspace metadata">
             <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 mon-foot">
-                <span class="foot-label">Pelacakan &amp; Monitoring</span>
-                <span class="foot-dot">·</span>
-                <span>v1.0 · Read-only</span>
-                <span class="foot-dot">·</span>
-                <span>Page size {{ $pageSize }}</span>
-                <span class="foot-dot">·</span>
-                <span>Poll {{ $pollInterval }}s</span>
-                @if ($summary->filteredUnits > 0)
+                {{-- Identity --}}
+                <span class="foot-group">
+                    <span class="foot-label">Pelacakan &amp; Monitoring</span>
                     <span class="foot-dot">·</span>
-                    <span>{{ $summary->filteredUnits }} unit terfilter</span>
-                @endif
-                @if ($rows && $rows->hasPages())
+                    <span>v1.0 · Read-only</span>
+                </span>
+
+                {{-- Operational config --}}
+                <span class="foot-group">
+                    <span>Page size {{ $pageSize }}</span>
                     <span class="foot-dot">·</span>
-                    <span>Hal {{ $rows->currentPage() }}/{{ $rows->lastPage() }} ({{ $rows->total() }} total)</span>
-                @endif
-                <span class="foot-dot">·</span>
-                <span class="tabular-nums">Diperbarui {{ $lastRefreshFormatted }}</span>
-                <span class="foot-dot">·</span>
-                <kbd class="mon-kbd">&#8593;&#8595;</kbd> <span>nav</span>
-                <span class="foot-dot">·</span>
-                <kbd class="mon-kbd">Enter</kbd> <span>detail</span>
-                <span class="foot-dot">·</span>
-                <kbd class="mon-kbd">/</kbd> <span>cari</span>
+                    <span>Poll {{ $pollInterval }}s</span>
+                    @if ($rows && $rows->hasPages())
+                        <span class="foot-dot">·</span>
+                        <span>Hal {{ $rows->currentPage() }}/{{ $rows->lastPage() }} ({{ $rows->total() }} total)</span>
+                    @endif
+                </span>
+
+                {{-- Live status --}}
+                <span class="foot-group">
+                    <span class="tabular-nums">Diperbarui {{ $lastRefreshFormatted }}</span>
+                </span>
+
+                {{-- Keyboard hints --}}
+                <span class="foot-group">
+                    <kbd class="mon-kbd">&#8593;&#8595;</kbd> <span>nav</span>
+                    <span class="foot-dot">·</span>
+                    <kbd class="mon-kbd">Enter</kbd> <span>detail</span>
+                    <span class="foot-dot">·</span>
+                    <kbd class="mon-kbd">/</kbd> <span>cari</span>
+                </span>
             </div>
         </footer>
 

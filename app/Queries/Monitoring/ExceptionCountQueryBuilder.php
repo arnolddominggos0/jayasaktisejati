@@ -108,21 +108,26 @@ final class ExceptionCountQueryBuilder
         // v1 domain constraint: sea mode only. See ADR-009 and MonitoringDomain.
         MonitoringDomain::applyTo($query);
 
+        // Sprint 6.4.2: branch + period context — same filters as the table,
+        // so exception counts in the header always match what's shown below.
         if ($filter->branch_id) {
             $query->where('shipments.branch_id', $filter->branch_id);
         }
+
+        \App\Support\Monitoring\PeriodResolver::applyTo($query, $filter->period);
 
         $customerIds = RouteResolver::customerIdsForRoute($filter->route);
         if ($filter->route && $filter->route !== 'all' && ! empty($customerIds)) {
             $query->whereIn('shipments.customer_id', $customerIds);
         }
 
-        if (! $filter->show_finished) {
-            $query->whereNotIn('shipments.status', [
-                \App\Enums\ShipmentStatus::Delivered->value,
-                \App\Enums\ShipmentStatus::Cancelled->value,
-            ]);
-        }
+        // Sprint 6.4.1: three-state status filter (was boolean show_finished).
+        $finishedStatuses = [\App\Enums\ShipmentStatus::Delivered->value, \App\Enums\ShipmentStatus::Cancelled->value];
+        match ($filter->status) {
+            'finished' => $query->whereIn('shipments.status', $finishedStatuses),
+            'all'      => null,
+            default    => $query->whereNotIn('shipments.status', $finishedStatuses), // 'active'
+        };
 
         return $query;
     }

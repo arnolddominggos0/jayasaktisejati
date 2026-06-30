@@ -4,11 +4,23 @@ namespace App\Livewire\Monitoring;
 
 use App\Services\Monitoring\DetailUnitProvider;
 use App\ViewModels\Monitoring\UnitDetailData;
-use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
+/**
+ * Hotfix: this component used to call $this->mountAction('viewDetail') /
+ * $this->unmountAction(), but never implemented Filament's HasActions
+ * contract or used the InteractsWithActions trait — both undefined-method
+ * calls, throwing on every single open AND close. The try/catch around
+ * load() silently swallowed it as a generic "Gagal memuat detail" toast,
+ * masking that $this->unitDetail had actually already loaded correctly one
+ * line above. The panel's real visibility is the plain `@if ($unitDetail)`
+ * in the Blade view (no slide-over CSS/modal exists) — the mountAction
+ * call was never load-bearing for anything actually rendered, so it (and
+ * the dead viewDetailAction() method) were removed rather than wiring up
+ * the full Actions infrastructure for a feature that isn't used.
+ */
 class MonitoringDetailSlide extends Component
 {
     // Protected to avoid Livewire serialization of complex readonly ViewModel
@@ -23,7 +35,6 @@ class MonitoringDetailSlide extends Component
 
         try {
             $this->unitDetail = app(DetailUnitProvider::class)->provide($unitId);
-            $this->mountAction('viewDetail');
         } catch (\Throwable $e) {
             Notification::make()
                 ->danger()
@@ -35,22 +46,8 @@ class MonitoringDetailSlide extends Component
     #[On('close-detail')]
     public function closeDetail(): void
     {
-        $this->unmountAction();
         $this->unitId = null;
         $this->dispatch('detail-closed');
-    }
-
-    public function viewDetailAction(): Action
-    {
-        return Action::make('viewDetail')
-            ->slideOver()
-            ->modalWidth('max-w-3xl')
-            ->modalHeading(fn() => $this->unitDetail?->unit_reg_no ?? 'Detail Unit')
-            ->modalSubmitAction(false)
-            ->modalCancelActionLabel('Tutup')
-            ->content(fn() => view('livewire.monitoring.monitoring-detail-slide', [
-                'unitDetail' => $this->unitDetail,
-            ]));
     }
 
     public function render(): \Illuminate\View\View

@@ -143,6 +143,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasRole('customer');
     }
 
+    public function isCmsEditor(): bool
+    {
+        return $this->hasRole('cms');
+    }
+
     // ── Panel access ──────────────────────────────────────────────────────────
 
     public function canAccessPanel(Panel $panel): bool
@@ -154,6 +159,8 @@ class User extends Authenticatable implements FilamentUser
             'fc'       => $this->isFieldCoordinator() || $this->isSuperAdmin(),
             // Customer portal: customers with a linked customer record
             'customer' => $this->isCustomer() && $this->customer_id !== null,
+            // CMS panel: CMS editors + super_admin
+            'cms'      => $this->isCmsEditor() || $this->isSuperAdmin(),
             default    => false,
         };
     }

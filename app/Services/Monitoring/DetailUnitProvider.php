@@ -43,7 +43,6 @@ final class DetailUnitProvider
         $age = $this->ageCalculator->calculate(
             $shipment->latestTrack?->tracked_at,
             $shipment->requested_at,
-            $shipment->mode?->value ?? 'sea',
         );
 
         $progress = $this->progressCalculator->calculate(

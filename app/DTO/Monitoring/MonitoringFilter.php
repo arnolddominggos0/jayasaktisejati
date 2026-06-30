@@ -2,9 +2,12 @@
 
 namespace App\DTO\Monitoring;
 
+use App\Support\Monitoring\PeriodResolver;
+
 final readonly class MonitoringFilter
 {
     public function __construct(
+        /** Sprint 6.4.2: workspace branch context. See applyBranch() in the query builders. */
         public readonly ?int $branch_id,
         /**
          * v2 extension point — not applied by v1 query builders.
@@ -17,9 +20,21 @@ final readonly class MonitoringFilter
         public readonly ?string $exception_filter,
         public readonly string $search,
         public readonly string $group_mode,
-        public readonly bool $show_finished,
+        /**
+         * Sprint 6.4.1: replaces the old boolean `show_finished`. One of
+         * 'active' (default, hide finished), 'finished' (finished only),
+         * or 'all' (no status restriction). See config('monitoring.status_options').
+         */
+        public readonly string $status,
         public readonly string $sort,
         public readonly int $page,
+        public readonly int $page_size,
+        /**
+         * Sprint 6.4.2: workspace period context, format 'YYYY-MM'. The
+         * primary context filter — Search/Exception/Status/Summary all
+         * operate within this period, not the whole database.
+         */
+        public readonly string $period,
     ) {}
 
     public static function default(?int $branchId = null): self
@@ -31,9 +46,11 @@ final readonly class MonitoringFilter
             exception_filter: null,
             search: '',
             group_mode: 'flat',
-            show_finished: false,
+            status: 'active',
             sort: 'exception-first',
             page: 1,
+            page_size: config('monitoring.page_size', 50),
+            period: PeriodResolver::default(),
         );
     }
 
@@ -44,7 +61,8 @@ final readonly class MonitoringFilter
         return md5(serialize([
             $this->branch_id,
             $this->route,
-            $this->show_finished,
+            $this->status,
+            $this->period,
         ]));
     }
 
@@ -57,9 +75,11 @@ final readonly class MonitoringFilter
             'exception_filter' => $this->exception_filter,
             'search'           => $this->search,
             'group_mode'       => $this->group_mode,
-            'show_finished'    => $this->show_finished,
+            'status'           => $this->status,
             'sort'             => $this->sort,
             'page'             => $this->page,
+            'page_size'        => $this->page_size,
+            'period'           => $this->period,
         ];
     }
 }
