@@ -5,7 +5,7 @@ namespace App\Queries\Monitoring;
 use App\DTO\Monitoring\MonitoringFilter;
 use App\Enums\ShipmentStatus;
 use App\Models\Branch;
-use App\Models\Shipment;
+use App\Models\Unit;
 use App\Support\Monitoring\MonitoringDomain;
 use App\Support\Monitoring\PeriodResolver;
 use App\Support\Monitoring\RouteResolver;
@@ -13,6 +13,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
+/**
+ * Sprint 6.4.4: root changed from Shipment to Unit.
+ * KPI counts now represent Units (vehicles), not Shipments (SPPB).
+ * All filter conditions still reference shipments.* via the JOIN.
+ */
 final class WorkspaceSummaryQueryBuilder
 {
     public function rawSummary(MonitoringFilter $filter): array
@@ -24,8 +29,8 @@ final class WorkspaceSummaryQueryBuilder
             $query = $this->build($filter);
 
             $counts = $query->selectRaw("
-                SUM(CASE WHEN status NOT IN (?, ?) THEN 1 ELSE 0 END) AS active_units,
-                SUM(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END) AS finished_units
+                SUM(CASE WHEN shipments.status NOT IN (?, ?) THEN 1 ELSE 0 END) AS active_units,
+                SUM(CASE WHEN shipments.status IN (?, ?) THEN 1 ELSE 0 END) AS finished_units
             ", [
                 ShipmentStatus::Delivered->value,
                 ShipmentStatus::Cancelled->value,
@@ -49,25 +54,23 @@ final class WorkspaceSummaryQueryBuilder
 
     public function build(MonitoringFilter $filter): Builder
     {
-        $query = Shipment::query();
+        $query = Unit::query()
+            ->join('shipments', 'shipments.id', '=', 'units.shipment_id');
 
-        $query->whereNotIn('status', [ShipmentStatus::Draft->value]);
+        $query->whereNotIn('shipments.status', [ShipmentStatus::Draft->value]);
 
         // v1 domain constraint: sea mode only. See ADR-009 and MonitoringDomain.
         MonitoringDomain::applyTo($query);
 
-        // Sprint 6.4.2: branch + period context — same filters as the table,
-        // so the active/finished counts in the header always match what's
-        // shown below, not the whole database.
         if ($filter->branch_id) {
-            $query->where('branch_id', $filter->branch_id);
+            $query->where('shipments.branch_id', $filter->branch_id);
         }
 
         PeriodResolver::applyTo($query, $filter->period);
 
         $customerIds = RouteResolver::customerIdsForRoute($filter->route);
         if ($filter->route && $filter->route !== 'all' && ! empty($customerIds)) {
-            $query->whereIn('customer_id', $customerIds);
+            $query->whereIn('shipments.customer_id', $customerIds);
         }
 
         return $query;

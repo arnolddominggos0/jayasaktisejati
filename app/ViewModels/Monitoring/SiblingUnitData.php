@@ -12,5 +12,6 @@ final readonly class SiblingUnitData
         public readonly ?string $container_display,
         public readonly bool $has_ng,
         public readonly ?string $inspection_status,
+        public readonly ?string $stage_label,
     ) {}
 }

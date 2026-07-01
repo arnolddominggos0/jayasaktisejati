@@ -9,14 +9,14 @@ use App\ViewModels\Monitoring\SiblingUnitData;
 
 final class SiblingUnitBuilder
 {
-    public function build(Shipment $shipment, int $selfUnitId): array
+    public function build(Shipment $shipment, int $selfUnitId, string $stageLabel = '—'): array
     {
         $units = $shipment->relationLoaded('units') ? $shipment->units : collect();
 
-        return $units->map(fn(Unit $unit) => $this->toData($unit))->values()->all();
+        return $units->map(fn(Unit $unit) => $this->toData($unit, $stageLabel))->values()->all();
     }
 
-    private function toData(Unit $unit): SiblingUnitData
+    private function toData(Unit $unit, string $stageLabel): SiblingUnitData
     {
         $inspections = $unit->relationLoaded('inspections') ? $unit->inspections : collect();
 
@@ -49,6 +49,7 @@ final class SiblingUnitBuilder
             container_display: $unit->container_display,
             has_ng: $hasNg,
             inspection_status: $inspStatus,
+            stage_label: $stageLabel,
         );
     }
 }

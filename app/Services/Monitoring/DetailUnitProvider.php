@@ -55,7 +55,7 @@ final class DetailUnitProvider
         $inspection = $this->inspectionSummaryBuilder->build($unit);
         $leadTime = $this->leadTimeBuilder->build($shipment);
         $admin = $this->buildAdmin($shipment);
-        $siblings = $this->siblingUnitBuilder->build($shipment, $unitId);
+        $siblings = $this->siblingUnitBuilder->build($shipment, $unitId, $stage->stage_label);
         $deepLinks = $this->deepLinkBuilder->build($shipment, $unit);
         $exceptions = $this->exceptionEvaluator->evaluate($shipment);
 
@@ -68,6 +68,8 @@ final class DetailUnitProvider
             unit_reg_no: $unit->reg_no ?? '—',
             unit_model_no: $unit->model_no,
             unit_chassis_no: $unit->chassis_no,
+            unit_engine_no: $unit->engine_no,
+            unit_sjkb_no: $unit->sjkb_no,
             unit_color: $unit->color ?? '—',
             container_display: $unit->container_display,
             shipment_id: $shipment->id,
@@ -76,6 +78,9 @@ final class DetailUnitProvider
             customer_name: $shipment->relationLoaded('customer')
                 ? (optional($shipment->customer)->name ?? '—')
                 : '—',
+            branch_name: $shipment->relationLoaded('branch')
+                ? optional($shipment->branch)->name
+                : null,
             route_label: $shipment->route_label,
             mode: $mode,
             stage: $stage,
@@ -122,6 +127,7 @@ final class DetailUnitProvider
             delivered_at: $shipment->delivered_at,
             pic_name: $shipment->pic_name,
             pic_phone: $shipment->pic_phone,
+            last_tracked_at: $shipment->latestTrack?->tracked_at,
         );
     }
 

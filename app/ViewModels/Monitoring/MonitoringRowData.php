@@ -4,13 +4,17 @@ namespace App\ViewModels\Monitoring;
 
 use App\Enums\ShipmentMode;
 
+/**
+ * Sprint 6.4.4: unit_id is now the primary identifier (non-nullable int).
+ * shipment_id is the Shipment context. unit_count removed — each row is one Unit.
+ */
 final readonly class MonitoringRowData
 {
     public function __construct(
         public readonly int $shipment_id,
         public readonly string $shipment_code,
         public readonly string $doc_number,
-        public readonly ?int $unit_id,
+        public readonly int $unit_id,
         public readonly ?string $unit_reg_no,
         public readonly ?string $unit_model_no,
         public readonly ?string $unit_chassis_no,
@@ -30,7 +34,6 @@ final readonly class MonitoringRowData
         public readonly ?string $lead_time_summary,
         public readonly bool $is_search_match,
         public readonly bool $is_finished,
-        public readonly int $unit_count,
     ) {}
 
     public static function empty(): self
@@ -39,7 +42,7 @@ final readonly class MonitoringRowData
             shipment_id: 0,
             shipment_code: '',
             doc_number: '',
-            unit_id: null,
+            unit_id: 0,
             unit_reg_no: null,
             unit_model_no: null,
             unit_chassis_no: null,
@@ -59,7 +62,6 @@ final readonly class MonitoringRowData
             lead_time_summary: null,
             is_search_match: false,
             is_finished: false,
-            unit_count: 0,
         );
     }
 }

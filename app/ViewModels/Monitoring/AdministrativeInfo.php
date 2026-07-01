@@ -20,6 +20,7 @@ final readonly class AdministrativeInfo
         public readonly ?Carbon $delivered_at,
         public readonly ?string $pic_name,
         public readonly ?string $pic_phone,
+        public readonly ?Carbon $last_tracked_at,
     ) {}
 
     public static function empty(): self
@@ -38,6 +39,7 @@ final readonly class AdministrativeInfo
             delivered_at: null,
             pic_name: null,
             pic_phone: null,
+            last_tracked_at: null,
         );
     }
 }

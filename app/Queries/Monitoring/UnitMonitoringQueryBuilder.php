@@ -4,7 +4,7 @@ namespace App\Queries\Monitoring;
 
 use App\DTO\Monitoring\MonitoringFilter;
 use App\Enums\ShipmentStatus;
-use App\Models\Shipment;
+use App\Models\Unit;
 use App\Support\Monitoring\LatestTrackSubquery;
 use App\Support\Monitoring\MonitoringDomain;
 use App\Support\Monitoring\PeriodResolver;
@@ -41,16 +41,19 @@ final class UnitMonitoringQueryBuilder
     ";
 
     /**
-     * Sprint 6.4.2: Branch and Period moved to the front of the pipeline —
-     * they're the workspace's primary context, typically the most selective
-     * filters, and don't need the lt JOIN, so applying them first keeps the
-     * query efficient. Pipeline: Branch → Period → Route → Status → [JOIN]
-     * → Exception → Search → Sort.
+     * Sprint 6.4.4: root changed from Shipment to Unit. All Shipment fields are
+     * accessed via the JOIN to shipments on units.shipment_id. Filter pipeline and
+     * sort expressions are unchanged — they still reference the same column names
+     * via the joined shipments table.
+     *
+     * Pipeline: Unit JOIN shipments → Branch → Period → Route → Status
+     * → [JOIN latestTrack] → Computed columns → Exception → Search → Sort → Eager load.
      */
     public function build(MonitoringFilter $filter): Builder
     {
-        $query = Shipment::query();
+        $query = Unit::query();
 
+        $this->joinShipment($query);
         $this->applyBaseScope($query);
         $this->applyModeFilter($query);
         $this->applyBranch($query, $filter);
@@ -68,25 +71,34 @@ final class UnitMonitoringQueryBuilder
         return $query;
     }
 
+    // ── Core JOIN ─────────────────────────────────────────────────────────────
+
+    /**
+     * The foundational JOIN that turns Unit into the root and exposes all
+     * Shipment columns for subsequent filters and computed columns.
+     */
+    private function joinShipment(Builder $q): void
+    {
+        $q->join('shipments', 'shipments.id', '=', 'units.shipment_id');
+    }
+
     // ── Scope filters ─────────────────────────────────────────────────────────
 
     private function applyBaseScope(Builder $q): void
     {
-        // Table-qualified to prevent ambiguity after the lt LEFT JOIN
         $q->whereNotIn('shipments.status', [ShipmentStatus::Draft->value]);
     }
 
     /**
      * Hard-pins the v1 domain constraint: sea mode only.
-     * See ADR-009 — this is a domain gate, not a user-facing filter, so it
-     * runs before Branch/Period regardless of how those are configured.
+     * See ADR-009 — MonitoringDomain::applyTo() targets shipments.mode,
+     * which is available via the JOIN.
      */
     private function applyModeFilter(Builder $q): void
     {
         MonitoringDomain::applyTo($q);
     }
 
-    /** Sprint 6.4.2: workspace branch context. */
     private function applyBranch(Builder $q, MonitoringFilter $f): void
     {
         if ($f->branch_id) {
@@ -94,12 +106,6 @@ final class UnitMonitoringQueryBuilder
         }
     }
 
-    /**
-     * Sprint 6.4.2: workspace period context — restricts to the calendar
-     * month identified by $f->period. See PeriodResolver::applyTo() — shared
-     * with ExceptionCountQueryBuilder/WorkspaceSummaryQueryBuilder so the
-     * table and the header KPIs can never disagree about "this period".
-     */
     private function applyPeriod(Builder $q, MonitoringFilter $f): void
     {
         PeriodResolver::applyTo($q, $f->period);
@@ -113,12 +119,6 @@ final class UnitMonitoringQueryBuilder
         }
     }
 
-    /**
-     * Sprint 6.4.1: three-state status filter (was a boolean show_finished).
-     * 'active'   — hide delivered/cancelled (default)
-     * 'finished' — delivered/cancelled only
-     * 'all'      — no restriction
-     */
     private function applyStatusFilter(Builder $q, MonitoringFilter $f): void
     {
         $finishedStatuses = [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value];
@@ -126,16 +126,15 @@ final class UnitMonitoringQueryBuilder
         match ($f->status) {
             'finished' => $q->whereIn('shipments.status', $finishedStatuses),
             'all'      => null,
-            default    => $q->whereNotIn('shipments.status', $finishedStatuses), // 'active'
+            default    => $q->whereNotIn('shipments.status', $finishedStatuses),
         };
     }
 
     // ── Latest-track JOIN ─────────────────────────────────────────────────────
 
     /**
-     * LEFT JOIN to a DISTINCT ON subquery that returns one row per shipment —
-     * the most-recent track by id. Uses the shared LatestTrackSubquery helper
-     * so this pattern is not duplicated across query builders.
+     * LEFT JOIN to the latest track per shipment. The subquery still keys on
+     * shipment_id — units within the same shipment share the same track position.
      */
     private function joinLatestTrack(Builder $q): void
     {
@@ -144,28 +143,31 @@ final class UnitMonitoringQueryBuilder
             'lt',
             'lt.shipment_id',
             '=',
-            'shipments.id',
+            'units.shipment_id',
         );
     }
 
     // ── Computed columns ──────────────────────────────────────────────────────
 
     /**
-     * Replace the default SELECT * with an explicit shipments.* plus computed
-     * columns used by MonitoringRowBuilder (has_ng_inspection, is_search_match).
-     * Explicit selection avoids column-name collisions from the lt JOIN.
+     * SELECT units.* only — Shipment data comes via the eager-loaded $unit->shipment
+     * relation in MonitoringRowBuilder. The shipments JOIN is only needed for
+     * WHERE/ORDER BY expressions, not for hydration. Selecting shipments.* here
+     * would cause column collisions on id/created_at/updated_at.
+     *
+     * has_ng_inspection: direct check on this unit's inspections — no correlated
+     * subquery through units table needed (we're already on a unit row).
      */
     private function applyComputedColumns(Builder $q): void
     {
-        $q->select('shipments.*');
+        $q->select('units.*');
 
-        // NG indicator: does any unit inspection for this shipment have status='failed'?
+        // NG indicator: does this specific unit have any failed inspection?
         $q->addSelect(DB::raw("
             EXISTS(
                 SELECT 1
-                FROM   units u
-                JOIN   unit_inspections ui ON ui.unit_id = u.id
-                WHERE  u.shipment_id = shipments.id
+                FROM   unit_inspections ui
+                WHERE  ui.unit_id = units.id
                 AND    ui.status = 'failed'
             ) AS has_ng_inspection
         "));
@@ -174,8 +176,9 @@ final class UnitMonitoringQueryBuilder
     // ── Exception filter ──────────────────────────────────────────────────────
 
     /**
-     * Narrow the result set to shipments that have the specified active exception.
-     * All thresholds come from config — no hardcoding.
+     * Narrow the result set to units whose shipment has the specified active
+     * exception. All thresholds come from config — no hardcoding.
+     * Conditions reference shipments.* via the JOIN.
      */
     private function applyExceptionFilter(Builder $q, MonitoringFilter $f): void
     {
@@ -193,9 +196,8 @@ final class UnitMonitoringQueryBuilder
 
             'ng' => $q->whereExists(function ($sub) {
                 $sub->select(DB::raw(1))
-                    ->from('units as u')
-                    ->join('unit_inspections as ui', 'ui.unit_id', '=', 'u.id')
-                    ->whereColumn('u.shipment_id', 'shipments.id')
+                    ->from('unit_inspections as ui')
+                    ->whereColumn('ui.unit_id', 'units.id')
                     ->where('ui.status', 'failed');
             }),
 
@@ -231,12 +233,11 @@ final class UnitMonitoringQueryBuilder
     // ── Search ────────────────────────────────────────────────────────────────
 
     /**
-     * Sprint 6.4.1: full operational-field search.
-     * Shipment-level: code, doc_number (SPPB), voyage no, vessel name, container no.
-     * Unit-level: reg_no (no polisi), chassis_no, engine_no, sjkb_no, container_display.
-     * Customer-level: customer name (via whereExists — customer isn't joined for WHERE).
-     * Adds is_search_match computed column so the Blade can highlight matched rows.
-     * When no search term, is_search_match is always false.
+     * Full operational-field search.
+     * Unit-level: reg_no, chassis_no, engine_no, sjkb_no, container_display — now
+     * direct WHERE conditions (no subquery needed — units is the root table).
+     * Shipment-level: code, doc_number, voyage, vessel_name, container_no — via JOIN.
+     * Customer-level: name via whereExists (customer isn't joined for WHERE performance).
      */
     private function applySearchMatch(Builder $q, MonitoringFilter $f): void
     {
@@ -250,23 +251,19 @@ final class UnitMonitoringQueryBuilder
 
         $q->where(function (Builder $where) use ($term) {
             $where
-                ->where('shipments.code', 'ilike', $term)
+                // Unit fields — direct (root table)
+                ->where('units.reg_no', 'ilike', $term)
+                ->orWhere('units.chassis_no', 'ilike', $term)
+                ->orWhere('units.engine_no', 'ilike', $term)
+                ->orWhere('units.sjkb_no', 'ilike', $term)
+                ->orWhere('units.container_display', 'ilike', $term)
+                // Shipment fields — via JOIN
+                ->orWhere('shipments.code', 'ilike', $term)
                 ->orWhere('shipments.doc_number', 'ilike', $term)
                 ->orWhere('shipments.voyage', 'ilike', $term)
                 ->orWhere('shipments.vessel_name', 'ilike', $term)
                 ->orWhere('shipments.container_no', 'ilike', $term)
-                ->orWhereExists(function ($sub) use ($term) {
-                    $sub->select(DB::raw(1))
-                        ->from('units')
-                        ->whereColumn('units.shipment_id', 'shipments.id')
-                        ->where(function ($q2) use ($term) {
-                            $q2->where('units.reg_no', 'ilike', $term)
-                               ->orWhere('units.chassis_no', 'ilike', $term)
-                               ->orWhere('units.engine_no', 'ilike', $term)
-                               ->orWhere('units.sjkb_no', 'ilike', $term)
-                               ->orWhere('units.container_display', 'ilike', $term);
-                        });
-                })
+                // Customer — via EXISTS (not joined for WHERE; too expensive for all rows)
                 ->orWhereExists(function ($sub) use ($term) {
                     $sub->select(DB::raw(1))
                         ->from('customers')
@@ -278,20 +275,12 @@ final class UnitMonitoringQueryBuilder
         $q->addSelect(DB::raw('true AS is_search_match'));
     }
 
-    // ── Sort ─────────────────────────────────────────────────────────────────
+    // ── Sort ──────────────────────────────────────────────────────────────────
 
     /**
-     * Default sort (exception-first): Hold → NG → Demurrage → Delay → Stuck →
-     * Missing Voyage → Age DESC.
-     * All thresholds come from config; integer interpolation is safe (no user input).
-     *
-     * Sprint 6.4.1 additions: progress, eta, voyage, customer sorts; stage sort
-     * fixed to use TrackStatus's numeric order instead of alphabetical string
-     * order (STAGE_ORDER_CASE — static enum metadata, not Stage Engine logic).
-     * Progress sort reuses the same stage scale since progress is a monotonic
-     * function of stage for the 10–120 range; cancelled/hold collapse to 0 to
-     * match ProgressCalculator's displayed percentage, not duplicated here
-     * beyond ranking order.
+     * Sort expressions are unchanged — they still reference shipments.* (via JOIN)
+     * and lt.* (via leftJoinSub). The only difference: age fallback uses
+     * shipments.requested_at / shipments.created_at, which are still available.
      */
     private function applySort(Builder $q, MonitoringFilter $f): void
     {
@@ -304,9 +293,8 @@ final class UnitMonitoringQueryBuilder
                 CASE
                     WHEN shipments.status = 'hold' THEN 1
                     WHEN EXISTS(
-                        SELECT 1 FROM units u
-                        JOIN unit_inspections ui ON ui.unit_id = u.id
-                        WHERE u.shipment_id = shipments.id AND ui.status = 'failed'
+                        SELECT 1 FROM unit_inspections ui
+                        WHERE ui.unit_id = units.id AND ui.status = 'failed'
                     ) THEN 2
                     WHEN (
                         lt.lt_status IN ({$portStatuses})
@@ -338,9 +326,6 @@ final class UnitMonitoringQueryBuilder
 
         $ageFallback = 'COALESCE(shipments.requested_at, shipments.created_at)';
         $stageOrder  = self::STAGE_ORDER_CASE;
-        // Stage-derived progress: cancelled/hold rank as 0 (matches ProgressCalculator's
-        // displayed 0%); everything else uses the same 10–120 stage scale (monotonic
-        // with the displayed percentage, so ranking order is identical).
         $progressOrder = "
             CASE
                 WHEN shipments.status = 'cancelled' THEN 0
@@ -371,10 +356,6 @@ final class UnitMonitoringQueryBuilder
         };
     }
 
-    /**
-     * Customer sort needs a real JOIN (ORDER BY can't reach into a WHERE-only
-     * subquery), added only when this sort is actually requested.
-     */
     private function applyCustomerSort(Builder $q, string $sort): void
     {
         $q->leftJoin('customers', 'customers.id', '=', 'shipments.customer_id');
@@ -386,26 +367,21 @@ final class UnitMonitoringQueryBuilder
     // ── Eager loading ─────────────────────────────────────────────────────────
 
     /**
-     * Minimum eager loading with column selection — avoids N+1 while keeping
-     * data transfer small. All relations consumed by MonitoringRowBuilder.
+     * Eager-load Shipment relations consumed by MonitoringRowBuilder.
+     * The shipment itself is eager-loaded so MonitoringRowBuilder can access
+     * $unit->shipment without triggering additional queries.
+     * latestTrack, customer, branch, originCity, destinationCity are loaded
+     * via the shipment relation to preserve the same N=0-extra-query guarantee
+     * as the old Shipment-root query.
      */
     private function applyEagerLoading(Builder $q): void
     {
         $q->with([
-            'latestTrack:shipment_tracks.id,shipment_tracks.shipment_id,shipment_tracks.status,shipment_tracks.tracked_at',
-            'customer:id,name',
-            'branch:id,name',
-            'originCity:id,name',
-            'destinationCity:id,name',
-            'units' => fn ($uq) => $uq->select([
-                'id',
-                'shipment_id',
-                'reg_no',
-                'model_no',
-                'chassis_no',
-                'color',
-                'container_display',
-            ]),
+            'shipment.latestTrack:shipment_tracks.id,shipment_tracks.shipment_id,shipment_tracks.status,shipment_tracks.tracked_at',
+            'shipment.customer:id,name',
+            'shipment.branch:id,name',
+            'shipment.originCity:id,name',
+            'shipment.destinationCity:id,name',
         ]);
     }
 }

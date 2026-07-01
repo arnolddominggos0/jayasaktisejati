@@ -5,7 +5,7 @@
 <!-- Hero Section -->
 <section class="relative jsl-gradient-hero text-white pt-32 pb-20 md:pt-40 md:pb-32 overflow-hidden">
     <div class="absolute inset-0 opacity-10">
-        <img src="https://images.unsplash.com/photo-1577416412292-747c6607f055?w=1920&q=80" alt="" class="w-full h-full object-cover" onerror="this.style.display='none'">
+        <img src="/storage/jsl/placeholders/m2.jpg" alt="" class="w-full h-full object-cover" onerror="this.style.display='none'">
     </div>
     <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="max-w-3xl">
@@ -84,7 +84,7 @@
             </div>
             <div class="relative">
                 <div class="aspect-[4/3] rounded-2xl overflow-hidden shadow-2xl">
-                    <img src="https://images.unsplash.com/photo-1605281316910-7c9e6c7c2f1d?w=800&q=80" alt="Marine vessel" class="w-full h-full object-cover" onerror="this.src='{{ asset('images/logo.png') }}'">
+                    <img src="/storage/jsl/placeholders/m3.jpg" alt="Marine vessel" class="w-full h-full object-cover" onerror="this.src='{{ asset('images/logo.png') }}'">
                 </div>
                 <div class="absolute -bottom-6 -left-6 bg-white rounded-xl shadow-xl p-6 border border-slate-100 hidden md:block">
                     <p class="text-3xl font-extrabold jsl-primary-text">30+</p>

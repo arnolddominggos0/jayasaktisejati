@@ -1,8 +1,8 @@
 @php
     /**
-     * Operational Control Tower — Monitoring Grid (Sprint 6.3B + 6.3C)
+     * Operational Control Tower - Monitoring Grid (Sprint 6.3B + 6.3C)
      * --------------------------------------------------------------------------
-     * Pure Blade partial — bound to App\ViewModels\Monitoring\MonitoringRowData
+     * Pure Blade partial - bound to App\ViewModels\Monitoring\MonitoringRowData
      * objects. NO queries, NO business logic here. Every cell renders from the
      * ViewModel. Lives inside WorkspaceShell's Livewire template, so wire:*
      * directives dispatch on the parent (WorkspaceShell).
@@ -13,9 +13,9 @@
      *  - $search           : string  (active search term, for highlight only)
      *  - $pageSize         : int
      *  - $groupMode        : string
-     *  - $hasActiveFilters : bool (Sprint 6.4.1 — distinguishes "filtered empty"
+     *  - $hasActiveFilters : bool (Sprint 6.4.1 - distinguishes "filtered empty"
      *                        from "database empty" in the empty state)
-     *  - $exceptionFilter  : ?string (Sprint 6.4.3-R1 — drives the exception-
+     *  - $exceptionFilter  : ?string (Sprint 6.4.3-R1 - drives the exception-
      *                        specific empty state copy; null when "Semua")
      *  - $exceptionLabel   : ?string (human-readable label, e.g. "Delay")
      */
@@ -24,7 +24,7 @@
     use App\ViewModels\Monitoring\ExceptionChipData;
     use App\Support\Monitoring\SearchHighlighter;
 
-    /** Map StageResolver flow_zone → mon-badge colour (presentation only). */
+    /** Map StageResolver flow_zone -> mon-badge colour (presentation only). */
     $flowZoneBadge = [
         'pickup'   => 'mon-badge-accent',
         'depot'    => 'mon-badge-warning',
@@ -43,10 +43,10 @@
     $activeSearch = is_string($search ?? null) && trim($search ?? '') !== '';
     $term = $activeSearch ? trim($search) : '';
 
-    // Sprint 6.4.3-R1: KPI vs Table consistency UX — empty state explains
+    // Sprint 6.4.3-R1: KPI vs Table consistency UX - empty state explains
     // *why* the table is empty (search vs exception vs both) instead of a
     // generic "no unit" message, since the KPI above intentionally doesn't
-    // reflect these two drill-down filters. Presentation only — no query change.
+    // reflect these two drill-down filters. Presentation only - no query change.
     $exceptionFilter = $exceptionFilter ?? null;
     $exceptionActive = filled($exceptionFilter);
     $exceptionLabel = $exceptionLabel ?? null;
@@ -69,14 +69,14 @@
      wire:key="mon-table-{{ $currentPage }}-{{ md5($term) }}"
      data-total-rows="{{ $rowCount }}"
      role="grid"
-     aria-label="Monitoring table — {{ $total }} unit"
+     aria-label="Monitoring table - {{ $total }} unit"
      aria-rowcount="{{ $total }}"
      tabindex="-1">
 
     <div class="mon-table-scroll">
         <table class="mon-table" role="table">
 
-            {{-- ── Table Header — 13px sticky, navy ── --}}
+            {{-- -- Table Header - 13px sticky, navy -- --}}
             <thead role="rowgroup">
                 <tr role="row">
                     <th scope="col" role="columnheader">Unit</th>
@@ -91,8 +91,8 @@
                 </tr>
             </thead>
 
-            {{-- ── Loading skeleton — shown whenever a Livewire
-                 action (search/refresh/polling/filter/pagination) is in-flight. ── --}}
+            {{-- -- Loading skeleton - shown whenever a Livewire
+                 action (search/refresh/polling/filter/pagination) is in-flight. -- --}}
             <tbody wire:loading.delay class="mon-skel-tbody" role="rowgroup" aria-hidden="true">
                 @foreach (range(1, $skeletonCount) as $_)
                 <tr role="row" aria-hidden="true">
@@ -109,7 +109,7 @@
                 @endforeach
             </tbody>
 
-            {{-- ── Real table body — HIDDEN while any Livewire action is in-flight ── --}}
+            {{-- -- Real table body - HIDDEN while any Livewire action is in-flight -- --}}
             <tbody wire:loading.remove.delay role="rowgroup">
                 @if (!empty($visibleRows))
                     @foreach ($visibleRows as $index => $row)
@@ -121,13 +121,13 @@
                                 ?? ($row->unit_chassis_no ? 'Chassis ' . $row->unit_chassis_no : null)
                                 ?? $row->customer_name;
 
-                            // Stage badge (Task 4) — flow_zone drives colour
+                            // Stage badge (Task 4) - flow_zone drives colour
                             $zone   = $row->stage->flow_zone;
                             $badge  = $flowZoneBadge[$zone] ?? 'mon-badge-neutral';
                             $stageLabel = $row->stage->is_cancelled ? 'Dibatalkan'
                                 : ($row->stage->is_held ? 'Ditahan' : $row->stage->stage_label);
 
-                            // Progress (Task 5) — already computed by ProgressCalculator
+                            // Progress (Task 5) - already computed by ProgressCalculator
                             $pct = (int) $row->progress_pct;
                             $progressFillClass = match(true) {
                                 $row->stage->is_cancelled        => 'is-neutral',
@@ -136,7 +136,7 @@
                                 default                           => 'is-warning',
                             };
 
-                            // Age (Task 6) — purely from AgeData (no recomputation in Blade)
+                            // Age (Task 6) - purely from AgeData (no recomputation in Blade)
                             $ageLabel = $row->age->label;
                             $ageClass = match(true) {
                                 $row->stage->is_held, $row->age->is_stuck => 'is-old',
@@ -147,7 +147,7 @@
                                 $ageLabel .= ' (est)';
                             }
 
-                            // Exceptions (Task 7) — priority-sorted chips
+                            // Exceptions (Task 7) - priority-sorted chips
                             $sortedExceptions = collect($row->exceptions)
                                 ->sortBy(fn(ExceptionChipData $c) =>
                                     array_search($c->type, $exceptionPriority, true) === false
@@ -161,7 +161,7 @@
                             // ETA (Task 9)
                             $eta = $row->eta_label;
 
-                            $clickTarget = $row->unit_id ?? $row->shipment_id;
+                            $clickTarget = $row->unit_id;
                         @endphp
 
                         <tr
@@ -189,7 +189,7 @@
                                 <span class="mon-unit-code text-[13px]">{!! SearchHighlighter::highlight($row->doc_number, $term) !!}</span>
                             </td>
 
-                            {{-- Route (Task 3) — simple with icon --}}
+                            {{-- Route (Task 3) - simple with icon --}}
                             <td role="cell">
                                 <span class="inline-flex items-center gap-1 text-gray-600">
                                     <x-heroicon-o-arrow-right class="w-3.5 h-3.5 text-gray-400" />
@@ -197,7 +197,7 @@
                                 </span>
                             </td>
 
-                            {{-- Stage (Task 4) — flow-zone badge --}}
+                            {{-- Stage (Task 4) - flow-zone badge --}}
                             <td role="cell">
                                 <span class="mon-badge {{ $badge }}">{{ $stageLabel }}</span>
                             </td>
@@ -212,12 +212,12 @@
                                 </div>
                             </td>
 
-                            {{-- Age (Task 6) — right-aligned, colour-coded --}}
+                            {{-- Age (Task 6) - right-aligned, colour-coded --}}
                             <td role="cell" class="col-num">
                                 <span class="mon-age {{ $ageClass }}">{{ $ageLabel }}</span>
                             </td>
 
-                            {{-- Exception (Task 7) — priority chips or em-dash --}}
+                            {{-- Exception (Task 7) - priority chips or em-dash --}}
                             <td role="cell">
                                 @if ($sortedExceptions->isNotEmpty())
                                     <div class="flex flex-wrap gap-1" role="list" aria-label="Exceptions">
@@ -234,7 +234,7 @@
                                         @endforeach
                                     </div>
                                 @else
-                                    <span class="text-gray-300" aria-label="No exceptions">—</span>
+                                    <span class="text-gray-300" aria-label="No exceptions">-</span>
                                 @endif
                             </td>
 
@@ -252,22 +252,22 @@
                                 @endif
                             </td>
 
-                            {{-- ETA (Task 9) — simple, right-aligned --}}
+                            {{-- ETA (Task 9) - simple, right-aligned --}}
                             <td role="cell" class="col-num">
-                                <span class="text-gray-700 tabular-nums">{{ $eta ?? '—' }}</span>
+                                <span class="text-gray-700 tabular-nums">{{ $eta ?? '-' }}</span>
                             </td>
                         </tr>
                     @endforeach
 
                 @else
 
-                    {{-- ── Empty state (Task 7 / Sprint 6.4.1) — enterprise-calm with CTA.
-                         Distinguishes "no filter matches" from "database genuinely empty". ── --}}
+                    {{-- -- Empty state (Task 7 / Sprint 6.4.1) - enterprise-calm with CTA.
+                         Distinguishes "no filter matches" from "database genuinely empty". -- --}}
                     @php $filtersActive = $hasActiveFilters ?? false; @endphp
                     <tr role="row">
                         <td colspan="9" role="cell">
                             @if ($activeSearch && $exceptionActive)
-                                {{-- Sprint 6.4.3-R1: search + exception both active —
+                                {{-- Sprint 6.4.3-R1: search + exception both active -
                                      combined message, no need to spell out both values
                                      here since the context bar above already shows them. --}}
                                 <div class="mon-empty" role="status" aria-label="Tidak ada shipment yang cocok dengan filter yang dipilih">
@@ -365,7 +365,7 @@
         </table>
     </div>
 
-    {{-- Table foot strip — range info + pagination --}}
+    {{-- Table foot strip - range info + pagination --}}
     @if ($total > 0)
         <div class="mon-table-foot" role="navigation" aria-label="Pagination">
             <span class="mon-foot" aria-live="polite">

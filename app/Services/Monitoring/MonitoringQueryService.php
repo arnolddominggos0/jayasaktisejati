@@ -3,9 +3,16 @@
 namespace App\Services\Monitoring;
 
 use App\DTO\Monitoring\MonitoringFilter;
+use App\Enums\ShipmentMode;
+use App\Enums\ShipmentStatus;
+use App\Enums\TrackStatus;
 use App\Queries\Monitoring\UnitMonitoringQueryBuilder;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\LengthAwarePaginator as ConcretePaginator;
+use App\ViewModels\Monitoring\AgeData;
+use App\ViewModels\Monitoring\CurrentStageData;
+use App\ViewModels\Monitoring\MonitoringRowData;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Carbon;
 
 final class MonitoringQueryService
 {
@@ -18,7 +25,7 @@ final class MonitoringQueryService
      * Run the monitoring query for the given filter and return a paginator
      * whose items are MonitoringRowData objects (built by MonitoringRowBuilder).
      *
-     * Flow: QueryBuilder → raw Shipment models → MonitoringRowBuilder → MonitoringRowData[]
+     * Flow: QueryBuilder -> Unit models (with shipment eager-loaded) -> MonitoringRowBuilder -> MonitoringRowData[]
      */
     public function paginate(MonitoringFilter $filter): LengthAwarePaginator
     {
@@ -26,7 +33,7 @@ final class MonitoringQueryService
             ->paginate($filter->page_size, ['*'], 'page', $filter->page);
 
         $rows = $paginator->getCollection()
-            ->map(fn ($shipment) => $this->rowBuilder->build($shipment));
+            ->map(fn ($unit) => $this->rowBuilder->build($unit));
 
         return new ConcretePaginator(
             items: $rows,

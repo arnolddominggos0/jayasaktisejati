@@ -5,6 +5,10 @@
         $band = $exceptionBand;
         $pollInterval = $pollInterval ?? 60;
         $pageSize = $pageSize ?? 50;
+        $summary = $workspaceSummary;
+        $band = $exceptionBand;
+        $pollInterval = $pollInterval ?? 60;
+        $pageSize = $pageSize ?? 50;
         $exceptionFilter = $exceptionFilter ?? null;
         $groupMode = $groupMode ?? 'flat';
         $activeFilters = $activeFilterCount ?? 0;
@@ -22,12 +26,12 @@
 
         $lastRefreshFormatted = $summary->lastRefresh->format('H:i:s');
 
-        // Sprint 6.4.3-R1: KPI vs Table consistency UX — presentation-only.
+        // Sprint 6.4.3-R1: KPI vs Table consistency UX - presentation-only.
         // KPI (workspace summary) deliberately ignores search/exception by
         // design (see audit Sprint 6.4.3); these two booleans drive a small
         // explanatory context bar + empty-state copy so that's visible to
         // the operator instead of looking like a bug. No query/filter logic
-        // here — both values already exist on the page (search, exception_filter).
+        // here - both values already exist on the page (search, exception_filter).
         $exceptionLabels = [
             'hold'           => 'Hold',
             'ng'             => 'NG',
@@ -81,11 +85,16 @@
 
                         Livewire.on('detail-closed', function() {
                             self.slideOpen = false;
+                            self.selectedRowIndex = -1;
                             self.$nextTick(function() {
                                 var row = document.querySelector('[data-row-index="' + self
                                     .focusedIndex + '"]');
                                 if (row) row.focus();
                             });
+                        });
+
+                        window.addEventListener('panel-close-requested', function() {
+                            self.$wire.call('closeDetail');
                         });
 
                         Livewire.on('refresh-complete', function() {
@@ -190,12 +199,12 @@
     <div class="jss-monitoring" x-data="monWorkspace({{ $pollInterval }})" @keydown.window="handleKey($event)" role="application"
         aria-label="Pelacakan dan Monitoring workspace">
 
-        {{-- ══════════════════════════════════════════════════════════════
-             1. WORKSPACE HEADER — the visual anchor (Task 3)
+        {{-- ==============================================================
+             1. WORKSPACE HEADER - the visual anchor (Task 3)
              Compact bar, no card. Identity + locked scope pills +
              compact live metrics. Scope (TAM · Laut) is workspace metadata,
              not an interactive filter.
-        ══════════════════════════════════════════════════════════════ --}}
+        ============================================================== --}}
         <section class="jss-mon-header">
             <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
 
@@ -210,14 +219,14 @@
                                 aktif</span>
                         @endif
                     </div>
-                    <p class="mon-subtitle">Operational Control Tower — pemantauan unit realtime lintas cabang</p>
+                    <p class="mon-subtitle">Operational Control Tower - pemantauan unit realtime lintas cabang</p>
                 </div>
 
                 {{-- Right: compact live status metrics (hierarchy via weight, not card) --}}
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:shrink-0">
                     {{-- Sprint 6.4.3-R1: explains the KPI is a workspace-wide
                          summary (period/branch/route/mode only), not affected
-                         by search/exception — only shown while one of those
+                         by search/exception - only shown while one of those
                          drill-down filters is active, so the default view is
                          untouched (Acceptance: "KPI tidak berubah saat search"). --}}
                     @if ($drilldownActive)
@@ -264,11 +273,11 @@
             </div>
         </section>
 
-        {{-- ══════════════════════════════════════════════════════════════
+        {{-- ==============================================================
              2. EXCEPTION BAND (Task 4 / Task 8)
              Clickable alert tiles when exceptions exist; passive single-line
              "all clear" indicator otherwise. Color carries operational meaning.
-        ══════════════════════════════════════════════════════════════ --}}
+        ============================================================== --}}
         <section class="jss-mon-exception-band" aria-label="Exception summary">
             @if ($hasExceptions)
                 @php
@@ -347,27 +356,34 @@
             @else
                 <span class="mon-allclear" role="status" aria-label="Tidak ada exception aktif">
                     <x-heroicon-o-check-circle class="mon-ic-4 text-emerald-500" />
-                    Tidak ada exception aktif — semua unit dalam status normal
+                    Tidak ada exception aktif - semua unit dalam status normal
                 </span>
+                    @if ($exceptionFilter)
+                        <button type="button" wire:click="updateFilter('exception_filter', null)" class="mon-reset"
+                            title="Hapus filter exception" aria-label="Hapus filter exception">
+                            <x-heroicon-o-x-mark class="mon-ic-3" />
+                            Reset
+                        </button>
+                    @endif
 
             @endif
         </section>
 
-        {{-- ══════════════════════════════════════════════════════════════
+        {{-- ==============================================================
              2.5 ACTIVE FILTER CHIPS (Sprint 6.4.1)
              Removable chips for non-default filters (search/status/view/
-             sort/route). Exception is intentionally excluded — it already
+             sort/route). Exception is intentionally excluded - it already
              has its own chip+reset in the exception band above.
-             Only renders when a filter is actually active — the result
+             Only renders when a filter is actually active - the result
              count pill is contextual to "this is what your filters
              produced", not a permanent fixture (Sprint 6.4.2-R1 cleanup;
              that count would otherwise duplicate the header's aktif/selesai
              metrics on the default, unfiltered view).
-        ══════════════════════════════════════════════════════════════ --}}
+        ============================================================== --}}
         @if (! empty($filterChips))
             <section class="jss-mon-active-filters" aria-label="Hasil dan filter aktif">
                 <div class="flex flex-wrap items-center gap-2">
-                    {{-- Sprint 6.4.3: Result count — from paginator total, no extra query --}}
+                    {{-- Sprint 6.4.3: Result count - from paginator total, no extra query --}}
                     @if ($rows && $rows->total() > 0)
                         <span class="mon-result-count" aria-live="polite" role="status">
                             {{ $rows->total() }} hasil
@@ -390,27 +406,38 @@
             </section>
         @endif
 
-        {{-- ══════════════════════════════════════════════════════════════
-             3+4. WORKSPACE SURFACE (Task 6) — single operational plane.
+        {{-- ==============================================================
+             3+4. WORKSPACE SURFACE (Task 6) - single operational plane.
              One surface unifies toolbar + table; the operator reads
              top-to-bottom without crossing two card boundaries.
-             Toolbar (Task 4): Periode → Cari (primary) → Exception → Tampilan → Selesai → Refresh — visual weight descends left-to-right.
-        ══════════════════════════════════════════════════════════════ --}}
+             Toolbar (Task 4): Periode -> Cari (primary) -> Exception -> Tampilan -> Selesai -> Refresh - visual weight descends left-to-right.
+        ============================================================== --}}
         <section class="jss-mon-workspace">
             <div class="mon-surface">
 
-                {{-- ── Toolbar rail ── --}}
+                {{-- -- Toolbar rail -- --}}
                 <div class="mon-toolbar">
                     <div class="flex items-end gap-3">
 
                         {{-- Form: Periode · Cari (primary) · Exception · Tampilan · Selesai --}}
                         {{-- Search clear button + loading spinner are native Filament
                              affixes on the 'search' field itself (suffixAction +
-                             wire:target loading indicator) — see getFormSchema()
+                             wire:target loading indicator) - see getFormSchema()
                              in WorkspaceShell. No manual absolute-positioned
                              overlay needed here. --}}
                         <div class="min-w-0 flex-1">
                             {{ $this->form }}
+                            {{-- Search clear button (Alpine) --}}
+                            <button type="button" x-show="$wire.search && $wire.search.length > 0" x-cloak
+                                x-transition:enter="transition ease-out duration-150"
+                                x-transition:enter-start="opacity-0 scale-95"
+                                x-transition:enter-end="opacity-100 scale-100"
+                                x-transition:leave="transition ease-in duration-100"
+                                x-transition:leave-start="opacity-100 scale-100"
+                                x-transition:leave-end="opacity-0 scale-95" wire:click="updateFilter('search', '')"
+                                class="mon-clear-search" aria-label="Hapus pencarian" title="Hapus pencarian">
+                                <x-heroicon-o-x-mark class="w-4 h-4" />
+                            </button>
                         </div>
 
                         {{-- Refresh: framed, aligned to input baseline --}}
@@ -431,15 +458,15 @@
                     </div>
                 </div>
 
-                {{-- ── Sprint 6.4.3-R1: Drill-down context bar ──
-                     "Tepat di atas tabel" — tells the operator the table
+                {{-- -- Sprint 6.4.3-R1: Drill-down context bar --
+                     "Tepat di atas tabel" - tells the operator the table
                      below is a filtered view (search/exception), distinct
                      from the workspace-wide KPI above. Presentation only;
                      $resultCount comes from the existing paginator total,
                      no extra query. Disappears the instant search/exception
                      is cleared (chip X, empty-state CTA, or the field itself)
                      since it's purely derived from $this->search /
-                     $exceptionFilter — same reactive state Livewire already
+                     $exceptionFilter - same reactive state Livewire already
                      re-renders on every filter change. --}}
                 @if ($drilldownActive)
                     <div class="mon-context-bar" role="status" aria-live="polite">
@@ -463,7 +490,7 @@
                     </div>
                 @endif
 
-                {{-- ── Monitoring Table (inherits workspace surface) ──
+                {{-- -- Monitoring Table (inherits workspace surface) --
                      Pure Blade partial bound to MonitoringRowData objects from
                      the paginator. Lives in the parent Livewire component's
                      template, so wire:* directives here dispatch on WorkspaceShell. --}}
@@ -484,9 +511,9 @@
         {{-- Detail slide-over (event-driven, always rendered, visually hidden) --}}
         <livewire:monitoring.monitoring-detail-slide />
 
-        {{-- ══════════════════════════════════════════════════════════════
-             5. FOOTER (Task 1 / Task 5) — metadata strip
-        ══════════════════════════════════════════════════════════════ --}}
+        {{-- ==============================================================
+             5. FOOTER (Task 1 / Task 5) - metadata strip
+        ============================================================== --}}
         <footer class="jss-mon-footer" aria-label="Workspace metadata">
             <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1 mon-foot">
                 {{-- Identity --}}

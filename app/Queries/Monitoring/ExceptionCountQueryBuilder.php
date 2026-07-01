@@ -3,7 +3,8 @@
 namespace App\Queries\Monitoring;
 
 use App\DTO\Monitoring\MonitoringFilter;
-use App\Models\Shipment;
+use App\Enums\ShipmentStatus;
+use App\Models\Unit;
 use App\Support\Monitoring\LatestTrackSubquery;
 use App\Support\Monitoring\MonitoringDomain;
 use App\Support\Monitoring\RouteResolver;
@@ -11,6 +12,15 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Sprint 6.4.4: root changed from Shipment to Unit.
+ * Exception counts now represent Units (vehicles) affected, not Shipments (SPPB).
+ * e.g. "5 Hold" means 5 vehicles whose shipment is in Hold — not 5 SPPBs.
+ *
+ * NG is now a direct check on unit_inspections (unit_id = units.id) instead of
+ * a correlated subquery joining through units. All other exceptions read from
+ * shipments.* or lt.* via the JOIN.
+ */
 final class ExceptionCountQueryBuilder
 {
     public function rawCounts(MonitoringFilter $filter): array
@@ -26,9 +36,8 @@ final class ExceptionCountQueryBuilder
     /**
      * Single aggregate query — one round-trip, no correlated subqueries.
      *
-     * NG check uses a LEFT JOIN to a pre-aggregated set of shipment_ids with
-     * failed inspections so the planner can hash-join once instead of running
-     * a correlated EXISTS for every row in shipments (previously ~80ms → ~20ms).
+     * NG check: LEFT JOIN to a pre-aggregated set of unit_ids with failed
+     * inspections so the planner can hash-join once.
      *
      * @return array{delay:int, hold:int, ng:int, demurrage:int, missing_voyage:int, stuck:int}
      */
@@ -37,26 +46,23 @@ final class ExceptionCountQueryBuilder
         $stuckDays     = (int) config('monitoring.stuck_days', 3);
         $demurrageDays = (int) config('monitoring.demurrage_days', 7);
 
-        // Port-related statuses that trigger demurrage risk.
         $portStatuses = implode("','", ['stacking', 'delivery_to_port', 'vessel_arrival', 'unloading']);
 
-        // Latest track per shipment — reusable DISTINCT ON pattern.
+        // Latest track per shipment — keyed by shipment_id as before.
         $latestTrackSub = LatestTrackSubquery::build(
             statusAlias: 'latest_status',
             trackedAtAlias: 'latest_tracked_at',
         );
 
-        // Pre-aggregate the NG shipment_ids once so the planner can hash-join
-        // instead of running a correlated EXISTS per row (was the slow path).
-        $ngShipmentsSub = DB::table('units as u')
-            ->select('u.shipment_id')
-            ->join('unit_inspections as ui', 'ui.unit_id', '=', 'u.id')
+        // Pre-aggregate the failed unit_ids so the planner can hash-join once.
+        $ngUnitsSub = DB::table('unit_inspections as ui')
+            ->select('ui.unit_id')
             ->where('ui.status', 'failed')
             ->distinct();
 
         $result = $this->build($filter)
-            ->leftJoinSub($latestTrackSub, 'lt', 'lt.shipment_id', '=', 'shipments.id')
-            ->leftJoinSub($ngShipmentsSub, 'ng', 'ng.shipment_id', '=', 'shipments.id')
+            ->leftJoinSub($latestTrackSub, 'lt', 'lt.shipment_id', '=', 'units.shipment_id')
+            ->leftJoinSub($ngUnitsSub, 'ng', 'ng.unit_id', '=', 'units.id')
             ->selectRaw("
                 COUNT(*) FILTER (WHERE
                     shipments.eta IS NOT NULL
@@ -66,7 +72,7 @@ final class ExceptionCountQueryBuilder
 
                 COUNT(*) FILTER (WHERE shipments.status = 'hold') AS hold,
 
-                COUNT(*) FILTER (WHERE ng.shipment_id IS NOT NULL) AS ng,
+                COUNT(*) FILTER (WHERE ng.unit_id IS NOT NULL) AS ng,
 
                 COUNT(*) FILTER (WHERE
                     lt.latest_status IN ('{$portStatuses}')
@@ -100,16 +106,14 @@ final class ExceptionCountQueryBuilder
 
     public function build(MonitoringFilter $filter): Builder
     {
-        $query = Shipment::query();
+        $query = Unit::query()
+            ->join('shipments', 'shipments.id', '=', 'units.shipment_id');
 
-        // Table-qualified to prevent ambiguity after JOINs are added.
-        $query->whereNotIn('shipments.status', [\App\Enums\ShipmentStatus::Draft->value]);
+        $query->whereNotIn('shipments.status', [ShipmentStatus::Draft->value]);
 
         // v1 domain constraint: sea mode only. See ADR-009 and MonitoringDomain.
         MonitoringDomain::applyTo($query);
 
-        // Sprint 6.4.2: branch + period context — same filters as the table,
-        // so exception counts in the header always match what's shown below.
         if ($filter->branch_id) {
             $query->where('shipments.branch_id', $filter->branch_id);
         }
@@ -121,12 +125,11 @@ final class ExceptionCountQueryBuilder
             $query->whereIn('shipments.customer_id', $customerIds);
         }
 
-        // Sprint 6.4.1: three-state status filter (was boolean show_finished).
-        $finishedStatuses = [\App\Enums\ShipmentStatus::Delivered->value, \App\Enums\ShipmentStatus::Cancelled->value];
+        $finishedStatuses = [ShipmentStatus::Delivered->value, ShipmentStatus::Cancelled->value];
         match ($filter->status) {
             'finished' => $query->whereIn('shipments.status', $finishedStatuses),
             'all'      => null,
-            default    => $query->whereNotIn('shipments.status', $finishedStatuses), // 'active'
+            default    => $query->whereNotIn('shipments.status', $finishedStatuses),
         };
 
         return $query;
