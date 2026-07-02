@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\VesselPlanResource\RelationManagers;
 
+use App\Models\VesselPlan;
 use Filament\Forms;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -12,11 +13,55 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class VesselPlanItemRelationManager extends RelationManager
 {
     protected static string $relationship = 'items';
     protected static ?string $title = 'Draft Jadwal Kapal';
+
+    /**
+     * Sprint 4.x — Vessel Plan Workflow Language Alignment.
+     * Judul & helper section mengikuti fase bisnis (bukan status teknis semata),
+     * supaya Planner langsung sadar konteks tanpa berpindah halaman.
+     */
+    public static function getTitle(Model $ownerRecord, string $pageClass): string
+    {
+        return self::sectionCopy($ownerRecord)['title'];
+    }
+
+    protected function getTableHeading(): string
+    {
+        return self::sectionCopy($this->getOwnerRecord())['title'];
+    }
+
+    /**
+     * @return array{title: string, description: string}
+     */
+    protected static function sectionCopy(?Model $plan): array
+    {
+        if (! $plan instanceof VesselPlan) {
+            return [
+                'title' => 'Draft Jadwal Kapal',
+                'description' => 'Menyusun jadwal kapal berdasarkan informasi dari Shipping Line.',
+            ];
+        }
+
+        return match (true) {
+            $plan->isFinal() => [
+                'title' => 'Jadwal Final',
+                'description' => 'Jadwal telah difinalisasi dan menjadi dasar pembentukan Voyage.',
+            ],
+            $plan->isSent(), $plan->isRevision() => [
+                'title' => 'Final Schedule TAM',
+                'description' => 'Memperbarui data sesuai Final Schedule yang diterima dari TAM.',
+            ],
+            default => [
+                'title' => 'Draft Jadwal Kapal',
+                'description' => 'Menyusun jadwal kapal berdasarkan informasi dari Shipping Line.',
+            ],
+        };
+    }
 
     public function form(Form $form): Form
     {
@@ -45,26 +90,20 @@ class VesselPlanItemRelationManager extends RelationManager
 
             Forms\Components\Section::make('Jadwal')
                 ->schema([
-                    DateTimePicker::make('planned_etd')
-                        ->label('ETD (Rencana)')
-                        ->required()
-                        ->native(false),
-
                     DateTimePicker::make('planned_etb')
                         ->label('ETB (Rencana Sandar)')
                         ->native(false)
                         ->helperText('Opsional. Waktu estimasi kapal sandar.'),
 
+                    DateTimePicker::make('planned_etd')
+                        ->label('ETD (Rencana)')
+                        ->required()
+                        ->native(false),
+
                     DateTimePicker::make('planned_eta')
                         ->label('ETA (Rencana)')
                         ->required()
                         ->native(false),
-
-                    TextInput::make('cargo_plan')
-                        ->label('Rencana Muatan (unit)')
-                        ->numeric()
-                        ->minValue(0)
-                        ->helperText('Opsional. Jumlah unit yang direncanakan.'),
                 ])
                 ->columns(2),
 
@@ -73,7 +112,19 @@ class VesselPlanItemRelationManager extends RelationManager
                     TextInput::make('voyage_no')
                         ->label('No Voyage')
                         ->maxLength(50)
-                        ->helperText('Nomor voyage dari shipping line. Kosongkan untuk auto-generate saat finalisasi.'),
+                        ->helperText('Nomor voyage dari shipping line.'),
+                ])
+                ->columns(1),
+
+            Forms\Components\Section::make('Final Schedule TAM')
+                ->description('Dicatat setelah menerima Final Schedule dari TAM.')
+                ->visible(fn() => ! ($this->getOwnerRecord()?->isDraft() ?? true))
+                ->schema([
+                    TextInput::make('cargo_plan')
+                        ->label('Cargo Plan (unit)')
+                        ->numeric()
+                        ->minValue(0)
+                        ->helperText('Alokasi unit sesuai Final Schedule dari TAM.'),
                 ])
                 ->columns(1),
         ]);
@@ -82,6 +133,7 @@ class VesselPlanItemRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->description(self::sectionCopy($this->getOwnerRecord())['description'])
             ->columns([
                 TextColumn::make('shippingLine.name')
                     ->label('Pelayaran'),
@@ -93,23 +145,26 @@ class VesselPlanItemRelationManager extends RelationManager
                     ->label('No Voyage')
                     ->placeholder('—')
                     ->copyable(),
+                
+                    TextColumn::make('planned_etb')
+                    ->label('ETB')
+                    ->dateTime()
+                    ->placeholder('—'),
 
                 TextColumn::make('planned_etd')
                     ->label('ETD')
-                    ->dateTime(),
-
-                TextColumn::make('planned_etb')
-                    ->label('ETB')
                     ->dateTime()
                     ->placeholder('—'),
 
                 TextColumn::make('planned_eta')
                     ->label('ETA')
-                    ->dateTime(),
+                    ->dateTime()
+                    ->placeholder('—'),
 
                 TextColumn::make('cargo_plan')
-                    ->label('Muatan (unit)')
-                    ->placeholder('—'),
+                    ->label('Cargo Plan')
+                    ->placeholder('—')
+                    ->visible(fn() => ! ($this->getOwnerRecord()?->isDraft() ?? true)),
 
                 TextColumn::make('planned_sailing')
                     ->label('Sailing (hari)')

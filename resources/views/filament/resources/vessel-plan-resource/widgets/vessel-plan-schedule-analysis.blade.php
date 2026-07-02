@@ -1,4 +1,3 @@
-@if ($hasData)
 @php
     $fmtDate = fn($d) => $d ? $d->format('d M Y') : '—';
 
@@ -13,10 +12,17 @@
         return $v > 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold';
     };
 
-    $n = $narrative;
+    $n = $narrative ?? null;
 @endphp
 
 <div class="rounded-xl border bg-white px-6 py-5 mb-6">
+
+@if (! $hasData)
+
+    <h3 class="text-base font-semibold mb-1">Analisa Jadwal Kapal</h3>
+    <p class="text-sm text-gray-500">Belum ada jadwal kapal pada vessel plan ini.</p>
+
+@else
 
     <h3 class="text-base font-semibold mb-1">Analisa Jadwal Kapal</h3>
     <p class="text-sm text-gray-500 mb-5">
@@ -154,5 +160,6 @@
         <span>Tinggi ≥ 4 hari &nbsp;·&nbsp; Sedang 2–3 hari &nbsp;·&nbsp; Rendah 0–1 hari</span>
     </div>
 
-</div>
 @endif
+
+</div>

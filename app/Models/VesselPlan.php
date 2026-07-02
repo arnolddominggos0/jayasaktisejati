@@ -234,7 +234,7 @@ class VesselPlan extends Model
 
     public function isEditable(): bool
     {
-        return $this->isDraft() || $this->isRevision();
+        return ! $this->isFinal();
     }
 
     public function analyze(): array

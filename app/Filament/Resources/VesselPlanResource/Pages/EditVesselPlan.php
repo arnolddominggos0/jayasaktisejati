@@ -11,12 +11,34 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\HtmlString;
 
 class EditVesselPlan extends EditRecord
 {
     protected static string $resource = VesselPlanResource::class;
 
     protected static string $view = 'filament.resources.vessel-plan-resource.pages.edit-vessel-plan';
+
+    // Sprint 4.x — Vessel Plan Workflow Language Alignment: badge status
+    // persisten di header, memakai warna dari VesselPlanStatus::color() lewat
+    // class mon-badge-* yang sudah ada (tidak membuat style baru), sebagai
+    // penguat konteks fase Draft/Sent/Final.
+    public function getSubheading(): string | Htmlable | null
+    {
+        $status = $this->record->status;
+
+        $colorClass = match ($status->color()) {
+            'warning' => 'mon-badge-warning',
+            'danger' => 'mon-badge-danger',
+            'success' => 'mon-badge-success',
+            default => 'mon-badge-neutral',
+        };
+
+        return new HtmlString(
+            '<span class="mon-badge ' . $colorClass . '">' . e($status->label()) . '</span>'
+        );
+    }
 
     public function mount(int|string $record): void
     {
@@ -59,7 +81,7 @@ class EditVesselPlan extends EditRecord
                 ->label('Kirim ke TAM (WhatsApp)')
                 ->icon('heroicon-o-paper-airplane')
                 ->color('primary')
-                ->visible(fn() => $this->record->isEditable())
+                ->visible(fn() => $this->record->isDraft())
                 ->disabled(fn() => ! $this->record->canSubmitDraft())
                 ->tooltip(fn() => $this->submitDraftDisabledReason())
                 ->requiresConfirmation()

@@ -12,23 +12,21 @@ class WhatsappMessageBuilder
     {
         $plan->loadMissing(['customer', 'items.shippingLine', 'items.vessel', 'pol', 'pod']);
 
-        $analysis = $plan->analyze();
         $greeting = $this->resolveGreeting();
         $recipientName = $this->sanitizeText($plan->whatsapp_recipient_name);
-        $periodLabel = $plan->period_month->translatedFormat('M Y');
+        $periodLabel = $plan->period_month->translatedFormat('F Y');
         $scheduleLines = $this->buildScheduleLines($plan);
         $routeLabel = $this->buildRouteLabel($plan);
-        $sopStatus = $plan->sopStatus()['label'] ?? '-';
 
         return "{$greeting}" . ($recipientName ? " {$recipientName}" : '') . ",\n\n"
-            . "Berikut draft jadwal kapal periode {$periodLabel}" . ($routeLabel ? " rute {$routeLabel}" : '') . ":\n\n"
+            . "Berikut kami sampaikan Draft Jadwal Kapal:\n\n"
+            . "Periode : {$periodLabel}"
+            . ($routeLabel ? "\nRute    : {$routeLabel}" : '') . "\n\n"
             . $scheduleLines . "\n\n"
-            . "Analisa SOP:\n"
-            . "- Max ETD Gap: " . ($analysis['max_gap'] ?? 0) . " hari\n"
-            . "- Status: {$sopStatus}\n\n"
-            . "Mohon konfirmasi / revisinya.\n"
+            . "Jadwal masih berupa estimasi dan dapat berubah sewaktu-waktu.\n\n"
             . "Terima kasih.";
     }
+
 
     protected function buildScheduleLines(VesselPlan $plan): string
     {
@@ -42,13 +40,12 @@ class WhatsappMessageBuilder
             ->map(function ($item, int $index) {
                 $etd = $item->planned_etd?->translatedFormat('d M Y');
                 $eta = $item->planned_eta?->translatedFormat('d M Y');
-                $shippingLine = $this->sanitizeText($item->shippingLine?->name ?? '-');
                 $vessel = $this->sanitizeText($item->vessel?->name ?? '-');
+                $voyage = $this->sanitizeText($item->voyage_no ?: '-');
 
-                return ($index + 1) . ". {$shippingLine}\n"
-                    . "Kapal : {$vessel}\n"
-                    . "ETD   : {$etd}\n"
-                    . "ETA   : {$eta}";
+                return ($index + 1) . ". {$vessel} V.{$voyage}\n"
+                    . "   ETD : {$etd}\n"
+                    . "   ETA : {$eta}";
             })
             ->implode("\n\n");
     }
