@@ -12,6 +12,7 @@ use Filament\Forms\Get;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\TextColumn\TextColumnSize;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
@@ -135,39 +136,42 @@ class VesselPlanItemRelationManager extends RelationManager
         return $table
             ->description(self::sectionCopy($this->getOwnerRecord())['description'])
             ->columns([
-                TextColumn::make('shippingLine.name')
-                    ->label('Pelayaran'),
-
                 TextColumn::make('vessel.name')
-                    ->label('Kapal'),
+                    ->label('Kapal / Voyage')
+                    ->weight('semibold')
+                    ->description(function ($record) {
+                        $parts = array_filter([
+                            $record->voyage_no ? 'V.' . $record->voyage_no : null,
+                            $record->shippingLine?->name,
+                        ]);
 
-                TextColumn::make('voyage_no')
-                    ->label('No Voyage')
-                    ->placeholder('—')
-                    ->copyable(),
-                
-                    TextColumn::make('planned_etb')
+                        return implode(' · ', $parts) ?: null;
+                    }),
+
+                TextColumn::make('planned_etb')
                     ->label('ETB')
-                    ->dateTime()
+                    ->formatStateUsing(fn($state) => $state?->translatedFormat('d M Y'))
                     ->placeholder('—'),
 
                 TextColumn::make('planned_etd')
                     ->label('ETD')
-                    ->dateTime()
+                    ->formatStateUsing(fn($state) => $state?->translatedFormat('d M Y'))
                     ->placeholder('—'),
 
                 TextColumn::make('planned_eta')
                     ->label('ETA')
-                    ->dateTime()
+                    ->formatStateUsing(fn($state) => $state?->translatedFormat('d M Y'))
                     ->placeholder('—'),
 
                 TextColumn::make('cargo_plan')
                     ->label('Cargo Plan')
+                    ->alignEnd()
                     ->placeholder('—')
                     ->visible(fn() => ! ($this->getOwnerRecord()?->isDraft() ?? true)),
 
                 TextColumn::make('planned_sailing')
-                    ->label('Sailing (hari)')
+                    ->label('Sailing')
+                    ->alignEnd()
                     ->getStateUsing(function ($record) {
                         if (!$record->planned_etd || !$record->planned_eta) {
                             return '—';
@@ -179,6 +183,8 @@ class VesselPlanItemRelationManager extends RelationManager
                 TextColumn::make('etd_gap')
                     ->label('ETD Gap')
                     ->alignCenter()
+                    ->badge()
+                    ->size(TextColumnSize::ExtraSmall)
                     ->getStateUsing(function ($record) {
                         $plan = $this->getOwnerRecord();
                         if (! $plan) return '—';
@@ -188,23 +194,32 @@ class VesselPlanItemRelationManager extends RelationManager
                     })
                     ->color(function ($record) {
                         $plan = $this->getOwnerRecord();
-                        if (! $plan) return null;
+                        $gap = $plan?->etdGaps()[$record->id] ?? null;
 
-                        $gap = $plan->etdGaps()[$record->id] ?? null;
-                        return $gap !== null && $gap > 6 ? 'danger' : 'success';
+                        return match (true) {
+                            $gap === null => 'gray',
+                            $gap > 10     => 'danger',
+                            $gap > 6      => 'warning',
+                            default       => 'success',
+                        };
                     }),
             ])
 
             ->headerActions([
                 Tables\Actions\CreateAction::make()
+                    ->label('Tambah Jadwal')
                     ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
             ])
 
             ->actions([
                 Tables\Actions\EditAction::make()
+                    ->iconButton()
+                    ->tooltip('Ubah')
                     ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
 
                 Tables\Actions\DeleteAction::make()
+                    ->iconButton()
+                    ->tooltip('Hapus')
                     ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
             ])
 

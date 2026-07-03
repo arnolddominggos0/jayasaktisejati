@@ -42,42 +42,21 @@ $items  = $record->items->sortBy('planned_etd');
         "
     >
         {{-- Tab bar --}}
-        <div class="flex items-center gap-1 border-b border-gray-200 dark:border-gray-700 mb-6">
+        <div class="vp-tab-bar">
 
-            <button
-                @click="tab = 'schedule'"
-                :class="tab === 'schedule'
-                    ? 'border-b-2 border-primary-600 text-primary-700 font-semibold'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'"
-                class="px-4 py-2.5 text-sm transition-colors -mb-px">
-                <div class="flex items-center gap-1.5">
-                    <x-heroicon-o-calendar-days class="w-4 h-4" />
-                    Jadwal
-                </div>
+            <button @click="tab = 'schedule'" :class="tab === 'schedule' ? 'vp-tab is-active' : 'vp-tab'">
+                <x-heroicon-o-calendar-days class="w-4 h-4" />
+                Jadwal
             </button>
 
-            <button
-                @click="tab = 'analysis'"
-                :class="tab === 'analysis'
-                    ? 'border-b-2 border-primary-600 text-primary-700 font-semibold'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'"
-                class="px-4 py-2.5 text-sm transition-colors -mb-px">
-                <div class="flex items-center gap-1.5">
-                    <x-heroicon-o-chart-bar-square class="w-4 h-4" />
-                    Analisis Jadwal
-                </div>
+            <button @click="tab = 'analysis'" :class="tab === 'analysis' ? 'vp-tab is-active' : 'vp-tab'">
+                <x-heroicon-o-chart-bar-square class="w-4 h-4" />
+                Analisis Jadwal
             </button>
 
-            <button
-                @click="tab = 'history'"
-                :class="tab === 'history'
-                    ? 'border-b-2 border-primary-600 text-primary-700 font-semibold'
-                    : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'"
-                class="px-4 py-2.5 text-sm transition-colors -mb-px">
-                <div class="flex items-center gap-1.5">
-                    <x-heroicon-o-clock class="w-4 h-4" />
-                    Riwayat Jadwal
-                </div>
+            <button @click="tab = 'history'" :class="tab === 'history' ? 'vp-tab is-active' : 'vp-tab'">
+                <x-heroicon-o-clock class="w-4 h-4" />
+                Riwayat Jadwal
             </button>
 
         </div>
@@ -89,18 +68,23 @@ $items  = $record->items->sortBy('planned_etd');
         <div x-show="tab === 'schedule'">
 
             @capture($form)
-                <x-filament-panels::form
-                    id="form"
-                    :wire:key="$this->getId() . '.forms.' . $this->getFormStatePath()"
-                    wire:submit="save"
-                >
-                    {{ $this->form }}
+                {{-- Simpan/Batal butuh parent visual yang jelas — bukan
+                     mengambang di whitespace kosong (form record-level ini
+                     tidak punya field terlihat, hanya Simpan/Batal). --}}
+                <div class="vp-form-actions-card">
+                    <x-filament-panels::form
+                        id="form"
+                        :wire:key="$this->getId() . '.forms.' . $this->getFormStatePath()"
+                        wire:submit="save"
+                    >
+                        {{ $this->form }}
 
-                    <x-filament-panels::form.actions
-                        :actions="$this->getCachedFormActions()"
-                        :full-width="$this->hasFullWidthFormActions()"
-                    />
-                </x-filament-panels::form>
+                        <x-filament-panels::form.actions
+                            :actions="$this->getCachedFormActions()"
+                            :full-width="$this->hasFullWidthFormActions()"
+                        />
+                    </x-filament-panels::form>
+                </div>
             @endcapture
 
             @php
@@ -113,22 +97,30 @@ $items  = $record->items->sortBy('planned_etd');
             @endif
 
             @if (count($relationManagers))
-                <x-filament-panels::resources.relation-managers
-                    :active-locale="isset($activeLocale) ? $activeLocale : null"
-                    :active-manager="$this->activeRelationManager ?? ($hasCombinedRelationManagerTabsWithContent ? null : array_key_first($relationManagers))"
-                    :content-tab-label="$this->getContentTabLabel()"
-                    :content-tab-icon="$this->getContentTabIcon()"
-                    :content-tab-position="$this->getContentTabPosition()"
-                    :managers="$relationManagers"
-                    :owner-record="$record"
-                    :page-class="static::class"
-                >
-                    @if ($hasCombinedRelationManagerTabsWithContent)
-                        <x-slot name="content">
-                            {{ $form() }}
-                        </x-slot>
-                    @endif
-                </x-filament-panels::resources.relation-managers>
+                {{-- Nuansa fase: Draft netral, Sent/Revision aksen biru, Final redup terkunci --}}
+                <div @class([
+                    'vp-phase',
+                    'vp-phase-final' => $record->isFinal(),
+                    'vp-phase-draft' => $record->isDraft(),
+                    'vp-phase-sent'  => ! $record->isFinal() && ! $record->isDraft(),
+                ])>
+                    <x-filament-panels::resources.relation-managers
+                        :active-locale="isset($activeLocale) ? $activeLocale : null"
+                        :active-manager="$this->activeRelationManager ?? ($hasCombinedRelationManagerTabsWithContent ? null : array_key_first($relationManagers))"
+                        :content-tab-label="$this->getContentTabLabel()"
+                        :content-tab-icon="$this->getContentTabIcon()"
+                        :content-tab-position="$this->getContentTabPosition()"
+                        :managers="$relationManagers"
+                        :owner-record="$record"
+                        :page-class="static::class"
+                    >
+                        @if ($hasCombinedRelationManagerTabsWithContent)
+                            <x-slot name="content">
+                                {{ $form() }}
+                            </x-slot>
+                        @endif
+                    </x-filament-panels::resources.relation-managers>
+                </div>
             @endif
 
             <x-filament-panels::page.unsaved-data-changes-alert />

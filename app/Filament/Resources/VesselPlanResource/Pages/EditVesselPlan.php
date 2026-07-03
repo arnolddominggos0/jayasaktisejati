@@ -10,6 +10,7 @@ use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanReviewHistory;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
+use App\Supports\BusinessRouteResolver;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
@@ -20,10 +21,22 @@ class EditVesselPlan extends EditRecord
 
     protected static string $view = 'filament.resources.vessel-plan-resource.pages.edit-vessel-plan';
 
-    // Sprint 4.x — Vessel Plan Workflow Language Alignment: badge status
-    // persisten di header, memakai warna dari VesselPlanStatus::color() lewat
-    // class mon-badge-* yang sudah ada (tidak membuat style baru), sebagai
-    // penguat konteks fase Draft/Sent/Final.
+    // Sprint 4.x — Vessel Plan Workspace UX Refinement: header kontekstual.
+    // Identitas plan adalah periodenya, bukan kata "Ubah" — Planner mengelola
+    // 12 plan per tahun dan membedakannya lewat bulan.
+
+    public function getBreadcrumb(): string
+    {
+        return $this->record->period_month->translatedFormat('F Y');
+    }
+
+    public function getHeading(): string | Htmlable
+    {
+        return 'Vessel Plan — ' . $this->record->period_month->translatedFormat('F Y');
+    }
+
+    // Badge fase (warna dari VesselPlanStatus::color() via class mon-badge-*
+    // yang sudah ada) + konteks rute/customer/jumlah jadwal dalam satu baris.
     public function getSubheading(): string | Htmlable | null
     {
         $status = $this->record->status;
@@ -35,8 +48,19 @@ class EditVesselPlan extends EditRecord
             default => 'mon-badge-neutral',
         };
 
+        $route = BusinessRouteResolver::forPlan($this->record);
+
+        $parts = array_filter([
+            $route !== '—' ? $route : null,
+            optional($this->record->customer)->name,
+            $this->record->items->count() . ' jadwal',
+        ]);
+
         return new HtmlString(
-            '<span class="mon-badge ' . $colorClass . '">' . e($status->label()) . '</span>'
+            '<div class="vp-page-meta">'
+            . '<span class="mon-badge ' . $colorClass . '">' . e($status->label()) . '</span>'
+            . '<span class="vp-page-context">' . e(implode('  ·  ', $parts)) . '</span>'
+            . '</div>'
         );
     }
 
@@ -120,6 +144,7 @@ class EditVesselPlan extends EditRecord
                 ->label('Tolak / Kembalikan')
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
+                ->outlined()
                 ->visible(fn() => $this->record->isSent())
                 ->form([
                     Textarea::make('reason')
@@ -140,6 +165,7 @@ class EditVesselPlan extends EditRecord
             Action::make('hapus')
                 ->label('Hapus Vessel Plan')
                 ->color('danger')
+                ->outlined()
                 ->visible(fn() => $this->record->isDraft())
                 ->requiresConfirmation()
                 ->action(fn() => $this->record->delete()),
