@@ -20,6 +20,7 @@ class VesselPlanAnalyzer
                 'gap_limit'      => config('jss_kpi.manado.thresholds.etd_gap_max', 6),
                 'risk_level'     => 'valid',
                 'violations'     => [],
+                'conflicts'      => [],
                 'ok'             => true,
             ];
         }
@@ -42,10 +43,12 @@ class VesselPlanAnalyzer
 
         $violations = [];
         if ($riskLevel === 'warning') {
-            $violations[] = 'Max ETD Gap ' . $maxGap . ' hari melebihi target SOP ' . $gapLimit . ' hari. Potensi peningkatan dwelling time.';
+            $violations[] = 'Max ETD Gap ' . $maxGap . ' hari melebihi target SOP ' . $gapLimit . ' hari. Periksa kontinuitas jadwal antar kapal.';
         } elseif ($riskLevel === 'critical') {
             $violations[] = 'ETD Gap sangat tinggi (' . $maxGap . ' hari). Berpotensi mempengaruhi siklus kapal berikutnya.';
         }
+
+        $conflicts = $this->detectConflicts($items);
 
         return [
             'sailing_avg'    => round($avgSailing, 2),
@@ -56,6 +59,7 @@ class VesselPlanAnalyzer
             'gap_limit'      => $gapLimit,
             'risk_level'     => $riskLevel,
             'violations'     => $violations,
+            'conflicts'      => $conflicts,
             'ok'             => $gapOk,
         ];
     }
@@ -85,5 +89,54 @@ class VesselPlanAnalyzer
             'gaps' => $gaps,
             'max_gap' => $maxGap,
         ];
+    }
+
+    protected function detectConflicts($items): array
+    {
+        $conflicts = [];
+        $sorted = $items->sortBy('planned_etd')->values();
+
+        for ($i = 0; $i < $sorted->count(); $i++) {
+            $current = $sorted[$i];
+            $currentName = $current->vessel?->name ?? 'Unknown';
+
+            if ($i > 0) {
+                $prev = $sorted[$i - 1];
+                $prevName = $prev->vessel?->name ?? 'Unknown';
+
+                if ($current->planned_etd && $prev->planned_etd
+                    && $current->planned_etd->isSameDay($prev->planned_etd)) {
+                    $conflicts[] = sprintf(
+                        '%s dan %s memiliki ETD sama (%s)',
+                        $prevName,
+                        $currentName,
+                        $current->planned_etd->translatedFormat('d M Y')
+                    );
+                }
+
+                if ($prev->planned_eta && $current->planned_etd
+                    && $prev->planned_eta > $current->planned_etd) {
+                    $conflicts[] = sprintf(
+                        'ETA %s (%s) melebihi ETD %s (%s) — potensi overlap rute',
+                        $prevName,
+                        $prev->planned_eta->translatedFormat('d M Y'),
+                        $currentName,
+                        $current->planned_etd->translatedFormat('d M Y')
+                    );
+                }
+            }
+
+            if ($current->planned_eta && $current->planned_etd
+                && $current->planned_eta <= $current->planned_etd) {
+                $conflicts[] = sprintf(
+                    '%s: ETA (%s) harus setelah ETD (%s)',
+                    $currentName,
+                    $current->planned_eta->translatedFormat('d M Y'),
+                    $current->planned_etd->translatedFormat('d M Y')
+                );
+            }
+        }
+
+        return $conflicts;
     }
 }
