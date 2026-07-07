@@ -56,11 +56,19 @@ class EditVesselPlan extends EditRecord
             $this->record->items->count() . ' jadwal',
         ]);
 
+        $guidance = match ($status) {
+            VesselPlanStatus::Draft    => 'Susun jadwal kapal sebelum dikirim ke TAM.',
+            VesselPlanStatus::Sent     => "Menunggu Final Schedule dari TAM.\nSesuaikan ETD, ETA, dan Cargo Plan sebelum finalisasi.",
+            VesselPlanStatus::Revision => 'Revisi jadwal sesuai feedback dari TAM sebelum dikirim kembali.',
+            VesselPlanStatus::Final    => 'Vessel Plan telah difinalisasi.',
+        };
+
         return new HtmlString(
             '<div class="vp-page-meta">'
-            . '<span class="mon-badge ' . $colorClass . '">' . e($status->label()) . '</span>'
-            . '<span class="vp-page-context">' . e(implode('  ·  ', $parts)) . '</span>'
-            . '</div>'
+                . '<span class="mon-badge ' . $colorClass . '">' . e($status->label()) . '</span>'
+                . '<span class="vp-page-context">' . e(implode('  ·  ', $parts)) . '</span>'
+                . '</div>'
+                . '<p class="text-sm text-gray-500 leading-5 mt-2 whitespace-pre-line">' . e($guidance) . '</p>'
         );
     }
 
@@ -90,7 +98,10 @@ class EditVesselPlan extends EditRecord
     // 3. Analisa Jadwal Kapal  4. Riwayat Review — below the form
     protected function getFooterWidgets(): array
     {
-        return [VesselPlanScheduleAnalysis::class, VesselPlanReviewHistory::class];
+        return [
+            // VesselPlanScheduleAnalysis::class,
+            VesselPlanReviewHistory::class
+        ];
     }
 
     public function getFooterWidgetsColumns(): int

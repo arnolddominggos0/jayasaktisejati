@@ -6,6 +6,17 @@ use App\Models\VesselPlan;
 use Carbon\Carbon;
 use Filament\Widgets\Widget;
 
+/**
+ * @deprecated
+ *
+ * Removed from Vessel Plan Workspace in Sprint 12.8.
+ *
+ * This widget belongs to the Operational/Voyage Evaluation domain
+ * because it analyzes Draft -> Final -> Actual execution,
+ * Dwelling, Sailing, and Dooring after planning has finished.
+ *
+ * Candidate for reuse in Voyage Evaluation Workspace.
+ */
 class VesselPlanScheduleAnalysis extends Widget
 {
     protected static string $view =

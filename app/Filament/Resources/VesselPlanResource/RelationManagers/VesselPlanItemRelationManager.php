@@ -14,12 +14,33 @@ use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\TextColumn\TextColumnSize;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Livewire\Attributes\On;
 
 class VesselPlanItemRelationManager extends RelationManager
 {
     protected static string $relationship = 'items';
-    protected static ?string $title = 'Draft Jadwal Kapal';
+    protected static ?string $title = 'Jadwal Kapal';
+
+    /**
+     * Sprint 13.1 — Slim Shipping Line toolbar (driven from parent EditVesselPlan
+     * blade via dispatched Livewire event; replaces native Filament SelectFilter
+     * card form with a single inline dropdown + Reset text link).
+     *
+     * Livewire public property — kept in component state, applied to table query
+     * via {@see modifyQueryUsing()} below.
+     */
+    public ?string $vpShippingLineFilter = null;
+
+    #[On('vpFilterShippingLine')]
+    public function applyVpShippingLineFilter(?string $value = null): void
+    {
+        $this->vpShippingLineFilter = filled($value) ? $value : null;
+
+        // Reset pagination to avoid hidden rows when filter narrows result set.
+        $this->resetPage();
+    }
 
     /**
      * Sprint 4.x — Vessel Plan Workflow Language Alignment.
@@ -28,12 +49,18 @@ class VesselPlanItemRelationManager extends RelationManager
      */
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
+        // Sprint 13.2 — Section title tetap "Jadwal Kapal" (RM tab/section identity
+        // dipertahankan). Section ≠ Table heading (lihat getTableHeading).
         return self::sectionCopy($ownerRecord)['title'];
     }
 
     protected function getTableHeading(): string
     {
-        return self::sectionCopy($this->getOwnerRecord())['title'];
+        // Sprint 13.2 — Table heading dipisah dari Section title.
+        // Section name tetap "Jadwal Kapal" (RM tab), tetapi judul tabel
+        // di dalam section diberiNama "Daftar Jadwal" supaya Planner
+        // membedakan "section" (workflow konteks) vs "tabel" (daftar baris).
+        return 'Daftar Jadwal';
     }
 
     /**
@@ -50,16 +77,19 @@ class VesselPlanItemRelationManager extends RelationManager
 
         return match (true) {
             $plan->isFinal() => [
-                'title' => 'Jadwal Final',
-                'description' => 'Jadwal telah difinalisasi dan menjadi dasar pembentukan Voyage.',
+                'title' => 'Jadwal Kapal',
+                // Sprint 13.3 — table description dihapus; section header di parent blade
+                // sudah menjadi satu-satunya deskripsi workflow pada Tab Jadwal.
+                'description' => null,
             ],
             $plan->isSent(), $plan->isRevision() => [
-                'title' => 'Final Schedule TAM',
-                'description' => 'Memperbarui data sesuai Final Schedule yang diterima dari TAM.',
+                'title' => 'Jadwal Kapal',
+                // Sprint 13.3 — description dihapus (tumpang tindih dengan header).
+                'description' => null,
             ],
             default => [
-                'title' => 'Draft Jadwal Kapal',
-                'description' => 'Menyusun jadwal kapal berdasarkan informasi dari Shipping Line.',
+                'title' => 'Jadwal Kapal',
+                'description' => null,
             ],
         };
     }
@@ -117,12 +147,12 @@ class VesselPlanItemRelationManager extends RelationManager
                 ])
                 ->columns(1),
 
-            Forms\Components\Section::make('Final Schedule TAM')
+            Forms\Components\Section::make('Rencana Muatan')
                 ->description('Dicatat setelah menerima Final Schedule dari TAM.')
                 ->visible(fn() => ! ($this->getOwnerRecord()?->isDraft() ?? true))
                 ->schema([
                     TextInput::make('cargo_plan')
-                        ->label('Cargo Plan (unit)')
+                        ->label('Rencana Muatan (unit)')
                         ->numeric()
                         ->minValue(0)
                         ->helperText('Alokasi unit sesuai Final Schedule dari TAM.'),
@@ -134,11 +164,24 @@ class VesselPlanItemRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            ->description(self::sectionCopy($this->getOwnerRecord())['description'])
+            // Sprint 13.3 — table description dihapus. Section Header di parent blade
+            // ("JADWAL KAPAL / {N} jadwal kapal menunggu penyesuaian...") sudah menjadi
+            // satu-satunya deskripsi workflow pada Tab Jadwal. Tabel cukup ber-heading
+            // "Daftar Jadwal" tanpa subtitle untuk menghindari overlap informasi.
+            // Sprint 13.1 — Apply Shipping Line toolbar state to table query (no native filter card).
+            ->modifyQueryUsing(function (Builder $query) {
+                return $query->when(
+                    filled($this->vpShippingLineFilter),
+                    fn (Builder $q) => $q->where('shipping_line_id', $this->vpShippingLineFilter)
+                );
+            })
             ->columns([
+                // Sprint 12.5 — Voyage format kanon: V.NNN · Shipping Line.
+                // Sprint 13.2 — Kolom Kapal diasumsikan paling lebar (primary identifier).
                 TextColumn::make('vessel.name')
                     ->label('Kapal / Voyage')
                     ->weight('semibold')
+                    ->width('w-[28rem]')
                     ->description(function ($record) {
                         $parts = array_filter([
                             $record->voyage_no ? 'V.' . $record->voyage_no : null,
@@ -148,41 +191,58 @@ class VesselPlanItemRelationManager extends RelationManager
                         return implode(' · ', $parts) ?: null;
                     }),
 
+                // Sprint 13.2 — Tanggal & angka alignCenter untuk vertical scanning.
                 TextColumn::make('planned_etb')
                     ->label('ETB')
+                    ->alignCenter()
+                    ->width('w-32')
                     ->formatStateUsing(fn($state) => $state?->translatedFormat('d M Y'))
                     ->placeholder('—'),
 
                 TextColumn::make('planned_etd')
                     ->label('ETD')
+                    ->alignCenter()
+                    ->width('w-32')
                     ->formatStateUsing(fn($state) => $state?->translatedFormat('d M Y'))
                     ->placeholder('—'),
 
                 TextColumn::make('planned_eta')
                     ->label('ETA')
+                    ->alignCenter()
+                    ->width('w-32')
                     ->formatStateUsing(fn($state) => $state?->translatedFormat('d M Y'))
                     ->placeholder('—'),
 
+                // Sprint 12.5 — "Cargo Plan" → "Rencana Muatan"; kosong = "Belum diisi" (abu, bukan dash)
+                // Sprint 13.2 — alignEnd → alignCenter; width disempitkan (kolom angka sempit).
                 TextColumn::make('cargo_plan')
-                    ->label('Cargo Plan')
-                    ->alignEnd()
-                    ->placeholder('—')
+                    ->label('Rencana Muatan')
+                    ->alignCenter()
+                    ->width('w-28')
+                    ->placeholder('Belum diisi')
+                    ->color(fn ($state) => filled($state) ? null : 'gray')
                     ->visible(fn() => ! ($this->getOwnerRecord()?->isDraft() ?? true)),
 
                 TextColumn::make('planned_sailing')
                     ->label('Sailing')
-                    ->alignEnd()
+                    ->alignCenter()
+                    ->width('w-28')
                     ->getStateUsing(function ($record) {
                         if (!$record->planned_etd || !$record->planned_eta) {
-                            return '—';
+                            return null;
                         }
 
                         return $record->planned_etd->diffInDays($record->planned_eta) . ' hari';
-                    }),
+                    })
+                    ->placeholder('Belum diisi')
+                    ->color(fn ($state) => filled($state) ? null : 'gray'),
 
+                // Sprint 12.5 — Badge ETD Gap tetap semantic (green/amber/red, already in place).
+                // Sprint 13.2 — width disempitkan (kolom angka sempit).
                 TextColumn::make('etd_gap')
                     ->label('ETD Gap')
                     ->alignCenter()
+                    ->width('w-28')
                     ->badge()
                     ->size(TextColumnSize::ExtraSmall)
                     ->getStateUsing(function ($record) {
@@ -204,21 +264,42 @@ class VesselPlanItemRelationManager extends RelationManager
                         };
                     }),
             ])
+            // Sprint 13.2 — Action column rata tengah.
+            ->actionsAlignment('center')
+
+            // Sprint 12.5 — Empty state natural + action button Tambah Jadwal.
+            // Sprint 12.9 — Filter-aware empty state.
+            // Sprint 13.1 — Filter state dibaca dari public property (bukan Filament SelectFilter).
+            ->emptyStateHeading('Belum ada jadwal kapal')
+            ->emptyStateDescription(function () {
+                return filled($this->vpShippingLineFilter)
+                    ? 'Belum ada jadwal untuk Shipping Line ini.'
+                    : 'Tambah jadwal pertama untuk memulai penyusunan plan.';
+            })
+            ->emptyStateActions([
+                Tables\Actions\CreateAction::make()
+                    ->label('Tambah Jadwal')
+                    ->icon('heroicon-o-plus')
+                    ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
+            ])
 
             ->headerActions([
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah Jadwal')
+                    ->icon('heroicon-o-plus')
                     ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
             ])
 
             ->actions([
                 Tables\Actions\EditAction::make()
                     ->iconButton()
+                    ->extraAttributes(['class' => 'mx-0.5'])
                     ->tooltip('Ubah')
                     ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
 
                 Tables\Actions\DeleteAction::make()
                     ->iconButton()
+                    ->extraAttributes(['class' => 'mx-0.5'])
                     ->tooltip('Hapus')
                     ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
             ])

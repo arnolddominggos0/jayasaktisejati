@@ -38,10 +38,16 @@ $historyRows = $items->map(function ($item) use ($draftMap) {
         ? (int) $finalEtd->diffInDays($finalEta)
         : null;
 
+    // Sprint 12.9 — Voyage format kanon: V.NNN · Shipping Line
+    $voyageCanon = collect([
+        $item->voyage_no ? 'V.' . $item->voyage_no : null,
+        $item->shippingLine?->name,
+    ])->filter()->implode(' · ') ?: '—';
+
     return [
         'id'             => $item->id,
         'vessel'         => $item->vessel?->name ?? '—',
-        'voyage_no'      => $item->voyage_no ?? '—',
+        'voyage_label'   => $voyageCanon,
         'shipping_line'  => $item->shippingLine?->name ?? '—',
 
         // Draft
@@ -94,21 +100,21 @@ $deltaLabel = function (?int $d, bool $short = false): array {
             return (d > 0 ? '+' : '') + d + unit;
         }
     }"
-    class="space-y-5"
+    class="space-y-2.5"
 >
 
     {{-- Header --}}
     <div class="flex items-start justify-between flex-wrap gap-3">
         <div>
             <div class="text-[11px] uppercase tracking-wider font-bold text-gray-500 mb-1">
-                Schedule History Logbook
+                Riwayat Jadwal
             </div>
             <p class="text-sm text-gray-500">
                 Perbandingan
-                <span class="font-semibold text-blue-600">Draft Schedule</span>
+                <span class="font-semibold text-blue-600">Jadwal Draft</span>
                 vs
-                <span class="font-semibold text-emerald-600">Final Schedule</span>
-                per vessel.
+                <span class="font-semibold text-emerald-600">Jadwal Final</span>
+                per kapal.
                 Klik baris untuk melihat detail perubahan.
             </p>
         </div>
@@ -137,7 +143,7 @@ $deltaLabel = function (?int $d, bool $short = false): array {
     {{-- History Table --}}
     @if (count($historyRows) === 0)
     <div class="rounded-xl border border-dashed border-gray-200 p-8 text-center">
-        <div class="text-sm text-gray-400 italic">Belum ada item jadwal di vessel plan ini.</div>
+        <div class="text-sm text-gray-500">Belum ada perubahan jadwal.</div>
     </div>
     @else
     <div class="overflow-hidden rounded-xl border border-gray-200">
@@ -145,32 +151,32 @@ $deltaLabel = function (?int $d, bool $short = false): array {
             <thead>
                 <tr class="bg-gray-50 border-b border-gray-200">
                     {{-- Vessel --}}
-                    <th class="text-left px-4 py-3 text-[11px] uppercase tracking-wider text-gray-400 font-bold">
-                        Vessel
+                    <th class="text-left px-4 py-2.5 text-[11px] uppercase tracking-wider text-gray-400 font-bold">
+                        Kapal
                     </th>
                     {{-- Draft --}}
-                    <th class="text-center px-3 py-3 text-[11px] uppercase tracking-wider font-bold">
+                    <th class="text-center px-3 py-2.5 text-[11px] uppercase tracking-wider font-bold">
                         <span class="text-blue-500">Draft</span> ETD
                     </th>
-                    <th class="text-center px-3 py-3 text-[11px] uppercase tracking-wider font-bold">
+                    <th class="text-center px-3 py-2.5 text-[11px] uppercase tracking-wider font-bold">
                         <span class="text-blue-500">Draft</span> ETA
                     </th>
                     {{-- Final --}}
-                    <th class="text-center px-3 py-3 text-[11px] uppercase tracking-wider font-bold">
+                    <th class="text-center px-3 py-2.5 text-[11px] uppercase tracking-wider font-bold">
                         <span class="text-emerald-600">Final</span> ETD
                     </th>
-                    <th class="text-center px-3 py-3 text-[11px] uppercase tracking-wider font-bold">
+                    <th class="text-center px-3 py-2.5 text-[11px] uppercase tracking-wider font-bold">
                         <span class="text-emerald-600">Final</span> ETA
                     </th>
                     {{-- Delta --}}
-                    <th class="text-center px-3 py-3 text-[11px] uppercase tracking-wider text-gray-400 font-bold">
+                    <th class="text-center px-3 py-2.5 text-[11px] uppercase tracking-wider text-gray-400 font-bold">
                         Δ ETD
                     </th>
-                    <th class="text-center px-3 py-3 text-[11px] uppercase tracking-wider text-gray-400 font-bold">
+                    <th class="text-center px-3 py-2.5 text-[11px] uppercase tracking-wider text-gray-400 font-bold">
                         Δ ETA
                     </th>
                     {{-- Action --}}
-                    <th class="px-4 py-3 w-10"></th>
+                    <th class="px-4 py-2.5 w-10"></th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
@@ -184,33 +190,33 @@ $deltaLabel = function (?int $d, bool $short = false): array {
                     @click="showDetail(rows[{{ $i }}])"
                 >
                     {{-- Vessel --}}
-                    <td class="px-4 py-3">
+                    <td class="px-4 py-2.5">
                         <div class="font-semibold text-gray-800">{{ $row['vessel'] }}</div>
-                        <div class="text-[11px] text-gray-400 font-mono">{{ $row['voyage_no'] }}</div>
+                        <div class="text-[11px] text-gray-500 font-mono">{{ $row['voyage_label'] }}</div>
                     </td>
 
                     {{-- Draft --}}
-                    <td class="px-3 py-3 text-center font-mono text-blue-600 text-xs">
+                    <td class="px-3 py-2.5 text-center font-mono text-blue-600 text-xs">
                         {{ $row['draft_etd'] ?? '—' }}
                     </td>
-                    <td class="px-3 py-3 text-center font-mono text-blue-600 text-xs">
+                    <td class="px-3 py-2.5 text-center font-mono text-blue-600 text-xs">
                         {{ $row['draft_eta'] ?? '—' }}
                     </td>
 
                     {{-- Final --}}
-                    <td class="px-3 py-3 text-center font-mono text-emerald-700 text-xs font-semibold">
+                    <td class="px-3 py-2.5 text-center font-mono text-emerald-700 text-xs font-semibold">
                         {{ $row['final_etd'] ?? '—' }}
                     </td>
-                    <td class="px-3 py-3 text-center font-mono text-emerald-700 text-xs font-semibold">
+                    <td class="px-3 py-2.5 text-center font-mono text-emerald-700 text-xs font-semibold">
                         {{ $row['final_eta'] ?? '—' }}
                     </td>
 
                     {{-- Delta --}}
-                    <td class="px-3 py-3 text-center text-xs {{ $de['class'] }}">{{ $de['text'] }}</td>
-                    <td class="px-3 py-3 text-center text-xs {{ $da['class'] }}">{{ $da['text'] }}</td>
+                    <td class="px-3 py-2.5 text-center text-xs {{ $de['class'] }}">{{ $de['text'] }}</td>
+                    <td class="px-3 py-2.5 text-center text-xs {{ $da['class'] }}">{{ $da['text'] }}</td>
 
                     {{-- Arrow --}}
-                    <td class="px-4 py-3 text-gray-300 hover:text-gray-500">
+                    <td class="px-4 py-2.5 text-gray-300 hover:text-gray-500">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                         </svg>
@@ -257,7 +263,7 @@ $deltaLabel = function (?int $d, bool $short = false): array {
                     <div>
                         <div class="text-[10px] text-gray-400 uppercase tracking-wider">Detail Perubahan</div>
                         <div class="text-xl font-bold text-gray-900 mt-0.5" x-text="selected.vessel"></div>
-                        <div class="text-xs font-mono text-gray-400 mt-0.5" x-text="selected.voyage_no"></div>
+                        <div class="text-xs font-mono text-gray-400 mt-0.5" x-text="selected.voyage_label"></div>
                     </div>
                     <button @click="open = false" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -270,7 +276,7 @@ $deltaLabel = function (?int $d, bool $short = false): array {
                 <div class="rounded-xl border border-blue-100 bg-blue-50 p-4">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-2 h-2 rounded-full bg-blue-400"></div>
-                        <div class="text-xs font-bold text-blue-600 uppercase tracking-wider">Draft Schedule</div>
+                        <div class="text-xs font-bold text-blue-600 uppercase tracking-wider">Jadwal Draft</div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -295,7 +301,7 @@ $deltaLabel = function (?int $d, bool $short = false): array {
                 <div class="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-2 h-2 rounded-full bg-emerald-500"></div>
-                        <div class="text-xs font-bold text-emerald-600 uppercase tracking-wider">Final Schedule</div>
+                        <div class="text-xs font-bold text-emerald-600 uppercase tracking-wider">Jadwal Final</div>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
