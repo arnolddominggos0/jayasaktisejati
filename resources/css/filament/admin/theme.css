@@ -2067,29 +2067,121 @@
 }
 
 /* =======================================================================
-   Sprint 4.x.1 / 4.x.2 - Vessel Plan Workspace Visual Polish
+   Sprint 13.7 - Hero Composition (DESIGN FREEZE — final)
+   Hero tidak boleh didesain ulang kecuali ada usability issue nyata.
+
+   Kontrak visual (rhythm: 6 < 12 < 18 — dalam blok < antar blok):
+   - Heading Filament = satu-satunya headline (24px bold), gap 12px ke identitas.
+   - Identitas = Route 15px/600 + badge tenang inline, meta 13px, gap 6px.
+   - Guidance  = label 12px Title Case abu + body 15px/500 neutral,
+                 accent bar kiri 2px bertint status (300-series) = sinyal,
+                 bukan alert. Jarak identity->guidance 18px.
+   - Hero->KPI = row-gap section 14px (satu kesatuan visual).
+   - Header Actions = native Filament (flex-start di sm+, sm:mt-7 bawaan).
    ======================================================================= */
 
-/* --- 1. Header: badge fase + metadata, alignment CTA -------------------- */
-.vp-page-meta {
+/* Reset Filament text-lg; beri napas dari heading (native mt-2 terlalu rapat). */
+.fi-resource-edit-record-page.fi-resource-vessel-plans .fi-header-subheading {
+    font-size: 0.875rem;
+    line-height: 1.4;
+    color: #4B5563;
+    margin-top: 0.75rem;     /* 12px — heading berdiri sendiri, identitas tidak menempel */
+    padding-bottom: 0;       /* gap dikendalikan oleh fi-page, bukan di sini */
+}
+
+/* --- Identity block: Route+badge inline, lalu Customer (1 blok rapat) -- */
+.vp-hero-identity {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;          /* 6px antar elemen — tetap 1 unit, tidak menumpuk */
+}
+
+/* 1 — Title row: Route + status badge inline (status = atribut identitas) */
+.vp-hero-title-row {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.875rem;
-    margin-top: 0.25rem;
+    gap: 0.5rem;
 }
-.vp-page-context {
-    font-size: var(--mon-fs-cap);
-    color: var(--mon-neutral, #6B7280);
-    letter-spacing: 0.01em;
-}
-/* CTA header disejajarkan ke atas (baseline judul), bukan ke tengah blok
-   judul+badge+metadata yang sekarang 2 baris — scope ke halaman ini saja,
-   tidak menyentuh .fi-header global. */
-.fi-resource-edit-record-page.fi-resource-vessel-plans .fi-header {
-    align-items: flex-start;
+/* Badge di hero: lebih tenang dari chip global agar menyatu dengan route 15px,
+   bukan bersaing dengannya. Scoped — mon-badge global tidak berubah. */
+.vp-hero-title-row .mon-badge {
+    padding: 0.125rem 0.5rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
 }
 
+/* 2 — Route: sekunder terhadap heading Filament (bukan headline) */
+.vp-hero-route {
+    font-size: 0.9375rem;    /* 15px — jelas di bawah heading 24px */
+    font-weight: 600;
+    line-height: 1.3;
+    color: #1F2937;
+    letter-spacing: -0.01em;
+}
+
+/* 3 — Secondary rail: Customer (dominant) > Jadwal (lighter) */
+.vp-hero-meta {
+    font-size: 0.8125rem;    /* 13px */
+    line-height: 1.35;
+}
+.vp-hero-meta-customer {
+    font-weight: 500;
+    color: #374151;
+}
+.vp-hero-meta-count {
+    font-weight: 400;
+    color: #9CA3AF;
+}
+.vp-hero-meta-sep {
+    color: #D1D5DB;         /* halus tapi terlihat — tanpa ini terbaca sbg spasi aneh */
+    font-weight: 400;
+    margin: 0 0.25rem;
+}
+
+/* --- Guidance block — accent visual (bukan alert): bar lembut + teks netral */
+.vp-hero-next {
+    margin-top: 1.125rem;    /* 18px — zona guidance jelas terpisah dari identity */
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;           /* 4px label -> body */
+    padding-left: 0.75rem;
+    border-left: 2px solid #E5E7EB;
+}
+.vp-hero-next-label {
+    font-size: 0.75rem;      /* 12px Title Case — label tenang, bukan teriakan */
+    font-weight: 600;
+    color: #6B7280;
+    line-height: 1.2;
+}
+.vp-hero-next-body {
+    font-size: 0.9375rem;   /* 15px medium — setara route, jawaban "kerjakan apa" */
+    font-weight: 500;
+    line-height: 1.5;
+    color: #374151;         /* neutral untuk semua status — tone hanya di bar */
+    text-wrap: pretty;      /* hindari orphan saat wrap di viewport sempit */
+}
+/* Accent bar bertint status — soft (300-series), sinyal bukan peringatan */
+.vp-hero-next--neutral  { border-left-color: #E5E7EB; }
+.vp-hero-next--warning  { border-left-color: #FCD34D; }
+.vp-hero-next--danger   { border-left-color: #FCA5A5; }
+.vp-hero-next--success  { border-left-color: #6EE7B7; }
+
+/* Header Actions sejajar zona identitas (top), bukan floating center.
+   Native-friendly: hanya ganti align-items di breakpoint sm; sm:mt-7 bawaan
+   Filament (kompensasi tinggi breadcrumb) dibiarkan bekerja apa adanya. */
+@media (min-width: 640px) {
+    .fi-resource-edit-record-page.fi-resource-vessel-plans .fi-header {
+        align-items: flex-start;
+    }
+}
+
+/* Rapatkan Hero ke KPI strip.
+   Jarak berasal dari flex gap-y-8 (2rem) pada <section> pembungkus page —
+   bukan margin — jadi dikendalikan lewat row-gap, bukan margin-top sibling. */
+.fi-resource-edit-record-page.fi-resource-vessel-plans > section {
+    row-gap: 0.875rem;
+}
 /* --- 2. KPI strip: sekunder, tidak bersaing dengan workspace utama ------ */
 .vp-kpi-strip {
     background: var(--vp-surface-muted);

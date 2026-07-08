@@ -5,12 +5,12 @@ namespace App\Filament\Resources\VesselPlanResource\Pages;
 use App\Enums\VesselPlanStatus;
 use App\Filament\Resources\VesselPlanResource;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanAnalysis;
-use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanScheduleAnalysis;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanReviewHistory;
+use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanScheduleAnalysis;
+use App\Supports\BusinessRouteResolver;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
-use App\Supports\BusinessRouteResolver;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
@@ -30,45 +30,75 @@ class EditVesselPlan extends EditRecord
         return $this->record->period_month->translatedFormat('F Y');
     }
 
-    public function getHeading(): string | Htmlable
+    public function getHeading(): string|Htmlable
     {
-        return 'Vessel Plan — ' . $this->record->period_month->translatedFormat('F Y');
+        return 'Vessel Plan — '.$this->record->period_month->translatedFormat('F Y');
     }
 
-    // Badge fase (warna dari VesselPlanStatus::color() via class mon-badge-*
-    // yang sudah ada) + konteks rute/customer/jumlah jadwal dalam satu baris.
-    public function getSubheading(): string | Htmlable | null
+    // Sprint 13.7 — Hero DESIGN FREEZE (final).
+    // Struktur ini tidak boleh didesain ulang kecuali ada usability issue nyata.
+    // Heading Filament ("Vessel Plan — Juli 2026") tetap primary headline.
+    // Subheading = 2 zona:
+    //   Identitas : Route + badge status inline (1 baris) → Customer · N Jadwal.
+    //               Route sekunder terhadap heading (15px), badge menempel ke
+    //               route sehingga status terbaca sebagai atribut identitas.
+    //   Guidance  : "Langkah Saat Ini" — accent bar kiri 2px bertint status,
+    //               teks neutral (guidance, bukan alert), satu kalimat em dash.
+    // Layout 2-column & posisi Header Actions = native Filament, tidak diubah.
+    // Styling: theme.css blok "Sprint 13.7 - Hero Composition (DESIGN FREEZE)".
+    public function getSubheading(): string|Htmlable|null
     {
         $status = $this->record->status;
+        $color = $status->color();
 
-        $colorClass = match ($status->color()) {
+        $badgeClass = match ($color) {
             'warning' => 'mon-badge-warning',
             'danger' => 'mon-badge-danger',
             'success' => 'mon-badge-success',
             default => 'mon-badge-neutral',
         };
 
-        $route = BusinessRouteResolver::forPlan($this->record);
+        $rute = BusinessRouteResolver::forPlan($this->record);
+        $pelanggan = $this->record->customer?->name ?? '—';
+        $count = $this->record->items->count();
 
-        $parts = array_filter([
-            $route !== '—' ? $route : null,
-            optional($this->record->customer)->name,
-            $this->record->items->count() . ' jadwal',
-        ]);
+        // Guidance body — satu kalimat natural (em dash), tone hanya pada
+        // accent bar kiri; teks tetap neutral supaya terbaca guidance, bukan alert.
+        $guidanceTone = match ($color) {
+            'warning' => 'vp-hero-next--warning',
+            'danger' => 'vp-hero-next--danger',
+            'success' => 'vp-hero-next--success',
+            default => 'vp-hero-next--neutral',
+        };
 
         $guidance = match ($status) {
-            VesselPlanStatus::Draft    => 'Susun jadwal kapal sebelum dikirim ke TAM.',
-            VesselPlanStatus::Sent     => "Menunggu Final Schedule dari TAM.\nSesuaikan ETD, ETA, dan Cargo Plan sebelum finalisasi.",
-            VesselPlanStatus::Revision => 'Revisi jadwal sesuai feedback dari TAM sebelum dikirim kembali.',
-            VesselPlanStatus::Final    => 'Vessel Plan telah difinalisasi.',
+            VesselPlanStatus::Draft => 'Susun jadwal kapal sebelum dikirim ke TAM.',
+            // &nbsp; sebelum em dash: dash tidak boleh jatuh di awal baris saat wrap.
+            VesselPlanStatus::Sent => 'Menunggu Final Schedule dari TAM&nbsp;— sesuaikan ETD, ETA, dan Cargo Plan sebelum finalisasi.',
+            VesselPlanStatus::Revision => 'Revisi jadwal sesuai feedback dari TAM&nbsp;— kirim kembali setelah selesai.',
+            VesselPlanStatus::Final => 'Vessel Plan telah difinalisasi.',
         };
 
         return new HtmlString(
-            '<div class="vp-page-meta">'
-                . '<span class="mon-badge ' . $colorClass . '">' . e($status->label()) . '</span>'
-                . '<span class="vp-page-context">' . e(implode('  ·  ', $parts)) . '</span>'
-                . '</div>'
-                . '<p class="text-sm text-gray-500 leading-5 mt-2 whitespace-pre-line">' . e($guidance) . '</p>'
+            '<div class="vp-hero">'
+            // Identity block: Route + badge inline, lalu Customer•Jadwal (1 blok rapat)
+            .'<div class="vp-hero-identity">'
+            .'<div class="vp-hero-title-row">'
+            .'<span class="vp-hero-route">'.e($rute).'</span>'
+            .'<span class="mon-badge '.$badgeClass.'">'.e($status->label()).'</span>'
+            .'</div>'
+            .'<div class="vp-hero-meta">'
+            .'<span class="vp-hero-meta-customer">'.e($pelanggan).'</span>'
+            .' <span class="vp-hero-meta-sep" aria-hidden="true">&middot;</span> '
+            .'<span class="vp-hero-meta-count">'.e($count.' Jadwal').'</span>'
+            .'</div>'
+            .'</div>'
+            // Guidance block: dipisah jelas dari identity
+            .'<div class="vp-hero-next '.$guidanceTone.'">'
+            .'<span class="vp-hero-next-label">Langkah Saat Ini</span>'
+            .'<span class="vp-hero-next-body">'.$guidance.'</span>'
+            .'</div>'
+            .'</div>'
         );
     }
 
@@ -76,12 +106,16 @@ class EditVesselPlan extends EditRecord
     {
         parent::mount($record);
 
-        // Eager-load semua relasi yang dibutuhkan Tab 2 (Analysis) dan Tab 3 (History)
+        // Eager-load relasi Tab 2/3 + identitas Hero (pol/pod/customer)
+        // agar metadata rail tidak trigger lazy-load saat render subheading.
         $this->record->loadMissing([
             'items.vessel',
             'items.shippingLine',
             'items.voyage.scheduleHistories',
             'snapshots',
+            'pol',
+            'pod',
+            'customer',
         ]);
     }
 
@@ -100,7 +134,7 @@ class EditVesselPlan extends EditRecord
     {
         return [
             // VesselPlanScheduleAnalysis::class,
-            VesselPlanReviewHistory::class
+            VesselPlanReviewHistory::class,
         ];
     }
 
@@ -116,9 +150,9 @@ class EditVesselPlan extends EditRecord
                 ->label('Kirim ke TAM (WhatsApp)')
                 ->icon('heroicon-o-paper-airplane')
                 ->color('primary')
-                ->visible(fn() => $this->record->isDraft())
-                ->disabled(fn() => ! $this->record->canSubmitDraft())
-                ->tooltip(fn() => $this->submitDraftDisabledReason())
+                ->visible(fn () => $this->record->isDraft())
+                ->disabled(fn () => ! $this->record->canSubmitDraft())
+                ->tooltip(fn () => $this->submitDraftDisabledReason())
                 ->requiresConfirmation()
                 ->action(function () {
                     $this->record->submitDraft(auth()->id());
@@ -139,7 +173,7 @@ class EditVesselPlan extends EditRecord
                 ->label('Setujui & Finalisasi')
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
-                ->visible(fn() => $this->record->isSent())
+                ->visible(fn () => $this->record->isSent())
                 ->requiresConfirmation()
                 ->action(function () {
                     $count = $this->record->finalizeSchedule(auth()->id());
@@ -156,7 +190,7 @@ class EditVesselPlan extends EditRecord
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
                 ->outlined()
-                ->visible(fn() => $this->record->isSent())
+                ->visible(fn () => $this->record->isSent())
                 ->form([
                     Textarea::make('reason')
                         ->label('Alasan Penolakan')
@@ -177,9 +211,9 @@ class EditVesselPlan extends EditRecord
                 ->label('Hapus Vessel Plan')
                 ->color('danger')
                 ->outlined()
-                ->visible(fn() => $this->record->isDraft())
+                ->visible(fn () => $this->record->isDraft())
                 ->requiresConfirmation()
-                ->action(fn() => $this->record->delete()),
+                ->action(fn () => $this->record->delete()),
         ];
     }
 
@@ -203,10 +237,10 @@ class EditVesselPlan extends EditRecord
     protected function mutateFormDataBeforeSave(array $data): array
     {
         if ($this->record->isRevision()) {
-            $data['status']          = VesselPlanStatus::Draft;
+            $data['status'] = VesselPlanStatus::Draft;
             $data['feedback_reason'] = null;
-            $data['feedback_by']     = null;
-            $data['feedback_at']     = null;
+            $data['feedback_by'] = null;
+            $data['feedback_at'] = null;
         }
 
         return $data;
