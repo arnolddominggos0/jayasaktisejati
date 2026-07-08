@@ -33,10 +33,12 @@ class VesselPlanAnalysis extends Widget
             'riskLevel'      => $analysis['risk_level']     ?? 'valid',
             'violationCount' => count($analysis['violations'] ?? []),
             'statusLabel'    => $sop['label'],
+            // Shade 700: chip 11px di atas bg-*-50 butuh >=4.5:1 (WCAG AA);
+            // shade 600 hanya ~3.1:1 pada ukuran sekecil ini.
             'statusColor' => match ($sop['color']) {
-                'success' => 'text-green-600',
-                'warning' => 'text-amber-600',
-                'danger'  => 'text-red-600',
+                'success' => 'text-green-700',
+                'warning' => 'text-amber-700',
+                'danger'  => 'text-red-700',
                 default   => 'text-gray-600',
             },
             'statusBg' => match ($sop['color']) {

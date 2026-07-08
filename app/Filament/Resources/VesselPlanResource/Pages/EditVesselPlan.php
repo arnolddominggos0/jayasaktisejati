@@ -6,7 +6,6 @@ use App\Enums\VesselPlanStatus;
 use App\Filament\Resources\VesselPlanResource;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanAnalysis;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanReviewHistory;
-use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanScheduleAnalysis;
 use App\Supports\BusinessRouteResolver;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
@@ -35,17 +34,18 @@ class EditVesselPlan extends EditRecord
         return 'Vessel Plan — '.$this->record->period_month->translatedFormat('F Y');
     }
 
-    // Sprint 13.7 — Hero DESIGN FREEZE (final).
-    // Struktur ini tidak boleh didesain ulang kecuali ada usability issue nyata.
-    // Heading Filament ("Vessel Plan — Juli 2026") tetap primary headline.
-    // Subheading = 2 zona:
-    //   Identitas : Route + badge status inline (1 baris) → Customer · N Jadwal.
-    //               Route sekunder terhadap heading (15px), badge menempel ke
-    //               route sehingga status terbaca sebagai atribut identitas.
-    //   Guidance  : "Langkah Saat Ini" — accent bar kiri 2px bertint status,
-    //               teks neutral (guidance, bukan alert), satu kalimat em dash.
-    // Layout 2-column & posisi Header Actions = native Filament, tidak diubah.
-    // Styling: theme.css blok "Sprint 13.7 - Hero Composition (DESIGN FREEZE)".
+    /**
+     * Workspace Hero — Baseline Design Language v1.0
+     *
+     * Composition (jangan diubah tanpa usability issue nyata):
+     *   Heading (native Filament, satu-satunya headline)
+     *     ↓ Identity   : Route + badge status inline → Customer · N Jadwal
+     *     ↓ Guidance   : "Langkah Saat Ini" + accent bar bertint status
+     *     ↓ KPI Strip  : header widget VesselPlanAnalysis
+     *
+     * Design Freeze: Sprint 13.8. Hero ini adalah baseline untuk seluruh
+     * workspace lain. Styling: theme.css blok "Hero Composition (DESIGN FREEZE)".
+     */
     public function getSubheading(): string|Htmlable|null
     {
         $status = $this->record->status;
@@ -129,11 +129,9 @@ class EditVesselPlan extends EditRecord
         return 1;
     }
 
-    // 3. Analisa Jadwal Kapal  4. Riwayat Review — below the form
     protected function getFooterWidgets(): array
     {
         return [
-            // VesselPlanScheduleAnalysis::class,
             VesselPlanReviewHistory::class,
         ];
     }

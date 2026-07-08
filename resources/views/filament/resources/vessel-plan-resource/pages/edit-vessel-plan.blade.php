@@ -17,17 +17,6 @@
 
 $record = $this->record;
 $items  = $record->items->sortBy('planned_etd');
-
-// Sprint 12.9 — Tab Jadwal header card disederhanakan:
-// - Status pill dihapus (sudah ditampilkan oleh Header Workspace VesselPlanAnalysis).
-// - Variabel statusLabel/statusStyle tidak lagi dipakai di blade ini.
-//
-// Sprint 13.1 — Header Tab Jadwal dipangkas kembali:
-// - POL/POD badges & roster Shipping Line dihapus (sudah ada di Workspace
-//   main subheading via EditVesselPlan::getSubheading()).
-// - Filter Card Filament diganti dengan slim inline toolbar (dropdown +
-//   Reset text link) yang dispatch Livewire event 'vpFilterShippingLine'
-//   ke RelationManager untuk live update tanpa reload halaman.
 @endphp
 
 <x-filament-panels::page
@@ -57,17 +46,17 @@ $items  = $record->items->sortBy('planned_etd');
         {{-- Tab bar --}}
         <div class="vp-tab-bar">
 
-            <button @click="tab = 'schedule'" :class="tab === 'schedule' ? 'vp-tab is-active' : 'vp-tab'">
+            <button type="button" @click="tab = 'schedule'" :class="tab === 'schedule' ? 'vp-tab is-active' : 'vp-tab'">
                 <x-heroicon-o-calendar-days class="w-4 h-4" />
                 Jadwal
             </button>
 
-            <button @click="tab = 'analysis'" :class="tab === 'analysis' ? 'vp-tab is-active' : 'vp-tab'">
+            <button type="button" @click="tab = 'analysis'" :class="tab === 'analysis' ? 'vp-tab is-active' : 'vp-tab'">
                 <x-heroicon-o-chart-bar-square class="w-4 h-4" />
                 Review Jadwal
             </button>
 
-            <button @click="tab = 'history'" :class="tab === 'history' ? 'vp-tab is-active' : 'vp-tab'">
+            <button type="button" @click="tab = 'history'" :class="tab === 'history' ? 'vp-tab is-active' : 'vp-tab'">
                 <x-heroicon-o-clock class="w-4 h-4" />
                 Riwayat Jadwal
             </button>
@@ -80,17 +69,10 @@ $items  = $record->items->sortBy('planned_etd');
         ─────────────────────────────────────────────────────────────────── --}}
         <div x-show="tab === 'schedule'">
 
-            {{-- Sprint 12.9 — Header card Tab Jadwal disederhanakan:
-                 status pill dihapus (sudah ditampilkan oleh Header Workspace),
-                 konteks POL/POD + roster Shipping Line ditambahkan sebagai
-                 context bar untuk membantu Planner men-sync Final Schedule TAM per pelayaran.
-
-  Sprint 13.1 — Header Tab Jadwal dipangkas kembali:
-   - POL/POD badges & roster Shipping Line dihapus (sudah ada di Workspace
-     main subheading: "Jakarta → Bitung · Toyota Astra Motor · 9 jadwal").
-   - Filter Card Filament diganti dengan slim toolbar inline (dropdown +
-     Reset text link) yang dispatch Livewire event ke RelationManager.
-   - Toolbar terasa sebagai bagian tabel, bukan form baru. --}}
+            {{-- Header card Tab Jadwal: identitas + slim toolbar filter Shipping Line.
+                 Toolbar dispatch Livewire event 'vpFilterShippingLine' ke
+                 RelationManager untuk live update tanpa reload halaman.
+                 Status pill & POL/POD sengaja tidak di sini — sudah ada di Hero. --}}
             @php
                 $shippingLines = $items
                     ->pluck('shippingLine')
@@ -115,7 +97,7 @@ $items  = $record->items->sortBy('planned_etd');
                         </p>
                     </div>
 
-                    {{-- Sprint 13.3 — Filter Shipping Line: label inline + dropdown, bukan search box. --}}
+                    {{-- Filter Shipping Line: label inline + dropdown, bukan search box. --}}
                     @if ($shippingLines->count() > 1)
                         <div
                             class="flex items-center gap-2"
@@ -148,9 +130,7 @@ $items  = $record->items->sortBy('planned_etd');
                 </div>
             </div>
 
-            {{-- Sprint 13.3 — Simpan toolbar: bagian dari tabel, bukan card terpisah.
-                 Caption "Perbarui ETD..." dihapus (sudah ada di Section Header
-                 "9 jadwal kapal menunggu penyesuaian Final Schedule dari TAM").
+            {{-- Form actions (Simpan/Batal) menempel sebagai toolbar tabel.
                  Livewire form wiring (wire:submit="save") preserved as-is. --}}
             @capture($form)
                 @unless($record->isFinal())

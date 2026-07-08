@@ -2067,11 +2067,11 @@
 }
 
 /* =======================================================================
-   Sprint 13.7 - Hero Composition (DESIGN FREEZE — final)
+   Hero Composition (DESIGN FREEZE — Sprint 13.8, Baseline v1.0)
    Hero tidak boleh didesain ulang kecuali ada usability issue nyata.
 
    Kontrak visual (rhythm: 6 < 12 < 18 — dalam blok < antar blok):
-   - Heading Filament = satu-satunya headline (24px bold), gap 12px ke identitas.
+   - Heading Filament = satu-satunya headline (30px bold di sm+), gap 12px ke identitas.
    - Identitas = Route 15px/600 + badge tenang inline, meta 13px, gap 6px.
    - Guidance  = label 12px Title Case abu + body 15px/500 neutral,
                  accent bar kiri 2px bertint status (300-series) = sinyal,
@@ -2131,7 +2131,7 @@
 }
 .vp-hero-meta-count {
     font-weight: 400;
-    color: #9CA3AF;
+    color: #6B7280;         /* gray-500: 4.6:1 — gray-400 gagal WCAG AA (2.4:1) */
 }
 .vp-hero-meta-sep {
     color: #D1D5DB;         /* halus tapi terlihat — tanpa ini terbaca sbg spasi aneh */
@@ -2221,19 +2221,7 @@
     vertical-align: middle;
 }
 
-/* --- 5. Form actions (Simpan/Batal): beri parent visual, bukan hack ----- */
-.vp-form-actions-card {
-    background: var(--vp-surface-muted);
-    border: 1px solid var(--mon-border-soft, #EEF2F7);
-    border-radius: var(--mon-radius-sm, 0.5rem);
-    padding: 0.75rem 1rem;
-    margin-bottom: 1rem;
-}
-.vp-form-actions-card .fi-form {
-    gap: 0;
-}
-
-/* --- 6. Tab navigation: menyatu dengan bahasa desain Monitoring -------- */
+/* --- 5. Tab navigation: menyatu dengan bahasa desain Monitoring -------- */
 .vp-tab-bar {
     display: flex;
     align-items: center;
@@ -2261,4 +2249,10 @@
     color: var(--mon-accent-600, #1D4ED8);
     font-weight: 600;
     border-bottom-color: var(--mon-accent-600, #1D4ED8);
+}
+/* Sprint 13.8 — keyboard focus harus terlihat (audit acceptance:
+   outline default ter-reset jadi none, tab tak bisa dinavigasi visual). */
+.vp-tab:focus-visible {
+    outline: 2px solid var(--mon-accent-600, #1D4ED8);
+    outline-offset: -2px;
 }
