@@ -2132,7 +2132,7 @@
 .vp-hero-meta {
     display: flex;
     flex-direction: column;
-    gap: 0.125rem;           /* 2px — tetap satu unit rapat */
+    gap: 0.25rem;            /* 4px — cukup napas, tidak berhimpitan (was 2px) */
 }
 .vp-hero-meta-customer {
     font-size: 0.8125rem;    /* 13px */
@@ -2212,6 +2212,7 @@
    Hero Summary terasa kelanjutan Guidance, bukan kotak dashboard baru. */
 .vp-kpi-strip {
     background: var(--vp-surface-muted);
+    border: 1px solid var(--mon-border-soft, #EEF2F7);
     padding: 1.25rem 2rem;
 }
 
