@@ -30,34 +30,45 @@ class EditVesselPlan extends EditRecord
         return $this->record->period_month->translatedFormat('F Y');
     }
 
+    /**
+     * Sprint 14.11 (brief "14.7") — Status naik ke heading: Draft adalah
+     * status Vessel Plan (objek), bukan status Route. Pola Object Page
+     * enterprise (GitHub PR, Jira, Fiori): badge status berdampingan dengan
+     * judul objek, bukan dengan atributnya.
+     */
     public function getHeading(): string|Htmlable
     {
-        return 'Vessel Plan — '.$this->record->period_month->translatedFormat('F Y');
-    }
-
-    /**
-     * Workspace Hero — Baseline Design Language v1.0
-     *
-     * Composition (jangan diubah tanpa usability issue nyata):
-     *   Heading (native Filament, satu-satunya headline)
-     *     ↓ Identity   : Route + badge status inline → Customer · N Jadwal
-     *     ↓ Guidance   : "Langkah Saat Ini" + accent bar bertint status
-     *     ↓ KPI Strip  : header widget VesselPlanAnalysis
-     *
-     * Design Freeze: Sprint 13.8. Hero ini adalah baseline untuk seluruh
-     * workspace lain. Styling: theme.css blok "Hero Composition (DESIGN FREEZE)".
-     */
-    public function getSubheading(): string|Htmlable|null
-    {
         $status = $this->record->status;
-        $color = $status->color();
 
-        $badgeClass = match ($color) {
+        $badgeClass = match ($status->color()) {
             'warning' => 'mon-badge-warning',
             'danger' => 'mon-badge-danger',
             'success' => 'mon-badge-success',
             default => 'mon-badge-neutral',
         };
+
+        return new HtmlString(
+            e('Vessel Plan — '.$this->record->period_month->translatedFormat('F Y'))
+            .' <span class="mon-badge '.$badgeClass.' vp-heading-badge">'.e($status->label()).'</span>'
+        );
+    }
+
+    /**
+     * Workspace Hero — Baseline Design Language v1.1 (Object Header)
+     *
+     * Composition (Sprint 14.11):
+     *   Heading + Status badge (objek + statusnya, satu baris)
+     *     ↓ Identity   : Route → Customer • N Jadwal (satu grup, 2 baris)
+     *     ↓ Guidance   : "Langkah Saat Ini" + accent bar bertint status
+     *     ↓ Summary    : widget VesselPlanAnalysis — menyatu sebagai bagian
+     *                    bawah Object Header (divider tipis, bg muted),
+     *                    bukan kotak kedua. Styling: theme.css blok
+     *                    "Hero Composition".
+     */
+    public function getSubheading(): string|Htmlable|null
+    {
+        $status = $this->record->status;
+        $color = $status->color();
 
         $rute = BusinessRouteResolver::forPlan($this->record);
         $pelanggan = $this->record->customer?->name ?? '—';
