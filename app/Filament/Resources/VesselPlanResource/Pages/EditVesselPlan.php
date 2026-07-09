@@ -95,7 +95,6 @@ class EditVesselPlan extends EditRecord
             .'</div>'
             .'<div class="vp-hero-meta">'
             .'<span class="vp-hero-meta-customer">'.e($pelanggan).'</span>'
-            .' <span class="vp-hero-meta-sep" aria-hidden="true">&middot;</span> '
             .'<span class="vp-hero-meta-count">'.e($count.' Jadwal').'</span>'
             .'</div>'
             .'</div>'
