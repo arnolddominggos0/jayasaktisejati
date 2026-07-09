@@ -1,11 +1,11 @@
 <div class="rounded-xl border bg-white px-6 py-5 mb-6"
      x-data="{ open: false, entry: null }">
 
-    <h3 class="text-base font-semibold mb-1">Riwayat Review</h3>
-    <p class="text-sm text-gray-500 mb-4">Jejak pengiriman draft, revisi, dan persetujuan final vessel plan.</p>
+    <h3 class="text-base font-semibold mb-1">Log Persetujuan</h3>
+    <p class="text-sm text-gray-500 mb-4">Riwayat audit: siapa, kapan, dan status apa yang pernah terjadi pada vessel plan ini.</p>
 
     @if (empty($entries))
-        <div class="text-sm text-gray-400">Belum ada riwayat review.</div>
+        <div class="text-sm text-gray-400">Belum ada riwayat persetujuan.</div>
     @else
         <div class="overflow-x-auto rounded-lg border">
             <table class="w-full text-sm">
@@ -28,7 +28,7 @@
                             </td>
                             <td class="px-4 py-3 text-gray-700">{{ $entry['actor'] }}</td>
                             <td class="px-4 py-3 text-center">
-                                @if (!empty($entry['note']) || !empty($entry['meta']))
+                                @if (!empty($entry['note']) || !empty($entry['snapshot']))
                                     <button
                                         type="button"
                                         class="text-xs text-blue-600 hover:underline"
@@ -75,24 +75,25 @@
 
             <div class="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
 
-                {{-- Note --}}
+                {{-- Ringkasan / Feedback TAM — label dinamis, lihat note_label --}}
                 <template x-if="entry?.note">
                     <div>
-                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1">Catatan</div>
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1" x-text="entry.note_label"></div>
                         <div class="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-800" x-text="entry.note"></div>
                     </div>
                 </template>
 
-                {{-- Meta --}}
-                <template x-if="entry?.meta && Object.keys(entry.meta).length > 0">
+                {{-- Snapshot Saat Persetujuan: hanya field yang menjelaskan
+                     keputusan (Status Plan, Jumlah Jadwal) — lihat audit
+                     Sprint 13.10 di VesselPlanReviewHistory::buildSnapshot(). --}}
+                <template x-if="entry?.snapshot && entry.snapshot.length > 0">
                     <div>
-                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Detail</div>
+                        <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Snapshot Saat Persetujuan</div>
                         <dl class="divide-y rounded-lg border overflow-hidden">
-                            <template x-for="[key, val] in Object.entries(entry.meta)" :key="key">
+                            <template x-for="row in entry.snapshot" :key="row.label">
                                 <div class="flex justify-between gap-4 px-3 py-2 text-xs">
-                                    <dt class="text-gray-500 capitalize" x-text="key.replace(/_/g, ' ')"></dt>
-                                    <dd class="text-gray-800 font-medium text-right break-all"
-                                        x-text="typeof val === 'object' ? JSON.stringify(val) : val"></dd>
+                                    <dt class="text-gray-500" x-text="row.label"></dt>
+                                    <dd class="text-gray-800 font-medium text-right" x-text="row.value"></dd>
                                 </div>
                             </template>
                         </dl>
