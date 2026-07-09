@@ -1,14 +1,26 @@
 {{--
-    Health Strip — bagian dari Workspace Hero (Baseline Design Language v1.0).
-    Sprint 14.3: bukan lagi 4 tile dashboard — hanya menjawab satu pertanyaan,
-    "apakah jadwal ini sehat?": ETD Gap (satu-satunya angka ber-threshold SOP)
-    + status card Risiko. Jumlah Jadwal sudah di Hero meta; Avg Sailing tetap
-    di tab Review Jadwal (rumah analytics).
+    Decision Summary — bagian dari Workspace Hero (Baseline Design Language v1.0).
+    Sprint 14.4: maks. 3 blok, semua menjawab pertanyaan planner sehari-hari —
+    "berapa unit bulan ini" (Rencana Muatan), "apakah ETD Gap aman" (ETD Gap),
+    dan "apakah plan ini siap" (Verdict). Jumlah Jadwal sudah di Hero meta;
+    Avg Sailing tetap di tab Review Jadwal (rumah analytics).
     Teks sekunder minimal gray-500 (WCAG AA); gray-400 hanya untuk dekoratif.
 --}}
 <div class="vp-kpi-strip rounded-xl border mb-2">
 
     <div class="flex items-center flex-wrap gap-x-7 gap-y-3 py-0.5">
+
+        {{-- Rencana Muatan — context metric: apa yang benar-benar direncanakan
+             planner (unit muatan), bukan jumlah kapal (sudah ada di Hero). --}}
+        <div>
+            <div class="text-xs font-medium text-gray-500">Rencana Muatan</div>
+            <div class="mt-0.5 flex items-baseline gap-1.5">
+                <span class="text-2xl font-semibold leading-none tracking-tight text-gray-800">{{ $cargoTotal }}</span>
+                <span class="text-sm text-gray-500">unit</span>
+            </div>
+        </div>
+
+        <div class="vp-kpi-divider w-px h-8 self-center hidden sm:block" aria-hidden="true"></div>
 
         {{-- ETD Gap — fokus utama: angka besar, target sebagai subtitle --}}
         <div>
@@ -25,10 +37,12 @@
         {{-- Divider mengikuti konten (h-8), bukan memenuhi strip --}}
         <div class="vp-kpi-divider w-px h-8 self-center hidden sm:block" aria-hidden="true"></div>
 
-        {{-- Health Verdict — tipografis, bukan chip/card berlatar.
-             Title 15px/700 (skala route Hero), warna semantik hanya di title. --}}
+        {{-- Decision Verdict — tipografis, bukan chip/card berlatar. Ikon +
+             label = kesimpulan keputusan, bukan sekadar status mentah. --}}
         <div>
-            <div class="text-[15px] font-bold leading-tight {{ $statusColor }}">{{ $statusLabel }}</div>
+            <div class="text-[15px] font-bold leading-tight {{ $statusColor }}">
+                <span aria-hidden="true">{{ $verdictIcon }}</span> {{ $statusLabel }}
+            </div>
             <div class="mt-0.5 text-xs text-gray-600">{{ $statusSub }}</div>
         </div>
 

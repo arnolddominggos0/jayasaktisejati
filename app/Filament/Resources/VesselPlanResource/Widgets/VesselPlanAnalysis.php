@@ -21,34 +21,43 @@ class VesselPlanAnalysis extends Widget
         }
 
         $analysis = $this->record->analyze();
-        $sop = $this->record->sopStatus();
 
-        // Sprint 14.3 — Health Strip: hanya Max ETD Gap + Risiko.
-        // Jumlah Jadwal sudah tampil di Hero meta; Avg Sailing adalah metrik
-        // analitis dan tetap tersedia di tab Review Jadwal.
+        $riskLevel = $analysis['risk_level'] ?? 'valid';
+        $isEmpty = ($analysis['schedule_count'] ?? 0) === 0;
+
+        // Sprint 14.4 — subtitle verdict dari gap_warnings yang SUDAH dihitung
+        // analyzer (severity per vessel), bukan angka baru. Tidak memakai kata
+        // "Revisi" — sudah dipakai VesselPlanStatus::Revision untuk konsep lain
+        // (TAM meminta revisi plan), beda arti dari "ETD Gap melebihi SOP".
+        $gapWarnings = $analysis['gap_warnings'] ?? [];
+        $criticalCount = count(array_filter($gapWarnings, fn ($w) => $w['severity'] === 'critical'));
+        $warningCount = count($gapWarnings) - $criticalCount;
+
+        [$statusColor, $verdictIcon, $statusLabel, $statusSub] = match (true) {
+            $isEmpty => ['text-gray-600', '○', 'Belum Ada Jadwal', 'Tambahkan rencana kapal untuk memulai.'],
+            $riskLevel === 'critical' => ['text-red-700', '✕', 'Perlu Perhatian Segera', $criticalCount.' jadwal ETD Gap sangat tinggi (>10 hari)'],
+            $riskLevel === 'warning' => ['text-amber-700', '⚠', 'Perlu Ditinjau', $warningCount.' jadwal ETD Gap melewati target SOP'],
+            default => ['text-green-700', '✓', 'Siap Dikirim', 'Semua ETD Gap masih dalam SOP'],
+        };
+
+        // Sprint 14.4 — Decision Summary: maks. 3 blok (Rencana Muatan, ETD
+        // Gap, Verdict). Rencana Muatan dijumlah dari relasi items yang SUDAH
+        // dimuat (dipakai analyze() juga) — agregasi presentasi, bukan query
+        // baru. Jumlah Jadwal & Avg Sailing tetap tidak dikembalikan ke sini
+        // (lihat audit Sprint 14.2 & 14.3) — Avg Sailing tetap rumah di tab
+        // Review Jadwal.
         return [
+            'cargoTotal' => $this->record->items->sum('cargo_plan'),
             'maxGap' => $analysis['max_gap'] ?? 0,
             'idealGap' => $analysis['gap_limit'] ?? 6,
             'gapOk' => $analysis['gap_ok'] ?? false,
             'violations' => $analysis['violations'] ?? [],
-            'riskLevel' => $analysis['risk_level'] ?? 'valid',
+            'riskLevel' => $riskLevel,
             'violationCount' => count($analysis['violations'] ?? []),
-            'statusLabel' => $sop['label'],
-            // Subtitle pendek untuk status card — versi ringkas dari
-            // violations (yang tetap tampil lengkap di baris detail).
-            'statusSub' => match ($analysis['risk_level'] ?? 'valid') {
-                'warning' => 'ETD Gap melewati target',
-                'critical' => 'ETD Gap sangat tinggi',
-                default => 'Dalam batas SOP',
-            },
-            // Sprint 14.3A — verdict tipografis (bukan chip berlatar):
-            // shade 700 di atas surface muted tetap lolos WCAG AA.
-            'statusColor' => match ($sop['color']) {
-                'success' => 'text-green-700',
-                'warning' => 'text-amber-700',
-                'danger' => 'text-red-700',
-                default => 'text-gray-600',
-            },
+            'verdictIcon' => $verdictIcon,
+            'statusLabel' => $statusLabel,
+            'statusSub' => $statusSub,
+            'statusColor' => $statusColor,
         ];
     }
 }
