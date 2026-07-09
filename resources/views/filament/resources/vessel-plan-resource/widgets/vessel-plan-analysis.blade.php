@@ -10,10 +10,15 @@
     tambahan. Background tint tetap dipertahankan supaya blok ini masih
     terbaca sebagai satu kesatuan ringkasan, bukan teks lepas.
     Teks sekunder minimal gray-500 (WCAG AA); gray-400 hanya untuk dekoratif.
+    Sprint 14.7: kotak sudah full-width sejak 14.5, tapi 3 metric-nya
+    ber-flex-start (mepet kiri) menyisakan ruang kosong lebar di kanan —
+    membuat kartu TERLIHAT lebih pendek dari Workspace meski batas kotaknya
+    identik. justify-between menyebar metric mengisi lebar penuh, sama
+    seperti kolom tabel di bawahnya. Nol metric baru, nol wording berubah.
 --}}
 <div class="vp-kpi-strip rounded-xl mb-2">
 
-    <div class="flex items-center flex-wrap gap-x-12 gap-y-4">
+    <div class="flex items-center flex-wrap justify-between gap-x-12 gap-y-4">
 
         {{-- Rencana Muatan — context metric: apa yang benar-benar direncanakan
              planner (unit muatan), bukan jumlah kapal (sudah ada di Hero). --}}
