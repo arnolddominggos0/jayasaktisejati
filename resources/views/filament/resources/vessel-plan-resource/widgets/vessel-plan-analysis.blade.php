@@ -20,7 +20,7 @@
             </div>
         </div>
 
-        <div class="vp-kpi-divider w-px h-8 self-center hidden sm:block" aria-hidden="true"></div>
+        <div class="vp-kpi-divider w-px h-9 self-center hidden sm:block" aria-hidden="true"></div>
 
         {{-- ETD Gap — fokus utama: angka besar, target sebagai subtitle --}}
         <div>
@@ -34,8 +34,8 @@
             <div class="mt-1 text-xs font-medium text-gray-600">Target &le; {{ $idealGap }} hari</div>
         </div>
 
-        {{-- Divider mengikuti konten (h-8), bukan memenuhi strip --}}
-        <div class="vp-kpi-divider w-px h-8 self-center hidden sm:block" aria-hidden="true"></div>
+        {{-- Divider mengikuti konten (h-9), bukan memenuhi strip --}}
+        <div class="vp-kpi-divider w-px h-9 self-center hidden sm:block" aria-hidden="true"></div>
 
         {{-- Decision Verdict — tipografis, bukan chip/card berlatar. Ikon +
              label = kesimpulan keputusan, bukan sekadar status mentah. --}}

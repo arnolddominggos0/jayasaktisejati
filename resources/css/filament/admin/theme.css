@@ -2176,17 +2176,35 @@
     }
 }
 
-/* Jarak Hero ke Health Strip (Sprint 14.3A: 14px -> 20px untuk napas).
+/* Sprint 14.5 — Hero Alignment: kolom kiri fi-header (heading+subheading)
+   default-nya flex:0 1 auto (shrink-to-fit konten), sementara KPI Strip/Tabs/
+   Table di bawahnya adalah grid penuh lebar page. Akibatnya Hero terlihat
+   sempit dengan celah kosong sebelum Header Actions ("mengambang" di kanan),
+   padahal .fi-header sendiri sudah selebar container. flex:1 menutup celah
+   itu; min-width:0 mencegah flex item menolak menyusut saat wrap teks.
+   Subheading tetap dibatasi max-w-2xl (native) untuk keterbacaan paragraf —
+   fix ini hanya menghapus penyusutan yang tidak disengaja, bukan menghapus
+   batas baca. */
+.fi-resource-edit-record-page.fi-resource-vessel-plans .fi-header > div:first-child {
+    flex: 1 1 0%;
+    min-width: 0;
+}
+
+/* Jarak Hero ke Health Strip (Sprint 14.3A: 14px -> 20px; 14.5: 20px -> 24px
+   untuk ritme yang sedikit lebih lega tanpa menambah tinggi Hero berlebihan).
    Jarak berasal dari flex gap-y-8 (2rem) pada <section> pembungkus page —
    bukan margin — jadi dikendalikan lewat row-gap, bukan margin-top sibling. */
 .fi-resource-edit-record-page.fi-resource-vessel-plans > section {
-    row-gap: 1.25rem;
+    row-gap: 1.5rem;
 }
-/* --- 2. KPI strip: sekunder, tidak bersaing dengan workspace utama ------ */
+/* --- 2. KPI strip: sekunder, tidak bersaing dengan workspace utama ------
+   Sprint 14.5: padding dilonggarkan (10/18px -> 14/24px) — strip ini sudah
+   full-width sejak 14.4, padding lama terasa sempit/dashboard-card untuk
+   lebar sebesar itu. 24px horizontal senada dengan margin kiri halaman. */
 .vp-kpi-strip {
     background: var(--vp-surface-muted);
     border-color: var(--mon-border-soft, #EEF2F7);
-    padding: 0.625rem 1.125rem;
+    padding: 0.875rem 1.5rem;
 }
 .vp-kpi-divider {
     background: var(--mon-border-soft, #EEF2F7);
