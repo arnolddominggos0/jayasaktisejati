@@ -2213,7 +2213,9 @@
 .vp-kpi-strip {
     background: var(--vp-surface-muted);
     border: 1px solid var(--mon-border-soft, #EEF2F7);
-    padding: 1.25rem 2rem;
+    /* Sprint 14.9 — padding vertikal naik (bukan horizontal) untuk napas
+       tinggi ~120-132px sekarang value 36px, bukan lagi 24px. */
+    padding: 1.125rem 2rem;
 }
 
 /* --- 3. Workspace card: area kerja utama, paling dominan secara visual -- */

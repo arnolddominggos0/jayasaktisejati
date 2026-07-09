@@ -19,46 +19,49 @@
     (items-center men-tengah-kan tiap kolom terhadap kolom tertinggi) dan
     kolom Verdict tidak punya "jangkar" sebesar angka 24px di kolom 1/2 —
     struktur baris (label->value->subtitle) disamakan + label "Status Plan"
-    ditambahkan (bukan metric baru, hanya baris label yang sebelumnya hilang)
-    + items-start supaya top edge ketiganya benar-benar sejajar + text-center
-    per kolom supaya tiap kolom terasa satu tile mandiri, bukan teks lepas
-    yang kebetulan berdekatan. Nol border/divider/shadow/icon/badge baru.
+    ditambahkan (bukan metric baru, hanya baris label yang sebelumnya hilang).
+    Sprint 14.9 ("14.7" pada brief — nomor sudah terpakai, lanjut kronologis):
+    flex+justify-between diganti CSS Grid 1fr/1fr/1.3fr (kolom Status lebih
+    lebar karena teksnya lebih panjang) — grid memberi proporsi kolom yang
+    stabil, tidak lagi bergantung pada lebar konten seperti flex. Angka value
+    dinaikkan 24px->36px agar jadi jangkar visual yang jauh lebih kuat (Three
+    KPI, One Surface). Padding vertikal naik (bukan horizontal) untuk napas
+    tinggi ~120-132px. Nol border/divider/shadow/icon/badge baru — grid +
+    alignment + typography saja.
 --}}
 <div class="vp-kpi-strip rounded-xl mb-2">
 
-    <div class="flex items-start flex-wrap justify-between gap-x-12 gap-y-4">
+    <div class="grid grid-cols-[1fr_1fr_1.3fr] gap-x-8">
 
         {{-- Rencana Muatan — context metric: apa yang benar-benar direncanakan
              planner (unit muatan), bukan jumlah kapal (sudah ada di Hero). --}}
         <div class="text-center">
-            <div class="text-xs font-medium text-gray-500">Rencana Muatan</div>
-            <div class="mt-1 flex items-baseline justify-center gap-1.5">
-                <span class="text-2xl font-semibold leading-none tracking-tight text-gray-800">{{ $cargoTotal }}</span>
-                <span class="text-sm text-gray-500">unit</span>
+            <div class="text-[13px] font-medium uppercase tracking-wide text-gray-500">Rencana Muatan</div>
+            <div class="mt-1.5 flex items-baseline justify-center gap-2">
+                <span class="text-4xl font-bold leading-none tracking-tight text-gray-800">{{ $cargoTotal }}</span>
+                <span class="text-base font-medium text-gray-500">unit</span>
             </div>
         </div>
 
         {{-- ETD Gap — fokus utama: angka besar, target sebagai subtitle --}}
         <div class="text-center">
-            <div class="text-xs font-medium text-gray-500">ETD Gap</div>
-            <div class="mt-1 flex items-baseline justify-center gap-1.5">
-                <span class="text-2xl font-semibold leading-none tracking-tight {{ $gapOk ? 'text-gray-800' : ($maxGap <= 10 ? 'text-amber-600' : 'text-red-600') }}">{{ $maxGap }}</span>
-                <span class="text-sm text-gray-500">hari</span>
+            <div class="text-[13px] font-medium uppercase tracking-wide text-gray-500">ETD Gap</div>
+            <div class="mt-1.5 flex items-baseline justify-center gap-2">
+                <span class="text-4xl font-bold leading-none tracking-tight {{ $gapOk ? 'text-gray-800' : ($maxGap <= 10 ? 'text-amber-600' : 'text-red-600') }}">{{ $maxGap }}</span>
+                <span class="text-base font-medium text-gray-500">hari</span>
             </div>
-            {{-- Sprint 14.3A — gray-600 medium: penjelas angka, sedikit lebih
-                 kontras dari label tapi tetap subordinat terhadap angka. --}}
-            <div class="mt-1 text-xs font-medium text-gray-600">Target &le; {{ $idealGap }} hari</div>
+            <div class="mt-1.5 text-sm text-gray-500">Target &le; {{ $idealGap }} hari</div>
         </div>
 
         {{-- Decision Verdict — tipografis, bukan chip/card berlatar. Label
              "Status Plan" (Sprint 14.8) menyamakan struktur label->value
              ->subtitle dengan 2 kolom lain, bukan metric/field baru. --}}
         <div class="text-center">
-            <div class="text-xs font-medium text-gray-500">Status Plan</div>
-            <div class="mt-1 text-[15px] font-bold leading-tight {{ $statusColor }}">
+            <div class="text-[13px] font-medium uppercase tracking-wide text-gray-500">Status Plan</div>
+            <div class="mt-1.5 text-lg font-semibold leading-tight {{ $statusColor }}">
                 <span aria-hidden="true">{{ $verdictIcon }}</span> {{ $statusLabel }}
             </div>
-            <div class="mt-1 text-xs text-gray-600">{{ $statusSub }}</div>
+            <div class="mt-1.5 text-sm text-gray-500">{{ $statusSub }}</div>
         </div>
 
     </div>
