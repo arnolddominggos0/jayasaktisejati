@@ -2184,6 +2184,20 @@
     }
 }
 
+/* Sprint 14.10 — Hero sebagai satu section utuh (bukan teks lepas di atas
+   background halaman). Heading, Route+Badge, Customer, Jumlah Jadwal,
+   Guidance, breadcrumb, dan Header Actions kini satu kotak — sejajar
+   dengan Health Strip di bawahnya yang sudah lebih dulu berbentuk kotak
+   (14.6.1). fi-header adalah satu-satunya elemen native Filament yang
+   membungkus semua itu, jadi cukup diberi bg/border/radius/padding di
+   sini tanpa menyentuh markup vendor. */
+.fi-resource-edit-record-page.fi-resource-vessel-plans .fi-header {
+    background: #FFFFFF;
+    border: 1px solid var(--mon-border-soft, #EEF2F7);
+    border-radius: 0.75rem;
+    padding: 1.5rem 2rem;
+}
+
 /* Sprint 14.5 — Hero Alignment: kolom kiri fi-header (heading+subheading)
    default-nya flex:0 1 auto (shrink-to-fit konten), sementara KPI Strip/Tabs/
    Table di bawahnya adalah grid penuh lebar page. Akibatnya Hero terlihat
