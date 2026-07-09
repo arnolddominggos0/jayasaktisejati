@@ -15,25 +15,33 @@
     membuat kartu TERLIHAT lebih pendek dari Workspace meski batas kotaknya
     identik. justify-between menyebar metric mengisi lebar penuh, sama
     seperti kolom tabel di bawahnya. Nol metric baru, nol wording berubah.
+    Sprint 14.8: audit browser menemukan 3 kolom tidak sejajar top edge
+    (items-center men-tengah-kan tiap kolom terhadap kolom tertinggi) dan
+    kolom Verdict tidak punya "jangkar" sebesar angka 24px di kolom 1/2 —
+    struktur baris (label->value->subtitle) disamakan + label "Status Plan"
+    ditambahkan (bukan metric baru, hanya baris label yang sebelumnya hilang)
+    + items-start supaya top edge ketiganya benar-benar sejajar + text-center
+    per kolom supaya tiap kolom terasa satu tile mandiri, bukan teks lepas
+    yang kebetulan berdekatan. Nol border/divider/shadow/icon/badge baru.
 --}}
 <div class="vp-kpi-strip rounded-xl mb-2">
 
-    <div class="flex items-center flex-wrap justify-between gap-x-12 gap-y-4">
+    <div class="flex items-start flex-wrap justify-between gap-x-12 gap-y-4">
 
         {{-- Rencana Muatan — context metric: apa yang benar-benar direncanakan
              planner (unit muatan), bukan jumlah kapal (sudah ada di Hero). --}}
-        <div>
+        <div class="text-center">
             <div class="text-xs font-medium text-gray-500">Rencana Muatan</div>
-            <div class="mt-1 flex items-baseline gap-1.5">
+            <div class="mt-1 flex items-baseline justify-center gap-1.5">
                 <span class="text-2xl font-semibold leading-none tracking-tight text-gray-800">{{ $cargoTotal }}</span>
                 <span class="text-sm text-gray-500">unit</span>
             </div>
         </div>
 
         {{-- ETD Gap — fokus utama: angka besar, target sebagai subtitle --}}
-        <div>
+        <div class="text-center">
             <div class="text-xs font-medium text-gray-500">ETD Gap</div>
-            <div class="mt-1 flex items-baseline gap-1.5">
+            <div class="mt-1 flex items-baseline justify-center gap-1.5">
                 <span class="text-2xl font-semibold leading-none tracking-tight {{ $gapOk ? 'text-gray-800' : ($maxGap <= 10 ? 'text-amber-600' : 'text-red-600') }}">{{ $maxGap }}</span>
                 <span class="text-sm text-gray-500">hari</span>
             </div>
@@ -42,13 +50,15 @@
             <div class="mt-1 text-xs font-medium text-gray-600">Target &le; {{ $idealGap }} hari</div>
         </div>
 
-        {{-- Decision Verdict — tipografis, bukan chip/card berlatar. Ikon +
-             label = kesimpulan keputusan, bukan sekadar status mentah. --}}
-        <div>
-            <div class="text-[15px] font-bold leading-tight {{ $statusColor }}">
+        {{-- Decision Verdict — tipografis, bukan chip/card berlatar. Label
+             "Status Plan" (Sprint 14.8) menyamakan struktur label->value
+             ->subtitle dengan 2 kolom lain, bukan metric/field baru. --}}
+        <div class="text-center">
+            <div class="text-xs font-medium text-gray-500">Status Plan</div>
+            <div class="mt-1 text-[15px] font-bold leading-tight {{ $statusColor }}">
                 <span aria-hidden="true">{{ $verdictIcon }}</span> {{ $statusLabel }}
             </div>
-            <div class="mt-0.5 text-xs text-gray-600">{{ $statusSub }}</div>
+            <div class="mt-1 text-xs text-gray-600">{{ $statusSub }}</div>
         </div>
 
     </div>
