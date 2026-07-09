@@ -2191,11 +2191,6 @@
 .vp-kpi-divider {
     background: var(--mon-border-soft, #EEF2F7);
 }
-.vp-kpi-risk-chip {
-    font-size: var(--mon-fs-foot, 0.6875rem);
-    font-weight: 500;
-    padding: 0.1875rem 0.5rem;
-}
 
 /* --- 3. Workspace card: area kerja utama, paling dominan secara visual -- */
 .vp-phase .fi-ta-header-ctn {
