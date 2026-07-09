@@ -13,6 +13,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 
 class EditVesselPlan extends EditRecord
 {
@@ -71,11 +72,16 @@ class EditVesselPlan extends EditRecord
             default => 'vp-hero-next--neutral',
         };
 
+        // &nbsp; sebelum em dash: dash tidak boleh jatuh di awal baris saat wrap.
         $guidance = match ($status) {
             VesselPlanStatus::Draft => 'Susun jadwal kapal sebelum dikirim ke TAM.',
-            // &nbsp; sebelum em dash: dash tidak boleh jatuh di awal baris saat wrap.
             VesselPlanStatus::Sent => 'Menunggu Final Schedule dari TAM&nbsp;— sesuaikan ETD, ETA, dan Cargo Plan sebelum finalisasi.',
-            VesselPlanStatus::Revision => 'Revisi jadwal sesuai feedback dari TAM&nbsp;— kirim kembali setelah selesai.',
+            // Sprint 13.9 — feedback_reason adalah Current Instruction selama
+            // status = Revision (dikosongkan lagi begitu kembali ke Draft, lihat
+            // mutateFormDataBeforeSave). Dikutip langsung di Guidance, bukan
+            // hanya terekam di modal footer, supaya Planner tidak perlu mencari
+            // instruksi aktifnya sendiri.
+            VesselPlanStatus::Revision => $this->revisionGuidance(),
             VesselPlanStatus::Final => 'Vessel Plan telah difinalisasi.',
         };
 
@@ -100,6 +106,25 @@ class EditVesselPlan extends EditRecord
             .'</div>'
             .'</div>'
         );
+    }
+
+    /**
+     * Sprint 13.9 — kutip feedback_reason (Current Instruction) langsung di
+     * Guidance selama status Revision. Truncate menjaga tinggi Hero; versi
+     * lengkap tetap permanen di Log Persetujuan (footer) begitu ditutup oleh
+     * transisi status berikutnya.
+     */
+    protected function revisionGuidance(): string
+    {
+        $feedback = trim((string) $this->record->feedback_reason);
+
+        if ($feedback === '') {
+            return 'Revisi jadwal sesuai feedback dari TAM&nbsp;— kirim kembali setelah selesai.';
+        }
+
+        $feedback = Str::limit($feedback, 90);
+
+        return 'TAM meminta revisi: &ldquo;'.e($feedback).'&rdquo;&nbsp;— sesuaikan lalu kirim kembali.';
     }
 
     public function mount(int|string $record): void
