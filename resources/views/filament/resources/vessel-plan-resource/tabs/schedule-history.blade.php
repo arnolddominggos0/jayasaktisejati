@@ -98,6 +98,22 @@ $deltaLabel = function (?int $d, bool $short = false): array {
             if (d === null) return '—';
             if (d === 0)    return '±0';
             return (d > 0 ? '+' : '') + d + unit;
+        },
+        // Sprint 14.1 — Summary First: kalimat natural dari delta yang sudah
+        // dihitung PHP (delta_etd/delta_eta/delta_sailing). Tidak ada logika
+        // bisnis baru, murni phrasing atas angka yang sudah ada.
+        hasFullDelta(sel) {
+            return !!sel && sel.delta_etd !== null && sel.delta_eta !== null && sel.delta_sailing !== null;
+        },
+        allZero(sel) {
+            return this.hasFullDelta(sel) && sel.delta_etd === 0 && sel.delta_eta === 0 && sel.delta_sailing === 0;
+        },
+        isChanged(d) {
+            return d !== null && d !== 0;
+        },
+        summaryLine(label, d, positiveWord, negativeWord) {
+            if (d === 0) return label + ' tetap.';
+            return label + ' ' + (d > 0 ? positiveWord : negativeWord) + ' ' + Math.abs(d) + ' hari.';
         }
     }"
     class="space-y-2.5"
@@ -306,17 +322,22 @@ $deltaLabel = function (?int $d, bool $short = false): array {
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <div class="text-[10px] text-emerald-400 uppercase mb-1">ETD</div>
-                            <div class="font-semibold text-emerald-800 text-sm"
+                            {{-- Sprint 14.1 — emphasis tipografi murni (bukan badge/bg/icon)
+                                 untuk field yang berubah dibanding Draft, lihat isChanged(). --}}
+                            <div class="text-sm"
+                                 :class="isChanged(selected.delta_etd) ? 'font-semibold text-emerald-800' : 'font-normal text-emerald-700'"
                                  x-text="selected.final_etd || '—'"></div>
                         </div>
                         <div>
                             <div class="text-[10px] text-emerald-400 uppercase mb-1">ETA</div>
-                            <div class="font-semibold text-emerald-800 text-sm"
+                            <div class="text-sm"
+                                 :class="isChanged(selected.delta_eta) ? 'font-semibold text-emerald-800' : 'font-normal text-emerald-700'"
                                  x-text="selected.final_eta || '—'"></div>
                         </div>
                         <div class="col-span-2">
                             <div class="text-[10px] text-emerald-400 uppercase mb-1">Sailing</div>
-                            <div class="font-semibold text-emerald-800 text-sm"
+                            <div class="text-sm"
+                                 :class="isChanged(selected.delta_sailing) ? 'font-semibold text-emerald-800' : 'font-normal text-emerald-700'"
                                  x-text="selected.final_sailing !== null ? selected.final_sailing + ' hari' : '—'"></div>
                         </div>
                     </div>
@@ -328,33 +349,51 @@ $deltaLabel = function (?int $d, bool $short = false): array {
                         <div class="w-2 h-2 rounded-full bg-gray-500"></div>
                         <div class="text-xs font-bold text-gray-600 uppercase tracking-wider">Perubahan</div>
                     </div>
-                    <div class="space-y-2.5">
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-500">ETD</span>
-                            <span class="text-sm font-semibold"
-                                  :class="deltaClass(selected.delta_etd)"
-                                  x-text="deltaText(selected.delta_etd)"></span>
+                    {{-- Sprint 14.1 — Task 3: semua delta nol = satu kalimat,
+                         bukan tiga baris ±0 yang tidak menambah informasi. --}}
+                    <template x-if="allZero(selected)">
+                        <div class="text-sm font-medium text-emerald-700">
+                            &check; Tidak ada perubahan jadwal.
                         </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-500">ETA</span>
-                            <span class="text-sm font-semibold"
-                                  :class="deltaClass(selected.delta_eta)"
-                                  x-text="deltaText(selected.delta_eta)"></span>
+                    </template>
+
+                    {{-- Task 2: Summary First — kalimat pendek per field, di atas
+                         detail angka. Hanya tampil kalau draft lengkap (bukan
+                         menebak saat data draft tidak ada). --}}
+                    <template x-if="!allZero(selected) && hasFullDelta(selected)">
+                        <div class="space-y-1 mb-3 text-sm text-gray-700">
+                            <div x-text="summaryLine('ETD', selected.delta_etd, 'mundur', 'maju')"></div>
+                            <div x-text="summaryLine('ETA', selected.delta_eta, 'mundur', 'maju')"></div>
+                            <div x-text="summaryLine('Durasi sailing', selected.delta_sailing, 'bertambah', 'berkurang')"></div>
                         </div>
-                        <div class="border-t border-gray-200 pt-2.5">
+                    </template>
+
+                    {{-- Task 4: detail angka tetap sebagai layer kedua (audit),
+                         disembunyikan hanya untuk kasus zero-change di atas. --}}
+                    <template x-if="!allZero(selected)">
+                        <div class="space-y-2.5">
                             <div class="flex items-center justify-between">
-                                <span class="text-sm text-gray-500">Sailing</span>
+                                <span class="text-sm text-gray-500">ETD</span>
                                 <span class="text-sm font-semibold"
-                                      :class="deltaClass(selected.delta_sailing)"
-                                      x-text="deltaText(selected.delta_sailing)"></span>
+                                      :class="deltaClass(selected.delta_etd)"
+                                      x-text="deltaText(selected.delta_etd)"></span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-500">ETA</span>
+                                <span class="text-sm font-semibold"
+                                      :class="deltaClass(selected.delta_eta)"
+                                      x-text="deltaText(selected.delta_eta)"></span>
+                            </div>
+                            <div class="border-t border-gray-200 pt-2.5">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm text-gray-500">Sailing</span>
+                                    <span class="text-sm font-semibold"
+                                          :class="deltaClass(selected.delta_sailing)"
+                                          x-text="deltaText(selected.delta_sailing)"></span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                {{-- Shipping line --}}
-                <div class="text-xs text-gray-400 text-center">
-                    Shipping Line: <span class="text-gray-600 font-medium" x-text="selected.shipping_line"></span>
+                    </template>
                 </div>
 
             </div>
