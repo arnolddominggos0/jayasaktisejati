@@ -2076,7 +2076,7 @@
    - Guidance  = label 12px Title Case abu + body 15px/500 neutral,
                  accent bar kiri 2px bertint status (300-series) = sinyal,
                  bukan alert. Jarak identity->guidance 18px.
-   - Hero->KPI = row-gap section 14px (satu kesatuan visual).
+   - Hero->Health Strip = row-gap section 20px (Sprint 14.3A).
    - Header Actions = native Filament (flex-start di sm+, sm:mt-7 bawaan).
    ======================================================================= */
 
@@ -2176,11 +2176,11 @@
     }
 }
 
-/* Rapatkan Hero ke KPI strip.
+/* Jarak Hero ke Health Strip (Sprint 14.3A: 14px -> 20px untuk napas).
    Jarak berasal dari flex gap-y-8 (2rem) pada <section> pembungkus page —
    bukan margin — jadi dikendalikan lewat row-gap, bukan margin-top sibling. */
 .fi-resource-edit-record-page.fi-resource-vessel-plans > section {
-    row-gap: 0.875rem;
+    row-gap: 1.25rem;
 }
 /* --- 2. KPI strip: sekunder, tidak bersaing dengan workspace utama ------ */
 .vp-kpi-strip {

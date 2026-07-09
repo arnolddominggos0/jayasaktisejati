@@ -8,7 +8,7 @@
 --}}
 <div class="vp-kpi-strip rounded-xl border mb-2">
 
-    <div class="flex items-center flex-wrap gap-x-8 gap-y-3 py-1">
+    <div class="flex items-center flex-wrap gap-x-7 gap-y-3 py-0.5">
 
         {{-- ETD Gap — fokus utama: angka besar, target sebagai subtitle --}}
         <div>
@@ -17,15 +17,19 @@
                 <span class="text-2xl font-semibold leading-none tracking-tight {{ $gapOk ? 'text-gray-800' : ($maxGap <= 10 ? 'text-amber-600' : 'text-red-600') }}">{{ $maxGap }}</span>
                 <span class="text-sm text-gray-500">hari</span>
             </div>
-            <div class="mt-1 text-xs text-gray-500">Target &le; {{ $idealGap }} hari</div>
+            {{-- Sprint 14.3A — gray-600 medium: penjelas angka, sedikit lebih
+                 kontras dari label tapi tetap subordinat terhadap angka. --}}
+            <div class="mt-1 text-xs font-medium text-gray-600">Target &le; {{ $idealGap }} hari</div>
         </div>
 
-        <div class="vp-kpi-divider h-10 w-px hidden sm:block"></div>
+        {{-- Divider mengikuti konten (h-8), bukan memenuhi strip --}}
+        <div class="vp-kpi-divider w-px h-8 self-center hidden sm:block" aria-hidden="true"></div>
 
-        {{-- Risiko — status card kecil, warna semantik --}}
-        <div class="rounded-lg border px-3.5 py-2 {{ $statusBg }} {{ $statusBorder }}">
-            <div class="text-sm font-semibold leading-tight {{ $statusColor }}">{{ $statusLabel }}</div>
-            <div class="mt-0.5 text-xs {{ $statusColor }}">{{ $statusSub }}</div>
+        {{-- Health Verdict — tipografis, bukan chip/card berlatar.
+             Title 15px/700 (skala route Hero), warna semantik hanya di title. --}}
+        <div>
+            <div class="text-[15px] font-bold leading-tight {{ $statusColor }}">{{ $statusLabel }}</div>
+            <div class="mt-0.5 text-xs text-gray-600">{{ $statusSub }}</div>
         </div>
 
     </div>

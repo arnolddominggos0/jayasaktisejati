@@ -41,25 +41,13 @@ class VesselPlanAnalysis extends Widget
                 'critical' => 'ETD Gap sangat tinggi',
                 default => 'Dalam batas SOP',
             },
-            // Shade 700: chip 11px di atas bg-*-50 butuh >=4.5:1 (WCAG AA);
-            // shade 600 hanya ~3.1:1 pada ukuran sekecil ini.
+            // Sprint 14.3A — verdict tipografis (bukan chip berlatar):
+            // shade 700 di atas surface muted tetap lolos WCAG AA.
             'statusColor' => match ($sop['color']) {
                 'success' => 'text-green-700',
                 'warning' => 'text-amber-700',
                 'danger' => 'text-red-700',
                 default => 'text-gray-600',
-            },
-            'statusBg' => match ($sop['color']) {
-                'success' => 'bg-green-50',
-                'warning' => 'bg-amber-50',
-                'danger' => 'bg-red-50',
-                default => 'bg-gray-50',
-            },
-            'statusBorder' => match ($sop['color']) {
-                'success' => 'border-green-200',
-                'warning' => 'border-amber-200',
-                'danger' => 'border-red-200',
-                default => 'border-gray-200',
             },
         ];
     }
