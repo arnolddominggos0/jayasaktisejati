@@ -12,6 +12,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\HtmlString;
 
 class EditVesselPlan extends EditRecord
@@ -36,21 +37,19 @@ class EditVesselPlan extends EditRecord
     }
 
     // Status adalah atribut plan itu sendiri, bukan atribut Route — badge
-    // status karena itu berdampingan dengan judul objek.
+    // status karena itu berdampingan dengan judul objek. Badge Filament asli
+    // (bukan class CSS custom) supaya konsisten dengan komponen native lain.
     public function getHeading(): string|Htmlable
     {
         $status = $this->record->status;
 
-        $badgeClass = match ($status->color()) {
-            'warning' => 'mon-badge-warning',
-            'danger' => 'mon-badge-danger',
-            'success' => 'mon-badge-success',
-            default => 'mon-badge-neutral',
-        };
+        $badge = Blade::render(
+            '<x-filament::badge :color="$color" class="vp-heading-badge">{{ $label }}</x-filament::badge>',
+            ['color' => $status->color(), 'label' => $status->label()]
+        );
 
         return new HtmlString(
-            e('Vessel Plan — '.$this->record->period_month->translatedFormat('F Y'))
-            .' <span class="mon-badge '.$badgeClass.' vp-heading-badge">'.e($status->label()).'</span>'
+            e('Vessel Plan — '.$this->record->period_month->translatedFormat('F Y')).' '.$badge
         );
     }
 

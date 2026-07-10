@@ -2070,7 +2070,11 @@
    route, status, primary actions). Tidak membungkus Planning Summary —
    itu card terpisah, bukan bagian dari header.
    ======================================================================= */
+/* fi-badge asli pakai display:flex (block-level di luar konteks flex-row
+   bawaannya) — inline-flex supaya duduk sejajar teks heading, bukan
+   melebar penuh baris baru. */
 .vp-heading-badge {
+    display: inline-flex !important;
     vertical-align: middle;
     margin-left: 0.5rem;
 }
@@ -2079,7 +2083,7 @@
     border: 0;
     border-bottom: 1px solid var(--mon-border-soft, #EEF2F7);
     border-radius: 0;
-    padding: 0 0 1rem;
+    padding: 0 0 0.75rem;
 }
 .fi-resource-edit-record-page.fi-resource-vessel-plans .fi-header-subheading {
     margin-top: 0.375rem;
@@ -2121,7 +2125,7 @@
    native gap-y-8 (32px) diturunkan supaya halaman lebih compact tanpa
    terasa sesak. */
 .fi-resource-edit-record-page.fi-resource-vessel-plans > section > .auto-cols-fr {
-    row-gap: 1.25rem;
+    row-gap: 1rem;
 }
 
 /* --- Workspace card: area kerja utama, paling dominan secara visual ---- */
@@ -2145,7 +2149,7 @@
    control, summary adalah information.
    ======================================================================= */
 .vp-filter-section {
-    margin-bottom: 1.25rem;
+    margin-bottom: 1rem;
 }
 .vp-toolbar {
     display: flex;
@@ -2244,7 +2248,7 @@
     align-items: center;
     gap: 0.25rem;
     border-bottom: 1px solid var(--mon-border-soft, #EEF2F7);
-    margin-bottom: 1.5rem;
+    margin-bottom: 1.125rem;
 }
 .vp-tab {
     display: flex;
