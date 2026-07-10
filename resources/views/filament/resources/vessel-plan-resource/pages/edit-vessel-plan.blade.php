@@ -6,15 +6,8 @@
  */
 
 $record = $this->record;
-$allItems = $record->items->sortBy('planned_etd')->values();
-$shippingLines = $allItems->pluck('shippingLine')->filter()->unique('id')->sortBy('name')->values();
-
-// Shipping Line adalah global workspace filter: berlaku untuk semua tab.
-// Tab 1 (tabel) di-filter oleh RelationManager lewat event Livewire;
-// Tab 2/3 (blade-only) menerima $items yang sudah difilter di sini.
-$items = filled($this->shippingLineFilter)
-    ? $allItems->where('shipping_line_id', (int) $this->shippingLineFilter)->values()
-    : $allItems;
+$items  = $record->items->sortBy('planned_etd')->values();
+$shippingLines = $items->pluck('shippingLine')->filter()->unique('id')->sortBy('name')->values();
 
 // Riwayat Jadwal membandingkan draft snapshot dengan final snapshot —
 // tanpa final snapshot tidak ada apa pun untuk dibandingkan.
@@ -55,32 +48,6 @@ $defaultTab = match (true) {
             })
         "
     >
-        {{-- Shipping Line: global workspace filter — berlaku untuk Jadwal,
-             Review Jadwal, dan Riwayat Jadwal, karena itu berada di atas
-             Tabs, bukan di dalam salah satu tab. Livewire property
-             shippingLineFilter juga dispatch 'vpFilterShippingLine' ke
-             RelationManager (lihat updatedShippingLineFilter di page class). --}}
-        @if ($shippingLines->count() > 1)
-            <div class="vp-toolbar vp-filter-toolbar">
-                <span class="vp-toolbar-label">Shipping Line</span>
-                <select
-                    wire:model.live="shippingLineFilter"
-                    class="text-sm rounded-md border-gray-300 shadow-sm py-1.5 pl-2.5 pr-8 leading-none bg-white text-gray-700 focus:border-primary-500 focus:ring-primary-500 cursor-pointer"
-                    aria-label="Shipping Line"
-                >
-                    <option value="">Semua</option>
-                    @foreach ($shippingLines as $line)
-                        <option value="{{ $line->id }}">{{ $line->name }}</option>
-                    @endforeach
-                </select>
-                @if (filled($this->shippingLineFilter))
-                    <button type="button" wire:click="$set('shippingLineFilter', '')" class="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer">
-                        Reset Filter
-                    </button>
-                @endif
-            </div>
-        @endif
-
         {{-- Planning Summary: 3 Stats Overview card bawaan Filament. --}}
         <div class="vp-summary-stats">
             @livewire(\App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanAnalysis::class, ['record' => $record])
@@ -118,6 +85,35 @@ $defaultTab = match (true) {
                  (.vp-workspace), dipisah divider — bukan card terpisah.
                  Identitas plan tidak diulang di sini — sudah ada di Header. --}}
             <div class="vp-workspace">
+
+                {{-- Shipping Line: filter milik tabel di tab ini saja (bukan
+                     workspace filter global) — hanya memengaruhi isi tabel
+                     Jadwal, tidak ikut memfilter Review/Riwayat Jadwal.
+                     Livewire property shippingLineFilter dispatch
+                     'vpFilterShippingLine' ke RelationManager untuk live
+                     update tanpa reload halaman. Berada tepat di atas
+                     "+ Tambah Jadwal" (header RelationManager) supaya
+                     terlihat sebagai satu toolbar. --}}
+                @if ($shippingLines->count() > 1)
+                    <div class="vp-toolbar vp-filter-toolbar">
+                        <span class="vp-toolbar-label">Shipping Line</span>
+                        <select
+                            wire:model.live="shippingLineFilter"
+                            class="text-sm rounded-md border-gray-300 shadow-sm py-1.5 pl-2.5 pr-8 leading-none bg-white text-gray-700 focus:border-primary-500 focus:ring-primary-500 cursor-pointer"
+                            aria-label="Shipping Line"
+                        >
+                            <option value="">Semua</option>
+                            @foreach ($shippingLines as $line)
+                                <option value="{{ $line->id }}">{{ $line->name }}</option>
+                            @endforeach
+                        </select>
+                        @if (filled($this->shippingLineFilter))
+                            <button type="button" wire:click="$set('shippingLineFilter', '')" class="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer">
+                                Reset Filter
+                            </button>
+                        @endif
+                    </div>
+                @endif
 
                 {{-- Toolbar Simpan/Batal — divider, bukan kotak terpisah.
                      Livewire form wiring (wire:submit="save") preserved as-is.

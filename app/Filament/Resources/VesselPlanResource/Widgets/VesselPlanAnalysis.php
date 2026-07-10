@@ -23,12 +23,12 @@ class VesselPlanAnalysis extends StatsOverviewWidget
         $gapOk = $analysis['gap_ok'] ?? false;
 
         return [
-            Stat::make('Jadwal', $this->record->items->count()),
+            Stat::make('Jadwal', $this->record->items->count().' Jadwal'),
 
-            Stat::make('Rencana Muatan', $this->record->items->sum('cargo_plan').' unit'),
+            Stat::make('Rencana Muatan', $this->record->items->sum('cargo_plan').' Unit'),
 
-            Stat::make('ETD Gap', $maxGap.' hari')
-                ->description('Target ≤ '.$gapLimit.' hari')
+            Stat::make('ETD Gap', $maxGap.' Hari')
+                ->description('Target SOP ≤ '.$gapLimit.' Hari')
                 ->descriptionColor($gapOk ? 'gray' : ($maxGap <= 10 ? 'warning' : 'danger')),
         ];
     }
