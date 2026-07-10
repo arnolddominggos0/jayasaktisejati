@@ -2144,18 +2144,18 @@
 
 /* =======================================================================
    Workspace Filter — kontrol terhadap isi workspace (filter, nantinya
-   search/sort/export/bulk action/view options). Card Filament sendiri
-   (.vp-filter-section), terpisah dari Planning Summary: filter adalah
-   control, summary adalah information.
+   search/sort/export/bulk action/view options). Toolbar sederhana, bukan
+   Card — filter adalah control, summary adalah information, dua hal itu
+   tidak dicampur secara visual.
    ======================================================================= */
-.vp-filter-section {
-    margin-bottom: 1rem;
-}
 .vp-toolbar {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 0.625rem;
+}
+.vp-filter-toolbar {
+    margin-bottom: 1rem;
 }
 .vp-toolbar-label {
     font-size: 0.8125rem;
