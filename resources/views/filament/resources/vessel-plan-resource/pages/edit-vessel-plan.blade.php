@@ -73,14 +73,11 @@ $defaultTab = match (true) {
         ─────────────────────────────────────────────────────────────────── --}}
         <div x-show="tab === 'schedule'">
 
-            {{-- Sprint 15.1 — One Tab = One Workspace: header, toolbar Simpan/
-                 Batal, dan tabel dulu 3 kotak terpisah (gap kosong di antara
-                 masing-masing + double heading "Jadwal Kapal" vs "Daftar
-                 Jadwal" dari getTableHeading()). Sekarang satu surface
-                 (.vp-workspace), dipisah divider (border-t), bukan gap+card.
-                 Toolbar dispatch Livewire event 'vpFilterShippingLine' ke
-                 RelationManager untuk live update tanpa reload halaman.
-                 Status pill & POL/POD sengaja tidak di sini — sudah ada di Hero. --}}
+            {{-- Header, toolbar Simpan/Batal, dan tabel adalah satu workspace
+                 surface (.vp-workspace), dipisah divider — bukan card terpisah.
+                 Toolbar filter dispatch Livewire event 'vpFilterShippingLine'
+                 ke RelationManager untuk live update tanpa reload halaman.
+                 Status & POL/POD sengaja tidak diulang di sini — sudah ada di Hero. --}}
             @php
                 $shippingLines = $items
                     ->pluck('shippingLine')
@@ -92,9 +89,9 @@ $defaultTab = match (true) {
 
             <div class="vp-workspace">
 
-                {{-- Workspace Header: judul + subtitle + filter (satu-satunya
-                     heading Tab Jadwal — getTableHeading() dikosongkan supaya
-                     tidak ada "Daftar Jadwal" bersaing di bawahnya). --}}
+                {{-- Workspace Header: judul + subtitle + filter — satu-satunya
+                     heading Tab Jadwal (lihat getTableHeading() di
+                     RelationManager). --}}
                 <div class="vp-workspace-header">
                     <div class="min-w-0">
                         <div class="vp-workspace-title">Jadwal Kapal</div>
@@ -214,10 +211,6 @@ $defaultTab = match (true) {
              Blade-only, read-only — menggunakan x-show + x-cloak
         ─────────────────────────────────────────────────────────────────── --}}
         <div x-show="tab === 'analysis'" x-cloak>
-            {{-- Sprint 15.1 — rounded-2xl+shadow-sm -> rounded-xl tanpa shadow:
-                 selaras dengan .vp-workspace (Tab Jadwal) & Object Header
-                 (Sprint 14.7 FINAL) — satu bahasa radius (12px) dan "Divider
-                 > Border, Whitespace > Shadow" di seluruh 3 tab. --}}
             <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
                 @include(
                     'filament.resources.vessel-plan-resource.tabs.schedule-analysis',
@@ -232,10 +225,6 @@ $defaultTab = match (true) {
              Draft vs Final + delta + detail drawer Alpine.js
         ─────────────────────────────────────────────────────────────────── --}}
         <div x-show="tab === 'history'" x-cloak>
-            {{-- Sprint 15.1 — rounded-2xl+shadow-sm -> rounded-xl tanpa shadow:
-                 selaras dengan .vp-workspace (Tab Jadwal) & Object Header
-                 (Sprint 14.7 FINAL) — satu bahasa radius (12px) dan "Divider
-                 > Border, Whitespace > Shadow" di seluruh 3 tab. --}}
             <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
                 @include(
                     'filament.resources.vessel-plan-resource.tabs.schedule-history',

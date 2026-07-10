@@ -25,10 +25,9 @@ class VesselPlanAnalysis extends Widget
         $riskLevel = $analysis['risk_level'] ?? 'valid';
         $isEmpty = ($analysis['schedule_count'] ?? 0) === 0;
 
-        // Sprint 14.4 — subtitle verdict dari gap_warnings yang SUDAH dihitung
-        // analyzer (severity per vessel), bukan angka baru. Tidak memakai kata
-        // "Revisi" — sudah dipakai VesselPlanStatus::Revision untuk konsep lain
-        // (TAM meminta revisi plan), beda arti dari "ETD Gap melebihi SOP".
+        // Label verdict sengaja tidak memakai kata "Revisi" — istilah itu sudah
+        // dipakai VesselPlanStatus::Revision untuk konsep lain (TAM meminta
+        // revisi plan), beda arti dari "ETD Gap melebihi SOP".
         $gapWarnings = $analysis['gap_warnings'] ?? [];
         $criticalCount = count(array_filter($gapWarnings, fn ($w) => $w['severity'] === 'critical'));
         $warningCount = count($gapWarnings) - $criticalCount;
@@ -40,12 +39,10 @@ class VesselPlanAnalysis extends Widget
             default => ['text-green-700', '✓', 'Siap Dikirim', 'Semua ETD Gap masih dalam SOP'],
         };
 
-        // Sprint 14.4 — Decision Summary: maks. 3 blok (Rencana Muatan, ETD
-        // Gap, Verdict). Rencana Muatan dijumlah dari relasi items yang SUDAH
-        // dimuat (dipakai analyze() juga) — agregasi presentasi, bukan query
-        // baru. Jumlah Jadwal & Avg Sailing tetap tidak dikembalikan ke sini
-        // (lihat audit Sprint 14.2 & 14.3) — Avg Sailing tetap rumah di tab
-        // Review Jadwal.
+        // Rencana Muatan dijumlah dari relasi items yang sudah dimuat (juga
+        // dipakai analyze()) — agregasi presentasi, bukan query baru. Avg
+        // Sailing sengaja tidak dikembalikan ke sini; itu metrik analitis
+        // yang rumahnya di tab Review Jadwal, bukan ringkasan keputusan.
         return [
             'cargoTotal' => $this->record->items->sum('cargo_plan'),
             'maxGap' => $analysis['max_gap'] ?? 0,

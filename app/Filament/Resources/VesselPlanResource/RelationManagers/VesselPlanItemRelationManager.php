@@ -24,14 +24,8 @@ class VesselPlanItemRelationManager extends RelationManager
 
     protected static ?string $title = 'Jadwal Kapal';
 
-    /**
-     * Sprint 13.1 — Slim Shipping Line toolbar (driven from parent EditVesselPlan
-     * blade via dispatched Livewire event; replaces native Filament SelectFilter
-     * card form with a single inline dropdown + Reset text link).
-     *
-     * Livewire public property — kept in component state, applied to table query
-     * via {@see modifyQueryUsing()} below.
-     */
+    // Filter Shipping Line dikendalikan dari toolbar di blade parent lewat
+    // event Livewire, diterapkan ke query tabel via modifyQueryUsing() di bawah.
     public ?string $vpShippingLineFilter = null;
 
     #[On('vpFilterShippingLine')]
@@ -43,28 +37,19 @@ class VesselPlanItemRelationManager extends RelationManager
         $this->resetPage();
     }
 
-    /**
-     * Sprint 4.x — Vessel Plan Workflow Language Alignment.
-     * Judul & helper section mengikuti fase bisnis (bukan status teknis semata),
-     * supaya Planner langsung sadar konteks tanpa berpindah halaman.
-     */
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
-        // Sprint 13.2 — Section title tetap "Jadwal Kapal" (RM tab/section identity
-        // dipertahankan). Section ≠ Table heading (lihat getTableHeading).
+        // Section title (identitas tab) berbeda dari table heading —
+        // lihat getTableHeading().
         return self::sectionCopy($ownerRecord)['title'];
     }
 
+    // Judul tabel dikosongkan karena Workspace Header di halaman parent
+    // sudah menampilkan judul dan konteks yang sama; heading kosong membuat
+    // baris header tabel native Filament otomatis menyisakan hanya action
+    // "Tambah Jadwal" rata kanan.
     protected function getTableHeading(): string
     {
-        // Sprint 15.1 — audit Workspace Body: "Daftar Jadwal" (di sini) dan
-        // "Jadwal Kapal" (Workspace Header di edit-vessel-plan.blade.php)
-        // adalah judul untuk objek yang sama, dibaca dua kali oleh Planner
-        // (Task 3, "Hilangkan Double Header"). Workspace Header sudah lebih
-        // lengkap (subtitle dinamis + filter), jadi judul tabel dikosongkan —
-        // baris header tabel native Filament otomatis menyisakan hanya
-        // action "Tambah Jadwal" rata kanan (lihat vendor
-        // components/header.blade.php: heading kosong -> actions ms-auto).
         return '';
     }
 
@@ -80,22 +65,12 @@ class VesselPlanItemRelationManager extends RelationManager
             ];
         }
 
+        // Description dikosongkan di seluruh status — section header di
+        // parent blade sudah jadi satu-satunya deskripsi workflow tab ini.
         return match (true) {
-            $plan->isFinal() => [
-                'title' => 'Jadwal Kapal',
-                // Sprint 13.3 — table description dihapus; section header di parent blade
-                // sudah menjadi satu-satunya deskripsi workflow pada Tab Jadwal.
-                'description' => null,
-            ],
-            $plan->isSent(), $plan->isRevision() => [
-                'title' => 'Jadwal Kapal',
-                // Sprint 13.3 — description dihapus (tumpang tindih dengan header).
-                'description' => null,
-            ],
-            default => [
-                'title' => 'Jadwal Kapal',
-                'description' => null,
-            ],
+            $plan->isFinal() => ['title' => 'Jadwal Kapal', 'description' => null],
+            $plan->isSent(), $plan->isRevision() => ['title' => 'Jadwal Kapal', 'description' => null],
+            default => ['title' => 'Jadwal Kapal', 'description' => null],
         };
     }
 
@@ -168,11 +143,6 @@ class VesselPlanItemRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            // Sprint 13.3 — table description dihapus. Section Header di parent blade
-            // ("JADWAL KAPAL / {N} jadwal kapal menunggu penyesuaian...") sudah menjadi
-            // satu-satunya deskripsi workflow pada Tab Jadwal. Tabel cukup ber-heading
-            // "Daftar Jadwal" tanpa subtitle untuk menghindari overlap informasi.
-            // Sprint 13.1 — Apply Shipping Line toolbar state to table query (no native filter card).
             ->modifyQueryUsing(function (Builder $query) {
                 return $query->when(
                     filled($this->vpShippingLineFilter),
@@ -180,8 +150,7 @@ class VesselPlanItemRelationManager extends RelationManager
                 );
             })
             ->columns([
-                // Sprint 12.5 — Voyage format kanon: V.NNN · Shipping Line.
-                // Sprint 13.2 — Kolom Kapal diasumsikan paling lebar (primary identifier).
+                // Kolom Kapal paling lebar — identifier utama baris.
                 TextColumn::make('vessel.name')
                     ->label('Kapal / Voyage')
                     ->weight('semibold')
@@ -195,7 +164,6 @@ class VesselPlanItemRelationManager extends RelationManager
                         return implode(' · ', $parts) ?: null;
                     }),
 
-                // Sprint 13.2 — Tanggal & angka alignCenter untuk vertical scanning.
                 TextColumn::make('planned_etb')
                     ->label('ETB')
                     ->alignCenter()
@@ -217,8 +185,8 @@ class VesselPlanItemRelationManager extends RelationManager
                     ->formatStateUsing(fn ($state) => $state?->translatedFormat('d M Y'))
                     ->placeholder('—'),
 
-                // Sprint 12.5 — "Cargo Plan" → "Rencana Muatan"; kosong = "Belum diisi" (abu, bukan dash)
-                // Sprint 13.2 — alignEnd → alignCenter; width disempitkan (kolom angka sempit).
+                // Kosong ditampilkan sebagai "Belum diisi" (abu), bukan dash —
+                // field ini baru terisi setelah Final Schedule dari TAM diterima.
                 TextColumn::make('cargo_plan')
                     ->label('Rencana Muatan')
                     ->alignCenter()
@@ -241,8 +209,6 @@ class VesselPlanItemRelationManager extends RelationManager
                     ->placeholder('Belum diisi')
                     ->color(fn ($state) => filled($state) ? null : 'gray'),
 
-                // Sprint 12.5 — Badge ETD Gap tetap semantic (green/amber/red, already in place).
-                // Sprint 13.2 — width disempitkan (kolom angka sempit).
                 TextColumn::make('etd_gap')
                     ->label('ETD Gap')
                     ->alignCenter()
@@ -271,12 +237,11 @@ class VesselPlanItemRelationManager extends RelationManager
                         };
                     }),
             ])
-            // Sprint 13.2 — Action column rata tengah.
             ->actionsAlignment('center')
 
-            // Sprint 12.5 — Empty state natural + action button Tambah Jadwal.
-            // Sprint 12.9 — Filter-aware empty state.
-            // Sprint 13.1 — Filter state dibaca dari public property (bukan Filament SelectFilter).
+            // Pesan empty state berbeda tergantung apakah filter Shipping
+            // Line sedang aktif, supaya jelas apakah memang belum ada
+            // jadwal sama sekali atau hanya tidak ada untuk filter ini.
             ->emptyStateHeading('Belum ada jadwal kapal')
             ->emptyStateDescription(function () {
                 return filled($this->vpShippingLineFilter)

@@ -84,8 +84,8 @@
                 </template>
 
                 {{-- Snapshot Saat Persetujuan: hanya field yang menjelaskan
-                     keputusan (Status Plan, Jumlah Jadwal) — lihat audit
-                     Sprint 13.10 di VesselPlanReviewHistory::buildSnapshot(). --}}
+                     keputusan (Status Plan, Jumlah Jadwal) — lihat
+                     VesselPlanReviewHistory::buildSnapshot(). --}}
                 <template x-if="entry?.snapshot && entry.snapshot.length > 0">
                     <div>
                         <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Snapshot Saat Persetujuan</div>

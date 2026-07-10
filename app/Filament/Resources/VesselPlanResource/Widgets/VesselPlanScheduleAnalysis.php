@@ -9,7 +9,7 @@ use Filament\Widgets\Widget;
 /**
  * @deprecated
  *
- * Removed from Vessel Plan Workspace in Sprint 12.8.
+ * Removed from Vessel Plan Workspace.
  *
  * This widget belongs to the Operational/Voyage Evaluation domain
  * because it analyzes Draft -> Final -> Actual execution,
@@ -70,33 +70,32 @@ class VesselPlanScheduleAnalysis extends Widget
             $effectiveImpact = $dooringImpact ?? $dwellingImpact;
 
             $status = match (true) {
-                $fETD === null                         => 'no_final',
-                abs($effectiveImpact ?? 0) >= 4        => 'tinggi',
-                abs($effectiveImpact ?? 0) >= 2        => 'sedang',
-                default                                => 'rendah',
+                $fETD === null => 'no_final',
+                abs($effectiveImpact ?? 0) >= 4 => 'tinggi',
+                abs($effectiveImpact ?? 0) >= 2 => 'sedang',
+                default => 'rendah',
             };
 
             return [
-                'voyage_no'      => $item->voyage_no ?? '—',
-                'vessel_name'    => $item->vessel?->name ?? '—',
-                'draftETD'       => $dETD,
-                'finalETD'       => $fETD,
-                'actualATD'      => $aATD,
+                'voyage_no' => $item->voyage_no ?? '—',
+                'vessel_name' => $item->vessel?->name ?? '—',
+                'draftETD' => $dETD,
+                'finalETD' => $fETD,
+                'actualATD' => $aATD,
                 'dwellingImpact' => $dwellingImpact,
-                'sailingImpact'  => $sailingImpact,
-                'dooringImpact'  => $dooringImpact,
-                'sailingPlan'    => $sailingPlan,
-                'hasActual'      => $aATD !== null,
-                'status'         => $status,
+                'sailingImpact' => $sailingImpact,
+                'dooringImpact' => $dooringImpact,
+                'sailingPlan' => $sailingPlan,
+                'hasActual' => $aATD !== null,
+                'status' => $status,
             ];
         })->all();
 
         // Narrative: most-impacted revised voyage
-        $revisedRows = array_filter($rows, fn($r) => abs($r['dwellingImpact'] ?? 0) > 0);
+        $revisedRows = array_filter($rows, fn ($r) => abs($r['dwellingImpact'] ?? 0) > 0);
         $revisedCount = count($revisedRows);
 
-        usort($revisedRows, fn($a, $b) =>
-            abs($b['dwellingImpact'] ?? 0) <=> abs($a['dwellingImpact'] ?? 0)
+        usort($revisedRows, fn ($a, $b) => abs($b['dwellingImpact'] ?? 0) <=> abs($a['dwellingImpact'] ?? 0)
         );
 
         $topRow = ! empty($revisedRows) ? array_values($revisedRows)[0] : null;
@@ -107,12 +106,12 @@ class VesselPlanScheduleAnalysis extends Widget
             : null;
 
         return [
-            'hasData'             => true,
-            'rows'                => $rows,
-            'revisedCount'        => $revisedCount,
+            'hasData' => true,
+            'rows' => $rows,
+            'revisedCount' => $revisedCount,
             'narrative' => [
-                'topRow'               => $topRow,
-                'revisedCount'         => $revisedCount,
+                'topRow' => $topRow,
+                'revisedCount' => $revisedCount,
                 'forecastDooringTotal' => $forecastDooringTotal,
             ],
         ];

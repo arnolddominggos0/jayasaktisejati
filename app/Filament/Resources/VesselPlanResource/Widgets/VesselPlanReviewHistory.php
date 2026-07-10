@@ -28,8 +28,7 @@ class VesselPlanReviewHistory extends Widget
                 return [
                     'action' => $this->formatActionLabel($review->action),
                     'note' => $review->note,
-                    // Sprint 13.10 — Feedback TAM adalah label domain yang lebih
-                    // spesifik untuk note pada event Revision (isinya = alasan
+                    // "Feedback TAM" untuk event Revision (isinya = alasan
                     // penolakan TAM); event lain memakai label netral.
                     'note_label' => $review->action === VesselPlan::REVIEW_ACTION_REVISION_REQUESTED
                         ? 'Feedback TAM'
@@ -46,10 +45,9 @@ class VesselPlanReviewHistory extends Widget
     }
 
     /**
-     * Sprint 13.10 — Event Snapshot audit: hanya field yang menjelaskan
-     * keputusan approval yang ditampilkan. sailing_avg (KPI performa, sudah
-     * ada di KPI Strip) dan snapshot_id (FK internal, tidak bermakna bisnis)
-     * sengaja tidak ikut — lihat audit Sprint 13.10.
+     * Hanya field yang menjelaskan keputusan approval yang ditampilkan.
+     * sailing_avg (metrik performa, bukan bagian keputusan) dan snapshot_id
+     * (FK internal, tidak bermakna bisnis bagi pembaca) sengaja tidak ikut.
      *
      * @return array<int, array{label: string, value: string}>
      */

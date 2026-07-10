@@ -21,21 +21,15 @@ class EditVesselPlan extends EditRecord
 
     protected static string $view = 'filament.resources.vessel-plan-resource.pages.edit-vessel-plan';
 
-    // Sprint 4.x — Vessel Plan Workspace UX Refinement: header kontekstual.
-    // Identitas plan adalah periodenya, bukan kata "Ubah" — Planner mengelola
-    // 12 plan per tahun dan membedakannya lewat bulan.
-
+    // Identitas plan adalah periodenya, bukan kata "Ubah" — satu customer
+    // punya sampai 12 plan per tahun, dibedakan lewat bulan.
     public function getBreadcrumb(): string
     {
         return $this->record->period_month->translatedFormat('F Y');
     }
 
-    /**
-     * Sprint 14.11 (brief "14.7") — Status naik ke heading: Draft adalah
-     * status Vessel Plan (objek), bukan status Route. Pola Object Page
-     * enterprise (GitHub PR, Jira, Fiori): badge status berdampingan dengan
-     * judul objek, bukan dengan atributnya.
-     */
+    // Status adalah atribut plan itu sendiri, bukan atribut Route — badge
+    // status karena itu berdampingan dengan judul objek.
     public function getHeading(): string|Htmlable
     {
         $status = $this->record->status;
@@ -53,18 +47,6 @@ class EditVesselPlan extends EditRecord
         );
     }
 
-    /**
-     * Workspace Hero — Baseline Design Language v1.1 (Object Header)
-     *
-     * Composition (Sprint 14.11):
-     *   Heading + Status badge (objek + statusnya, satu baris)
-     *     ↓ Identity   : Route → Customer • N Jadwal (satu grup, 2 baris)
-     *     ↓ Guidance   : "Langkah Saat Ini" + accent bar bertint status
-     *     ↓ Summary    : widget VesselPlanAnalysis — menyatu sebagai bagian
-     *                    bawah Object Header (divider tipis, bg muted),
-     *                    bukan kotak kedua. Styling: theme.css blok
-     *                    "Hero Composition".
-     */
     public function getSubheading(): string|Htmlable|null
     {
         $status = $this->record->status;
@@ -87,19 +69,16 @@ class EditVesselPlan extends EditRecord
         $guidance = match ($status) {
             VesselPlanStatus::Draft => 'Susun jadwal kapal sebelum dikirim ke TAM.',
             VesselPlanStatus::Sent => 'Menunggu Final Schedule dari TAM&nbsp;— sesuaikan ETD, ETA, dan Cargo Plan sebelum finalisasi.',
-            // Sprint 13.9 — feedback_reason adalah Current Instruction selama
-            // status = Revision (dikosongkan lagi begitu kembali ke Draft, lihat
-            // mutateFormDataBeforeSave). Dikutip langsung di Guidance, bukan
-            // hanya terekam di modal footer, supaya Planner tidak perlu mencari
-            // instruksi aktifnya sendiri.
+            // Feedback TAM dikutip langsung di Guidance selama status Revision
+            // (bukan hanya terekam di riwayat) supaya Planner tidak perlu
+            // mencari instruksi aktifnya sendiri.
             VesselPlanStatus::Revision => $this->revisionGuidance(),
             VesselPlanStatus::Final => 'Vessel Plan telah difinalisasi.',
         };
 
         return new HtmlString(
             '<div class="vp-hero">'
-            // Identity block: Route (status sudah di Heading, tidak diulang di
-            // sini — Sprint 14.11 fix), lalu Customer • Jadwal sebagai satu frasa.
+            // Route saja — status sudah ada di Heading, tidak diulang di sini.
             .'<div class="vp-hero-identity">'
             .'<div class="vp-hero-title-row">'
             .'<span class="vp-hero-route">'.e($rute).'</span>'
@@ -119,12 +98,8 @@ class EditVesselPlan extends EditRecord
         );
     }
 
-    /**
-     * Sprint 13.9 — kutip feedback_reason (Current Instruction) langsung di
-     * Guidance selama status Revision. Truncate menjaga tinggi Hero; versi
-     * lengkap tetap permanen di Log Persetujuan (footer) begitu ditutup oleh
-     * transisi status berikutnya.
-     */
+    // Feedback dipotong supaya Hero tidak melebar; versi lengkap tetap
+    // tersimpan permanen di Log Persetujuan setelah siklus revisi ini ditutup.
     protected function revisionGuidance(): string
     {
         $feedback = trim((string) $this->record->feedback_reason);

@@ -38,7 +38,7 @@ $historyRows = $items->map(function ($item) use ($draftMap) {
         ? (int) $finalEtd->diffInDays($finalEta)
         : null;
 
-    // Sprint 12.9 — Voyage format kanon: V.NNN · Shipping Line
+    // Format voyage kanon: V.NNN · Shipping Line
     $voyageCanon = collect([
         $item->voyage_no ? 'V.' . $item->voyage_no : null,
         $item->shippingLine?->name,
@@ -99,9 +99,9 @@ $deltaLabel = function (?int $d, bool $short = false): array {
             if (d === 0)    return '±0';
             return (d > 0 ? '+' : '') + d + unit;
         },
-        // Sprint 14.1 — Summary First: kalimat natural dari delta yang sudah
-        // dihitung PHP (delta_etd/delta_eta/delta_sailing). Tidak ada logika
-        // bisnis baru, murni phrasing atas angka yang sudah ada.
+        // Kalimat natural dari delta yang sudah dihitung PHP
+        // (delta_etd/delta_eta/delta_sailing) — murni phrasing, bukan
+        // perhitungan baru.
         hasFullDelta(sel) {
             return !!sel && sel.delta_etd !== null && sel.delta_eta !== null && sel.delta_sailing !== null;
         },
@@ -322,8 +322,8 @@ $deltaLabel = function (?int $d, bool $short = false): array {
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <div class="text-[10px] text-emerald-400 uppercase mb-1">ETD</div>
-                            {{-- Sprint 14.1 — emphasis tipografi murni (bukan badge/bg/icon)
-                                 untuk field yang berubah dibanding Draft, lihat isChanged(). --}}
+                            {{-- Emphasis tipografi murni (bukan badge/bg/icon) untuk
+                                 field yang berubah dibanding Draft, lihat isChanged(). --}}
                             <div class="text-sm"
                                  :class="isChanged(selected.delta_etd) ? 'font-semibold text-emerald-800' : 'font-normal text-emerald-700'"
                                  x-text="selected.final_etd || '—'"></div>
@@ -349,8 +349,8 @@ $deltaLabel = function (?int $d, bool $short = false): array {
                         <div class="w-2 h-2 rounded-full bg-gray-500"></div>
                         <div class="text-xs font-bold text-gray-600 uppercase tracking-wider">Perubahan</div>
                     </div>
-                    {{-- Sprint 14.1 — Task 3: semua delta nol = satu kalimat,
-                         bukan tiga baris ±0 yang tidak menambah informasi. --}}
+                    {{-- Semua delta nol = satu kalimat, bukan tiga baris ±0
+                         yang tidak menambah informasi. --}}
                     <template x-if="allZero(selected)">
                         <div class="text-sm font-medium text-emerald-700">
                             &check; Tidak ada perubahan jadwal.

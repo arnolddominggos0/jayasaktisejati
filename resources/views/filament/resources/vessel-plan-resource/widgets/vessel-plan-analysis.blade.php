@@ -1,40 +1,14 @@
 {{--
-    Hero Summary — bagian dari Workspace Hero (Baseline Design Language v1.0).
-    Sprint 14.4: maks. 3 blok, semua menjawab pertanyaan planner sehari-hari —
-    "berapa unit bulan ini" (Rencana Muatan), "apakah ETD Gap aman" (ETD Gap),
-    dan "apakah plan ini siap" (Verdict). Jumlah Jadwal sudah di Hero meta;
-    Avg Sailing tetap di tab Review Jadwal (rumah analytics).
-    Sprint 14.6: tanpa border & divider vertikal — whitespace antar metric
-    (gap-x-12) sudah cukup memisahkan tiap blok (Gestalt: proximity), lebih
-    sesuai prinsip "tenang, bukan banyak kotak/garis" daripada furniture
-    tambahan. Background tint tetap dipertahankan supaya blok ini masih
-    terbaca sebagai satu kesatuan ringkasan, bukan teks lepas.
+    Operational Summary — bagian bawah Object Header, menyatu dengan Hero
+    (box disediakan oleh wrapper .fi-page-header-widgets, bukan di sini).
+    Maksimal 3 blok, masing-masing menjawab satu pertanyaan planner sehari-
+    hari: berapa unit bulan ini (Rencana Muatan), apakah ETD Gap aman (ETD
+    Gap), apakah plan ini siap (Status Plan). Jumlah Jadwal sudah ada di
+    Hero meta dan Avg Sailing adalah metrik analitis — keduanya sengaja
+    tidak diulang di sini, rumahnya tab Review Jadwal.
+    Kolom Status lebih lebar (1.3fr) karena teksnya secara konsisten lebih
+    panjang dari dua kolom angka lainnya.
     Teks sekunder minimal gray-500 (WCAG AA); gray-400 hanya untuk dekoratif.
-    Sprint 14.7: kotak sudah full-width sejak 14.5, tapi 3 metric-nya
-    ber-flex-start (mepet kiri) menyisakan ruang kosong lebar di kanan —
-    membuat kartu TERLIHAT lebih pendek dari Workspace meski batas kotaknya
-    identik. justify-between menyebar metric mengisi lebar penuh, sama
-    seperti kolom tabel di bawahnya. Nol metric baru, nol wording berubah.
-    Sprint 14.8: audit browser menemukan 3 kolom tidak sejajar top edge
-    (items-center men-tengah-kan tiap kolom terhadap kolom tertinggi) dan
-    kolom Verdict tidak punya "jangkar" sebesar angka 24px di kolom 1/2 —
-    struktur baris (label->value->subtitle) disamakan + label "Status Plan"
-    ditambahkan (bukan metric baru, hanya baris label yang sebelumnya hilang).
-    Sprint 14.9 ("14.7" pada brief — nomor sudah terpakai, lanjut kronologis):
-    flex+justify-between diganti CSS Grid 1fr/1fr/1.3fr (kolom Status lebih
-    lebar karena teksnya lebih panjang) — grid memberi proporsi kolom yang
-    stabil, tidak lagi bergantung pada lebar konten seperti flex. Angka value
-    dinaikkan 24px->36px agar jadi jangkar visual yang jauh lebih kuat (Three
-    KPI, One Surface). Padding vertikal naik (bukan horizontal) untuk napas
-    tinggi ~120-132px. Nol border/divider/shadow/icon/badge baru — grid +
-    alignment + typography saja.
-    Sprint 14.7 FINAL (Object Header Freeze): box (bg/border/radius/padding)
-    dipindah ke .fi-page-header-widgets (wrapper native Filament) supaya Hero
-    dan Summary menyatu jadi satu Object Header — vp-kpi-strip berhenti jadi
-    card kedua yang berdiri sendiri. rounded-xl & mb-2 dihapus dari sini,
-    kolom Status tetap 1.3fr (audit konten: teks Status lebih panjang per
-    baris meski jumlah barisnya sama dengan ETD Gap — 25/25/50 akan
-    memaksakan proporsi yang tidak didukung konten).
 --}}
 <div class="vp-kpi-strip">
 
@@ -60,9 +34,9 @@
             <div class="mt-1.5 text-sm text-gray-500">Target &le; {{ $idealGap }} hari</div>
         </div>
 
-        {{-- Decision Verdict — tipografis, bukan chip/card berlatar. Label
-             "Status Plan" (Sprint 14.8) menyamakan struktur label->value
-             ->subtitle dengan 2 kolom lain, bukan metric/field baru. --}}
+        {{-- Verdict — tipografis, bukan chip/card berlatar. Label "Status
+             Plan" menyamakan struktur label->value->subtitle dengan 2
+             kolom lain. --}}
         <div class="text-center">
             <div class="text-[13px] font-medium uppercase tracking-wide text-gray-500">Status Plan</div>
             <div class="mt-1.5 text-lg font-semibold leading-tight {{ $statusColor }}">

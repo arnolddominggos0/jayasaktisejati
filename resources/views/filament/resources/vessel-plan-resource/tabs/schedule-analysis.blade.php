@@ -10,24 +10,8 @@
  *   Axiom 6 (Behavior Judgment) — setiap Recognition menghasilkan keputusan yang jelas
  *   Axiom 12 (Directedness)— perhatian diarahkan ke exception, bukan tabel detail
  *
- * Sprint 12.2 — Planning Analysis Workspace (planning/operational domain split).
- * Sprint 12.3 — Decision Support refinement (removed false-positive overlap rules).
- * Sprint 12.4 — UX Polish (Executive Summary + Decision Summary + Conclusion).
- * Sprint 12.5 (Workspace Polish) — workspace-wide consistency freeze.
- * Sprint 12.5 (Decision Review Polish) — Tab rename "Review Jadwal", Exception First.
- * Sprint 12.6 (UX Freeze) — Final compact polish:
- *   - Executive Summary dipadatkan (bullets singkat, narrative spesifik per fase).
- *   - Exception Box satu kalimat (tidak ada paragraf).
- *   - Decision Card "Gap ETD Terbesar" → "Gap ETD Maksimum".
- *   - Status Plan value sebagai badge kecil (bukan heading besar).
- *   - Tabel header "Tabel Verifikasi Jadwal" → "Daftar Jadwal".
- *   - Table density dipadatkan ~10% (py-2.5 → py-2).
- *   - ETD Gap legend dipangkas (tanpa penjelasan warna — badge sudah menjelaskan).
- *   - Checklist Finalisasi compact (footer-style, no big card).
- *   - White space lebih rapat.
- *   - Bahasa Indonesia konsisten (Perencanaan / Perlu Perbaikan).
- *   - Hanya semantic icon (✓ / ⚠ / ✕) — tidak ada icon dekoratif.
- * Freeze: tidak ada KPI / card / widget / summary baru.
+ * Icon hanya dipakai untuk makna semantik (✓ / ⚠ / ✕), tidak dekoratif.
+ * Tidak ada KPI / card / widget / summary tambahan di luar yang sudah ada.
  */
 
 $analysis       = $record->analyze();
@@ -40,7 +24,6 @@ $scheduleCount  = $analysis['schedule_count'] ?? 0;
 $sailingAvg     = $analysis['sailing_avg']    ?? 0;
 $maxGap         = $analysis['max_gap']        ?? 0;
 
-// Sprint 12.3 — Decision Support outputs (untouched)
 $gapWarnings      = $analysis['gap_warnings']      ?? [];
 $chronologyIssues = $analysis['chronology_issues'] ?? [];
 $missingSailing   = $analysis['missing_sailing']   ?? [];
@@ -74,7 +57,7 @@ $planReady  = $readiness['ready'] ?? false;
 $submitPass = collect($submitChecks)->every(fn ($c) => $c['pass']);
 $finalizePass = collect($finalizeChecks)->every(fn ($c) => $c['pass']);
 
-// ── Sprint 12.6 — Executive Summary (compact) ─────────────────────────────
+// ── Executive Summary ──────────────────────────────────────────────────
 $isEditable = $isDraft || $isRevision;
 
 $execTitle     = null;
@@ -128,7 +111,7 @@ $execStyle = $execReady
     ? ['bg' => 'bg-emerald-50', 'border' => 'border-emerald-200', 'text' => 'text-emerald-800', 'narrative' => 'text-emerald-700', 'bullet' => 'text-emerald-600']
     : ['bg' => 'bg-red-50',     'border' => 'border-red-200',     'text' => 'text-red-800',     'narrative' => 'text-red-700',     'bullet' => 'text-red-500'];
 
-// ── Sprint 12.6 — Decision Summary card wording + Status badge kecil ─────
+// ── Decision Summary ──────────────────────────────────────────────────
 $statusPlanLabel = match (true) {
     $isFinal                      => 'Final',
     $isEditable && $execReady      => 'Siap Submit',
@@ -146,9 +129,9 @@ $statusBadgeStyle = match ($statusPlanLabel) {
 // ETD Gap value color for card
 $gapCardColor = $gapOk ? 'text-gray-800' : ($maxGap <= 10 ? 'text-amber-600' : 'text-red-600');
 
-// ── Sprint 13.3 — Exception First (grouped per-vessel, actionable wording) ──
-// Build flat issue list, then group by vessel name so Planner langsung tahu
-// harus buka baris mana di Daftar Jadwal.
+// ── Exception First: dikelompokkan per kapal, bukan per jenis masalah ────
+// Build flat issue list, lalu group by vessel name supaya Planner langsung
+// tahu harus buka baris mana di Daftar Jadwal.
 $exceptionIssues = [];
 $exceptionIssues[] = ['vessel_raw' => $chronologyIssues, 'severity' => 'critical', 'label' => 'ETA tidak valid'];
 $exceptionIssues[] = ['vessel_raw' => $gapWarnings,      'severity' => 'warning',  'labelBuilder' => fn ($w) => 'ETD Gap ' . $w['gap'] . ' hari (melebihi SOP)'];
@@ -187,7 +170,6 @@ $hasExceptions  = $exceptionVesselCount > 0;
 $fmtDate = fn ($d) => $d ? $d->translatedFormat('d M Y') : '—';
 @endphp
 
-{{-- Sprint 12.6 — white space dipadatkan (space-y-2.5) --}}
 <div class="space-y-2.5">
 
     {{-- ── Header — Review Jadwal ─────────────────────────────────────────── --}}
@@ -346,7 +328,6 @@ $fmtDate = fn ($d) => $d ? $d->translatedFormat('d M Y') : '—';
 
     {{-- ── 4. Tabel Jadwal (Supporting Information) ────────────────────────── --}}
     @if ($items->isEmpty())
-        {{-- Sprint 13.3 — Empty state konsisten antar tab. --}}
         <div class="rounded-xl border border-dashed border-gray-200 p-8 text-center">
             <div class="text-sm text-gray-500">Belum ada jadwal untuk direview.</div>
         </div>
@@ -465,8 +446,7 @@ $fmtDate = fn ($d) => $d ? $d->translatedFormat('d M Y') : '—';
                 </table>
             </div>
 
-            {{-- Sprint 12.6 — ETD Gap legend dipangkas (tanpa penjelasan warna; badge sudah menjelaskan) --}}
-            {{-- Sprint 13.3 — Legend dipadatkan menjadi referensi singkat. --}}
+            {{-- Tanpa penjelasan warna — badge di kolom ETD Gap sudah menjelaskan. --}}
             <div class="text-[11px] text-gray-500 mt-1.5">
                 Target ETD Gap ≤ {{ $gapLimit }} hari antar keberangkatan kapal.
             </div>
