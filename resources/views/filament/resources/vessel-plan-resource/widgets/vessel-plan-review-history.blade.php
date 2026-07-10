@@ -1,3 +1,4 @@
+@unless ($hideWhenEmpty ?? false)
 <div class="rounded-xl border bg-white px-6 py-5 mb-6"
      x-data="{ open: false, entry: null }">
 
@@ -112,3 +113,4 @@
     </div>
 
 </div>
+@endunless

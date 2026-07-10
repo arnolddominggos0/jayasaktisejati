@@ -18,7 +18,7 @@ class VesselPlanReviewHistory extends Widget
     protected function getViewData(): array
     {
         if (! $this->record) {
-            return ['entries' => []];
+            return ['entries' => [], 'hideWhenEmpty' => true];
         }
 
         $entries = $this->record->reviews()
@@ -41,7 +41,12 @@ class VesselPlanReviewHistory extends Widget
             })
             ->all();
 
-        return ['entries' => $entries];
+        // Draft belum punya apa pun untuk dicatat — sembunyikan seluruh
+        // widget alih-alih menampilkan kotak kosong "Belum ada riwayat."
+        return [
+            'entries' => $entries,
+            'hideWhenEmpty' => $this->record->isDraft() && $entries === [],
+        ];
     }
 
     /**

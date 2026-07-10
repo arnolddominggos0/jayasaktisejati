@@ -16,12 +16,14 @@ $hasFinalSnapshot = $record->finalSnapshot() !== null;
 // masih menyusun jadwal, Sent berarti menunggu/mencatat hasil dari TAM
 // sehingga bukti kelayakan (Review Jadwal) yang perlu dibaca dulu, Final
 // berarti tidak ada lagi yang perlu disusun sehingga perbandingan jadwal
-// akhir (Riwayat Jadwal) yang paling relevan. Query string ?tab= tetap
-// menang kalau user membuka tautan langsung ke tab tertentu.
+// akhir (Riwayat Jadwal) yang paling relevan — kecuali belum ada snapshot
+// final untuk dibandingkan, maka Review Jadwal tetap jadi fallback yang
+// paling relevan. Query string ?tab= tetap menang kalau user membuka
+// tautan langsung ke tab tertentu.
 $defaultTab = match (true) {
-    $record->isSent()                       => 'analysis',
-    $record->isFinal() && $hasFinalSnapshot => 'history',
-    default                                  => 'schedule',
+    $record->isFinal() => $hasFinalSnapshot ? 'history' : 'analysis',
+    $record->isSent()  => 'analysis',
+    default             => 'schedule',
 };
 @endphp
 
