@@ -2143,10 +2143,11 @@
 }
 
 /* =======================================================================
-   Table Filter — kontrol milik tabel Jadwal (nantinya search/sort/
-   export/bulk action). Bukan Card, hanya toolbar tipis di dalam
-   .vp-workspace, tepat di atas header RelationManager ("+ Tambah
-   Jadwal") supaya keduanya terbaca sebagai satu toolbar.
+   Workspace Filter — Shipping Line berlaku untuk seluruh workspace
+   (Jadwal, Review Jadwal, Riwayat Jadwal), karena itu berada sebelum
+   Planning Summary dan Tabs, bukan di dalam salah satu tab. Toolbar
+   sederhana, bukan Card — filter adalah control, summary adalah
+   information, dua hal itu tidak dicampur secara visual.
    ======================================================================= */
 .vp-toolbar {
     display: flex;
@@ -2155,8 +2156,7 @@
     gap: 0.625rem;
 }
 .vp-filter-toolbar {
-    padding: 0.75rem 1.5rem;
-    border-bottom: 1px solid var(--mon-border-soft, #EEF2F7);
+    margin-bottom: 1rem;
 }
 .vp-toolbar-label {
     font-size: 0.8125rem;
