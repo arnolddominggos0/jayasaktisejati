@@ -1,22 +1,28 @@
 @php
 /**
- * Edit Vessel Plan — 3-tab layout
- *
- * Tab 1 — Jadwal   : Form edit + RelationManager + slim toolbar Shipping Line
- * Tab 2 — Review   : Review Jadwal — Decision Support Workspace
- * Tab 3 — Riwayat  : Schedule History — Draft vs Final, delta, detail drawer
- *
- * Catatan:
- *  - Tab 1 menggunakan x-show agar Livewire form + relation manager tetap
- *    di-mounted dan tidak kehilangan state saat pindah tab.
- *  - Toolbar Shipping Line di Tab 1 dispatch Livewire event ke RM child
- *    (vpFilterShippingLine) untuk live update tabel tanpa reload halaman.
- *  - Tab 2 & 3 merupakan blade-only (no Livewire) — aman dibungkus x-show.
- *  - Relasi di-eager-load di mount() EditVesselPlan.php.
+ * Tab 1 (schedule) tetap ter-mount lewat x-show agar Livewire form dan
+ * relation manager tidak kehilangan state saat berpindah tab. Tab 2 dan 3
+ * blade-only sehingga aman dibungkus x-show juga.
  */
 
 $record = $this->record;
 $items  = $record->items->sortBy('planned_etd');
+
+// Riwayat Jadwal membandingkan draft snapshot dengan final snapshot —
+// tanpa final snapshot tidak ada apa pun untuk dibandingkan.
+$hasFinalSnapshot = $record->finalSnapshot() !== null;
+
+// Tab yang paling relevan berbeda tergantung fase: Draft/Revision berarti
+// masih menyusun jadwal, Sent berarti menunggu/mencatat hasil dari TAM
+// sehingga bukti kelayakan (Review Jadwal) yang perlu dibaca dulu, Final
+// berarti tidak ada lagi yang perlu disusun sehingga perbandingan jadwal
+// akhir (Riwayat Jadwal) yang paling relevan. Query string ?tab= tetap
+// menang kalau user membuka tautan langsung ke tab tertentu.
+$defaultTab = match (true) {
+    $record->isSent()                       => 'analysis',
+    $record->isFinal() && $hasFinalSnapshot => 'history',
+    default                                  => 'schedule',
+};
 @endphp
 
 <x-filament-panels::page
@@ -27,13 +33,9 @@ $items  = $record->items->sortBy('planned_etd');
     ])
 >
 
-    {{-- ──────────────────────────────────────────────────────────────────────
-         Tab Navigation — persisten via URL ?tab=
-         Default: 'schedule'
-    ───────────────────────────────────────────────────────────────────────── --}}
     <div
         x-data="{
-            tab: new URLSearchParams(window.location.search).get('tab') || 'schedule'
+            tab: new URLSearchParams(window.location.search).get('tab') || '{{ $defaultTab }}'
         }"
         x-init="
             $watch('tab', v => {
@@ -56,10 +58,12 @@ $items  = $record->items->sortBy('planned_etd');
                 Review Jadwal
             </button>
 
+            @if ($hasFinalSnapshot)
             <button type="button" @click="tab = 'history'" :class="tab === 'history' ? 'vp-tab is-active' : 'vp-tab'">
                 <x-heroicon-o-clock class="w-4 h-4" />
                 Riwayat Jadwal
             </button>
+            @endif
 
         </div>
 
