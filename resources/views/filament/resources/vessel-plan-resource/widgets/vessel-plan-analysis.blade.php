@@ -28,8 +28,15 @@
     KPI, One Surface). Padding vertikal naik (bukan horizontal) untuk napas
     tinggi ~120-132px. Nol border/divider/shadow/icon/badge baru — grid +
     alignment + typography saja.
+    Sprint 14.7 FINAL (Object Header Freeze): box (bg/border/radius/padding)
+    dipindah ke .fi-page-header-widgets (wrapper native Filament) supaya Hero
+    dan Summary menyatu jadi satu Object Header — vp-kpi-strip berhenti jadi
+    card kedua yang berdiri sendiri. rounded-xl & mb-2 dihapus dari sini,
+    kolom Status tetap 1.3fr (audit konten: teks Status lebih panjang per
+    baris meski jumlah barisnya sama dengan ETD Gap — 25/25/50 akan
+    memaksakan proporsi yang tidak didukung konten).
 --}}
-<div class="vp-kpi-strip rounded-xl mb-2">
+<div class="vp-kpi-strip">
 
     <div class="grid grid-cols-[1fr_1fr_1.3fr] gap-x-8">
 

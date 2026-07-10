@@ -2067,21 +2067,38 @@
 }
 
 /* =======================================================================
-   Hero Composition (DESIGN FREEZE — Sprint 13.8, Baseline v1.0)
-   Hero tidak boleh didesain ulang kecuali ada usability issue nyata.
+   Hero Composition (DESIGN FREEZE — Sprint 14.7 FINAL, Baseline v2.0)
+   Object Header dianggap final. Jangan didesain ulang kecuali ada
+   perubahan kebutuhan bisnis nyata (bukan preferensi visual).
 
-   Kontrak visual (rhythm: 6 < 12 < 18 — dalam blok < antar blok):
-   - Heading Filament = satu-satunya headline (30px bold di sm+), gap 12px ke identitas.
-   - Identitas = Route 16px/700 (Sprint 14.6: naik dari 15px/600 — bagian
-                 Identity, bukan sub-info) + badge tenang inline; Customer &
-                 Jumlah Jadwal di baris terpisah (bukan digabung separator),
-                 gap 6px.
+   Kontrak visual final — SATU Object Header (Hero + Summary), rhythm
+   16 < 16 < (divider) < 24 (dalam blok < antar blok < antar section):
+   - Heading Filament = satu-satunya headline (30px bold di sm+) + status
+                 badge inline (status milik objek, bukan atribut Route).
+                 Gap 16px ke Identity.
+   - Identity  = Route 16px/700 (bagian Identity, bukan sub-info); Customer
+                 • Jumlah Jadwal satu frasa (bullet, bukan baris terpisah —
+                 dua fakta sekunder dibaca sebagai satu kelompok, bukan dua
+                 scan vertikal). Gap 16px ke Guidance.
    - Guidance  = label 12px Title Case abu + body 15px/500 neutral,
                  accent bar kiri 2px bertint status (300-series) = sinyal,
-                 bukan alert. Jarak identity->guidance 18px.
-   - Hero->Health Strip = row-gap section 24px (Sprint 14.5). Strip tanpa
-                 border (Sprint 14.6) — hanya bg tint lembut, agar transisi
-                 dari Guidance terasa menyatu, bukan kotak baru yang ditempel.
+                 bukan alert/notifikasi — Current Operational Context.
+   - Guidance->Summary = TIDAK ADA GAP. fi-header (Hero) dan
+                 .fi-page-header-widgets (Summary) menyatu jadi satu kotak;
+                 satu-satunya pemisah adalah border-top tipis di Summary
+                 (divider, bukan card kedua). Ini pusat Sprint 14.7 FINAL:
+                 sebelumnya dua card terpisah dengan gap 24px kosong di
+                 antaranya, terbaca sebagai Hero+Dashboard, bukan satu
+                 Object Header.
+   - Summary   = Operational Snapshot (bukan KPI dashboard) — grid
+                 Label -> Primary Value -> Supporting Context per kolom,
+                 1fr/1fr/1.3fr (Status lebih lebar krn teks lebih panjang,
+                 diaudit dari konten aktual, bukan preferensi 25/25/50).
+                 Violation footnote tetap di dalam kotak yang sama
+                 (border-top sendiri) — plan-level detail, bukan milik satu
+                 kolom.
+   - Summary->Tabs = row-gap 24px (Task 9) — baru di titik ini Object
+                 Header benar-benar berakhir dan Workspace (Tabs) mulai.
    - Header Actions = native Filament (flex-start di sm+, sm:mt-7 bawaan).
    ======================================================================= */
 
@@ -2090,7 +2107,7 @@
     font-size: 0.875rem;
     line-height: 1.4;
     color: #4B5563;
-    margin-top: 0.75rem;     /* 12px — heading berdiri sendiri, identitas tidak menempel */
+    margin-top: 1rem;        /* 16px (Sprint 14.7 FINAL rhythm: Heading -> Identity) */
     padding-bottom: 0;       /* gap dikendalikan oleh fi-page, bukan di sini */
 }
 
@@ -2101,19 +2118,15 @@
     gap: 0.375rem;          /* 6px antar elemen — tetap 1 unit, tidak menumpuk */
 }
 
-/* 1 — Title row: Route + status badge inline (status = atribut identitas) */
+/* 1 — Title row: Route saja. Status badge sudah pindah ke Heading sejak
+   Sprint 14.11 — tidak diulang di sini (dulu ada bug $badgeClass undefined
+   yang membuat badge kedua tampil tanpa warna; sekaligus melanggar prinsip
+   "status milik objek, bukan atribut Route"). */
 .vp-hero-title-row {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 0.5rem;
-}
-/* Badge di hero: lebih tenang dari chip global agar menyatu dengan route 15px,
-   bukan bersaing dengannya. Scoped — mon-badge global tidak berubah. */
-.vp-hero-title-row .mon-badge {
-    padding: 0.125rem 0.5rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
 }
 
 /* 2 — Route: Sprint 14.6 — naik jadi bagian Identity (bukan sub-info lagi),
@@ -2126,19 +2139,24 @@
     letter-spacing: -0.01em;
 }
 
-/* 3 — Customer & Jumlah Jadwal: dua fakta berbeda jenis (entitas vs angka),
-   Sprint 14.6 dipisah jadi baris sendiri-sendiri, bukan digabung separator
-   yang membuat mata berhenti menebak "satu frasa atau dua". */
+/* 3 — Customer • Jumlah Jadwal: satu frasa identity dibaca sebagai satu
+   kelompok (Sprint 14.11 fix) — sebelumnya 2 baris terpisah membuat mata
+   melakukan 2x scan vertikal untuk info yang sama-sama sekunder. */
 .vp-hero-meta {
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;            /* 4px — cukup napas, tidak berhimpitan (was 2px) */
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.375rem;           /* 6px antar elemen frasa */
 }
 .vp-hero-meta-customer {
     font-size: 0.8125rem;    /* 13px */
     line-height: 1.35;
     font-weight: 500;
     color: #374151;
+}
+.vp-hero-meta-sep {
+    font-size: 0.75rem;
+    color: #D1D5DB;          /* gray-300 — dekoratif, bukan konten */
 }
 .vp-hero-meta-count {
     font-size: 0.75rem;      /* 12px — trailing detail, lebih kecil dari customer */
@@ -2149,7 +2167,7 @@
 
 /* --- Guidance block — accent visual (bukan alert): bar lembut + teks netral */
 .vp-hero-next {
-    margin-top: 1.125rem;    /* 18px — zona guidance jelas terpisah dari identity */
+    margin-top: 1rem;        /* 16px (Sprint 14.7 FINAL rhythm: Identity -> Guidance) */
     display: flex;
     flex-direction: column;
     gap: 0.25rem;           /* 4px label -> body */
@@ -2186,16 +2204,21 @@
 
 /* Sprint 14.10 — Hero sebagai satu section utuh (bukan teks lepas di atas
    background halaman). Heading, Route+Badge, Customer, Jumlah Jadwal,
-   Guidance, breadcrumb, dan Header Actions kini satu kotak — sejajar
-   dengan Health Strip di bawahnya yang sudah lebih dulu berbentuk kotak
-   (14.6.1). fi-header adalah satu-satunya elemen native Filament yang
-   membungkus semua itu, jadi cukup diberi bg/border/radius/padding di
-   sini tanpa menyentuh markup vendor. */
+   Guidance, breadcrumb, dan Header Actions kini satu kotak. fi-header
+   adalah satu-satunya elemen native Filament yang membungkus semua itu,
+   jadi cukup diberi bg/border/radius/padding di sini tanpa menyentuh
+   markup vendor.
+   Sprint 14.7 FINAL — Object Header Freeze: fi-header berhenti jadi
+   persegi utuh. Border/radius bawah dihapus supaya Hero menyatu langsung
+   dengan Summary di bawahnya (.fi-page-header-widgets) — satu kotak,
+   bukan dua kotak bersebelahan dengan gap kosong di antaranya. */
 .fi-resource-edit-record-page.fi-resource-vessel-plans .fi-header {
     background: #FFFFFF;
     border: 1px solid var(--mon-border-soft, #EEF2F7);
-    border-radius: 0.75rem;
-    padding: 1.5rem 2rem;
+    border-bottom: none;
+    border-top-left-radius: 0.75rem;
+    border-top-right-radius: 0.75rem;
+    padding: 1.5rem 2rem 1.25rem;
 }
 
 /* Sprint 14.5 — Hero Alignment: kolom kiri fi-header (heading+subheading)
@@ -2212,24 +2235,41 @@
     min-width: 0;
 }
 
-/* Jarak Hero ke Health Strip (Sprint 14.3A: 14px -> 20px; 14.5: 20px -> 24px
-   untuk ritme yang sedikit lebih lega tanpa menambah tinggi Hero berlebihan).
-   Jarak berasal dari flex gap-y-8 (2rem) pada <section> pembungkus page —
-   bukan margin — jadi dikendalikan lewat row-gap, bukan margin-top sibling. */
+/* Sprint 14.7 FINAL — Hero dan Summary sekarang satu Object Header, jadi
+   gap kosong di antara keduanya (dulu row-gap 1.5rem di <section>) dihapus.
+   Batas dua zona itu sekarang murni border-top tipis di .fi-page-header-widgets
+   (lihat blok di bawah), bukan jarak. Gap ke Workspace (Tabs) tetap perlu —
+   dipindah ke selector .auto-cols-fr di bawah supaya Summary->Tabs (24px,
+   Task 9) tidak ikut hilang. */
 .fi-resource-edit-record-page.fi-resource-vessel-plans > section {
+    row-gap: 0;
+}
+
+/* Grid pembungkus native Filament (fi-page-header-widgets + slot tab/workspace)
+   — gap ini yang jadi jarak Summary -> Tabs. Native gap-y-8 (32px) diturunkan
+   ke 24px (Task 9 rhythm: Summary 24px Tabs). */
+.fi-resource-edit-record-page.fi-resource-vessel-plans > section > .auto-cols-fr {
     row-gap: 1.5rem;
 }
-/* --- 2. Hero Summary: sekunder, tidak bersaing dengan workspace utama ---
-   Sprint 14.5: padding dilonggarkan (10/18px -> 14/24px).
-   Sprint 14.6: padding naik lagi (14/24px -> 20/32px) + border dihapus dari
-   Blade (rounded-xl tanpa border) — hanya bg tint lembut yang tersisa, agar
-   Hero Summary terasa kelanjutan Guidance, bukan kotak dashboard baru. */
-.vp-kpi-strip {
+
+/* --- 2. Summary wrapper (fi-page-header-widgets, elemen native Filament) —
+   Sprint 14.7 FINAL: ini sekarang separuh-bawah dari Object Header yang
+   sama dengan fi-header, bukan card kedua. border-top tipis di sini adalah
+   SATU-SATUNYA pemisah visual antara Guidance dan Summary (divider, bukan
+   gap) — sisi kiri/kanan/bawah menutup kotak yang dimulai fi-header di atas. */
+.fi-resource-edit-record-page.fi-resource-vessel-plans .fi-page-header-widgets {
     background: var(--vp-surface-muted);
     border: 1px solid var(--mon-border-soft, #EEF2F7);
-    /* Sprint 14.9 — padding vertikal naik (bukan horizontal) untuk napas
-       tinggi ~120-132px sekarang value 36px, bukan lagi 24px. */
-    padding: 1.125rem 2rem;
+    border-bottom-left-radius: 0.75rem;
+    border-bottom-right-radius: 0.75rem;
+    padding: 1.25rem 2rem 1.125rem;
+}
+
+/* --- 2b. Hero Summary content: box-nya sudah dipindah ke wrapper di atas —
+   vp-kpi-strip sekarang murni layout grid, bukan card sendiri lagi. */
+.vp-kpi-strip {
+    /* intentionally no background/border/padding — disediakan oleh
+       .fi-page-header-widgets (Sprint 14.7 FINAL merge) */
 }
 
 /* --- 3. Workspace card: area kerja utama, paling dominan secara visual -- */

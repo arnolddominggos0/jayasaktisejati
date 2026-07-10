@@ -98,14 +98,15 @@ class EditVesselPlan extends EditRecord
 
         return new HtmlString(
             '<div class="vp-hero">'
-            // Identity block: Route + badge inline, lalu Customer•Jadwal (1 blok rapat)
+            // Identity block: Route (status sudah di Heading, tidak diulang di
+            // sini — Sprint 14.11 fix), lalu Customer • Jadwal sebagai satu frasa.
             .'<div class="vp-hero-identity">'
             .'<div class="vp-hero-title-row">'
             .'<span class="vp-hero-route">'.e($rute).'</span>'
-            .'<span class="mon-badge '.$badgeClass.'">'.e($status->label()).'</span>'
             .'</div>'
             .'<div class="vp-hero-meta">'
             .'<span class="vp-hero-meta-customer">'.e($pelanggan).'</span>'
+            .'<span class="vp-hero-meta-sep" aria-hidden="true">&bull;</span>'
             .'<span class="vp-hero-meta-count">'.e($count.' Jadwal').'</span>'
             .'</div>'
             .'</div>'
