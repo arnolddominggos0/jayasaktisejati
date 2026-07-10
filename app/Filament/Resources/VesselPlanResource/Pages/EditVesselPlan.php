@@ -4,6 +4,7 @@ namespace App\Filament\Resources\VesselPlanResource\Pages;
 
 use App\Enums\VesselPlanStatus;
 use App\Filament\Resources\VesselPlanResource;
+use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanAnalysis;
 use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanReviewHistory;
 use App\Supports\BusinessRouteResolver;
 use Filament\Actions\Action;
@@ -83,6 +84,16 @@ class EditVesselPlan extends EditRecord
             'pod',
             'customer',
         ]);
+    }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [VesselPlanAnalysis::class];
+    }
+
+    public function getHeaderWidgetsColumns(): int
+    {
+        return 1;
     }
 
     protected function getFooterWidgets(): array

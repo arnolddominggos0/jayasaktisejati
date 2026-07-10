@@ -9,13 +9,6 @@ $record = $this->record;
 $items  = $record->items->sortBy('planned_etd')->values();
 $shippingLines = $items->pluck('shippingLine')->filter()->unique('id')->sortBy('name')->values();
 
-// Summary kecil di header Workspace — informasi pendukung, bukan section
-// tersendiri. Angka yang sama dengan analyze(), bukan hitungan baru.
-$analysis = $record->analyze();
-$maxGap = $analysis['max_gap'] ?? 0;
-$gapOk = $analysis['gap_ok'] ?? false;
-$cargoTotal = $items->sum('cargo_plan');
-
 // Riwayat Jadwal membandingkan draft snapshot dengan final snapshot —
 // tanpa final snapshot tidak ada apa pun untuk dibandingkan.
 $hasFinalSnapshot = $record->finalSnapshot() !== null;
@@ -83,17 +76,42 @@ $defaultTab = match (true) {
         ─────────────────────────────────────────────────────────────────── --}}
         <div x-show="tab === 'schedule'">
 
-            {{-- Header, filter, summary kecil, toolbar Simpan/Batal, dan tabel
-                 adalah satu workspace surface (.vp-workspace), dipisah divider
-                 — bukan card terpisah. Status & POL/POD sengaja tidak diulang
-                 di sini — sudah ada di Document Header. --}}
+            {{-- Workspace Filter: kontrol terhadap isi workspace (filter,
+                 nantinya search/sort/export/bulk action/view options).
+                 Card Filament sendiri, terpisah dari Planning Summary —
+                 filter adalah control, summary adalah information. Livewire
+                 property shippingLineFilter dispatch 'vpFilterShippingLine'
+                 ke RelationManager untuk live update tanpa reload halaman. --}}
+            @if ($shippingLines->count() > 1)
+                <x-filament::section compact class="vp-filter-section">
+                    <div class="vp-toolbar">
+                        <span class="vp-toolbar-label">Shipping Line</span>
+                        <select
+                            wire:model.live="shippingLineFilter"
+                            class="text-sm rounded-md border-gray-300 shadow-sm py-1.5 pl-2.5 pr-8 leading-none bg-white text-gray-700 focus:border-primary-500 focus:ring-primary-500 cursor-pointer"
+                            aria-label="Shipping Line"
+                        >
+                            <option value="">Semua</option>
+                            @foreach ($shippingLines as $line)
+                                <option value="{{ $line->id }}">{{ $line->name }}</option>
+                            @endforeach
+                        </select>
+                        @if (filled($this->shippingLineFilter))
+                            <button type="button" wire:click="$set('shippingLineFilter', '')" class="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer">
+                                Reset Filter
+                            </button>
+                        @endif
+                    </div>
+                </x-filament::section>
+            @endif
+
+            {{-- Header, toolbar Simpan/Batal, dan tabel adalah satu workspace
+                 surface (.vp-workspace), dipisah divider — bukan card terpisah.
+                 Status & POL/POD sengaja tidak diulang di sini — sudah ada di Header. --}}
             <div class="vp-workspace">
 
-                {{-- Workspace Header: heading aktivitas (bukan statistik) +
-                     Shipping Line filter + summary kecil sebagai informasi
-                     pendukung, bukan section tersendiri. Livewire property
-                     shippingLineFilter dispatch 'vpFilterShippingLine' ke
-                     RelationManager untuk live update tanpa reload halaman. --}}
+                {{-- Workspace Header: heading aktivitas, bukan statistik —
+                     jumlah jadwal sudah ada di Planning Summary. --}}
                 <div class="vp-workspace-header">
                     <div class="min-w-0">
                         <div class="vp-workspace-title">Jadwal Kapal</div>
@@ -106,34 +124,6 @@ $defaultTab = match (true) {
                                 Susun dan kelola jadwal kapal sebelum dikirim ke TAM.
                             @endif
                         </p>
-                    </div>
-
-                    <div class="vp-workspace-controls">
-                        <span class="vp-workspace-summary">
-                            {{ $items->count() }} Jadwal &bull; {{ $cargoTotal }} unit &bull;
-                            <span class="{{ $gapOk ? '' : ($maxGap <= 10 ? 'text-amber-600' : 'text-red-600') }}">ETD Gap {{ $maxGap }} hari</span>
-                        </span>
-
-                        @if ($shippingLines->count() > 1)
-                            <div class="vp-toolbar">
-                                <span class="vp-toolbar-label">Shipping Line</span>
-                                <select
-                                    wire:model.live="shippingLineFilter"
-                                    class="text-sm rounded-md border-gray-300 shadow-sm py-1.5 pl-2.5 pr-8 leading-none bg-white text-gray-700 focus:border-primary-500 focus:ring-primary-500 cursor-pointer"
-                                    aria-label="Shipping Line"
-                                >
-                                    <option value="">Semua</option>
-                                    @foreach ($shippingLines as $line)
-                                        <option value="{{ $line->id }}">{{ $line->name }}</option>
-                                    @endforeach
-                                </select>
-                                @if (filled($this->shippingLineFilter))
-                                    <button type="button" wire:click="$set('shippingLineFilter', '')" class="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer">
-                                        Reset Filter
-                                    </button>
-                                @endif
-                            </div>
-                        @endif
                     </div>
                 </div>
 

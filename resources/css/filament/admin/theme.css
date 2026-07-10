@@ -2142,18 +2142,14 @@
     color: var(--mon-neutral, #6B7280);
 }
 
-/* Summary kecil + filter: informasi dan kontrol pendukung di dalam
-   Workspace Header, bukan section tersendiri. */
-.vp-workspace-controls {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-.vp-workspace-summary {
-    font-size: 0.75rem;
-    color: #6B7280;
-    white-space: nowrap;
+/* =======================================================================
+   Workspace Filter — kontrol terhadap isi workspace (filter, nantinya
+   search/sort/export/bulk action/view options). Card Filament sendiri
+   (.vp-filter-section), terpisah dari Planning Summary: filter adalah
+   control, summary adalah information.
+   ======================================================================= */
+.vp-filter-section {
+    margin-bottom: 1rem;
 }
 .vp-toolbar {
     display: flex;
@@ -2189,8 +2185,8 @@
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 1rem;
-    padding: 1.125rem 1.5rem;
+    gap: 0.75rem 1rem;
+    padding: 0.875rem 1.25rem;
 }
 .vp-workspace-title {
     font-size: 0.6875rem;
