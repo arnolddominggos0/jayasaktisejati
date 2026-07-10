@@ -2102,6 +2102,17 @@
    - Header Actions = native Filament (flex-start di sm+, sm:mt-7 bawaan).
    ======================================================================= */
 
+/* Sprint 15.0 — audit menemukan .vp-heading-badge dipakai di getHeading()
+   (EditVesselPlan.php) tanpa CSS pendamping: .mon-badge base = inline-flex,
+   default vertical-align:baseline membuat badge kecil (11px) "menggantung"
+   di baseline teks 30px, bukan sejajar visual dengan heading (Task 1: "Badge
+   status sejajar Heading"). vertical-align:middle adalah fix standar untuk
+   badge inline di sebelah heading besar (pola sama dipakai GitHub/Linear). */
+.vp-heading-badge {
+    vertical-align: middle;
+    margin-left: 0.5rem;
+}
+
 /* Reset Filament text-lg; beri napas dari heading (native mt-2 terlalu rapat). */
 .fi-resource-edit-record-page.fi-resource-vessel-plans .fi-header-subheading {
     font-size: 0.875rem;
