@@ -69,7 +69,11 @@ $items  = $record->items->sortBy('planned_etd');
         ─────────────────────────────────────────────────────────────────── --}}
         <div x-show="tab === 'schedule'">
 
-            {{-- Header card Tab Jadwal: identitas + slim toolbar filter Shipping Line.
+            {{-- Sprint 15.1 — One Tab = One Workspace: header, toolbar Simpan/
+                 Batal, dan tabel dulu 3 kotak terpisah (gap kosong di antara
+                 masing-masing + double heading "Jadwal Kapal" vs "Daftar
+                 Jadwal" dari getTableHeading()). Sekarang satu surface
+                 (.vp-workspace), dipisah divider (border-t), bukan gap+card.
                  Toolbar dispatch Livewire event 'vpFilterShippingLine' ke
                  RelationManager untuk live update tanpa reload halaman.
                  Status pill & POL/POD sengaja tidak di sini — sudah ada di Hero. --}}
@@ -82,11 +86,15 @@ $items  = $record->items->sortBy('planned_etd');
                     ->values();
             @endphp
 
-            <div class="rounded-xl border border-gray-200 bg-white px-4 py-2.5 mb-2">
-                <div class="flex items-center justify-between flex-wrap gap-x-4 gap-y-2">
+            <div class="vp-workspace">
+
+                {{-- Workspace Header: judul + subtitle + filter (satu-satunya
+                     heading Tab Jadwal — getTableHeading() dikosongkan supaya
+                     tidak ada "Daftar Jadwal" bersaing di bawahnya). --}}
+                <div class="vp-workspace-header">
                     <div class="min-w-0">
-                        <div class="text-[11px] uppercase tracking-wider font-bold text-gray-500">Jadwal Kapal</div>
-                        <p class="text-xs text-gray-500 mt-0.5 truncate">
+                        <div class="vp-workspace-title">Jadwal Kapal</div>
+                        <p class="vp-workspace-subtitle truncate">
                             @if ($record->isFinal())
                                 {{ $items->count() }} jadwal kapal telah difinalisasi.
                             @elseif ($record->isSent() || $record->isRevision())
@@ -128,64 +136,69 @@ $items  = $record->items->sortBy('planned_etd');
                         </div>
                     @endif
                 </div>
-            </div>
 
-            {{-- Form actions (Simpan/Batal) menempel sebagai toolbar tabel.
-                 Livewire form wiring (wire:submit="save") preserved as-is. --}}
-            @capture($form)
-                @unless($record->isFinal())
-                    <div class="rounded-t-lg border border-gray-200 border-b-0 bg-gray-50 px-4 py-2 flex justify-end gap-2">
-                        <x-filament-panels::form
-                            id="form"
-                            :wire:key="$this->getId() . '.forms.' . $this->getFormStatePath()"
-                            wire:submit="save"
+                {{-- Toolbar Simpan/Batal — divider, bukan kotak terpisah.
+                     Livewire form wiring (wire:submit="save") preserved as-is. --}}
+                @capture($form)
+                    @unless($record->isFinal())
+                        <div class="vp-workspace-toolbar">
+                            <x-filament-panels::form
+                                id="form"
+                                :wire:key="$this->getId() . '.forms.' . $this->getFormStatePath()"
+                                wire:submit="save"
+                            >
+                                {{ $this->form }}
+
+                                <x-filament-panels::form.actions
+                                    :actions="$this->getCachedFormActions()"
+                                    :full-width="$this->hasFullWidthFormActions()"
+                                />
+                            </x-filament-panels::form>
+                        </div>
+                    @endunless
+                @endcapture
+
+                @php
+                    $relationManagers                          = $this->getRelationManagers();
+                    $hasCombinedRelationManagerTabsWithContent = $this->hasCombinedRelationManagerTabsWithContent();
+                @endphp
+
+                @if ((! $hasCombinedRelationManagerTabsWithContent) || (! count($relationManagers)))
+                    {{ $form() }}
+                @endif
+
+                @if (count($relationManagers))
+                    {{-- Nuansa fase: Draft netral, Sent/Revision aksen biru, Final redup terkunci.
+                         vp-workspace-table: menyatukan tabel ke dalam surface yang sama
+                         (lihat theme.css — box native Filament .fi-ta-ctn dilepas). --}}
+                    <div @class([
+                        'vp-phase',
+                        'vp-workspace-table',
+                        'vp-phase-final' => $record->isFinal(),
+                        'vp-phase-draft' => $record->isDraft(),
+                        'vp-phase-sent'  => ! $record->isFinal() && ! $record->isDraft(),
+                    ])>
+                        <x-filament-panels::resources.relation-managers
+                            :active-locale="isset($activeLocale) ? $activeLocale : null"
+                            :active-manager="$this->activeRelationManager ?? ($hasCombinedRelationManagerTabsWithContent ? null : array_key_first($relationManagers))"
+                            :content-tab-label="$this->getContentTabLabel()"
+                            :content-tab-icon="$this->getContentTabIcon()"
+                            :content-tab-position="$this->getContentTabPosition()"
+                            :managers="$relationManagers"
+                            :owner-record="$record"
+                            :page-class="static::class"
                         >
-                            {{ $this->form }}
-
-                            <x-filament-panels::form.actions
-                                :actions="$this->getCachedFormActions()"
-                                :full-width="$this->hasFullWidthFormActions()"
-                            />
-                        </x-filament-panels::form>
+                            @if ($hasCombinedRelationManagerTabsWithContent)
+                                <x-slot name="content">
+                                    {{ $form() }}
+                                </x-slot>
+                            @endif
+                        </x-filament-panels::resources.relation-managers>
                     </div>
-                @endunless
-            @endcapture
+                @endif
 
-            @php
-                $relationManagers                          = $this->getRelationManagers();
-                $hasCombinedRelationManagerTabsWithContent = $this->hasCombinedRelationManagerTabsWithContent();
-            @endphp
-
-            @if ((! $hasCombinedRelationManagerTabsWithContent) || (! count($relationManagers)))
-                {{ $form() }}
-            @endif
-
-            @if (count($relationManagers))
-                {{-- Nuansa fase: Draft netral, Sent/Revision aksen biru, Final redup terkunci --}}
-                <div @class([
-                    'vp-phase',
-                    'vp-phase-final' => $record->isFinal(),
-                    'vp-phase-draft' => $record->isDraft(),
-                    'vp-phase-sent'  => ! $record->isFinal() && ! $record->isDraft(),
-                ])>
-                    <x-filament-panels::resources.relation-managers
-                        :active-locale="isset($activeLocale) ? $activeLocale : null"
-                        :active-manager="$this->activeRelationManager ?? ($hasCombinedRelationManagerTabsWithContent ? null : array_key_first($relationManagers))"
-                        :content-tab-label="$this->getContentTabLabel()"
-                        :content-tab-icon="$this->getContentTabIcon()"
-                        :content-tab-position="$this->getContentTabPosition()"
-                        :managers="$relationManagers"
-                        :owner-record="$record"
-                        :page-class="static::class"
-                    >
-                        @if ($hasCombinedRelationManagerTabsWithContent)
-                            <x-slot name="content">
-                                {{ $form() }}
-                            </x-slot>
-                        @endif
-                    </x-filament-panels::resources.relation-managers>
-                </div>
-            @endif
+            </div>
+            {{-- /vp-workspace --}}
 
             <x-filament-panels::page.unsaved-data-changes-alert />
 
@@ -197,7 +210,11 @@ $items  = $record->items->sortBy('planned_etd');
              Blade-only, read-only — menggunakan x-show + x-cloak
         ─────────────────────────────────────────────────────────────────── --}}
         <div x-show="tab === 'analysis'" x-cloak>
-            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm p-5">
+            {{-- Sprint 15.1 — rounded-2xl+shadow-sm -> rounded-xl tanpa shadow:
+                 selaras dengan .vp-workspace (Tab Jadwal) & Object Header
+                 (Sprint 14.7 FINAL) — satu bahasa radius (12px) dan "Divider
+                 > Border, Whitespace > Shadow" di seluruh 3 tab. --}}
+            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
                 @include(
                     'filament.resources.vessel-plan-resource.tabs.schedule-analysis',
                     ['record' => $record, 'items' => $items]
@@ -211,7 +228,11 @@ $items  = $record->items->sortBy('planned_etd');
              Draft vs Final + delta + detail drawer Alpine.js
         ─────────────────────────────────────────────────────────────────── --}}
         <div x-show="tab === 'history'" x-cloak>
-            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl shadow-sm p-5">
+            {{-- Sprint 15.1 — rounded-2xl+shadow-sm -> rounded-xl tanpa shadow:
+                 selaras dengan .vp-workspace (Tab Jadwal) & Object Header
+                 (Sprint 14.7 FINAL) — satu bahasa radius (12px) dan "Divider
+                 > Border, Whitespace > Shadow" di seluruh 3 tab. --}}
+            <div class="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-5">
                 @include(
                     'filament.resources.vessel-plan-resource.tabs.schedule-history',
                     ['record' => $record, 'items' => $items]

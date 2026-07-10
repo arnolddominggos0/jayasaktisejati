@@ -2289,11 +2289,79 @@
     padding-bottom: 1.125rem;
     align-items: center;
 }
-.vp-phase .fi-ta-header-heading {
-    margin-bottom: 0.25rem;
-}
+/* Sprint 15.1 — getTableHeading() dikosongkan (Task 3, hilangkan double
+   header "Daftar Jadwal" vs "Jadwal Kapal"); .fi-ta-header-heading tidak
+   pernah render lagi untuk tabel ini -> rule lama dihapus (orphan).
+   .fi-ta-header-description dipertahankan: description() tidak dipakai
+   RelationManager ini tapi selector generik, aman untuk future use. */
 .vp-phase .fi-ta-header-description {
     color: var(--mon-neutral, #6B7280);
+}
+
+/* =======================================================================
+   Sprint 15.1 — Workspace Body: One Tab = One Workspace.
+   Root cause "terasa dashboard": Header (judul+filter), toolbar Simpan/
+   Batal, dan tabel masing-masing box terpisah dengan gap kosong di antara
+   -> planner membaca 3 card, bukan 1 area kerja. Fix: satu surface
+   (.vp-workspace) dengan divider (border-top) sebagai pemisah internal,
+   bukan card+gap. Prinsip yang sama dengan Object Header (Sprint 14.7
+   FINAL): Divider > Border, Section > Card, Whitespace > Shadow.
+   ======================================================================= */
+.vp-workspace {
+    background: #FFFFFF;
+    border: 1px solid var(--mon-border-soft, #EEF2F7);
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+.vp-workspace-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding: 1.125rem 1.5rem;
+}
+.vp-workspace-title {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #6B7280;
+}
+.vp-workspace-subtitle {
+    font-size: 0.75rem;
+    color: #6B7280;
+    margin-top: 0.125rem;
+}
+.vp-workspace-toolbar {
+    border-top: 1px solid var(--mon-border-soft, #EEF2F7);
+    background: var(--vp-surface-muted);
+    padding: 0.5rem 1.5rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+.vp-workspace-toolbar .fi-form {
+    display: contents;
+}
+/* Tabel: lepas box native Filament (.fi-ta-ctn = rounded-xl + shadow-sm +
+   ring-1, lihat vendor components/container.blade.php) supaya menyatu ke
+   .vp-workspace, hanya disekat divider atas. Background TIDAK disentuh —
+   .vp-phase-final .fi-ta-ctn (tint redup) tetap berlaku di atas bg-white
+   bawaan Filament, tidak dikalahkan aturan ini. */
+.vp-workspace-table {
+    border-top: 1px solid var(--mon-border-soft, #EEF2F7);
+}
+.vp-workspace-table .fi-ta-ctn {
+    box-shadow: none;
+    border-radius: 0;
+}
+/* Empty state (Task 6): py-12 bawaan Filament (48px atas+bawah) terlalu
+   lega untuk workspace yang sudah padat — dipadatkan tanpa mengurangi
+   konten (icon, heading, description, action tetap ada). */
+.vp-phase .fi-ta-empty-state {
+    padding-top: 2.5rem;
+    padding-bottom: 2.5rem;
 }
 
 /* --- 4. Table: hover, transition, vertical alignment, row whitespace ---- */
