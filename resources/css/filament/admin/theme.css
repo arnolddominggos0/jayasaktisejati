@@ -2096,37 +2096,6 @@
     color: #D1D5DB;
 }
 
-/* Guidance block — accent visual (bukan alert): bar lembut + teks netral.
-   Satu-satunya tempat Planner melihat feedback TAM tanpa membuka Log
-   Persetujuan; wajib tetap ada meskipun tidak eksplisit di daftar field
-   Document Header, karena ini konteks utama pada fase Revision. */
-.vp-hero-next {
-    margin-top: 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;           /* 4px label -> body */
-    padding-left: 0.75rem;
-    border-left: 2px solid #E5E7EB;
-}
-.vp-hero-next-label {
-    font-size: 0.75rem;      /* 12px Title Case — label tenang, bukan teriakan */
-    font-weight: 600;
-    color: #6B7280;
-    line-height: 1.2;
-}
-.vp-hero-next-body {
-    font-size: 0.9375rem;   /* 15px medium — setara route, jawaban "kerjakan apa" */
-    font-weight: 500;
-    line-height: 1.5;
-    color: #374151;         /* neutral untuk semua status — tone hanya di bar */
-    text-wrap: pretty;      /* hindari orphan saat wrap di viewport sempit */
-}
-/* Accent bar bertint status — soft (300-series), sinyal bukan peringatan */
-.vp-hero-next--neutral  { border-left-color: #E5E7EB; }
-.vp-hero-next--warning  { border-left-color: #FCD34D; }
-.vp-hero-next--danger   { border-left-color: #FCA5A5; }
-.vp-hero-next--success  { border-left-color: #6EE7B7; }
-
 /* Header Actions sejajar zona identitas (top), bukan floating center.
    Native-friendly: hanya ganti align-items di breakpoint sm; sm:mt-7 bawaan
    Filament (kompensasi tinggi breadcrumb) dibiarkan bekerja apa adanya. */
@@ -2170,16 +2139,19 @@
 }
 
 /* =======================================================================
-   Workspace Toolbar — kontrol terhadap isi workspace (filter, nantinya
-   search/sort/export/bulk action/view options). Dipisah dari Planning
-   Summary: toolbar adalah control, summary adalah information.
+   Workspace Filter — kontrol terhadap isi workspace (filter, nantinya
+   search/sort/export/bulk action/view options). Card Filament sendiri
+   (.vp-filter-section), terpisah dari Planning Summary: filter adalah
+   control, summary adalah information.
    ======================================================================= */
+.vp-filter-section {
+    margin-bottom: 1.25rem;
+}
 .vp-toolbar {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 0.625rem;
-    padding: 0.5rem 0.25rem 0.875rem;
 }
 .vp-toolbar-label {
     font-size: 0.8125rem;

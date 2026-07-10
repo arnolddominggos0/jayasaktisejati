@@ -13,7 +13,6 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Str;
 
 class EditVesselPlan extends EditRecord
 {
@@ -55,33 +54,12 @@ class EditVesselPlan extends EditRecord
         );
     }
 
+    // Header hanya identitas dokumen — customer dan route, tanpa instruksi
+    // atau guidance. Feedback TAM tetap terekam dan terbaca di Log Persetujuan.
     public function getSubheading(): string|Htmlable|null
     {
-        $status = $this->record->status;
-        $color = $status->color();
-
         $rute = BusinessRouteResolver::forPlan($this->record);
         $pelanggan = $this->record->customer?->name ?? '—';
-
-        // Guidance body — satu kalimat natural (em dash), tone hanya pada
-        // accent bar kiri; teks tetap neutral supaya terbaca guidance, bukan alert.
-        $guidanceTone = match ($color) {
-            'warning' => 'vp-hero-next--warning',
-            'danger' => 'vp-hero-next--danger',
-            'success' => 'vp-hero-next--success',
-            default => 'vp-hero-next--neutral',
-        };
-
-        // &nbsp; sebelum em dash: dash tidak boleh jatuh di awal baris saat wrap.
-        $guidance = match ($status) {
-            VesselPlanStatus::Draft => 'Susun jadwal kapal sebelum dikirim ke TAM.',
-            VesselPlanStatus::Sent => 'Menunggu Final Schedule dari TAM&nbsp;— sesuaikan ETD, ETA, dan Cargo Plan sebelum finalisasi.',
-            // Feedback TAM dikutip langsung di Guidance selama status Revision
-            // (bukan hanya terekam di riwayat) supaya Planner tidak perlu
-            // mencari instruksi aktifnya sendiri.
-            VesselPlanStatus::Revision => $this->revisionGuidance(),
-            VesselPlanStatus::Final => 'Vessel Plan telah difinalisasi.',
-        };
 
         return new HtmlString(
             '<div class="vp-document-meta">'
@@ -89,28 +67,7 @@ class EditVesselPlan extends EditRecord
             .'<span class="vp-document-meta-sep" aria-hidden="true">&bull;</span>'
             .'<span>'.e($rute).'</span>'
             .'</div>'
-            // Guidance block: dipisah jelas dari identity, satu-satunya tempat
-            // Planner melihat feedback TAM tanpa membuka Log Persetujuan.
-            .'<div class="vp-hero-next '.$guidanceTone.'">'
-            .'<span class="vp-hero-next-label">Langkah Saat Ini</span>'
-            .'<span class="vp-hero-next-body">'.$guidance.'</span>'
-            .'</div>'
         );
-    }
-
-    // Feedback dipotong supaya Hero tidak melebar; versi lengkap tetap
-    // tersimpan permanen di Log Persetujuan setelah siklus revisi ini ditutup.
-    protected function revisionGuidance(): string
-    {
-        $feedback = trim((string) $this->record->feedback_reason);
-
-        if ($feedback === '') {
-            return 'Revisi jadwal sesuai feedback dari TAM&nbsp;— kirim kembali setelah selesai.';
-        }
-
-        $feedback = Str::limit($feedback, 90);
-
-        return 'TAM meminta revisi: &ldquo;'.e($feedback).'&rdquo;&nbsp;— sesuaikan lalu kirim kembali.';
     }
 
     public function mount(int|string $record): void

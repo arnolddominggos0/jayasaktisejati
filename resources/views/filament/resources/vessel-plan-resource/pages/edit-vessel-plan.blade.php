@@ -76,35 +76,38 @@ $defaultTab = match (true) {
         ─────────────────────────────────────────────────────────────────── --}}
         <div x-show="tab === 'schedule'">
 
-            {{-- Workspace Toolbar: kontrol terhadap isi workspace (filter,
-                 nantinya search/sort/export). Dipisah dari Planning Summary —
-                 toolbar adalah control, summary adalah information. Livewire
+            {{-- Workspace Filter: kontrol terhadap isi workspace (filter,
+                 nantinya search/sort/export/bulk action/view options).
+                 Card Filament sendiri, terpisah dari Planning Summary —
+                 filter adalah control, summary adalah information. Livewire
                  property shippingLineFilter dispatch 'vpFilterShippingLine'
                  ke RelationManager untuk live update tanpa reload halaman. --}}
             @if ($shippingLines->count() > 1)
-                <div class="vp-toolbar">
-                    <span class="vp-toolbar-label">Shipping Line</span>
-                    <select
-                        wire:model.live="shippingLineFilter"
-                        class="text-sm rounded-md border-gray-300 shadow-sm py-1.5 pl-2.5 pr-8 leading-none bg-white text-gray-700 focus:border-primary-500 focus:ring-primary-500 cursor-pointer"
-                        aria-label="Shipping Line"
-                    >
-                        <option value="">Semua</option>
-                        @foreach ($shippingLines as $line)
-                            <option value="{{ $line->id }}">{{ $line->name }}</option>
-                        @endforeach
-                    </select>
-                    @if (filled($this->shippingLineFilter))
-                        <button type="button" wire:click="$set('shippingLineFilter', '')" class="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer">
-                            Reset Filter
-                        </button>
-                    @endif
-                </div>
+                <x-filament::section compact class="vp-filter-section">
+                    <div class="vp-toolbar">
+                        <span class="vp-toolbar-label">Shipping Line</span>
+                        <select
+                            wire:model.live="shippingLineFilter"
+                            class="text-sm rounded-md border-gray-300 shadow-sm py-1.5 pl-2.5 pr-8 leading-none bg-white text-gray-700 focus:border-primary-500 focus:ring-primary-500 cursor-pointer"
+                            aria-label="Shipping Line"
+                        >
+                            <option value="">Semua</option>
+                            @foreach ($shippingLines as $line)
+                                <option value="{{ $line->id }}">{{ $line->name }}</option>
+                            @endforeach
+                        </select>
+                        @if (filled($this->shippingLineFilter))
+                            <button type="button" wire:click="$set('shippingLineFilter', '')" class="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer">
+                                Reset Filter
+                            </button>
+                        @endif
+                    </div>
+                </x-filament::section>
             @endif
 
             {{-- Header, toolbar Simpan/Batal, dan tabel adalah satu workspace
                  surface (.vp-workspace), dipisah divider — bukan card terpisah.
-                 Status & POL/POD sengaja tidak diulang di sini — sudah ada di Hero. --}}
+                 Status & POL/POD sengaja tidak diulang di sini — sudah ada di Header. --}}
             <div class="vp-workspace">
 
                 {{-- Workspace Header: heading aktivitas, bukan statistik —
