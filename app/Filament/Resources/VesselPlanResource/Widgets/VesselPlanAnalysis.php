@@ -3,18 +3,14 @@
 namespace App\Filament\Resources\VesselPlanResource\Widgets;
 
 use App\Models\VesselPlan;
-use Filament\Widgets\Widget;
+use Filament\Widgets\StatsOverviewWidget;
+use Filament\Widgets\StatsOverviewWidget\Stat;
 
-class VesselPlanAnalysis extends Widget
+class VesselPlanAnalysis extends StatsOverviewWidget
 {
-    protected static string $view =
-        'filament.resources.vessel-plan-resource.widgets.vessel-plan-analysis';
-
-    protected int|string|array $columnSpan = 'full';
-
     public ?VesselPlan $record = null;
 
-    protected function getViewData(): array
+    protected function getStats(): array
     {
         if (! $this->record) {
             return [];
@@ -22,40 +18,18 @@ class VesselPlanAnalysis extends Widget
 
         $analysis = $this->record->analyze();
 
-        $riskLevel = $analysis['risk_level'] ?? 'valid';
-        $isEmpty = ($analysis['schedule_count'] ?? 0) === 0;
+        $maxGap = $analysis['max_gap'] ?? 0;
+        $gapLimit = $analysis['gap_limit'] ?? 6;
+        $gapOk = $analysis['gap_ok'] ?? false;
 
-        // Label verdict sengaja tidak memakai kata "Revisi" — istilah itu sudah
-        // dipakai VesselPlanStatus::Revision untuk konsep lain (TAM meminta
-        // revisi plan), beda arti dari "ETD Gap melebihi SOP".
-        $gapWarnings = $analysis['gap_warnings'] ?? [];
-        $criticalCount = count(array_filter($gapWarnings, fn ($w) => $w['severity'] === 'critical'));
-        $warningCount = count($gapWarnings) - $criticalCount;
-
-        [$statusColor, $verdictIcon, $statusLabel, $statusSub] = match (true) {
-            $isEmpty => ['text-gray-600', '○', 'Belum Ada Jadwal', 'Tambahkan rencana kapal untuk memulai.'],
-            $riskLevel === 'critical' => ['text-red-700', '✕', 'Perlu Perhatian Segera', $criticalCount.' jadwal ETD Gap sangat tinggi (>10 hari)'],
-            $riskLevel === 'warning' => ['text-amber-700', '⚠', 'Perlu Ditinjau', $warningCount.' jadwal ETD Gap melewati target SOP'],
-            default => ['text-green-700', '✓', 'Siap Dikirim', 'Semua ETD Gap masih dalam SOP'],
-        };
-
-        // Rencana Muatan dijumlah dari relasi items yang sudah dimuat (juga
-        // dipakai analyze()) — agregasi presentasi, bukan query baru. Avg
-        // Sailing sengaja tidak dikembalikan ke sini; itu metrik analitis
-        // yang rumahnya di tab Review Jadwal, bukan ringkasan keputusan.
         return [
-            'scheduleCount' => $this->record->items->count(),
-            'cargoTotal' => $this->record->items->sum('cargo_plan'),
-            'maxGap' => $analysis['max_gap'] ?? 0,
-            'idealGap' => $analysis['gap_limit'] ?? 6,
-            'gapOk' => $analysis['gap_ok'] ?? false,
-            'violations' => $analysis['violations'] ?? [],
-            'riskLevel' => $riskLevel,
-            'violationCount' => count($analysis['violations'] ?? []),
-            'verdictIcon' => $verdictIcon,
-            'statusLabel' => $statusLabel,
-            'statusSub' => $statusSub,
-            'statusColor' => $statusColor,
+            Stat::make('Jadwal', $this->record->items->count()),
+
+            Stat::make('Rencana Muatan', $this->record->items->sum('cargo_plan').' unit'),
+
+            Stat::make('ETD Gap', $maxGap.' hari')
+                ->description('Target ≤ '.$gapLimit.' hari')
+                ->descriptionColor($gapOk ? 'gray' : ($maxGap <= 10 ? 'warning' : 'danger')),
         ];
     }
 }

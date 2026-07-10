@@ -2167,12 +2167,17 @@
     font-weight: 500;
 }
 
+/* Planning Summary (Stats Overview bawaan Filament) — beri jarak ke Tabs. */
+.vp-summary-stats {
+    margin-bottom: 1rem;
+}
+
 /* =======================================================================
    Workspace Body: One Tab = One Workspace.
-   Header (judul), toolbar Simpan/Batal, dan tabel adalah satu surface
-   (.vp-workspace) dengan divider (border-top) sebagai pemisah internal,
-   bukan card+gap — supaya planner membaca 1 area kerja, bukan 3 card
-   terpisah. Divider > Border, Section > Card, Whitespace > Shadow.
+   Toolbar Simpan/Batal dan tabel adalah satu surface (.vp-workspace)
+   dengan divider sebagai pemisah internal, bukan card+gap — supaya
+   planner membaca 1 area kerja, bukan card terpisah.
+   Divider > Border, Section > Card, Whitespace > Shadow.
    ======================================================================= */
 .vp-workspace {
     background: #FFFFFF;
@@ -2180,28 +2185,11 @@
     border-radius: 0.75rem;
     overflow: hidden;
 }
-.vp-workspace-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 0.75rem 1rem;
-    padding: 0.875rem 1.25rem;
-}
-.vp-workspace-title {
-    font-size: 0.6875rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #6B7280;
-}
-.vp-workspace-subtitle {
-    font-size: 0.75rem;
-    color: #6B7280;
-    margin-top: 0.125rem;
-}
+/* Toolbar bisa disembunyikan (dirty-state gating), jadi divider dipasang
+   sebagai border-bottom miliknya sendiri — tabel di bawahnya tidak perlu
+   tahu apakah toolbar sedang tampil. */
 .vp-workspace-toolbar {
-    border-top: 1px solid var(--mon-border-soft, #EEF2F7);
+    border-bottom: 1px solid var(--mon-border-soft, #EEF2F7);
     background: var(--vp-surface-muted);
     padding: 0.5rem 1.5rem;
     display: flex;
@@ -2213,12 +2201,9 @@
 }
 /* Tabel: lepas box native Filament (.fi-ta-ctn = rounded-xl + shadow-sm +
    ring-1, lihat vendor components/container.blade.php) supaya menyatu ke
-   .vp-workspace, hanya disekat divider atas. Background TIDAK disentuh —
-   .vp-phase-final .fi-ta-ctn (tint redup) tetap berlaku di atas bg-white
-   bawaan Filament, tidak dikalahkan aturan ini. */
-.vp-workspace-table {
-    border-top: 1px solid var(--mon-border-soft, #EEF2F7);
-}
+   .vp-workspace. Background TIDAK disentuh — .vp-phase-final .fi-ta-ctn
+   (tint redup) tetap berlaku di atas bg-white bawaan Filament, tidak
+   dikalahkan aturan ini. */
 .vp-workspace-table .fi-ta-ctn {
     box-shadow: none;
     border-radius: 0;
