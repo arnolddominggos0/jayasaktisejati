@@ -57,6 +57,11 @@ $defaultTab = match (true) {
             })
         "
     >
+        {{-- Planning Summary: 3 Stats Overview card bawaan Filament. --}}
+        <div class="vp-summary-stats">
+            @livewire(\App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanAnalysis::class, ['record' => $record])
+        </div>
+
         {{-- Workspace Filter: Shipping Line berlaku untuk seluruh workspace
              (Jadwal, Review Jadwal, Riwayat Jadwal) — karena itu berada di
              luar Tabs, sebelum navigasi tab, bukan di dalam salah satu tab.
@@ -83,11 +88,6 @@ $defaultTab = match (true) {
                 @endif
             </div>
         @endif
-
-        {{-- Planning Summary: 3 Stats Overview card bawaan Filament. --}}
-        <div class="vp-summary-stats">
-            @livewire(\App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanAnalysis::class, ['record' => $record])
-        </div>
 
         {{-- Tab bar --}}
         <div class="vp-tab-bar">
