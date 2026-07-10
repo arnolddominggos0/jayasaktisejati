@@ -21,6 +21,14 @@ class EditVesselPlan extends EditRecord
 
     protected static string $view = 'filament.resources.vessel-plan-resource.pages.edit-vessel-plan';
 
+    /** Shared workspace context; presentation state only. */
+    public string $shippingLineFilter = '';
+
+    public function updatedShippingLineFilter(): void
+    {
+        $this->dispatch('vpFilterShippingLine', value: $this->shippingLineFilter);
+    }
+
     // Identitas plan adalah periodenya, bukan kata "Ubah" — satu customer
     // punya sampai 12 plan per tahun, dibedakan lewat bulan.
     public function getBreadcrumb(): string
@@ -54,7 +62,6 @@ class EditVesselPlan extends EditRecord
 
         $rute = BusinessRouteResolver::forPlan($this->record);
         $pelanggan = $this->record->customer?->name ?? '—';
-        $count = $this->record->items->count();
 
         // Guidance body — satu kalimat natural (em dash), tone hanya pada
         // accent bar kiri; teks tetap neutral supaya terbaca guidance, bukan alert.
@@ -77,23 +84,16 @@ class EditVesselPlan extends EditRecord
         };
 
         return new HtmlString(
-            '<div class="vp-hero">'
-            // Route saja — status sudah ada di Heading, tidak diulang di sini.
-            .'<div class="vp-hero-identity">'
-            .'<div class="vp-hero-title-row">'
-            .'<span class="vp-hero-route">'.e($rute).'</span>'
+            '<div class="vp-document-meta">'
+            .'<span>'.e($pelanggan).'</span>'
+            .'<span class="vp-document-meta-sep" aria-hidden="true">&bull;</span>'
+            .'<span>'.e($rute).'</span>'
             .'</div>'
-            .'<div class="vp-hero-meta">'
-            .'<span class="vp-hero-meta-customer">'.e($pelanggan).'</span>'
-            .'<span class="vp-hero-meta-sep" aria-hidden="true">&bull;</span>'
-            .'<span class="vp-hero-meta-count">'.e($count.' Jadwal').'</span>'
-            .'</div>'
-            .'</div>'
-            // Guidance block: dipisah jelas dari identity
+            // Guidance block: dipisah jelas dari identity, satu-satunya tempat
+            // Planner melihat feedback TAM tanpa membuka Log Persetujuan.
             .'<div class="vp-hero-next '.$guidanceTone.'">'
             .'<span class="vp-hero-next-label">Langkah Saat Ini</span>'
             .'<span class="vp-hero-next-body">'.$guidance.'</span>'
-            .'</div>'
             .'</div>'
         );
     }

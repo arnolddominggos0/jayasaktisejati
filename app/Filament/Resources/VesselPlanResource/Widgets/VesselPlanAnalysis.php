@@ -44,6 +44,7 @@ class VesselPlanAnalysis extends Widget
         // Sailing sengaja tidak dikembalikan ke sini; itu metrik analitis
         // yang rumahnya di tab Review Jadwal, bukan ringkasan keputusan.
         return [
+            'scheduleCount' => $this->record->items->count(),
             'cargoTotal' => $this->record->items->sum('cargo_plan'),
             'maxGap' => $analysis['max_gap'] ?? 0,
             'idealGap' => $analysis['gap_limit'] ?? 6,

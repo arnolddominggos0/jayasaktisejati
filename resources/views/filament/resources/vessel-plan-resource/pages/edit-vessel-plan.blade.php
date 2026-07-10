@@ -6,7 +6,8 @@
  */
 
 $record = $this->record;
-$items  = $record->items->sortBy('planned_etd');
+$items  = $record->items->sortBy('planned_etd')->values();
+$shippingLines = $items->pluck('shippingLine')->filter()->unique('id')->sortBy('name')->values();
 
 // Riwayat Jadwal membandingkan draft snapshot dengan final snapshot —
 // tanpa final snapshot tidak ada apa pun untuk dibandingkan.
@@ -75,69 +76,52 @@ $defaultTab = match (true) {
         ─────────────────────────────────────────────────────────────────── --}}
         <div x-show="tab === 'schedule'">
 
+            {{-- Workspace Toolbar: kontrol terhadap isi workspace (filter,
+                 nantinya search/sort/export). Dipisah dari Planning Summary —
+                 toolbar adalah control, summary adalah information. Livewire
+                 property shippingLineFilter dispatch 'vpFilterShippingLine'
+                 ke RelationManager untuk live update tanpa reload halaman. --}}
+            @if ($shippingLines->count() > 1)
+                <div class="vp-toolbar">
+                    <span class="vp-toolbar-label">Shipping Line</span>
+                    <select
+                        wire:model.live="shippingLineFilter"
+                        class="text-sm rounded-md border-gray-300 shadow-sm py-1.5 pl-2.5 pr-8 leading-none bg-white text-gray-700 focus:border-primary-500 focus:ring-primary-500 cursor-pointer"
+                        aria-label="Shipping Line"
+                    >
+                        <option value="">Semua</option>
+                        @foreach ($shippingLines as $line)
+                            <option value="{{ $line->id }}">{{ $line->name }}</option>
+                        @endforeach
+                    </select>
+                    @if (filled($this->shippingLineFilter))
+                        <button type="button" wire:click="$set('shippingLineFilter', '')" class="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer">
+                            Reset Filter
+                        </button>
+                    @endif
+                </div>
+            @endif
+
             {{-- Header, toolbar Simpan/Batal, dan tabel adalah satu workspace
                  surface (.vp-workspace), dipisah divider — bukan card terpisah.
-                 Toolbar filter dispatch Livewire event 'vpFilterShippingLine'
-                 ke RelationManager untuk live update tanpa reload halaman.
                  Status & POL/POD sengaja tidak diulang di sini — sudah ada di Hero. --}}
-            @php
-                $shippingLines = $items
-                    ->pluck('shippingLine')
-                    ->filter()
-                    ->unique('id')
-                    ->sortBy('name')
-                    ->values();
-            @endphp
-
             <div class="vp-workspace">
 
-                {{-- Workspace Header: judul + subtitle + filter — satu-satunya
-                     heading Tab Jadwal (lihat getTableHeading() di
-                     RelationManager). --}}
+                {{-- Workspace Header: heading aktivitas, bukan statistik —
+                     jumlah jadwal sudah ada di Planning Summary. --}}
                 <div class="vp-workspace-header">
                     <div class="min-w-0">
                         <div class="vp-workspace-title">Jadwal Kapal</div>
                         <p class="vp-workspace-subtitle truncate">
                             @if ($record->isFinal())
-                                {{ $items->count() }} jadwal kapal telah difinalisasi.
+                                Jadwal telah difinalisasi.
                             @elseif ($record->isSent() || $record->isRevision())
-                                {{ $items->count() }} jadwal kapal menunggu penyesuaian Final Schedule dari TAM.
+                                Menunggu penyesuaian Final Schedule dari TAM.
                             @else
-                                {{ $items->count() }} jadwal kapal — susun sebelum dikirim ke TAM.
+                                Susun dan kelola jadwal kapal sebelum dikirim ke TAM.
                             @endif
                         </p>
                     </div>
-
-                    {{-- Filter Shipping Line: label inline + dropdown, bukan search box. --}}
-                    @if ($shippingLines->count() > 1)
-                        <div
-                            class="flex items-center gap-2"
-                            x-data="{ shippingLine: '' }"
-                        >
-                            <span class="text-xs text-gray-500 font-medium">Shipping Line</span>
-                            <select
-                                x-model="shippingLine"
-                                wire:change="$dispatch('vpFilterShippingLine', { value: $event.target.value })"
-                                class="text-sm rounded-md border-gray-300 shadow-sm py-1.5 pl-2.5 pr-8 leading-none bg-white text-gray-700 focus:border-primary-500 focus:ring-primary-500 cursor-pointer"
-                                aria-label="Shipping Line"
-                            >
-                                <option value="">Semua</option>
-                                @foreach ($shippingLines as $line)
-                                    <option value="{{ $line->id }}">{{ $line->name }}</option>
-                                @endforeach
-                            </select>
-
-                            <button
-                                type="button"
-                                x-show="shippingLine !== ''"
-                                x-cloak
-                                x-on:click="shippingLine = ''; $dispatch('vpFilterShippingLine', { value: '' })"
-                                class="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer"
-                            >
-                                Reset Filter
-                            </button>
-                        </div>
-                    @endif
                 </div>
 
                 {{-- Toolbar Simpan/Batal — divider, bukan kotak terpisah.

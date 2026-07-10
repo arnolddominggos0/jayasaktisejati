@@ -2066,103 +2066,42 @@
 }
 
 /* =======================================================================
-   Object Header (Hero + Operational Summary)
-   Kontrak visual — satu kotak utuh, rhythm 16 < 16 < (divider) < 24
-   (dalam blok < antar blok < antar section):
-   - Heading Filament = satu-satunya headline, status badge inline (status
-                 milik objek, bukan atribut Route). Gap 16px ke Identity.
-   - Identity  = Route (bagian Identity, bukan sub-info); Customer •
-                 Jumlah Jadwal satu frasa (dua fakta sekunder dibaca sebagai
-                 satu kelompok, bukan dua scan vertikal). Gap 16px ke Guidance.
-   - Guidance  = label Title Case abu + body neutral, accent bar kiri
-                 bertint status = sinyal, bukan alert/notifikasi.
-   - Guidance->Summary = tidak ada gap. fi-header (Hero) dan
-                 .fi-page-header-widgets (Summary) menyatu jadi satu kotak;
-                 satu-satunya pemisah adalah border-top tipis di Summary
-                 (divider, bukan card kedua).
-   - Summary   = Operational Snapshot (bukan KPI dashboard) — grid
-                 Label -> Primary Value -> Supporting Context per kolom,
-                 1fr/1fr/1.3fr (Status lebih lebar karena teksnya lebih
-                 panjang, diaudit dari konten aktual). Violation footnote
-                 tetap di dalam kotak yang sama — detail level plan, bukan
-                 milik satu kolom.
-   - Summary->Tabs = row-gap 24px — baru di titik ini Object Header
-                 berakhir dan Workspace (Tabs) mulai.
-   - Header Actions = native Filament (flex-start di sm+, sm:mt-7 bawaan).
+   Document Header — identitas Vessel Plan saja (judul, periode, customer,
+   route, status, primary actions). Tidak membungkus Planning Summary —
+   itu card terpisah, bukan bagian dari header.
    ======================================================================= */
-
-/* .mon-badge dasar adalah inline-flex dengan vertical-align:baseline
-   bawaan — badge kecil jadi menggantung di baseline teks heading yang
-   jauh lebih besar. vertical-align:middle menyejajarkannya secara visual. */
 .vp-heading-badge {
     vertical-align: middle;
     margin-left: 0.5rem;
 }
-
-/* Reset Filament text-lg; beri napas dari heading (native mt-2 terlalu rapat). */
+.fi-resource-edit-record-page.fi-resource-vessel-plans .fi-header {
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--mon-border-soft, #EEF2F7);
+    border-radius: 0;
+    padding: 0 0 1rem;
+}
 .fi-resource-edit-record-page.fi-resource-vessel-plans .fi-header-subheading {
-    font-size: 0.875rem;
-    line-height: 1.4;
-    color: #4B5563;
-    margin-top: 1rem;
-    padding-bottom: 0;       /* gap dikendalikan oleh fi-page, bukan di sini */
+    margin-top: 0.375rem;
+    font-size: 0.8125rem;
 }
-
-/* --- Identity block: Route+badge inline, lalu Customer (1 blok rapat) -- */
-.vp-hero-identity {
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;          /* 6px antar elemen — tetap 1 unit, tidak menumpuk */
-}
-
-/* Route saja — status sudah ada di Heading, tidak diulang di sini
-   (status adalah atribut objek plan, bukan atribut Route). */
-.vp-hero-title-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-/* Route: bagian Identity, tapi tetap jelas subordinat terhadap Heading
-   supaya tidak jadi headline kedua. */
-.vp-hero-route {
-    font-size: 1rem;
-    font-weight: 700;
-    line-height: 1.3;
-    color: #1F2937;
-    letter-spacing: -0.01em;
-}
-
-/* Customer • Jumlah Jadwal: satu frasa dibaca sebagai satu kelompok —
-   dua baris terpisah memaksa dua kali scan vertikal untuk info yang
-   sama-sama sekunder. */
-.vp-hero-meta {
+.vp-document-meta {
     display: flex;
     align-items: baseline;
     flex-wrap: wrap;
-    gap: 0.375rem;           /* 6px antar elemen frasa */
+    gap: 0.375rem;
+    color: #4B5563;
 }
-.vp-hero-meta-customer {
-    font-size: 0.8125rem;    /* 13px */
-    line-height: 1.35;
-    font-weight: 500;
-    color: #374151;
-}
-.vp-hero-meta-sep {
-    font-size: 0.75rem;
-    color: #D1D5DB;          /* gray-300 — dekoratif, bukan konten */
-}
-.vp-hero-meta-count {
-    font-size: 0.75rem;      /* 12px — trailing detail, lebih kecil dari customer */
-    line-height: 1.35;
-    font-weight: 400;
-    color: #6B7280;          /* gray-500: 4.6:1 — gray-400 gagal WCAG AA (2.4:1) */
+.vp-document-meta-sep {
+    color: #D1D5DB;
 }
 
-/* --- Guidance block — accent visual (bukan alert): bar lembut + teks netral */
+/* Guidance block — accent visual (bukan alert): bar lembut + teks netral.
+   Satu-satunya tempat Planner melihat feedback TAM tanpa membuka Log
+   Persetujuan; wajib tetap ada meskipun tidak eksplisit di daftar field
+   Document Header, karena ini konteks utama pada fase Revision. */
 .vp-hero-next {
-    margin-top: 1rem;
+    margin-top: 0.75rem;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;           /* 4px label -> body */
@@ -2197,21 +2136,6 @@
     }
 }
 
-/* Heading, Route+Badge, Customer, Jumlah Jadwal, Guidance, breadcrumb, dan
-   Header Actions berada dalam satu kotak — fi-header adalah satu-satunya
-   elemen native Filament yang membungkus semua itu, jadi cukup diberi
-   bg/border/radius/padding di sini tanpa menyentuh markup vendor. Radius
-   dan border bawah dihilangkan supaya Hero menyatu langsung dengan Summary
-   di bawahnya (.fi-page-header-widgets), bukan dua kotak dengan gap. */
-.fi-resource-edit-record-page.fi-resource-vessel-plans .fi-header {
-    background: #FFFFFF;
-    border: 1px solid var(--mon-border-soft, #EEF2F7);
-    border-bottom: none;
-    border-top-left-radius: 0.75rem;
-    border-top-right-radius: 0.75rem;
-    padding: 1.5rem 2rem 1.25rem;
-}
-
 /* Kolom kiri fi-header (heading+subheading) default-nya flex:0 1 auto
    (shrink-to-fit konten), sementara Summary/Tabs/Table di bawahnya adalah
    grid penuh lebar page — tanpa fix ini Hero terlihat sempit dengan celah
@@ -2224,43 +2148,14 @@
     min-width: 0;
 }
 
-/* Hero dan Summary adalah satu Object Header, jadi gap kosong di antara
-   keduanya dihapus di sini. Batas dua zona itu murni border-top tipis di
-   .fi-page-header-widgets (lihat blok di bawah), bukan jarak. Gap ke
-   Workspace (Tabs) tetap perlu — dipindah ke selector .auto-cols-fr di
-   bawah supaya Summary->Tabs (24px) tidak ikut hilang. */
-.fi-resource-edit-record-page.fi-resource-vessel-plans > section {
-    row-gap: 0;
-}
-
-/* Grid pembungkus native Filament (fi-page-header-widgets + slot tab/workspace)
-   — gap ini yang jadi jarak Summary -> Tabs. Native gap-y-8 (32px) diturunkan
-   ke 24px (rhythm: Summary 24px Tabs). */
+/* Spacing antar section (Document Header -> Planning Summary -> Tabs):
+   native gap-y-8 (32px) diturunkan supaya halaman lebih compact tanpa
+   terasa sesak. */
 .fi-resource-edit-record-page.fi-resource-vessel-plans > section > .auto-cols-fr {
-    row-gap: 1.5rem;
+    row-gap: 1.25rem;
 }
 
-/* --- 2. Summary wrapper (fi-page-header-widgets, elemen native Filament) —
-   ini separuh-bawah dari Object Header yang sama dengan fi-header, bukan
-   card kedua. border-top tipis di sini adalah SATU-SATUNYA pemisah visual
-   antara Guidance dan Summary (divider, bukan gap) — sisi kiri/kanan/bawah
-   menutup kotak yang dimulai fi-header di atas. */
-.fi-resource-edit-record-page.fi-resource-vessel-plans .fi-page-header-widgets {
-    background: var(--vp-surface-muted);
-    border: 1px solid var(--mon-border-soft, #EEF2F7);
-    border-bottom-left-radius: 0.75rem;
-    border-bottom-right-radius: 0.75rem;
-    padding: 1.25rem 2rem 1.125rem;
-}
-
-/* --- 2b. Hero Summary content: box-nya sudah dipindah ke wrapper di atas —
-   vp-kpi-strip sekarang murni layout grid, bukan card sendiri lagi. */
-.vp-kpi-strip {
-    /* intentionally no background/border/padding — disediakan oleh
-       .fi-page-header-widgets */
-}
-
-/* --- 3. Workspace card: area kerja utama, paling dominan secara visual -- */
+/* --- Workspace card: area kerja utama, paling dominan secara visual ---- */
 .vp-phase .fi-ta-header-ctn {
     padding-top: 1.125rem;
     padding-bottom: 1.125rem;
@@ -2275,12 +2170,33 @@
 }
 
 /* =======================================================================
+   Workspace Toolbar — kontrol terhadap isi workspace (filter, nantinya
+   search/sort/export/bulk action/view options). Dipisah dari Planning
+   Summary: toolbar adalah control, summary adalah information.
+   ======================================================================= */
+.vp-toolbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.625rem;
+    padding: 0.5rem 0.25rem 0.875rem;
+}
+.vp-toolbar-label {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #374151;
+}
+.vp-toolbar select {
+    min-width: 11rem;
+    font-weight: 500;
+}
+
+/* =======================================================================
    Workspace Body: One Tab = One Workspace.
-   Header (judul+filter), toolbar Simpan/Batal, dan tabel adalah satu
-   surface (.vp-workspace) dengan divider (border-top) sebagai pemisah
-   internal, bukan card+gap — supaya planner membaca 1 area kerja, bukan
-   3 card terpisah. Prinsip yang sama dengan Object Header: Divider >
-   Border, Section > Card, Whitespace > Shadow.
+   Header (judul), toolbar Simpan/Batal, dan tabel adalah satu surface
+   (.vp-workspace) dengan divider (border-top) sebagai pemisah internal,
+   bukan card+gap — supaya planner membaca 1 area kerja, bukan 3 card
+   terpisah. Divider > Border, Section > Card, Whitespace > Shadow.
    ======================================================================= */
 .vp-workspace {
     background: #FFFFFF;
@@ -2339,7 +2255,7 @@
     padding-bottom: 2.5rem;
 }
 
-/* --- 4. Table: hover, transition, vertical alignment, row whitespace ---- */
+/* --- Table: hover, transition, vertical alignment, row whitespace ------ */
 .vp-phase table.fi-ta-table tbody tr {
     transition: background-color 120ms ease;
 }
@@ -2350,7 +2266,7 @@
     vertical-align: middle;
 }
 
-/* --- 5. Tab navigation: menyatu dengan bahasa desain Monitoring -------- */
+/* --- Tab navigation: menyatu dengan bahasa desain Monitoring ----------- */
 .vp-tab-bar {
     display: flex;
     align-items: center;
