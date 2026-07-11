@@ -2174,22 +2174,12 @@
 }
 
 /* Planning Summary (Stats Overview bawaan Filament) — beri jarak ke Tabs.
-   Tinggi ketiga card TETAP sama secara otomatis (default CSS Grid
-   align-items: stretch pada .fi-wi-stats-overview-stats-ctn — tidak ada
-   height/min-height custom di mana pun). Yang dipadatkan hanya vertical
-   padding (native p-6 = 24px) dan row-gap konten internal (native 8px),
-   supaya card dengan konten tersingkat (Jadwal, Rencana Muatan) tidak
-   menyisakan ruang kosong berlebihan di bawah value saat mengikuti
-   tinggi card konten terpanjang (ETD Gap, deskripsi dua baris). */
+   Card itu sendiri 100% struktur & spacing native StatsOverviewWidget
+   (p-6, gap-y-2, dst) — tidak ada override padding/gap/height/alignment
+   di sini, supaya identik dengan Stats Overview card Filament di
+   halaman lain. */
 .vp-summary-stats {
     margin-bottom: 1rem;
-}
-.vp-summary-stats .fi-wi-stats-overview-stat {
-    padding-top: 0.875rem;
-    padding-bottom: 0.875rem;
-}
-.vp-summary-stats .fi-wi-stats-overview-stat > div {
-    row-gap: 0.25rem;
 }
 
 /* =======================================================================
