@@ -62,51 +62,56 @@ $defaultTab = match (true) {
             @livewire(\App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanAnalysis::class, ['record' => $record])
         </div>
 
-        {{-- Workspace Filter: Shipping Line berlaku untuk seluruh workspace
-             (Jadwal, Review Jadwal, Riwayat Jadwal) — karena itu berada di
-             luar Tabs, sebelum navigasi tab, bukan di dalam salah satu tab.
-             Livewire property shippingLineFilter juga dispatch
-             'vpFilterShippingLine' ke RelationManager untuk live update
-             tabel Jadwal tanpa reload halaman. --}}
-        @if ($shippingLines->count() > 1)
-            <div class="vp-toolbar vp-filter-toolbar">
-                <span class="vp-toolbar-label">Shipping Line</span>
-                <select
-                    wire:model.live="shippingLineFilter"
-                    class="text-sm rounded-md border-gray-300 shadow-sm py-1.5 pl-2.5 pr-8 leading-none bg-white text-gray-700 focus:border-primary-500 focus:ring-primary-500 cursor-pointer"
-                    aria-label="Shipping Line"
-                >
-                    <option value="">Semua</option>
-                    @foreach ($shippingLines as $line)
-                        <option value="{{ $line->id }}">{{ $line->name }}</option>
-                    @endforeach
-                </select>
-                @if (filled($this->shippingLineFilter))
-                    <button type="button" wire:click="$set('shippingLineFilter', '')" class="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer">
-                        Reset Filter
-                    </button>
+        {{-- Workspace Toolbar: Tabs (navigasi) + Shipping Line (filter) —
+             dua kontrol level workspace, berbeda fungsi tapi satu toolbar
+             visual. Shipping Line berlaku untuk seluruh workspace (Jadwal,
+             Review Jadwal, Riwayat Jadwal), bukan milik satu tab — karena
+             itu di sini, bukan di dalam salah satu tab. Livewire property
+             shippingLineFilter juga dispatch 'vpFilterShippingLine' ke
+             RelationManager untuk live update tabel Jadwal tanpa reload
+             halaman. --}}
+        <div class="vp-workspace-toolbar-row">
+
+            <div class="vp-tab-bar">
+
+                <button type="button" @click="tab = 'schedule'" :class="tab === 'schedule' ? 'vp-tab is-active' : 'vp-tab'">
+                    <x-heroicon-o-calendar-days class="w-4 h-4" />
+                    Jadwal
+                </button>
+
+                <button type="button" @click="tab = 'analysis'" :class="tab === 'analysis' ? 'vp-tab is-active' : 'vp-tab'">
+                    <x-heroicon-o-chart-bar-square class="w-4 h-4" />
+                    Review Jadwal
+                </button>
+
+                @if ($hasFinalSnapshot)
+                <button type="button" @click="tab = 'history'" :class="tab === 'history' ? 'vp-tab is-active' : 'vp-tab'">
+                    <x-heroicon-o-clock class="w-4 h-4" />
+                    Riwayat Jadwal
+                </button>
                 @endif
+
             </div>
-        @endif
 
-        {{-- Tab bar --}}
-        <div class="vp-tab-bar">
-
-            <button type="button" @click="tab = 'schedule'" :class="tab === 'schedule' ? 'vp-tab is-active' : 'vp-tab'">
-                <x-heroicon-o-calendar-days class="w-4 h-4" />
-                Jadwal
-            </button>
-
-            <button type="button" @click="tab = 'analysis'" :class="tab === 'analysis' ? 'vp-tab is-active' : 'vp-tab'">
-                <x-heroicon-o-chart-bar-square class="w-4 h-4" />
-                Review Jadwal
-            </button>
-
-            @if ($hasFinalSnapshot)
-            <button type="button" @click="tab = 'history'" :class="tab === 'history' ? 'vp-tab is-active' : 'vp-tab'">
-                <x-heroicon-o-clock class="w-4 h-4" />
-                Riwayat Jadwal
-            </button>
+            @if ($shippingLines->count() > 1)
+                <div class="vp-toolbar vp-filter-toolbar">
+                    <span class="vp-toolbar-label">Shipping Line</span>
+                    <select
+                        wire:model.live="shippingLineFilter"
+                        class="text-sm rounded-md border-gray-300 shadow-sm py-1.5 pl-2.5 pr-8 leading-none bg-white text-gray-700 focus:border-primary-500 focus:ring-primary-500 cursor-pointer"
+                        aria-label="Shipping Line"
+                    >
+                        <option value="">Semua</option>
+                        @foreach ($shippingLines as $line)
+                            <option value="{{ $line->id }}">{{ $line->name }}</option>
+                        @endforeach
+                    </select>
+                    @if (filled($this->shippingLineFilter))
+                        <button type="button" wire:click="$set('shippingLineFilter', '')" class="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer">
+                            Reset Filter
+                        </button>
+                    @endif
+                </div>
             @endif
 
         </div>

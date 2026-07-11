@@ -2143,20 +2143,25 @@
 }
 
 /* =======================================================================
-   Workspace Filter — Shipping Line berlaku untuk seluruh workspace
-   (Jadwal, Review Jadwal, Riwayat Jadwal), karena itu berada sebelum
-   Planning Summary dan Tabs, bukan di dalam salah satu tab. Toolbar
-   sederhana, bukan Card — filter adalah control, summary adalah
-   information, dua hal itu tidak dicampur secara visual.
+   Workspace Toolbar — Tabs (navigasi) + Shipping Line (filter) dalam
+   satu baris: dua kontrol level workspace, beda fungsi tapi satu
+   toolbar visual, dipisahkan dari Table Toolbar (Tambah Jadwal) di
+   bawahnya oleh satu divider standar halaman.
    ======================================================================= */
+.vp-workspace-toolbar-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    border-bottom: 1px solid var(--mon-border-soft, #EEF2F7);
+    margin-bottom: 1.125rem;
+}
 .vp-toolbar {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 0.625rem;
-}
-.vp-filter-toolbar {
-    margin-bottom: 1rem;
 }
 .vp-toolbar-label {
     font-size: 0.8125rem;
@@ -2228,13 +2233,13 @@
     vertical-align: middle;
 }
 
-/* --- Tab navigation: menyatu dengan bahasa desain Monitoring ----------- */
+/* --- Tab navigation: menyatu dengan bahasa desain Monitoring -----------
+   Divider dan spacing sekarang milik .vp-workspace-toolbar-row (parent),
+   supaya satu-satunya garis pemisah adalah antara toolbar dan konten. */
 .vp-tab-bar {
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    border-bottom: 1px solid var(--mon-border-soft, #EEF2F7);
-    margin-bottom: 1.125rem;
 }
 .vp-tab {
     display: flex;
