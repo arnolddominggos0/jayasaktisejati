@@ -3,8 +3,8 @@
      Filament, default collapsed, supaya tidak memperpanjang halaman
      saat tidak dibutuhkan. --}}
 <x-filament::section
-    heading="Log Persetujuan"
-    description="Riwayat audit: siapa, kapan, dan status apa yang pernah terjadi pada vessel plan ini."
+    heading="Riwayat Persetujuan & Audit"
+    description="Lihat riwayat pengiriman draft, revisi, persetujuan, dan finalisasi vessel plan."
     collapsible
     collapsed
 >

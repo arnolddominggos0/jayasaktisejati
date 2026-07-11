@@ -2161,7 +2161,7 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.75rem;
+    gap: 0.875rem;
 }
 .vp-toolbar-label {
     font-size: 0.8125rem;
@@ -2173,9 +2173,15 @@
     font-weight: 500;
 }
 
-/* Planning Summary (Stats Overview bawaan Filament) — beri jarak ke Tabs. */
+/* Planning Summary (Stats Overview bawaan Filament) — beri jarak ke Tabs.
+   Vertical padding native (p-6 = 24px) dipadatkan ~12px supaya card
+   tidak terasa lebih tinggi dari kebutuhan kontennya. */
 .vp-summary-stats {
     margin-bottom: 1rem;
+}
+.vp-summary-stats .fi-wi-stats-overview-stat {
+    padding-top: 1.125rem;
+    padding-bottom: 1.125rem;
 }
 
 /* =======================================================================

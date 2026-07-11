@@ -43,7 +43,7 @@ class EditVesselPlan extends EditRecord
         $status = $this->record->status;
 
         $badge = Blade::render(
-            '<x-filament::badge :color="$color" class="vp-heading-badge">{{ $label }}</x-filament::badge>',
+            '<x-filament::badge :color="$color" size="sm" class="vp-heading-badge">{{ $label }}</x-filament::badge>',
             ['color' => $status->color(), 'label' => $status->label()]
         );
 

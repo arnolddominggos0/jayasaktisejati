@@ -5,6 +5,7 @@ namespace App\Filament\Resources\VesselPlanResource\Widgets;
 use App\Models\VesselPlan;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Support\HtmlString;
 
 class VesselPlanAnalysis extends StatsOverviewWidget
 {
@@ -28,7 +29,10 @@ class VesselPlanAnalysis extends StatsOverviewWidget
             Stat::make('Rencana Muatan', $this->record->items->sum('cargo_plan').' Unit'),
 
             Stat::make('ETD Gap', $maxGap.' Hari')
-                ->description('Target SOP ≤ '.$gapLimit.' Hari')
+                ->description(new HtmlString(
+                    '<span class="block">Target SOP</span>'
+                    .'<span class="block">&le; '.$gapLimit.' Hari</span>'
+                ))
                 ->descriptionColor($gapOk ? 'gray' : ($maxGap <= 10 ? 'warning' : 'danger')),
         ];
     }
