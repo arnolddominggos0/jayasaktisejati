@@ -22,24 +22,34 @@ class VesselPlanAnalysis extends StatsOverviewWidget
         $maxGap = $analysis['max_gap'] ?? 0;
         $gapLimit = $analysis['gap_limit'] ?? 6;
         $gapOk = $analysis['gap_ok'] ?? false;
-
-        // Unit di dalam value ("Unit"/"Hari") pakai style secondary bawaan
-        // Filament (text-base font-normal text-gray-500, sama seperti
-        // sub-teks pada description) supaya angka tetap fokus utama —
-        // bukan seluruh value jadi bold rata dengan ukuran yang sama.
-        $unitSuffix = fn (string $unit) => '<span class="text-base font-normal text-gray-500"> '.$unit.'</span>';
+        $unitSuffix = fn(string $unit) => '<span class="text-base font-normal text-gray-500"> ' . $unit . '</span>';
 
         return [
-            Stat::make('Jadwal', $this->record->items->count()),
+            Stat::make('Jadwal', $this->record->items->count())
+                ->description('Jumlah jadwal yang direncanakan')
+                ->descriptionColor('gray'),
 
-            Stat::make('Rencana Muatan', new HtmlString(
-                $this->record->items->sum('cargo_plan').$unitSuffix('Unit')
-            )),
+            Stat::make(
+                'Rencana Muatan',
+                new HtmlString(
+                    $this->record->items->sum('cargo_plan') . $unitSuffix('Unit')
+                )
+            )
+                ->description('Total rencana muatan')
+                ->descriptionColor('gray'),
 
-            Stat::make('ETD Gap', new HtmlString(
-                $maxGap.$unitSuffix('Hari')
-                .'<span class="text-sm font-normal '.($gapOk ? 'text-gray-500' : ($maxGap <= 10 ? 'text-amber-600' : 'text-red-600')).'"> · Target SOP &le; '.$gapLimit.' Hari</span>'
-            )),
+            Stat::make(
+                'ETD Gap',
+                new HtmlString(
+                    $maxGap . $unitSuffix('Hari')
+                )
+            )
+                ->description("Target ≤ {$gapLimit} Hari")
+                ->descriptionColor('gray'),
+
+            Stat::make('Gap OK', $gapOk ? 'Ya' : 'Tidak')
+                ->description($gapOk ? 'Semua jadwal sesuai target' : 'Ada jadwal yang melebihi target')
+                ->descriptionColor($gapOk ? 'success' : 'danger'),
         ];
     }
 }
