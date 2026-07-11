@@ -2174,10 +2174,16 @@
 }
 
 /* Planning Summary (Stats Overview bawaan Filament) — beri jarak ke Tabs.
-   Card itu sendiri 100% struktur & spacing native StatsOverviewWidget
-   (p-6, gap-y-2, dst) — tidak ada override padding/gap/height/alignment
-   di sini, supaya identik dengan Stats Overview card Filament di
-   halaman lain. */
+   Root cause tinggi berlebih: .fi-wi-stats-overview-stats-ctn adalah
+   CSS Grid, align-items default-nya "stretch" — men-stretch semua card
+   ke tinggi cell tertinggi dalam row (ETD Gap, karena description-nya
+   dua baris). align-items: start membuat setiap card content-driven
+   (tinggi sesuai konten sendiri), bukan dipaksa menyamai card lain.
+   Satu-satunya properti yang diubah — padding, gap, dan typography
+   tetap 100% native StatsOverviewWidget. */
+.vp-summary-stats .fi-wi-stats-overview-stats-ctn {
+    align-items: start;
+}
 .vp-summary-stats {
     margin-bottom: 1rem;
 }
