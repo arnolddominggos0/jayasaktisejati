@@ -107,9 +107,9 @@ $defaultTab = match (true) {
                         @endforeach
                     </select>
                     @if (filled($this->shippingLineFilter))
-                        <button type="button" wire:click="$set('shippingLineFilter', '')" class="text-xs text-gray-500 hover:text-gray-700 underline cursor-pointer">
+                        <x-filament::link tag="button" type="button" color="gray" size="sm" wire:click="$set('shippingLineFilter', '')">
                             Reset Filter
-                        </button>
+                        </x-filament::link>
                     @endif
                 </div>
             @endif

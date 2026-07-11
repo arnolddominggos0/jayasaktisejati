@@ -1,9 +1,16 @@
 @unless ($hideWhenEmpty ?? false)
-<div class="rounded-xl border bg-white px-6 py-5 mb-6"
-     x-data="{ open: false, entry: null }">
-
-    <h3 class="text-base font-semibold mb-1">Log Persetujuan</h3>
-    <p class="text-sm text-gray-500 mb-4">Riwayat audit: siapa, kapan, dan status apa yang pernah terjadi pada vessel plan ini.</p>
+{{-- Log Persetujuan bukan pekerjaan utama Planner — collapsible bawaan
+     Filament, default collapsed, supaya tidak memperpanjang halaman
+     saat tidak dibutuhkan. --}}
+<x-filament::section
+    heading="Log Persetujuan"
+    description="Riwayat audit: siapa, kapan, dan status apa yang pernah terjadi pada vessel plan ini."
+    collapsible
+    collapsed
+>
+    {{-- x-data terpisah dari x-data collapse milik Section — dua scope
+         Alpine berbeda tidak bisa digabung di elemen yang sama. --}}
+    <div x-data="{ open: false, entry: null }">
 
     @if (empty($entries))
         <div class="text-sm text-gray-400">Belum ada riwayat persetujuan.</div>
@@ -112,5 +119,7 @@
         </div>
     </div>
 
-</div>
+    </div>
+
+</x-filament::section>
 @endunless

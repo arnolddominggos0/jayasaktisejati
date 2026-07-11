@@ -119,41 +119,31 @@ $deltaLabel = function (?int $d, bool $short = false): array {
     class="space-y-2.5"
 >
 
-    {{-- Header --}}
-    <div class="flex items-start justify-between flex-wrap gap-3">
-        <div>
-            <div class="text-[11px] uppercase tracking-wider font-bold text-gray-500 mb-1">
-                Riwayat Jadwal
-            </div>
-            <p class="text-sm text-gray-500">
-                Perbandingan
-                <span class="font-semibold text-blue-600">Jadwal Draft</span>
-                vs
-                <span class="font-semibold text-emerald-600">Jadwal Final</span>
-                per kapal.
-                Klik baris untuk melihat detail perubahan.
-            </p>
+    {{-- Header — snapshot meta jadi bagian dari header section, bukan
+         floating note terpisah di kanan atas. --}}
+    <div>
+        <div class="text-[11px] uppercase tracking-wider font-bold text-gray-500 mb-1">
+            Riwayat Jadwal
         </div>
+        <p class="text-sm text-gray-500">
+            Perbandingan
+            <span class="font-semibold text-blue-600">Jadwal Draft</span>
+            vs
+            <span class="font-semibold text-emerald-600">Jadwal Final</span>
+            per kapal.
+            Klik baris untuk melihat detail perubahan.
+        </p>
 
-        {{-- Snapshot meta --}}
-        <div class="shrink-0 text-right">
-            @if ($draftSnapshot)
-            <div class="text-xs text-gray-500">
-                Draft dikirim:
-                <span class="font-semibold text-gray-700">
-                    {{ $draftSnapshot->created_at?->format('d M Y H:i') }}
-                </span>
+        @if ($draftSnapshot || $finalSnapshot)
+            <div class="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5 text-xs text-gray-500">
+                @if ($draftSnapshot)
+                    <span>Draft terkirim: <span class="font-semibold text-gray-700">{{ $draftSnapshot->created_at?->format('d M Y H:i') }}</span></span>
+                @endif
+                @if ($finalSnapshot)
+                    <span>Difinalisasi: <span class="font-semibold text-gray-700">{{ $finalSnapshot->created_at?->format('d M Y H:i') }}</span></span>
+                @endif
             </div>
-            @endif
-            @if ($finalSnapshot)
-            <div class="text-xs text-gray-500 mt-0.5">
-                Difinalisasi:
-                <span class="font-semibold text-gray-700">
-                    {{ $finalSnapshot->created_at?->format('d M Y H:i') }}
-                </span>
-            </div>
-            @endif
-        </div>
+        @endif
     </div>
 
     {{-- History Table --}}

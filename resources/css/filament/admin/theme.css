@@ -2151,7 +2151,7 @@
 .vp-workspace-toolbar-row {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-end;
     flex-wrap: wrap;
     gap: 0.75rem;
     border-bottom: 1px solid var(--mon-border-soft, #EEF2F7);
@@ -2161,7 +2161,7 @@
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.625rem;
+    gap: 0.75rem;
 }
 .vp-toolbar-label {
     font-size: 0.8125rem;

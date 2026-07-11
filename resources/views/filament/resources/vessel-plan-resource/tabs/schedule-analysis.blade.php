@@ -167,6 +167,11 @@ usort($exceptionVessels, fn ($a, $b) => $b['hasCritical'] <=> $a['hasCritical'])
 $exceptionVesselCount = count($exceptionVessels);
 $hasExceptions  = $exceptionVesselCount > 0;
 
+// Satu status utama per state: kalau banner Executive Summary di atas
+// sudah menyampaikan "siap"/"final" (execReady atau isFinal), banner
+// "tidak ada exception" tidak perlu diulang — pesannya identik.
+$showNoExceptionBanner = ! $hasExceptions && ! $isFinal && ! $execReady;
+
 $fmtDate = fn ($d) => $d ? $d->translatedFormat('d M Y') : '—';
 @endphp
 
@@ -271,17 +276,19 @@ $fmtDate = fn ($d) => $d ? $d->translatedFormat('d M Y') : '—';
     {{-- ── 3. Exception First (grouped per-vessel, actionable) ─────────────── --}}
     @if ($hasItems)
         @if (! $hasExceptions)
-            <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2">
-                <div class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-                    </svg>
-                    <span class="text-sm text-emerald-800">
-                        <span class="font-semibold">Tidak ada exception.</span>
-                        Seluruh jadwal memenuhi aturan planning.
-                    </span>
+            @if ($showNoExceptionBanner)
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <span class="text-sm text-emerald-800">
+                            <span class="font-semibold">Tidak ada exception.</span>
+                            Seluruh jadwal memenuhi aturan planning.
+                        </span>
+                    </div>
                 </div>
-            </div>
+            @endif
         @else
             <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5">
                 <div class="flex items-start gap-2 mb-2">

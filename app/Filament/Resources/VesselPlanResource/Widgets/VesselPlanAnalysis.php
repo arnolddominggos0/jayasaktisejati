@@ -23,7 +23,7 @@ class VesselPlanAnalysis extends StatsOverviewWidget
         $gapOk = $analysis['gap_ok'] ?? false;
 
         return [
-            Stat::make('Jadwal', $this->record->items->count().' Jadwal'),
+            Stat::make('Jadwal', $this->record->items->count()),
 
             Stat::make('Rencana Muatan', $this->record->items->sum('cargo_plan').' Unit'),
 
