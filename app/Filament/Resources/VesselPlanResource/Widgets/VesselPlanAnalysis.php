@@ -37,10 +37,7 @@ class VesselPlanAnalysis extends StatsOverviewWidget
             )),
 
             Stat::make('ETD Gap', new HtmlString($maxGap.$unitSuffix('Hari')))
-                ->description(new HtmlString(
-                    '<span class="block">Target SOP</span>'
-                    .'<span class="block">&le; '.$gapLimit.' Hari</span>'
-                ))
+                ->description('Target SOP ≤ '.$gapLimit.' Hari')
                 ->descriptionColor($gapOk ? 'gray' : ($maxGap <= 10 ? 'warning' : 'danger')),
         ];
     }
