@@ -23,12 +23,20 @@ class VesselPlanAnalysis extends StatsOverviewWidget
         $gapLimit = $analysis['gap_limit'] ?? 6;
         $gapOk = $analysis['gap_ok'] ?? false;
 
+        // Unit di dalam value ("Unit"/"Hari") pakai style secondary bawaan
+        // Filament (text-base font-normal text-gray-500, sama seperti
+        // sub-teks pada description) supaya angka tetap fokus utama —
+        // bukan seluruh value jadi bold rata dengan ukuran yang sama.
+        $unitSuffix = fn (string $unit) => '<span class="text-base font-normal text-gray-500"> '.$unit.'</span>';
+
         return [
             Stat::make('Jadwal', $this->record->items->count()),
 
-            Stat::make('Rencana Muatan', $this->record->items->sum('cargo_plan').' Unit'),
+            Stat::make('Rencana Muatan', new HtmlString(
+                $this->record->items->sum('cargo_plan').$unitSuffix('Unit')
+            )),
 
-            Stat::make('ETD Gap', $maxGap.' Hari')
+            Stat::make('ETD Gap', new HtmlString($maxGap.$unitSuffix('Hari')))
                 ->description(new HtmlString(
                     '<span class="block">Target SOP</span>'
                     .'<span class="block">&le; '.$gapLimit.' Hari</span>'
