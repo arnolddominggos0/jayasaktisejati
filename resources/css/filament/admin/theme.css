@@ -2187,19 +2187,9 @@
 .vp-summary-stats .fi-wi-stats-overview-stat {
     padding-top: 0.875rem;
     padding-bottom: 0.875rem;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
 }
-/* Konten di-center vertikal (flex di atas) dan horizontal — tinggi card
-   tidak berubah, hanya reposisi konten di dalam tinggi yang sudah ada. */
 .vp-summary-stats .fi-wi-stats-overview-stat > div {
     row-gap: 0.25rem;
-    justify-items: center;
-    text-align: center;
-}
-.vp-summary-stats .fi-wi-stats-overview-stat > div > div {
-    justify-content: center;
 }
 
 /* =======================================================================
