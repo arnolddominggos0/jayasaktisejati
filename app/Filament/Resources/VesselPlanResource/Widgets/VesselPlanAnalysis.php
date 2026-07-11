@@ -36,9 +36,10 @@ class VesselPlanAnalysis extends StatsOverviewWidget
                 $this->record->items->sum('cargo_plan').$unitSuffix('Unit')
             )),
 
-            Stat::make('ETD Gap', new HtmlString($maxGap.$unitSuffix('Hari')))
-                ->description('Target SOP ≤ '.$gapLimit.' Hari')
-                ->descriptionColor($gapOk ? 'gray' : ($maxGap <= 10 ? 'warning' : 'danger')),
+            Stat::make('ETD Gap', new HtmlString(
+                $maxGap.$unitSuffix('Hari')
+                .'<span class="text-sm font-normal '.($gapOk ? 'text-gray-500' : ($maxGap <= 10 ? 'text-amber-600' : 'text-red-600')).'"> · Target SOP &le; '.$gapLimit.' Hari</span>'
+            )),
         ];
     }
 }
