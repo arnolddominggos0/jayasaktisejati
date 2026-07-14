@@ -259,21 +259,16 @@
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                 <!-- Company Info -->
                 <div>
-                    <div class="flex items-center space-x-2 mb-4">
+                    <div class="flex items-center space-x-3 mb-4">
                         <img src="{{ asset('images/logo.png') }}" alt="JSS Logo" class="h-14 w-auto">
                         <div>
-                            <span class="font-bold text-xl block">PT Jaya Sakti Sejati</span>
+                            <span class="font-bold text-xl block leading-tight">PT Jaya Sakti Sejati</span>
                             <span class="text-slate-400 text-sm">Freight Forwarding</span>
                         </div>
                     </div>
-                    <p class="text-slate-400 text-sm mb-6 leading-relaxed">
+                    <p class="text-slate-400 text-sm leading-relaxed">
                         Solusi logistik terpercaya untuk pengiriman domestik dan internasional dengan jangkauan seluruh Indonesia sejak 1995.
                     </p>
-                    <div class="bg-slate-800 rounded-lg p-4 border-l-4 border-blue-500">
-                        <p class="text-slate-300 text-sm italic">
-                            "Always deliver more than expected."
-                        </p>
-                    </div>
                 </div>
                 
                 <!-- Quick Links -->
