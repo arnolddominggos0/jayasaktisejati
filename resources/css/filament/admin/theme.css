@@ -2278,3 +2278,100 @@
     outline: 2px solid var(--mon-accent-600, #1D4ED8);
     outline-offset: -2px;
 }
+
+/* =======================================================================
+   WS-01A — Administrative Workspace Shell (Permintaan Pengiriman)
+   Reuse penuh bahasa desain Vessel Plan: .vp-tab*, .vp-workspace,
+   .vp-workspace-table, .vp-workspace-toolbar-row. Blok ini HANYA
+   menambah apa yang belum ada: layout toolbar workspace (search kiri,
+   utilitas kanan) dan penekanan chrome tabel native di dalam workspace
+   (header toolbar bawaan Filament digantikan toolbar custom).
+   ======================================================================= */
+.ws-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    /* 1.5rem horizontal = ritme px-6 tabel Filament & 1.5rem
+       .vp-workspace-toolbar — search sejajar kolom pertama tabel.
+       Vertikal 0.625rem (WS-01A.2): ritme divider, bukan whitespace. */
+    padding: 0.625rem 1.5rem;
+    border-bottom: 1px solid var(--mon-border-soft, #EEF2F7);
+}
+/* Search = interaksi primer Office Admin — ±48% lebar toolbar
+   (WS-01A.2 Search Dominance), tetap rata kiri. */
+.ws-toolbar-search {
+    flex: 1 1 48%;
+    max-width: 48%;
+    min-width: 16rem;
+}
+.ws-toolbar-utils {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+}
+/* Search + filter default Filament disembunyikan: perannya diambil alih
+   toolbar custom di atas tabel (search tersambung ke tableSearch yang
+   sama). Filter workspace menyusul di WS-01B. */
+.ws-shipment-workspace .fi-ta-header-toolbar {
+    display: none;
+}
+
+/* =======================================================================
+   WS-01A.1 — Workspace Polish (Permintaan Pengiriman)
+   ======================================================================= */
+
+/* Navigasi → workspace: rapatkan jarak agar tab terasa milik workspace
+   di bawahnya. Nilai .vp-workspace-toolbar-row (1.125rem) TIDAK diubah —
+   design freeze Vessel Plan; override hanya lewat kelas pendamping ini. */
+.ws-nav-row {
+    margin-bottom: 0.5rem;
+}
+
+/* Filter panel (FiltersLayout::AboveContent) — default COLLAPSED.
+   Wrapper native: .fi-ta-filters-above-content-ctn (grid px-4 py-4 sm:px-6).
+   Dibuka dari tombol Filter toolbar via .ws-filters-open pada workspace.
+   max-height (bukan display:none) supaya transisi halus; overflow kembali
+   visible saat terbuka agar dropdown Select/DatePicker tidak terpotong. */
+.ws-shipment-workspace .fi-ta-filters-above-content-ctn {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    padding-top: 0;
+    padding-bottom: 0;
+    border-bottom: 0 solid var(--mon-border-soft, #EEF2F7);
+    transition: max-height 200ms ease, opacity 150ms ease,
+                padding 200ms ease;
+}
+.ws-shipment-workspace.ws-filters-open .fi-ta-filters-above-content-ctn {
+    max-height: 60rem;
+    opacity: 1;
+    overflow: visible;
+    padding-top: 1rem;
+    padding-bottom: 1.25rem;
+    /* Divider bawah memisahkan panel dari tabel — ritme divider,
+       bukan whitespace. Divider atas sudah milik .ws-toolbar. */
+    border-bottom-width: 1px;
+}
+
+/* =======================================================================
+   WS-01A.2 — Final Shell Polish (FREEZE)
+   Setelah blok ini, Workspace Shell Permintaan Pengiriman dibekukan —
+   perubahan berikutnya hanya lewat sprint tabel (WS-01B dst.) atau
+   amendment eksplisit. Nilai .vp-* tetap tidak pernah disentuh.
+   ======================================================================= */
+
+/* Filter = aksi sekunder: padding horizontal dirapatkan sedikit supaya
+   tidak berkompetisi dengan Search. Perilaku & ikon tidak berubah. */
+.ws-filter-toggle {
+    padding-inline-start: 0.625rem;
+    padding-inline-end: 0.625rem;
+}
+
+/* Ritme tab: gap antar tab dirapatkan (0.25rem → 0.125rem) agar terbaca
+   sebagai satu grup navigasi. Scoped ke halaman ini via .ws-nav-row —
+   .vp-tab-bar milik Vessel Plan tidak berubah. */
+.ws-nav-row .vp-tab-bar {
+    gap: 0.125rem;
+}

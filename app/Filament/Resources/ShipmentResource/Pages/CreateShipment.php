@@ -8,6 +8,7 @@ use App\Filament\Resources\ShipmentResource;
 use App\Models\Shipment;
 use App\Models\Voyage;
 use App\Services\ShipmentService;
+use App\Support\Intake\IntakePrefill;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
@@ -19,6 +20,15 @@ class CreateShipment extends CreateRecord
     protected static string $resource = ShipmentResource::class;
 
     protected static bool $canCreateAnother = false;
+
+    /**
+     * OCR-01 — Review layer holder. Diisi oleh FileUpload::afterStateUpdated
+     * (via SppbAssistService::assist) TANPA menyentuh form state. Envelope
+     * ini menunggu Review Summary (OCR-02) dan Apply eksplisit (OCR-03).
+     * Null / empty = perilaku wizard identik dengan entri manual.
+     * IntakePrefill implements Wireable — aman menyeberangi request Livewire.
+     */
+    public ?IntakePrefill $intakePrefill = null;
 
     protected function getRedirectUrl(): string
     {

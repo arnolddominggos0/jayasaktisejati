@@ -439,15 +439,12 @@ class ShipmentResource extends Resource
                                         'text/plain',
                                     ])
                                     ->live()
-                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                    ->afterStateUpdated(function ($state, Get $get, $livewire) {
+                                        // OCR-01: ekstraksi TIDAK menulis ke form.
+                                        // Hasilnya (IntakePrefill) ditampung di page
+                                        // Livewire ($livewire->intakePrefill) menunggu
+                                        // Review (OCR-02) dan Apply eksplisit (OCR-03).
                                         $requestType = $get('request_type');
-
-                                        Log::info('SPPB AUDIT afterStateUpdated()', [
-                                            'stage' => 'afterStateUpdated',
-                                            'request_type' => $requestType,
-                                            'state' => $state,
-                                            'state_type' => gettype($state),
-                                        ]);
 
                                         if ($requestType !== RequestType::SPPB_DO->value) {
                                             Log::info('SPPB AUDIT afterStateUpdated() SKIP', [
@@ -464,16 +461,19 @@ class ShipmentResource extends Resource
                                             return;
                                         }
 
-                                        $filled = app(\App\Services\SppbAssistService::class)
-                                            ->assist($state, $get, $set);
+                                        // Halaman tanpa penampung envelope (mis. Edit)
+                                        // tidak menjalankan ekstraksi sama sekali.
+                                        if (! property_exists($livewire, 'intakePrefill')) {
+                                            return;
+                                        }
+
+                                        $livewire->intakePrefill = app(\App\Services\SppbAssistService::class)
+                                            ->assist($state);
 
                                         Log::info('SPPB AUDIT afterStateUpdated() RESULT', [
-                                            'filled' => $filled,
+                                            'detected_field_count' => $livewire->intakePrefill->detectedFieldCount(),
+                                            'warning_count' => count($livewire->intakePrefill->warnings),
                                         ]);
-
-                                        if (! empty($filled)) {
-                                            $set('_sppb_assisted_fields', $filled);
-                                        }
                                     })
                                     ->columnSpan(['default' => 12, 'md' => 6]),
                                 Textarea::make('notes')
@@ -482,9 +482,6 @@ class ShipmentResource extends Resource
                                     ->maxLength(1000)
                                     ->columnSpan(['default' => 12, 'md' => 6]),
                             ])->columnSpan(12),
-                            Hidden::make('_sppb_assisted_fields')
-                                ->default([])
-                                ->dehydrated(false),
                             ]),
                     ])
                     ->compact(),

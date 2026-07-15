@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Enums\DeliveryScope;
+use App\Enums\RequestType;
 use App\Models\City;
 use App\Models\Customer;
+use App\Support\Intake\IntakePrefill;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -12,15 +14,18 @@ use Illuminate\Support\Str;
 /**
  * SPPB Document Assist Service
  *
- * Processes uploaded SPPB/DO documents and returns suggested field values
- * with confidence scores. The form wires this into FileUpload::afterStateUpdated
- * — the system fills what it can, the admin owns the final decision.
+ * Processes uploaded SPPB/DO documents and produces an IntakePrefill —
+ * the channel-neutral extraction envelope. Extraction is an ASSISTANT:
+ * it never writes into form/Livewire state. Review (OCR-02) and Apply
+ * (OCR-03) are separate, explicit steps owned by the Office Admin.
  *
  * Sprint 1.5: Infrastructure foundation (apply/assist pipeline, match helpers).
  * Sprint 1.6: Header extraction (doc_number, date, sender, receiver, destination, coverage, notes).
  *   - Lightweight PDF text-stream extraction (no external package).
  *   - Regex-based key-value pair parsing.
  *   - Match helpers resolve raw text to master data IDs.
+ * Sprint OCR-01: extract()/assist() return IntakePrefill; apply() is no
+ *   longer called automatically (kept for the explicit Apply in OCR-03).
  * Sprint 1.7 (future): Unit table extraction (model, VIN, engine, color, qty, DO, police).
  */
 class SppbAssistService
@@ -80,23 +85,38 @@ class SppbAssistService
     ];
 
     /**
-     * Process uploaded SPPB/DO document(s) and return suggested field values.
+     * Raw suggestion keys that are ENTITY RESOLUTIONS (name → master-data id).
+     * These land in IntakePrefill->suggestions and are never auto-applied
+     * as links — the admin confirms the match (intake architecture review §4).
+     */
+    protected const RESOLUTION_FIELDS = [
+        'customer_id',
+        'receiver_id',
+        'destination_city_id',
+    ];
+
+    /**
+     * Process uploaded SPPB/DO document(s) into an IntakePrefill envelope.
+     *
+     * OCR-01: this method no longer returns form fields — it returns the
+     * intermediate extraction result. Nothing here touches Livewire state.
      *
      * @param array|string $filePaths  File path(s) relative to the upload disk.
-     * @return array  ['field_name' => ['value' => mixed, 'confidence' => float], ...]
      */
-    public function extract(array|string $filePaths): array
+    public function extract(array|string $filePaths): IntakePrefill
     {
         $paths = (array) $filePaths;
-        $validPaths = array_filter($paths, fn ($p) => ! empty($p));
+        $validPaths = array_values(array_filter($paths, fn ($p) => ! empty($p)));
 
         if (empty($validPaths)) {
             Log::info('SPPB AUDIT extract() SKIP', [
                 'stage' => 'extract',
                 'reason' => 'no valid file paths',
             ]);
-            return [];
+            return IntakePrefill::empty(RequestType::SPPB_DO->value);
         }
+
+        $artifacts = $this->artifactNames($validPaths);
 
         $text = $this->extractTextFromFiles($validPaths);
 
@@ -110,9 +130,130 @@ class SppbAssistService
             Log::info('SPPB AUDIT extract() STOP — extracted text is empty/invalid', [
                 'stage' => 'extract',
             ]);
-            return [];
+
+            return new IntakePrefill(
+                source: $this->sourceMeta($artifacts),
+                document: ['number' => null, 'date' => null, 'confidence' => []],
+                copyFields: [],
+                manifest: ['detected_count' => 0, 'units' => []],
+                suggestions: [],
+                warnings: [[
+                    'code'    => 'document_unreadable',
+                    'message' => 'Dokumen tidak dapat dibaca otomatis — lanjutkan pengisian manual.',
+                ]],
+            );
         }
 
+        $raw = $this->extractSuggestionsFromText($text);
+
+        return $this->buildPrefill($artifacts, $raw);
+    }
+
+    /**
+     * Classify raw suggestions into the envelope's field species.
+     * doc_number/requested_at → document; RESOLUTION_FIELDS → suggestions;
+     * everything else (scalar values) → copyFields.
+     */
+    protected function buildPrefill(array $artifacts, array $raw): IntakePrefill
+    {
+        $document    = ['number' => null, 'date' => null, 'confidence' => []];
+        $copyFields  = [];
+        $suggestions = [];
+
+        foreach ($raw as $field => $data) {
+            if ($field === 'doc_number') {
+                $document['number']               = $data['value'];
+                $document['confidence']['number'] = $data['confidence'];
+                continue;
+            }
+
+            if ($field === 'requested_at') {
+                $document['date']               = $data['value'];
+                $document['confidence']['date'] = $data['confidence'];
+                continue;
+            }
+
+            if (in_array($field, self::RESOLUTION_FIELDS, true)) {
+                $suggestions[$field] = [
+                    'value'      => $data['value'],
+                    'confidence' => $data['confidence'],
+                    'match'      => $data['match'] ?? null,
+                ];
+                continue;
+            }
+
+            $copyFields[$field] = [
+                'value'      => $data['value'],
+                'confidence' => $data['confidence'],
+            ];
+        }
+
+        $warnings = [];
+
+        $nothingDetected = $document['number'] === null
+            && $document['date'] === null
+            && $copyFields === []
+            && $suggestions === [];
+
+        if ($nothingDetected) {
+            $warnings[] = [
+                'code'    => 'no_fields_detected',
+                'message' => 'Tidak ada field yang terdeteksi dari dokumen — isi formulir secara manual.',
+            ];
+        } else {
+            // Unit-table extraction belum tersedia (Sprint 1.7) — nyatakan
+            // jujur supaya admin tahu manifest tetap diinput manual.
+            $warnings[] = [
+                'code'    => 'manifest_not_extracted',
+                'message' => 'Tabel unit belum terbaca otomatis — masukkan unit secara manual.',
+            ];
+        }
+
+        return new IntakePrefill(
+            source: $this->sourceMeta($artifacts),
+            document: $document,
+            copyFields: $copyFields,
+            manifest: ['detected_count' => 0, 'units' => []],
+            suggestions: $suggestions,
+            warnings: $warnings,
+        );
+    }
+
+    /** Source block for the envelope (channel + artifact names). */
+    protected function sourceMeta(array $artifacts): array
+    {
+        return [
+            'channel'     => RequestType::SPPB_DO->value,
+            'artifacts'   => $artifacts,
+            'received_at' => now()->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Normalize upload state entries to serializable artifact names —
+     * the envelope crosses the Livewire wire, so objects must not leak in.
+     */
+    protected function artifactNames(array $paths): array
+    {
+        return array_values(array_map(function ($p) {
+            if (is_string($p)) {
+                return $p;
+            }
+            if (is_object($p) && method_exists($p, 'getClientOriginalName')) {
+                return (string) $p->getClientOriginalName();
+            }
+            return (string) $p;
+        }, $paths));
+    }
+
+    /**
+     * Regex + match phases over already-extracted text. Body unchanged from
+     * the pre-OCR-01 extract() — same patterns, same confidences, same logs.
+     *
+     * @return array  ['field_name' => ['value' => mixed, 'confidence' => float, ...], ...]
+     */
+    protected function extractSuggestionsFromText(string $text): array
+    {
         $suggestions = [];
 
         // --- Regex phase (Task 4) ---
@@ -663,6 +804,10 @@ class SppbAssistService
     /**
      * Apply extracted suggestions to the form.
      *
+     * OCR-01: NOT called automatically anymore. Retained for OCR-03, where
+     * the Office Admin's explicit "Terapkan" action will invoke it with the
+     * envelope's applicable fields. Do not wire this back into assist().
+     *
      * Rules:
      * - Only fill fields with confidence >= threshold.
      * - Never overwrite fields that already have a value (respect admin's manual entry).
@@ -732,14 +877,13 @@ class SppbAssistService
     }
 
     /**
-     * Full pipeline: extract from files → apply to form.
+     * OCR-01 pipeline: extract from files → return IntakePrefill → (wait).
      *
-     * @param array|string $filePaths
-     * @param callable $get  Filament Get
-     * @param callable $set  Filament Set
-     * @return array  Field names that were auto-filled
+     * Apply is NO LONGER automatic. The envelope is held by the Livewire
+     * page ($livewire->intakePrefill) until the admin explicitly reviews
+     * (OCR-02) and applies (OCR-03). This method never touches form state.
      */
-    public function assist(array|string $filePaths, callable $get, callable $set): array
+    public function assist(array|string $filePaths): IntakePrefill
     {
         $paths = (array) $filePaths;
         $validPaths = array_filter($paths, fn ($p) => ! empty($p));
@@ -747,25 +891,18 @@ class SppbAssistService
         Log::info('SPPB AUDIT assist() entered', [
             'stage' => 'assist',
             'file_count' => count($validPaths),
-            'paths' => array_map(fn ($p) => Storage::disk('public')->path($p), array_values($validPaths)),
         ]);
 
-        $suggestions = $this->extract($filePaths);
+        $prefill = $this->extract($filePaths);
 
         Log::info('SPPB AUDIT assist() extract() result', [
             'stage' => 'assist',
-            'suggestion_count' => count($suggestions),
-            'suggestions' => $suggestions,
+            'detected_field_count' => $prefill->detectedFieldCount(),
+            'unit_count' => $prefill->unitCount(),
+            'warning_count' => count($prefill->warnings),
         ]);
 
-        if (empty($suggestions)) {
-            Log::info('SPPB AUDIT assist() STOP — no suggestions from extract()', [
-                'stage' => 'assist',
-            ]);
-            return [];
-        }
-
-        return $this->apply($suggestions, $get, $set);
+        return $prefill;
     }
 
     /**
