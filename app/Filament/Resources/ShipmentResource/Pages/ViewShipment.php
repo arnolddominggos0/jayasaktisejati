@@ -42,6 +42,9 @@ class ViewShipment extends ViewRecord
                             ->label('Penerima'),
                         TextEntry::make('branch.name')
                             ->label('Cabang'),
+                        TextEntry::make('originCity.name')
+                            ->label('Kota Asal')
+                            ->placeholder('—'),
                     ]),
 
                 Section::make('Loading Operations')

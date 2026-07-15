@@ -1,3 +1,4 @@
+<div>
 @unless ($hideWhenEmpty ?? false)
 {{-- Log Persetujuan bukan pekerjaan utama Planner — collapsible bawaan
      Filament, default collapsed, supaya tidak memperpanjang halaman
@@ -123,3 +124,4 @@
 
 </x-filament::section>
 @endunless
+</div>

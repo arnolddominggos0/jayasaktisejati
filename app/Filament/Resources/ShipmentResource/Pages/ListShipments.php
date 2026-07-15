@@ -19,6 +19,12 @@ class ListShipments extends ListRecords
     {
         return [
             ShipmentResource\Widgets\ShipmentStats::class,
+        ];
+    }
+
+    protected function getFooterWidgets(): array
+    {
+        return [
             ShipmentResource\Widgets\RecentShipmentActivities::class,
         ];
     }

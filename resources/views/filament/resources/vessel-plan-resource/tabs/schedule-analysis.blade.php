@@ -191,6 +191,20 @@ $fmtDate = fn ($d) => $d ? $d->translatedFormat('d M Y') : '—';
         <p class="text-sm text-gray-500">{{ $reviewSubtitle }}</p>
     </div>
 
+    {{-- ── Empty state: belum ada jadwal sama sekali ───────────────────────
+         Tanpa jadwal, tidak ada apa pun untuk dianalisis — analyze() untuk
+         plan kosong mengembalikan gap_ok=true/max_gap=0 (default netral),
+         yang kalau ditampilkan apa adanya di sini akan terkesan seolah
+         Review sudah menghitung dan menyatakan "aman". Ganti seluruh
+         Executive Summary / Decision Summary / Exception First / Checklist
+         dengan satu pesan jelas; Tabel Jadwal (bagian 4) sudah punya
+         empty-state sendiri jadi tidak diulang di sini. --}}
+    @if (! $hasItems)
+        <div class="rounded-xl border border-dashed border-gray-200 p-8 text-center">
+            <div class="text-sm text-gray-500">Review akan tersedia setelah minimal satu jadwal dibuat.</div>
+        </div>
+    @else
+
     {{-- ── 1. Executive Summary (compact) ─────────────────────────────────── --}}
     @if ($isFinal)
         <div class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5">
@@ -490,5 +504,7 @@ $fmtDate = fn ($d) => $d ? $d->translatedFormat('d M Y') : '—';
             @endforeach
         </div>
     @endif
+
+    @endif{{-- /! $hasItems --}}
 
 </div>

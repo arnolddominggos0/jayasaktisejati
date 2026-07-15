@@ -1,22 +1,35 @@
-﻿<div class="bg-white border border-gray-200/40 rounded-lg overflow-hidden">
+﻿{{-- Supporting section, not a workspace card — no bg/border/shadow box.
+     Divider + section heading (Divider over Border, Section over Card). --}}
+<div>
 
-    <div class="px-3 py-1.5 border-b border-gray-100/60 flex justify-between items-center">
-        <div class="text-[10px] tracking-wide text-gray-500 font-medium">
+    <div class="pb-2 border-b border-gray-100 flex justify-between items-center">
+        <h3 class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
             Kalender Operasional — {{ $calendar['month_label'] }}
-        </div>
+        </h3>
 
         <div class="text-[10px] text-gray-400">
-            Merah = weekend
+            Merah = akhir pekan
         </div>
     </div>
 
-    <div class="overflow-x-auto">
+    {{-- Sprint B4.5: when there's genuinely nothing on the calendar (no
+         chips in any lane/day), showing the full multi-row grid just reads
+         as a large blank area. Swap to a compact, intentional empty state
+         instead — same lightweight treatment as Matrix's empty state, no
+         illustration/icon. $calendarHasChips computed once in the parent
+         page from this same $calendar data (no new query). --}}
+    @if (! $calendarHasChips)
+        <div class="mt-3 rounded-lg border border-dashed border-gray-200 px-4 py-3 text-center">
+            <p class="text-[11px] text-gray-400">Belum ada aktivitas kapal terjadwal di kalender bulan ini.</p>
+        </div>
+    @else
+    <div class="overflow-x-auto mt-3">
         <table class="min-w-[1000px] w-full border-collapse text-[10px]">
 
             <thead class="sticky top-0 z-30 bg-white">
                 <tr class="bg-gray-50/50">
                     <th class="sticky left-0 z-20 bg-white border-r border-gray-100/60 px-2 py-1.5 w-24 text-left font-medium text-gray-500 text-[10px]">
-                        Lane
+                        Kategori
                     </th>
 
                     @foreach ($calendar['days'] as $day)
@@ -138,4 +151,5 @@
         </div>
 
     </div>
+    @endif
 </div>

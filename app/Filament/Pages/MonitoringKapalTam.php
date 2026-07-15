@@ -70,6 +70,13 @@ class MonitoringKapalTam extends Page
     public bool   $showActionModal    = false;
     public string $actionModalType    = ''; // atb | atd | ata | closing | delay | readiness
     public ?int   $actionVoyageId     = null;
+
+    // VI Sprint / VR1 item 6 — verification settle. Holds the voyage whose
+    // operational state was just recorded, so the Fleet Board can briefly
+    // elevate it then settle back (VP2 Q4/Q13 — the operator SEES the change
+    // land). Presentation-only: never read by any query/mutation, only by
+    // the Blade layer. Cleared on the operator's next intent.
+    public ?int   $recentlyUpdatedVoyageId = null;
     public array  $actionForm         = [
         'datetime'               => '',
         'note'                   => '',
@@ -101,6 +108,24 @@ class MonitoringKapalTam extends Page
         $this->loadCarrierReadiness();
     }
 
+    // WX5(1) §1 — single hero: the page previously rendered Filament's own
+    // auto-title AND a manually-coded <h1>+period line beneath it,
+    // repeating the same information. Overriding getHeading() here (pure
+    // presentation, reactive to $period on every Livewire render — no
+    // query, no engineering) let the native Filament header carry the
+    // period itself.
+    //
+    // WX5(2) §1/§7 — getSubheading() removed. A descriptive sentence
+    // under the title is exactly the "explanatory paragraph" this sprint
+    // forbids: the module title is now pure application chrome, not page
+    // content — a label to orient by, not a sentence to read.
+    public function getHeading(): string
+    {
+        $periodLabel = Carbon::createFromFormat('Y-m', $this->period)->translatedFormat('F Y');
+
+        return "Monitoring Kapal TAM — {$periodLabel}";
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // Operational Action Modal
     // ═══════════════════════════════════════════════════════════════════
@@ -109,6 +134,7 @@ class MonitoringKapalTam extends Page
     {
         $v = $this->resolveVoyage($voyageId);
 
+        $this->recentlyUpdatedVoyageId = null; // clear any prior settle highlight
         $this->actionVoyageId  = $voyageId;
         $this->actionModalType = $type;
         $this->actionForm      = [
@@ -148,6 +174,10 @@ class MonitoringKapalTam extends Page
 
     public function saveOpModal(): void
     {
+        // Capture before closeOpModal() nulls actionVoyageId — needed for the
+        // verification settle (VR1 item 6). Mutation flow itself is unchanged.
+        $updatedVoyageId = $this->actionVoyageId;
+
         match ($this->actionModalType) {
             'atb', 'atd', 'ata', 'closing' => $this->saveTimestamp(),
             'delay'     => $this->saveDelay(),
@@ -159,6 +189,8 @@ class MonitoringKapalTam extends Page
         $this->closeOpModal();
         $this->loadData();
         $this->loadCarrierReadiness();
+
+        $this->recentlyUpdatedVoyageId = $updatedVoyageId;
     }
 
     protected function saveTimestamp(): void
@@ -318,6 +350,7 @@ class MonitoringKapalTam extends Page
 
     public function openDrawer(int $voyageId): void
     {
+        $this->recentlyUpdatedVoyageId = null; // clear settle highlight on next intent
         $this->drawerVoyageId = $voyageId;
         $this->showDrawer     = true;
     }
@@ -350,11 +383,13 @@ class MonitoringKapalTam extends Page
 
     public function updatedPeriod(): void
     {
+        $this->recentlyUpdatedVoyageId = null;
         $this->loadData();
     }
 
     public function updatedSearch(): void
     {
+        $this->recentlyUpdatedVoyageId = null;
         $this->loadData();
     }
 
@@ -383,7 +418,10 @@ class MonitoringKapalTam extends Page
         $branchId = $this->resolvedBranchId();
 
         return Voyage::query()
-            ->with(['vessel', 'pol', 'pod', 'milestones', 'checkpoints', 'vesselChecks'])
+            // 'shippingLine' added Sprint WD2 Finding 1 / UI1 Phase 4 —
+            // Voyage Block's identity line now displays it; without this
+            // eager-load it would N+1 per row.
+            ->with(['vessel', 'pol', 'pod', 'milestones', 'checkpoints', 'vesselChecks', 'shippingLine'])
             ->whereYear('period_month', $dt->year)
             ->whereMonth('period_month', $dt->month)
             ->whereHas('shipments', fn($q) => $q
@@ -701,6 +739,310 @@ class MonitoringKapalTam extends Page
             'max_days'      => (int) ($delayDays->max() ?? 0),
             'reasons'       => $reasons,
             'top5'          => $top5,
+        ];
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Operational Brief / TaskClassifier — Sprint X (D1–D3), refactored
+    // Sprint I1 (ES2 §5/§9/§16 correction: single classification pass).
+    // Pure derivation over $rows / $carrierReadiness, already loaded by
+    // loadData()/loadCarrierReadiness() — no new query, no new workflow.
+    //   P3 (task taxonomy: Preventive/Reactive/Decision/Reporting)
+    //   P4 (priority tiers, saturation = 2+ simultaneous Critical)
+    //   P8 (Control: Action = Coordinator still holds it, Awaiting =
+    //       control transferred to an external party)
+    // Every leaf method below returns a fully normalized, render-ready
+    // item shape — voyage_id / vessel_name / label / severity /
+    // action_label / action_type / modal_type — so the Blade layer
+    // (TaskItem component, ES1 §16's smallest reusable unit) performs
+    // zero domain branching, only rendering (DS1 §2, ES1 §8).
+    // ═══════════════════════════════════════════════════════════════════
+
+    /**
+     * TaskClassifier's one true entry point (ES2 §5/§16). Computes each
+     * of the five Brief outputs exactly once and returns them together.
+     * OperationalBrief (tam-brief.blade.php) must call ONLY this method
+     * during normal rendering — never the five below individually — so
+     * Action/Awaiting/Checkpoints are each evaluated a single time per
+     * reload (ES1 §10, ES2 §14 "every expensive operation executes
+     * exactly once"). The leaf methods remain independently public so
+     * they stay separately testable (ES1 §12), but must not re-invoke
+     * each other.
+     */
+    public function getBrief(): array
+    {
+        $action      = $this->getBriefAction();
+        $awaiting    = $this->getBriefAwaiting();
+        $checkpoints = $this->getBriefCheckpoints();
+
+        return [
+            'action'      => $action,
+            'awaiting'    => $awaiting,
+            'checkpoints' => $checkpoints,
+            'onTrack'     => $this->getBriefOnTrackCount($action, $awaiting, $checkpoints),
+            'health'      => $this->getBriefHealth($action, $awaiting),
+            'voyageCards' => $this->getVoyageCards($action, $awaiting, $checkpoints),
+            'fleetStatus' => $this->getFleetStatus($action, $awaiting),
+        ];
+    }
+
+    /**
+     * Sprint WD1 §4 / Sprint UI1 Phase 3 — regroups the already-computed
+     * flat Action/Awaiting/Checkpoint arrays by voyage_id into one card
+     * per Voyage: a dominant (highest-severity) item plus a count of any
+     * remaining items on the same voyage. This is still classification-
+     * adjacent (deciding dominance order), so it lives here, in
+     * TaskClassifier — never recomputed in Blade (UI1's explicit rule).
+     * Accepts already-computed arrays, triggers no new query.
+     */
+    protected function getVoyageCards(array $action, array $awaiting, array $checkpoints): array
+    {
+        // Priority order: Critical Action > High Action > Awaiting > Checkpoint.
+        $ranked = [];
+        foreach ($action as $item) {
+            $ranked[] = $item + ['zone' => 'action', '_rank' => $item['severity'] === 'critical' ? 0 : 1];
+        }
+        foreach ($awaiting as $item) {
+            $ranked[] = $item + ['zone' => 'awaiting', '_rank' => 2];
+        }
+        foreach ($checkpoints as $item) {
+            $ranked[] = $item + ['zone' => 'checkpoint', '_rank' => 3];
+        }
+
+        $byVoyage = collect($ranked)->groupBy('voyage_id');
+
+        return $byVoyage->map(function ($items) {
+            $sorted = $items->sortBy('_rank')->values();
+            $dominant = $sorted->first();
+
+            return [
+                'voyage_id'       => $dominant['voyage_id'],
+                'vessel_name'     => $dominant['vessel_name'],
+                'zone'            => $dominant['zone'],
+                'dominant'        => $dominant,
+                'secondary_count' => $sorted->count() - 1,
+            ];
+        })->sortBy('dominant._rank')->values()->all();
+    }
+
+    /**
+     * Sprint WD1 §3 / Sprint UI1 Phase 2 — plain-language fleet condition.
+     * "Requiring attention" and "critical" are distinct-voyage counts
+     * (union across zones by voyage_id), not task counts — a voyage with
+     * two simultaneous tasks still counts once. Today's departures/
+     * arrivals are the one disclosed additive derivation (WD1 §12): a
+     * zero-query read of already-loaded $rows against today's date.
+     */
+    protected function getFleetStatus(array $action, array $awaiting): int|array
+    {
+        $needingAttention = collect($action)->merge($awaiting)
+            ->pluck('voyage_id')->unique()->count();
+
+        $critical = collect($action)->merge($awaiting)
+            ->where('severity', 'critical')
+            ->pluck('voyage_id')->unique()->count();
+
+        $today = now()->startOfDay();
+
+        return [
+            'total_active'       => $this->rows->count(),
+            'needing_attention'  => $needingAttention,
+            'critical'           => $critical,
+            'departures_today'   => $this->rows->filter(fn ($v) => $v->etd?->isSameDay($today))->count(),
+            'arrivals_today'     => $this->rows->filter(fn ($v) => $v->eta?->isSameDay($today))->count(),
+        ];
+    }
+
+    /**
+     * Currently actionable, highest-consequence items — the Coordinator's
+     * Control layer right now (P8 §1). Delay Reason Recording is
+     * mandatory the instant a departure is late/overdue and no reason is
+     * yet recorded (P3 §6 dependency-chain head). Readiness at H-1 is the
+     * imminent, "must act" checkpoint (P8 §5).
+     */
+    public function getBriefAction(): array
+    {
+        $items = [];
+
+        foreach ($this->rows as $v) {
+            $isCritical = $v->overdue_days > 0 || $v->eta_overdue;
+
+            if ($isCritical && ! $v->manual_delay_reason) {
+                $items[] = [
+                    'voyage_id'    => $v->id,
+                    'vessel_name'  => $v->vessel?->name ?? '-',
+                    'label'        => $v->overdue_days
+                        ? 'Terlambat '.$v->overdue_days.' Hari — penyebab belum dicatat'
+                        : 'Belum Tiba — penyebab belum dicatat',
+                    'severity'     => $v->overdue_days > 10 ? 'critical' : 'high',
+                    'action_label' => 'Catat Penyebab',
+                    'action_type'  => 'modal',
+                    'modal_type'   => 'delay',
+                ];
+            }
+        }
+
+        foreach ($this->carrierReadiness as $cr) {
+            if ($cr['day_code'] === 'H-1' && in_array($cr['status'], ['pending', 'late'], true)) {
+                $items[] = [
+                    'voyage_id'    => $cr['voyage_id'],
+                    'vessel_name'  => $cr['vessel_name'],
+                    'label'        => $cr['status'] === 'late'
+                        ? 'Readiness H-1 — sudah Terlambat'
+                        : 'Readiness H-1 — belum dikonfirmasi',
+                    'severity'     => $cr['status'] === 'late' ? 'critical' : 'high',
+                    'action_label' => $cr['status'] === 'pending' ? 'Input' : 'Update',
+                    'action_type'  => 'modal',
+                    'modal_type'   => 'readiness',
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Control has transferred externally (P8 §8) — the Coordinator has
+     * done their part (the delay reason is recorded) and is now tracking
+     * toward resolution, not actively working it. Stays visible (P3 §7)
+     * but never competes with Action for first attention.
+     */
+    public function getBriefAwaiting(): array
+    {
+        $items = [];
+
+        foreach ($this->rows as $v) {
+            $isCritical = $v->overdue_days > 0 || $v->eta_overdue;
+
+            if ($isCritical && $v->manual_delay_reason) {
+                $items[] = [
+                    'voyage_id'    => $v->id,
+                    'vessel_name'  => $v->vessel?->name ?? '-',
+                    'label'        => 'Menunggu penyelesaian — '.$v->manual_delay_reason->label(),
+                    'severity'     => $v->overdue_days > 10 ? 'critical' : 'high',
+                    'action_label' => 'Lihat',
+                    'action_type'  => 'drawer',
+                    'modal_type'   => null,
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Due today, not yet urgent (P1, P7 §2) — Medium tier (P3 §8):
+     * Readiness at H-2 still pending (2 days of runway), and voyages with
+     * only secondary issues (sailing risk, milestone overdue) and no
+     * critical issue.
+     */
+    public function getBriefCheckpoints(): array
+    {
+        $items = [];
+
+        foreach ($this->carrierReadiness as $cr) {
+            if ($cr['day_code'] !== 'H-1' && $cr['status'] === 'pending') {
+                $items[] = [
+                    'voyage_id'    => $cr['voyage_id'],
+                    'vessel_name'  => $cr['vessel_name'],
+                    'label'        => 'Readiness '.$cr['day_code'].' — belum dikonfirmasi',
+                    'severity'     => null,
+                    'action_label' => 'Input',
+                    'action_type'  => 'modal',
+                    'modal_type'   => 'readiness',
+                ];
+            }
+        }
+
+        foreach ($this->rows as $v) {
+            $isCritical = $v->overdue_days > 0 || $v->eta_overdue;
+            if ($isCritical) {
+                continue;
+            }
+
+            $reasons = [];
+            if ($v->sailing_risk) {
+                $reasons[] = 'Risiko Telat';
+            }
+            if ($v->milestones->where('is_overdue', true)->count()) {
+                $reasons[] = 'Update Terlambat';
+            }
+
+            if (! empty($reasons)) {
+                $items[] = [
+                    'voyage_id'    => $v->id,
+                    'vessel_name'  => $v->vessel?->name ?? '-',
+                    'label'        => implode(' · ', $reasons),
+                    'severity'     => null,
+                    'action_label' => 'Lihat',
+                    'action_type'  => 'drawer',
+                    'modal_type'   => null,
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Confirmation-only tier (P1) — voyages with nothing flagged in
+     * Action/Awaiting/Checkpoints. Deliberately returned as a count, not
+     * a list: the point of "on track" is that it requires no scanning.
+     *
+     * Accepts the already-computed arrays (ES2 §5/§16 correction) instead
+     * of recomputing them — this is the only behavioural correction
+     * authorized for Sprint I1; output is unchanged, only the
+     * computation path.
+     */
+    public function getBriefOnTrackCount(array $action, array $awaiting, array $checkpoints): int
+    {
+        $flaggedIds = collect($action)
+            ->merge($awaiting)
+            ->merge($checkpoints)
+            ->pluck('voyage_id')
+            ->filter()
+            ->unique();
+
+        return $this->rows->whereNotIn('id', $flaggedIds)->count();
+    }
+
+    /**
+     * Operational Health (P9) — a derived state, never an independent
+     * KPI or aggregation. Computed entirely from Action/Awaiting's
+     * current composition; requires no synchronization of its own
+     * (D3 §6). Saturation threshold (2+ simultaneous Critical items)
+     * comes directly from P4 §8.
+     *
+     * Accepts the already-computed arrays (ES2 §5/§16 correction) instead
+     * of recomputing them.
+     */
+    public function getBriefHealth(array $action, array $awaiting): array
+    {
+        $criticalCount = collect($action)
+            ->merge($awaiting)
+            ->where('severity', 'critical')
+            ->count();
+
+        if ($criticalCount >= 2) {
+            return [
+                'state'  => 'critical',
+                'label'  => 'Perlu Perhatian',
+                'reason' => $criticalCount.' voyage dalam kondisi kritis bersamaan — tangani berurutan sesuai prioritas.',
+            ];
+        }
+
+        if (count($action) > 0) {
+            return [
+                'state'  => 'busy',
+                'label'  => 'Sibuk, Terkendali',
+                'reason' => count($action).' voyage memerlukan tindakan segera.',
+            ];
+        }
+
+        return [
+            'state'  => 'healthy',
+            'label'  => 'Sehat',
+            'reason' => 'Tidak ada voyage yang memerlukan tindakan segera saat ini.',
         ];
     }
 }

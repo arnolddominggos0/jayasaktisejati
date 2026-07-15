@@ -20,9 +20,11 @@ use App\Models\City;
 use App\Models\Customer;
 use App\Models\Depot;
 use App\Models\Driver;
+use App\Models\Office;
 use App\Models\Shipment;
 use App\Models\Voyage;
 use App\Services\ShipmentService;
+use Illuminate\Support\Facades\Log;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Checkbox;
@@ -87,6 +89,41 @@ class ShipmentResource extends Resource
         }
 
         return Filament::auth()->user()?->effectiveBranchId();
+    }
+
+    /**
+     * Smart Origin by Office: User -> Branch -> Office -> City -> origin_city_id.
+     *
+     * Returns ['city_id' => int|null, 'city_name' => string|null, 'office_name' => string|null].
+     * When $branchId is null, resolves from the authenticated user's effective branch.
+     */
+    public static function resolveOriginCityFromUser(?int $branchId = null): array
+    {
+        if (! $branchId) {
+            $branchId = Filament::auth()->user()?->effectiveBranchId();
+        }
+
+        if (! $branchId) {
+            return ['city_id' => null, 'city_name' => null, 'office_name' => null];
+        }
+
+        $office = Office::where('branch_id', $branchId)
+            ->select(['id', 'name', 'city'])
+            ->first();
+
+        if (! $office || ! $office->city) {
+            return ['city_id' => null, 'city_name' => null, 'office_name' => $office?->name];
+        }
+
+        $city = City::whereRaw('LOWER(name) = ?', [strtolower(trim($office->city))])
+            ->where('is_active', true)
+            ->first();
+
+        return [
+            'city_id'     => $city?->id,
+            'city_name'   => $office->city,
+            'office_name' => $office->name,
+        ];
     }
 
     public static function getEloquentQuery(): Builder
@@ -401,6 +438,43 @@ class ShipmentResource extends Resource
                                         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
                                         'text/plain',
                                     ])
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                        $requestType = $get('request_type');
+
+                                        Log::info('SPPB AUDIT afterStateUpdated()', [
+                                            'stage' => 'afterStateUpdated',
+                                            'request_type' => $requestType,
+                                            'state' => $state,
+                                            'state_type' => gettype($state),
+                                        ]);
+
+                                        if ($requestType !== RequestType::SPPB_DO->value) {
+                                            Log::info('SPPB AUDIT afterStateUpdated() SKIP', [
+                                                'reason' => 'request_type is not sppb_do',
+                                                'request_type' => $requestType,
+                                            ]);
+                                            return;
+                                        }
+
+                                        if (empty($state)) {
+                                            Log::info('SPPB AUDIT afterStateUpdated() SKIP', [
+                                                'reason' => 'state is empty',
+                                            ]);
+                                            return;
+                                        }
+
+                                        $filled = app(\App\Services\SppbAssistService::class)
+                                            ->assist($state, $get, $set);
+
+                                        Log::info('SPPB AUDIT afterStateUpdated() RESULT', [
+                                            'filled' => $filled,
+                                        ]);
+
+                                        if (! empty($filled)) {
+                                            $set('_sppb_assisted_fields', $filled);
+                                        }
+                                    })
                                     ->columnSpan(['default' => 12, 'md' => 6]),
                                 Textarea::make('notes')
                                     ->label('Keterangan tambahan')
@@ -408,7 +482,10 @@ class ShipmentResource extends Resource
                                     ->maxLength(1000)
                                     ->columnSpan(['default' => 12, 'md' => 6]),
                             ])->columnSpan(12),
-                        ]),
+                            Hidden::make('_sppb_assisted_fields')
+                                ->default([])
+                                ->dehydrated(false),
+                            ]),
                     ])
                     ->compact(),
 
@@ -491,16 +568,35 @@ class ShipmentResource extends Resource
                             })
                             ->columnSpan(12),
 
-                        Select::make('origin_city_id')
-                            ->label('Asal (Kota Asal) *')
-                            ->placeholder('Pilih Kota Asal')
-                            ->relationship('originCity', 'name', fn ($query) => $query->active()->orderBy('name'))
-                            ->searchable()
-                            ->preload()
-                            ->required()
-                            ->helperText('cth: Jakarta')
-                            ->reactive()
+                        Placeholder::make('origin_city_display')
+                            ->label('Kota Asal')
+                            ->content(function ($record) {
+                                if ($record && $record->originCity) {
+                                    $officeName = $record->originOffice?->name ?? $record->branch?->name ?? '';
+
+                                    return $officeName
+                                        ? "📍 {$record->originCity->name} (Berdasarkan Office {$officeName})"
+                                        : "📍 {$record->originCity->name}";
+                                }
+
+                                $resolved = self::resolveOriginCityFromUser();
+
+                                if ($resolved['city_name']) {
+                                    return $resolved['office_name']
+                                        ? "📍 {$resolved['city_name']} (Berdasarkan Office {$resolved['office_name']})"
+                                        : "📍 {$resolved['city_name']}";
+                                }
+
+                                return '— Cabang Anda belum dikaitkan ke kota —';
+                            })
+                            ->extraAttributes([
+                                'class' => 'text-sm font-medium text-gray-700 dark:text-gray-300',
+                            ])
                             ->columnSpan(['default' => 12, 'md' => 6]),
+
+                        Hidden::make('origin_city_id')
+                            ->default(fn () => self::resolveOriginCityFromUser()['city_id'])
+                            ->dehydrated(),
 
                         Select::make('destination_city_id')
                             ->label('Tujuan (Kota Tujuan) *')
@@ -791,7 +887,7 @@ class ShipmentResource extends Resource
 
                                 Repeater::make('units')
                                     ->label('Unit Kendaraan (Laut)')
-                                    ->dehydrated(false)
+                                    // ->dehydrated(false)
                                     ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
                                     ->columns(12)
                                     ->defaultItems(1)
@@ -1174,6 +1270,53 @@ class ShipmentResource extends Resource
                         return $val === ShipmentMode::Sea->value ? 'Laut' : 'Darat';
                     }),
 
+                TextColumn::make('priority')
+                    ->label('Prioritas')
+                    ->badge()
+                    ->formatStateUsing(fn(?string $state) => match ($state) {
+                        'urgent' => 'Mendesak',
+                        'normal' => 'Normal',
+                        'high'   => 'Tinggi',
+                        'low'    => 'Rendah',
+                        default  => $state ?: '-'
+                    })
+                    ->color(fn(?string $state) => $state === 'urgent' ? 'danger' : 'gray')
+                    ->sortable(),
+
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
+                    ->getStateUsing(fn(Shipment $r): ShipmentStatus|string|null => $r->status?->label() ?? (is_string($r->status) ? $r->status : '-'))
+                    ->colors([
+                        'gray' => ['Draf'],
+                        'warning' => ['Menunggu', 'Ditahan'],
+                        'info' => ['Penjemputan', 'Dalam Perjalanan'],
+                        'success' => ['Terkirim'],
+                        'danger' => ['Dibatalkan'],
+                    ])
+                    ->sortable(),
+
+                TextColumn::make('eta')
+                    ->label('ETA')
+                    ->badge()
+                    ->dateTime('d M Y H:i')
+                    ->color(function ($state) {
+                        if (! $state) {
+                            return 'gray';
+                        }
+
+                        $eta = Carbon::parse($state);
+                        if ($eta->isPast()) {
+                            return 'danger';
+                        }
+                        if ($eta->diffInDays(now()) <= 2) {
+                            return 'warning';
+                        }
+
+                        return 'success';
+                    })
+                    ->sortable(),
+
                 TextColumn::make('customer.name')
                     ->label('Pengirim')
                     ->badge()
@@ -1269,18 +1412,6 @@ class ShipmentResource extends Resource
                     ])
                     ->toggleable(),
 
-                TextColumn::make('priority')
-                    ->label('Prioritas')
-                    ->badge()
-                    ->formatStateUsing(fn(?string $state) => match ($state) {
-                        'urgent' => 'Mendesak',
-                        'normal' => 'Normal',
-                        'high'   => 'Tinggi',
-                        'low'    => 'Rendah',
-                        default  => $state ?: '-'
-                    })
-                    ->color(fn(?string $state) => $state === 'urgent' ? 'danger' : 'gray'),
-
                 TextColumn::make('packages_total')
                     ->label('Koli')
                     ->getStateUsing(function (Shipment $r) {
@@ -1324,19 +1455,6 @@ class ShipmentResource extends Resource
                     ->label('Lampiran')
                     ->getStateUsing(fn(Shipment $r) => count($r->attachments ?? []))
                     ->badge()
-                    ->sortable(),
-
-                TextColumn::make('status')
-                    ->label('Status')
-                    ->badge()
-                    ->getStateUsing(fn(Shipment $r): ShipmentStatus|string|null => $r->status?->label() ?? (is_string($r->status) ? $r->status : '-'))
-                    ->colors([
-                        'gray' => ['Draf'],
-                        'warning' => ['Menunggu', 'Ditahan'],
-                        'info' => ['Penjemputan', 'Dalam Perjalanan'],
-                        'success' => ['Terkirim'],
-                        'danger' => ['Dibatalkan'],
-                    ])
                     ->sortable(),
 
                 TextColumn::make('kpi_tam_status')
@@ -1470,28 +1588,8 @@ class ShipmentResource extends Resource
                     ->badge()
                     ->dateTime('d M Y H:i')
                     ->color('gray')
-                    ->sortable(),
-
-                TextColumn::make('eta')
-                    ->label('ETA')
-                    ->badge()
-                    ->dateTime('d M Y H:i')
-                    ->color(function ($state) {
-                        if (! $state) {
-                            return 'gray';
-                        }
-
-                        $eta = Carbon::parse($state);
-                        if ($eta->isPast()) {
-                            return 'danger';
-                        }
-                        if ($eta->diffInDays(now()) <= 2) {
-                            return 'warning';
-                        }
-
-                        return 'success';
-                    })
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(),
 
                 TextColumn::make('updated_at')
                     ->label('Diubah')
@@ -1564,7 +1662,8 @@ class ShipmentResource extends Resource
                     ->toggle(),
             ], layout: FiltersLayout::AboveContent)
             ->filtersFormColumns(4)
-            ->defaultSort('updated_at', 'desc')
+            ->defaultSort('priority', 'desc')
+            ->defaultSort('eta', 'asc')
             ->actions([
                 EditAction::make()->label('Edit'),
 

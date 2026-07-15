@@ -9,7 +9,7 @@ use App\Enums\ServiceType;
 use App\Enums\ShipmentMode;
 use App\Enums\ShipmentStatus;
 use App\Enums\TrackStatus;
-use App\Services\MpCheckGate;
+use App\Services\LoadingSessionAutoCreate;
 use App\Services\ShipmentKpiEvaluator;
 use DomainException;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,7 +18,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
@@ -145,8 +144,8 @@ class Shipment extends Model
             $reqType = $m->request_type?->value ?? (string) $m->request_type;
             if (blank($m->doc_number)) {
                 $m->doc_number = $reqType === RequestType::SPPB_DO->value
-                    ? 'SPPB-' . now()->format('YmdHis')
-                    : 'AUTO-' . now()->format('Ymd-His');
+                    ? 'SPPB-'.now()->format('YmdHis')
+                    : 'AUTO-'.now()->format('Ymd-His');
             }
 
             if (blank($m->eta)) {
@@ -166,6 +165,21 @@ class Shipment extends Model
                 $u = Auth::user();
                 if (method_exists($u, 'hasRole') && $u->hasRole('field_coordinator')) {
                     $m->coordinator_id = $u->id;
+                }
+            }
+
+            // Smart Origin by Office: origin_city_id is derived from the
+            // branch's office city. Backend is the source of truth — always
+            // override regardless of what was sent in the request.
+            if ($m->branch_id) {
+                $officeCity = Office::where('branch_id', $m->branch_id)->value('city');
+                if ($officeCity) {
+                    $cityId = City::whereRaw('LOWER(name) = ?', [strtolower(trim($officeCity))])
+                        ->where('is_active', true)
+                        ->value('id');
+                    if ($cityId) {
+                        $m->origin_city_id = $cityId;
+                    }
                 }
             }
         });
@@ -237,6 +251,21 @@ class Shipment extends Model
                     $m->branch_id = Auth::user()->effectiveBranchId();
                 } elseif ($m->origin_office_id) {
                     $m->branch_id = Office::whereKey($m->origin_office_id)->value('branch_id');
+                }
+            }
+
+            // Smart Origin by Office: origin_city_id is derived from the
+            // branch's office city. Backend is the source of truth — always
+            // override regardless of what was sent in the request.
+            if ($m->branch_id) {
+                $officeCity = Office::where('branch_id', $m->branch_id)->value('city');
+                if ($officeCity) {
+                    $cityId = City::whereRaw('LOWER(name) = ?', [strtolower(trim($officeCity))])
+                        ->where('is_active', true)
+                        ->value('id');
+                    if ($cityId) {
+                        $m->origin_city_id = $cityId;
+                    }
                 }
             }
 
@@ -332,14 +361,14 @@ class Shipment extends Model
 
         if (! $resolvedDepotId) {
             $branchName = $this->branch?->name ?? ($user?->branch?->name ?? '-');
-            $modeLabel  = $this->mode?->label() ?? (string) $this->mode;
+            $modeLabel = $this->mode?->label() ?? (string) $this->mode;
             throw new DomainException(
                 "Depot untuk cabang \"{$branchName}\" dengan moda \"{$modeLabel}\" tidak ditemukan. Pastikan depot sudah dikonfigurasi di menu Depo."
             );
         }
 
         $this->forceFill([
-            'status'            => ShipmentStatus::Pending,
+            'status' => ShipmentStatus::Pending,
             'assigned_depot_id' => $resolvedDepotId,
         ])->saveQuietly();
 
@@ -353,11 +382,11 @@ class Shipment extends Model
     public function scopeReadyForBriefing($query, ?int $depotId = null)
     {
         $query->whereNotNull('assigned_depot_id')
-              ->whereNotIn('status', [
-                  ShipmentStatus::Delivered,
-                  ShipmentStatus::Cancelled,
-                  ShipmentStatus::Draft,
-              ]);
+            ->whereNotIn('status', [
+                ShipmentStatus::Delivered,
+                ShipmentStatus::Cancelled,
+                ShipmentStatus::Draft,
+            ]);
 
         if ($depotId !== null) {
             $query->where('assigned_depot_id', $depotId);
@@ -381,16 +410,16 @@ class Shipment extends Model
         $session = BriefingSession::firstOrCreate(
             ['shipment_id' => $this->id],
             [
-                'depot_id'          => $depotId,
-                'date'              => now()->toDateString(),
+                'depot_id' => $depotId,
+                'date' => now()->toDateString(),
                 'summary_headcount' => 5,
-                'mp_check_status'   => 'draft',
+                'mp_check_status' => 'draft',
             ]
         );
 
         if ($session->wasRecentlyCreated) {
             foreach (['helm', 'rompi', 'sepatu', 'sarung_tangan'] as $type) {
-                \App\Models\StockApdCheck::firstOrCreate(
+                StockApdCheck::firstOrCreate(
                     ['session_id' => $session->id, 'ppe_type' => $type],
                     ['required_quantity' => 5, 'stock_available' => null]
                 );
@@ -406,7 +435,7 @@ class Shipment extends Model
         $year = $year ?: $now->year;
         $month = $month ?: $now->month;
 
-        $prefix = 'JSS' . str_pad($month, 2, '0', STR_PAD_LEFT) . substr($year, -2);
+        $prefix = 'JSS'.str_pad($month, 2, '0', STR_PAD_LEFT).substr($year, -2);
         $modeCode = match (strtolower((string) $mode)) {
             'sea', 'sea_freight' => 'SH',
             'land', 'land_trucking', 'car_carrier', 'towing', 'truck' => 'TC',
@@ -416,16 +445,16 @@ class Shipment extends Model
         $prefix .= $modeCode;
 
         $last = static::query()
-            ->where('code', 'like', $prefix . '%')
+            ->where('code', 'like', $prefix.'%')
             ->orderByDesc('code')
             ->value('code');
 
         $seq = 1;
-        if ($last && preg_match('/^' . $prefix . '(\d{4})$/', $last, $matches)) {
+        if ($last && preg_match('/^'.$prefix.'(\d{4})$/', $last, $matches)) {
             $seq = (int) $matches[1] + 1;
         }
 
-        return $prefix . str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
     }
 
     public static function computeEta(string $modeCode, string $priority, ?Carbon $base = null): Carbon
@@ -498,7 +527,7 @@ class Shipment extends Model
             return $order[0] ?? null;
         }
 
-        $values = array_map(fn(TrackStatus $s) => $s->value, $order);
+        $values = array_map(fn (TrackStatus $s) => $s->value, $order);
         $currValue = $current->value;
         $idx = array_search($currValue, $values, strict: true);
 
@@ -535,10 +564,6 @@ class Shipment extends Model
 
         $this->ensureTrackSkeleton();
 
-        if ($this->requiresMpCheck($status)) {
-            $this->handleMpCheck($status, $override);
-        }
-
         $track = $this->tracks()
             ->where('status', $status->value)
             ->first();
@@ -551,7 +576,7 @@ class Shipment extends Model
         }
 
         if ($track->tracked_at) {
-            throw new DomainException('Status "' . $status->label() . '" sudah pernah dicapai pada ' . $track->tracked_at->format('d M Y H:i') . '.');
+            throw new DomainException('Status "'.$status->label().'" sudah pernah dicapai pada '.$track->tracked_at->format('d M Y H:i').'.');
         }
 
         $track->tracked_at = now();
@@ -621,7 +646,7 @@ class Shipment extends Model
         $targetIndex = array_search($status->value, $orderValues, true);
 
         if ($targetIndex === false) {
-            throw new DomainException('Status "' . $status->label() . '" tidak valid untuk shipment laut.');
+            throw new DomainException('Status "'.$status->label().'" tidak valid untuk shipment laut.');
         }
 
         if ($targetIndex <= $currentIndex) {
@@ -633,23 +658,23 @@ class Shipment extends Model
         // Allow rack shipment to skip Stuffing and go Handover -> DeliveryToPort
         $isValidSkip = $current?->value === TrackStatus::Handover->value
             && $status === TrackStatus::DeliveryToPort
-            && \App\Services\LoadingSessionAutoCreate::isRackShipment($this);
+            && LoadingSessionAutoCreate::isRackShipment($this);
 
         if (! $isImmediateNext && ! $isValidSkip) {
             $expected = $order[$currentIndex + 1] ?? null;
             $expectedLabel = $expected?->label() ?? 'tidak ada';
 
             throw new DomainException(
-                'Status hanya dapat dilanjutkan ke tahap berikutnya secara berurutan. Status berikutnya yang diharapkan: ' . $expectedLabel . '.'
+                'Status hanya dapat dilanjutkan ke tahap berikutnya secara berurutan. Status berikutnya yang diharapkan: '.$expectedLabel.'.'
             );
         }
     }
 
     protected function ensureHandoverInspectionCleared(TrackStatus $status): void
     {
-        $isRack = \App\Services\LoadingSessionAutoCreate::isRackShipment($this);
+        $isRack = LoadingSessionAutoCreate::isRackShipment($this);
 
-        $isStuffingGate     = $status === TrackStatus::Stuffing && ! $isRack;
+        $isStuffingGate = $status === TrackStatus::Stuffing && ! $isRack;
         $isRackDeliveryGate = $status === TrackStatus::DeliveryToPort && $isRack;
 
         if (! $isStuffingGate && ! $isRackDeliveryGate) {
@@ -663,39 +688,39 @@ class Shipment extends Model
         }
 
         // Validation 1: inspection record must exist for every unit
-        $withInspection = \App\Models\UnitInspection::query()
+        $withInspection = UnitInspection::query()
             ->where('stage', 'handover_depot')
             ->whereIn('unit_id', $unitIds)
             ->pluck('unit_id');
 
         if ($withInspection->count() < $unitIds->count()) {
-            throw new \DomainException(
+            throw new DomainException(
                 'Inspeksi Handover Depo belum tersedia untuk seluruh unit.'
             );
         }
 
         // Validation 2: all inspections must be submitted
-        $unsubmitted = \App\Models\UnitInspection::query()
+        $unsubmitted = UnitInspection::query()
             ->where('stage', 'handover_depot')
             ->whereIn('unit_id', $unitIds)
             ->whereNull('submitted_at')
             ->count();
 
         if ($unsubmitted > 0) {
-            throw new \DomainException(
+            throw new DomainException(
                 'Masih ada unit yang belum menyelesaikan inspeksi Handover Depo.'
             );
         }
 
         // Validation 3: no unit may have return_to_pdc decision
-        $rejected = \App\Models\UnitInspection::query()
+        $rejected = UnitInspection::query()
             ->where('stage', 'handover_depot')
             ->whereIn('unit_id', $unitIds)
-            ->where('gate_decision', \App\Models\UnitInspection::GATE_RETURN_TO_PDC)
+            ->where('gate_decision', UnitInspection::GATE_RETURN_TO_PDC)
             ->count();
 
         if ($rejected > 0) {
-            throw new \DomainException(
+            throw new DomainException(
                 'Ada unit yang ditandai Return To PDC. Selesaikan permasalahan unit terlebih dahulu.'
             );
         }
@@ -707,34 +732,44 @@ class Shipment extends Model
      */
     protected function ensureContainerAssigned(TrackStatus $status): void
     {
-        if ($status !== TrackStatus::Stuffing) {
-            return;
-        }
+        // if ($status !== TrackStatus::Stuffing) {
+        //     return;
+        // }
 
-        $isVehicle = ($this->cargo_type instanceof \App\Enums\CargoType)
-            ? $this->cargo_type === \App\Enums\CargoType::Vehicle
-            : $this->cargo_type === \App\Enums\CargoType::Vehicle->value;
+        // $isVehicle = ($this->cargo_type instanceof \App\Enums\CargoType)
+        //     ? $this->cargo_type === \App\Enums\CargoType::Vehicle
+        //     : $this->cargo_type === \App\Enums\CargoType::Vehicle->value;
 
-        if (! $isVehicle) {
-            return;
-        }
+        // if (! $isVehicle) {
+        //     return;
+        // }
 
-        $totalUnits      = $this->units()->count();
-        $unassignedCount = $this->units()->whereNull('container_display')->count();
+        // $units = $this->units()->get();
 
-        if ($totalUnits === 0 || $unassignedCount === 0) {
-            return;
-        }
+        // if ($units->isEmpty()) {
+        //     return;
+        // }
 
-        throw new DomainException(
-            "Semua unit harus memiliki container assignment sebelum proses Stuffing dapat dilakukan. " .
-            "{$unassignedCount} dari {$totalUnits} unit belum memiliki container."
-        );
+        // $unassigned = $units->filter(function ($unit) {
+        //     return blank(trim((string) $unit->container_display));
+        // });
+
+        // if ($unassigned->isEmpty()) {
+        //     return;
+        // }
+
+        // throw new DomainException(
+        //     sprintf(
+        //         'Semua unit harus memiliki container assignment sebelum proses Stuffing dapat dilakukan. %d dari %d unit belum memiliki container.',
+        //         $unassigned->count(),
+        //         $units->count()
+        //     )
+        // );
     }
 
     protected function ensureLoadingInspectionCleared(TrackStatus $status): void
     {
-        $isRack = \App\Services\LoadingSessionAutoCreate::isRackShipment($this);
+        $isRack = LoadingSessionAutoCreate::isRackShipment($this);
 
         // Gate applies only for non-rack ships advancing to DeliveryToPort.
         // Rack ships go Handover → DeliveryToPort (no Stuffing, no loading inspection).
@@ -750,39 +785,39 @@ class Shipment extends Model
         }
 
         // Validation 1: loading inspection record must exist for every unit
-        $withInspection = \App\Models\UnitInspection::query()
+        $withInspection = UnitInspection::query()
             ->where('stage', 'loading')
             ->whereIn('unit_id', $unitIds)
             ->pluck('unit_id');
 
         if ($withInspection->count() < $unitIds->count()) {
-            throw new \DomainException(
+            throw new DomainException(
                 'Inspeksi Loading belum tersedia untuk seluruh unit.'
             );
         }
 
         // Validation 2: all loading inspections must be submitted
-        $unsubmitted = \App\Models\UnitInspection::query()
+        $unsubmitted = UnitInspection::query()
             ->where('stage', 'loading')
             ->whereIn('unit_id', $unitIds)
             ->whereNull('submitted_at')
             ->count();
 
         if ($unsubmitted > 0) {
-            throw new \DomainException(
+            throw new DomainException(
                 'Masih ada unit yang belum menyelesaikan inspeksi Loading.'
             );
         }
 
         // Validation 3: no unit may have return_to_pdc on loading inspection
-        $rejected = \App\Models\UnitInspection::query()
+        $rejected = UnitInspection::query()
             ->where('stage', 'loading')
             ->whereIn('unit_id', $unitIds)
-            ->where('gate_decision', \App\Models\UnitInspection::GATE_RETURN_TO_PDC)
+            ->where('gate_decision', UnitInspection::GATE_RETURN_TO_PDC)
             ->count();
 
         if ($rejected > 0) {
-            throw new \DomainException(
+            throw new DomainException(
                 'Ada unit yang ditandai Return To PDC pada inspeksi Loading. Selesaikan permasalahan unit terlebih dahulu.'
             );
         }
@@ -794,63 +829,14 @@ class Shipment extends Model
             return;
         }
 
-        if (! \App\Services\LoadingSessionAutoCreate::isRackShipment($this)) {
+        if (! LoadingSessionAutoCreate::isRackShipment($this)) {
             return;
         }
 
-        if (! \App\Services\LoadingSessionAutoCreate::canTransitionTo($this, $status)) {
+        if (! LoadingSessionAutoCreate::canTransitionTo($this, $status)) {
             throw new DomainException(
                 'Loading Session untuk shipment rack belum selesai. Selesaikan semua pemeriksaan loading di AppSheet terlebih dahulu.'
             );
-        }
-    }
-
-    protected function requiresMpCheck(TrackStatus $status): bool
-    {
-        // SC.3B.20 — gate at Pickup only (work-start authorisation).
-        // Briefing cleared = permission to begin all subsequent operations.
-        return $status === TrackStatus::Pickup;
-    }
-
-    protected function handleMpCheck(TrackStatus $status, ?array $override): void
-    {
-        try {
-            MpCheckGate::ensureApproved($this);
-        } catch (DomainException $e) {
-            $isSea = ($this->mode?->value ?? $this->mode) === 'sea';
-
-            if (! Auth::user()?->hasRole('super_admin')) {
-                throw $e;
-            }
-
-            if ($isSea) {
-                if (! is_array($override) || empty($override['reason'])) {
-                    throw new DomainException(
-                        'MP Check belum Cleared. Super admin harus menyertakan alasan override (minimal 20 karakter).'
-                    );
-                }
-
-                $reason = trim((string) $override['reason']);
-                if (strlen($reason) < 20) {
-                    throw new DomainException(
-                        'Alasan override untuk sea shipment harus minimal 20 karakter.'
-                    );
-                }
-            } else {
-                if (! is_array($override) || empty($override['reason'])) {
-                    throw $e;
-                }
-            }
-
-            DB::table('mp_check_overrides')->insert([
-                'shipment_id'  => $this->id,
-                'depot_id'     => $this->assigned_depot_id,
-                'track_status' => $status->value,
-                'override_by'  => Auth::id(),
-                'reason'       => $override['reason'],
-                'created_at'   => now(),
-                'updated_at'   => now(),
-            ]);
         }
     }
 
@@ -879,7 +865,7 @@ class Shipment extends Model
 
         $existingStatuses = $this->tracks()
             ->pluck('status')
-            ->map(fn($s) => $s instanceof TrackStatus ? $s->value : (string) $s)
+            ->map(fn ($s) => $s instanceof TrackStatus ? $s->value : (string) $s)
             ->toArray();
 
         foreach ($necessaryStatuses as $st) {
@@ -893,12 +879,12 @@ class Shipment extends Model
 
     public function scopeActive($query)
     {
-        return $query->whereIn('status', array_map(fn($event) => $event->value, ShipmentStatus::active()));
+        return $query->whereIn('status', array_map(fn ($event) => $event->value, ShipmentStatus::active()));
     }
 
     public function scopeHistory($q)
     {
-        return $q->whereIn('status', array_map(fn($e) => $e->value, ShipmentStatus::completed()));
+        return $q->whereIn('status', array_map(fn ($e) => $e->value, ShipmentStatus::completed()));
     }
 
     public function getCompletedAtAttribute(): ?Carbon
@@ -1088,9 +1074,6 @@ class Shipment extends Model
      * Resolution chain: shipment.pod_id → depots.port_id
      * FK-complete — no migration needed.
      * Returns null if pod_id is unset or no depot serves that port.
-     *
-     * Used by handleMpCheck() to validate the correct depot's MP briefing
-     * for destination-side operations (Unloading).
      */
     public function destinationDepot(): ?Depot
     {
@@ -1194,7 +1177,7 @@ class Shipment extends Model
             ?? $this->pod_name
             ?? $this->to;
 
-        return trim(($origin ?: '—') . ' → ' . ($dest ?: '—'));
+        return trim(($origin ?: '—').' → '.($dest ?: '—'));
     }
 
     public function getAttachmentUrlsAttribute(): array
@@ -1203,7 +1186,7 @@ class Shipment extends Model
 
         return array_values(
             array_map(
-                fn($p) => Storage::disk('public')->url($p),
+                fn ($p) => Storage::disk('public')->url($p),
                 $paths
             )
         );
@@ -1221,7 +1204,7 @@ class Shipment extends Model
     public function getContainerMapAttribute(): array
     {
         $containers = collect($this->containers ?? [])
-            ->filter(fn($c) => ! empty($c['container_no']))
+            ->filter(fn ($c) => ! empty($c['container_no']))
             ->mapWithKeys(function ($c) {
                 $no = trim((string) $c['container_no']);
 
@@ -1280,7 +1263,7 @@ class Shipment extends Model
                 $detail[] = "{$c['unit_count']} unit";
             }
 
-            $det = $detail ? ' • ' . implode(', ', $detail) : '';
+            $det = $detail ? ' • '.implode(', ', $detail) : '';
             $parts[] = "{$c['container_no']}{$seal}{$det}";
         }
 

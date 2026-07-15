@@ -17,15 +17,41 @@ class VesselPlanAnalysis extends StatsOverviewWidget
             return [];
         }
 
+        $itemCount = $this->record->items->count();
+        $unitSuffix = fn(string $unit) => '<span class="text-base font-normal text-gray-500"> ' . $unit . '</span>';
+
+        // Belum ada jadwal = belum ada apa pun untuk dianalisis. Tampilkan
+        // placeholder netral, bukan hasil analyze() (yang defaultnya
+        // gap_ok=true/max_gap=0 untuk plan kosong) — itu memberi kesan
+        // palsu bahwa evaluasi sudah dilakukan dan semuanya "OK".
+        if ($itemCount === 0) {
+            return [
+                Stat::make('Jadwal', 0)
+                    ->description('Jumlah jadwal yang direncanakan')
+                    ->descriptionColor('gray'),
+
+                Stat::make('Rencana Muatan', '—')
+                    ->description('Belum ada data')
+                    ->descriptionColor('gray'),
+
+                Stat::make('ETD Gap', '—')
+                    ->description('Belum ada data')
+                    ->descriptionColor('gray'),
+
+                Stat::make('Gap Status', 'Belum dievaluasi')
+                    ->description('Tambahkan jadwal untuk mulai evaluasi')
+                    ->descriptionColor('gray'),
+            ];
+        }
+
         $analysis = $this->record->analyze();
 
         $maxGap = $analysis['max_gap'] ?? 0;
         $gapLimit = $analysis['gap_limit'] ?? 6;
         $gapOk = $analysis['gap_ok'] ?? false;
-        $unitSuffix = fn(string $unit) => '<span class="text-base font-normal text-gray-500"> ' . $unit . '</span>';
 
         return [
-            Stat::make('Jadwal', $this->record->items->count())
+            Stat::make('Jadwal', $itemCount)
                 ->description('Jumlah jadwal yang direncanakan')
                 ->descriptionColor('gray'),
 

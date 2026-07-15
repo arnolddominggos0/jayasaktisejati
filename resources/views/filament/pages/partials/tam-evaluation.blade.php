@@ -1,43 +1,52 @@
-<div class="bg-white border border-gray-200/40 rounded-lg overflow-hidden">
+{{-- Supporting section, not a workspace card — no bg/border/shadow box.
+     Same tier as Calendar (Divider over Border, Section over Card). --}}
+<div>
 
-    <div class="px-4 py-2.5 border-b border-gray-100/60 flex items-center justify-between">
-        <h2 class="text-[11px] font-semibold text-gray-700 uppercase tracking-wider">
+    <div class="pb-2 border-b border-gray-100 flex items-center justify-between">
+        <h3 class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
             Evaluasi Operasional — {{ \Illuminate\Support\Carbon::createFromFormat('Y-m', $period)->translatedFormat('F Y') }}
-        </h2>
+        </h3>
     </div>
 
-    <div class="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
 
-        {{-- ── Delay Summary ──────────────────────────────────────────── --}}
+        {{-- ── Delay Summary — WX5 §3/§4/§5 ─────────────────────────────
+             Number-first hierarchy (angka → label → satuan), flat — no
+             card/border/shadow. All four cells share the exact same
+             treatment, including the fourth (previously a red-tinted box
+             that outweighed its neighbors): "Terlambat Terlama" is a
+             historical statistic, not a live severity alert, so it gets
+             no reserve-hue treatment — equal visual weight across all
+             four, per WX5 §5. --}}
         <div class="space-y-2">
-            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Delay Summary</p>
-            <div class="grid grid-cols-2 gap-2">
-                <div class="bg-gray-50/60 rounded p-2.5">
-                    <p class="text-[9px] text-gray-400">Total Delay</p>
-                    <p class="text-lg font-bold text-gray-800">{{ $evaluation['total_delay'] }}</p>
+            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Ringkasan Keterlambatan</p>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-2xl font-bold text-gray-900 tabular-nums leading-none">{{ $evaluation['total_delay'] }}</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Voyage Terlambat</p>
                     <p class="text-[9px] text-gray-400">voyage</p>
                 </div>
-                <div class="bg-gray-50/60 rounded p-2.5">
-                    <p class="text-[9px] text-gray-400">Total Hari</p>
-                    <p class="text-lg font-bold text-gray-800">{{ $evaluation['total_days'] }}</p>
+                <div>
+                    <p class="text-2xl font-bold text-gray-900 tabular-nums leading-none">{{ $evaluation['total_days'] }}</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Total Hari Terlambat</p>
                     <p class="text-[9px] text-gray-400">hari</p>
                 </div>
-                <div class="bg-gray-50/60 rounded p-2.5">
-                    <p class="text-[9px] text-gray-400">Rata-rata</p>
-                    <p class="text-lg font-bold text-gray-800">{{ $evaluation['avg_days'] }}</p>
+                <div>
+                    <p class="text-2xl font-bold text-gray-900 tabular-nums leading-none">{{ $evaluation['avg_days'] }}</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Rata-rata Terlambat</p>
                     <p class="text-[9px] text-gray-400">hari/voyage</p>
                 </div>
-                <div class="bg-red-50/40 rounded p-2.5">
-                    <p class="text-[9px] text-red-400">Max Delay</p>
-                    <p class="text-lg font-bold text-red-700">{{ $evaluation['max_days'] }}</p>
-                    <p class="text-[9px] text-red-400">hari</p>
+                <div>
+                    <p class="text-2xl font-bold text-gray-900 tabular-nums leading-none">{{ $evaluation['max_days'] }}</p>
+                    <p class="text-[10px] text-gray-500 mt-1">Terlambat Terlama</p>
+                    <p class="text-[9px] text-gray-400">hari</p>
                 </div>
             </div>
         </div>
 
         {{-- ── Root Cause Summary ─────────────────────────────────────── --}}
         <div class="space-y-2">
-            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Root Cause</p>
+            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Penyebab Keterlambatan</p>
             @if ($evaluation['reasons']->isEmpty())
                 <p class="text-[10px] text-gray-400 italic">Belum ada penyebab dicatat.</p>
             @else
@@ -66,9 +75,9 @@
 
         {{-- ── Top 5 Delay Voyage ─────────────────────────────────────── --}}
         <div class="space-y-2">
-            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Top Delay Voyage</p>
+            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Voyage Paling Terlambat</p>
             @if ($evaluation['top5']->isEmpty())
-                <p class="text-[10px] text-gray-400 italic">Tidak ada voyage delay.</p>
+                <p class="text-[10px] text-gray-400 italic">Tidak ada voyage terlambat.</p>
             @else
                 <div class="space-y-1">
                     @foreach ($evaluation['top5'] as $i => $tv)
@@ -79,7 +88,7 @@
                                 <p class="text-gray-400 font-mono text-[9px]">{{ $tv->voyage_no }}</p>
                             </div>
                             <span class="text-red-600 font-bold whitespace-nowrap">
-                                {{ $tv->departure_delay_days }}d
+                                {{ $tv->departure_delay_days }} Hari
                             </span>
                         </div>
                     @endforeach

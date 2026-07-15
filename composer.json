@@ -23,6 +23,7 @@
         "milon/barcode": "^12.0",
         "picqer/php-barcode-generator": "^3.2",
         "simplesoftwareio/simple-qrcode": "^4.2",
+        "smalot/pdfparser": "^2.12",
         "spatie/laravel-activitylog": "^4.10",
         "spatie/laravel-permission": "^6.21"
     },

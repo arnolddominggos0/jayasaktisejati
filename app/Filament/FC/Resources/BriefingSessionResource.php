@@ -177,47 +177,47 @@ class BriefingSessionResource extends Resource
                         ->rows(3),
                 ]),
 
-            Section::make('Shipment Kandidat')
-                ->description('Pilih shipment yang akan dikerjakan pada sesi briefing ini.')
-                ->schema([
-                    Select::make('shipments')
-                        ->label('Shipment')
-                        ->multiple()
-                        ->required()
-                        ->minItems(1)
-                        ->relationship(
-                            name: 'shipments',
-                            titleAttribute: 'code',
-                            modifyQueryUsing: function (Builder $query, Get $get) {
-                                $depotId = $get('depot_id');
+            // Section::make('Shipment Kandidat')
+            //     ->description('Pilih shipment yang akan dikerjakan pada sesi briefing ini.')
+            //     ->schema([
+            //         Select::make('shipments')
+            //             ->label('Shipment')
+            //             ->multiple()
+            //             ->required()
+            //             ->minItems(1)
+            //             ->relationship(
+            //                 name: 'shipments',
+            //                 titleAttribute: 'code',
+            //                 modifyQueryUsing: function (Builder $query, Get $get) {
+            //                     $depotId = $get('depot_id');
 
-                                // Select only non-JSON columns so PostgreSQL DISTINCT works.
-                                // Filament's multi-select relationship adds DISTINCT internally;
-                                // shipments has JSON columns (attachments, containers, etc.)
-                                // that break DISTINCT on shipments.*.
-                                return $query
-                                    ->select([
-                                        'shipments.id',
-                                        'shipments.code',
-                                        'shipments.customer_id',
-                                        'shipments.status',
-                                        'shipments.assigned_depot_id',
-                                    ])
-                                    ->readyForBriefing($depotId ?: null)
-                                    ->orderBy('shipments.code');
-                            }
-                        )
-                        ->getOptionLabelFromRecordUsing(fn (Shipment $r) =>
-                            $r->code . ' — ' . ($r->customer?->name ?? '-')
-                        )
-                        ->searchable(['code'])
-                        ->preload(false)
-                        ->columnSpanFull()
-                        ->validationMessages([
-                            'required' => 'Minimal 1 shipment harus dipilih.',
-                            'min'      => 'Minimal 1 shipment harus dipilih.',
-                        ]),
-                ]),
+            //                     // Select only non-JSON columns so PostgreSQL DISTINCT works.
+            //                     // Filament's multi-select relationship adds DISTINCT internally;
+            //                     // shipments has JSON columns (attachments, containers, etc.)
+            //                     // that break DISTINCT on shipments.*.
+            //                     return $query
+            //                         ->select([
+            //                             'shipments.id',
+            //                             'shipments.code',
+            //                             'shipments.customer_id',
+            //                             'shipments.status',
+            //                             'shipments.assigned_depot_id',
+            //                         ])
+            //                         ->readyForBriefing($depotId ?: null)
+            //                         ->orderBy('shipments.code');
+            //                 }
+            //             )
+            //             ->getOptionLabelFromRecordUsing(fn (Shipment $r) =>
+            //                 $r->code . ' — ' . ($r->customer?->name ?? '-')
+            //             )
+            //             ->searchable(['code'])
+            //             ->preload(false)
+            //             ->columnSpanFull()
+            //             ->validationMessages([
+            //                 'required' => 'Minimal 1 shipment harus dipilih.',
+            //                 'min'      => 'Minimal 1 shipment harus dipilih.',
+            //             ]),
+            //     ]),
 
             Section::make('Shipment Readiness')
                 ->columns(4)

@@ -84,19 +84,28 @@ class VesselPlanItemRelationManager extends RelationManager
                         ->relationship('shippingLine', 'name')
                         ->required()
                         ->live()
-                        ->afterStateUpdated(fn ($set) => $set('vessel_id', null)),
+                        ->afterStateUpdated(fn($set) => $set('vessel_id', null)),
 
                     Select::make('vessel_id')
                         ->label('Kapal')
                         ->relationship(
                             'vessel',
                             'name',
-                            fn ($query, Get $get) => $query->where('shipping_line_id', $get('shipping_line_id'))
+                            fn($query, Get $get) => $query->where('shipping_line_id', $get('shipping_line_id'))
                         )
                         ->required()
-                        ->disabled(fn (Get $get) => blank($get('shipping_line_id'))),
+                        ->disabled(fn(Get $get) => blank($get('shipping_line_id'))),
                 ])
                 ->columns(2),
+                
+            Forms\Components\Section::make('Informasi Voyage')
+                ->schema([
+                    TextInput::make('voyage_no')
+                        ->label('No Voyage')
+                        ->maxLength(50)
+                        ->helperText('Nomor voyage dari shipping line.'),
+                ])
+                ->columns(1),
 
             Forms\Components\Section::make('Jadwal')
                 ->schema([
@@ -117,18 +126,9 @@ class VesselPlanItemRelationManager extends RelationManager
                 ])
                 ->columns(2),
 
-            Forms\Components\Section::make('Informasi Voyage')
-                ->schema([
-                    TextInput::make('voyage_no')
-                        ->label('No Voyage')
-                        ->maxLength(50)
-                        ->helperText('Nomor voyage dari shipping line.'),
-                ])
-                ->columns(1),
-
             Forms\Components\Section::make('Rencana Muatan')
                 ->description('Dicatat setelah menerima Final Schedule dari TAM.')
-                ->visible(fn () => ! ($this->getOwnerRecord()?->isDraft() ?? true))
+                ->visible(fn() => ! ($this->getOwnerRecord()?->isDraft() ?? true))
                 ->schema([
                     TextInput::make('cargo_plan')
                         ->label('Rencana Muatan (unit)')
@@ -146,7 +146,7 @@ class VesselPlanItemRelationManager extends RelationManager
             ->modifyQueryUsing(function (Builder $query) {
                 return $query->when(
                     filled($this->vpShippingLineFilter),
-                    fn (Builder $q) => $q->where('shipping_line_id', $this->vpShippingLineFilter)
+                    fn(Builder $q) => $q->where('shipping_line_id', $this->vpShippingLineFilter)
                 );
             })
             ->columns([
@@ -157,7 +157,7 @@ class VesselPlanItemRelationManager extends RelationManager
                     ->width('w-[28rem]')
                     ->description(function ($record) {
                         $parts = array_filter([
-                            $record->voyage_no ? 'V.'.$record->voyage_no : null,
+                            $record->voyage_no ? 'V.' . $record->voyage_no : null,
                             $record->shippingLine?->name,
                         ]);
 
@@ -168,21 +168,21 @@ class VesselPlanItemRelationManager extends RelationManager
                     ->label('ETB')
                     ->alignCenter()
                     ->width('w-32')
-                    ->formatStateUsing(fn ($state) => $state?->translatedFormat('d M Y'))
+                    ->formatStateUsing(fn($state) => $state?->translatedFormat('d M Y'))
                     ->placeholder('—'),
 
                 TextColumn::make('planned_etd')
                     ->label('ETD')
                     ->alignCenter()
                     ->width('w-32')
-                    ->formatStateUsing(fn ($state) => $state?->translatedFormat('d M Y'))
+                    ->formatStateUsing(fn($state) => $state?->translatedFormat('d M Y'))
                     ->placeholder('—'),
 
                 TextColumn::make('planned_eta')
                     ->label('ETA')
                     ->alignCenter()
                     ->width('w-32')
-                    ->formatStateUsing(fn ($state) => $state?->translatedFormat('d M Y'))
+                    ->formatStateUsing(fn($state) => $state?->translatedFormat('d M Y'))
                     ->placeholder('—'),
 
                 // Kosong ditampilkan sebagai "Belum diisi" (abu), bukan dash —
@@ -192,8 +192,8 @@ class VesselPlanItemRelationManager extends RelationManager
                     ->alignCenter()
                     ->width('w-28')
                     ->placeholder('Belum diisi')
-                    ->color(fn ($state) => filled($state) ? null : 'gray')
-                    ->visible(fn () => ! ($this->getOwnerRecord()?->isDraft() ?? true)),
+                    ->color(fn($state) => filled($state) ? null : 'gray')
+                    ->visible(fn() => ! ($this->getOwnerRecord()?->isDraft() ?? true)),
 
                 TextColumn::make('planned_sailing')
                     ->label('Sailing')
@@ -204,10 +204,10 @@ class VesselPlanItemRelationManager extends RelationManager
                             return null;
                         }
 
-                        return $record->planned_etd->diffInDays($record->planned_eta).' hari';
+                        return $record->planned_etd->diffInDays($record->planned_eta) . ' hari';
                     })
                     ->placeholder('Belum diisi')
-                    ->color(fn ($state) => filled($state) ? null : 'gray'),
+                    ->color(fn($state) => filled($state) ? null : 'gray'),
 
                 TextColumn::make('etd_gap')
                     ->label('ETD Gap')
@@ -242,24 +242,29 @@ class VesselPlanItemRelationManager extends RelationManager
             // Pesan empty state berbeda tergantung apakah filter Shipping
             // Line sedang aktif, supaya jelas apakah memang belum ada
             // jadwal sama sekali atau hanya tidak ada untuk filter ini.
-            ->emptyStateHeading('Belum ada jadwal kapal')
+            ->emptyStateHeading('Belum ada jadwal pada Vessel Plan ini')
             ->emptyStateDescription(function () {
                 return filled($this->vpShippingLineFilter)
                     ? 'Belum ada jadwal untuk Shipping Line ini.'
-                    : 'Tambah jadwal pertama untuk memulai penyusunan plan.';
+                    : 'Tambahkan jadwal kapal pertama untuk mulai menyusun rencana pengiriman bulan ini.';
             })
             ->emptyStateActions([
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah Jadwal')
                     ->icon('heroicon-o-plus')
-                    ->visible(fn () => $this->getOwnerRecord()?->isEditable()),
+                    ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
             ])
 
+            // Toolbar CTA disembunyikan saat tabel benar-benar kosong supaya
+            // tidak dobel dengan CTA di dalam empty state (aksi yang sama,
+            // area yang sama). Begitu ada 1 jadwal, empty state hilang dan
+            // toolbar CTA ini jadi satu-satunya CTA "Tambah Jadwal" lagi.
             ->headerActions([
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah Jadwal')
                     ->icon('heroicon-o-plus')
-                    ->visible(fn () => $this->getOwnerRecord()?->isEditable()),
+                    ->visible(fn() => $this->getOwnerRecord()?->isEditable()
+                        && $this->getOwnerRecord()->items->isNotEmpty()),
             ])
 
             ->actions([
@@ -267,13 +272,13 @@ class VesselPlanItemRelationManager extends RelationManager
                     ->iconButton()
                     ->extraAttributes(['class' => 'mx-0.5'])
                     ->tooltip('Ubah')
-                    ->visible(fn () => $this->getOwnerRecord()?->isEditable()),
+                    ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
 
                 Tables\Actions\DeleteAction::make()
                     ->iconButton()
                     ->extraAttributes(['class' => 'mx-0.5'])
                     ->tooltip('Hapus')
-                    ->visible(fn () => $this->getOwnerRecord()?->isEditable()),
+                    ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
             ])
 
             ->defaultSort('planned_etd');

@@ -6,7 +6,6 @@ use App\Enums\CargoType;
 use App\Enums\MPCheckStatus;
 use App\Enums\ShipmentStatus;
 use App\Enums\TrackStatus;
-use App\Filament\FC\Pages\OperationalShipmentPage;
 use App\Filament\FC\Resources\BriefingSessionResource;
 use App\Filament\FC\Resources\ContainerReadinessSessionResource;
 use App\Filament\FC\Resources\ShipmentResource;
@@ -14,7 +13,6 @@ use App\Models\BriefingSession;
 use App\Models\ContainerReadinessSession;
 use App\Models\Depot;
 use App\Models\Shipment;
-use Illuminate\Support\Carbon;
 use App\Models\UnitInspection;
 use App\Models\UnitInspectionItem;
 use App\Services\InspectionDraftAutoCreate;
@@ -28,28 +26,35 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Section;
-use Filament\Forms\Components\TextInput as FormTextInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Textarea as FormTextarea;
+use Filament\Forms\Components\TextInput as FormTextInput;
+use Filament\Forms\Components\ToggleButtons;
+use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\ActionGroup;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class OperationalTasks extends Page implements HasTable
 {
     use InteractsWithTable;
 
     protected static ?string $navigationGroup = 'Operasional Lapangan';
+
     protected static ?string $navigationLabel = 'Tugas Operasional';
-    protected static ?string $navigationIcon  = 'heroicon-o-clipboard-document-list';
-    protected static ?int    $navigationSort  = 10;
+
+    protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
+
+    protected static ?int $navigationSort = 10;
 
     protected static string $view = 'filament.fc.pages.operational-tasks';
 
@@ -115,18 +120,18 @@ class OperationalTasks extends Page implements HasTable
 
         return [
             'briefing' => [
-                'exists'       => $briefing !== null,
+                'exists' => $briefing !== null,
                 'status_label' => $briefingStatusLabel,
-                'create_url'   => BriefingSessionResource::getUrl('create'),
-                'view_url'     => $briefing
+                'create_url' => BriefingSessionResource::getUrl('create'),
+                'view_url' => $briefing
                     ? BriefingSessionResource::getUrl('view', ['record' => $briefing->id])
                     : null,
             ],
             'container' => [
-                'exists'     => $container !== null,
-                'is_ready'   => $container ? (bool) $container->summary_sufficient : null,
+                'exists' => $container !== null,
+                'is_ready' => $container ? (bool) $container->summary_sufficient : null,
                 'create_url' => ContainerReadinessSessionResource::getUrl('create'),
-                'edit_url'   => $container
+                'edit_url' => $container
                     ? ContainerReadinessSessionResource::getUrl('edit', ['record' => $container->id])
                     : null,
             ],
@@ -166,8 +171,8 @@ class OperationalTasks extends Page implements HasTable
     protected function getTableQuery(): Builder
     {
         $depotId = $this->depotId();
-        $portId  = $this->portId();
-        $userId  = auth()->id();
+        $portId = $this->portId();
+        $userId = auth()->id();
 
         return Shipment::query()
             ->select('shipments.*')
@@ -189,11 +194,10 @@ class OperationalTasks extends Page implements HasTable
                         }
                     })->where(function (Builder $phase) {
                         $phase
-                            ->whereDoesntHave('tracks', fn(Builder $t) => $t->whereNotNull('tracked_at'))
+                            ->whereDoesntHave('tracks', fn (Builder $t) => $t->whereNotNull('tracked_at'))
                             ->orWhereHas(
                                 'latestTrack',
-                                fn(Builder $t) =>
-                                $t->whereIn('status', self::originStatuses())
+                                fn (Builder $t) => $t->whereIn('status', self::originStatuses())
                             );
                     });
                 });
@@ -205,15 +209,13 @@ class OperationalTasks extends Page implements HasTable
                         $b->where(function (Builder $pod) use ($portId) {
                             $pod->where('pod_id', $portId)
                                 ->orWhereExists(
-                                    fn($v) =>
-                                    $v->from('voyages')
+                                    fn ($v) => $v->from('voyages')
                                         ->whereColumn('voyages.id', 'shipments.voyage_id')
                                         ->where('voyages.pod_id', $portId)
                                 );
                         })->whereHas(
                             'latestTrack',
-                            fn(Builder $t) =>
-                            $t->whereIn('status', self::destActiveStatuses())
+                            fn (Builder $t) => $t->whereIn('status', self::destActiveStatuses())
                         );
                     });
                 }
@@ -223,8 +225,7 @@ class OperationalTasks extends Page implements HasTable
                 $outer->orWhere(function (Builder $c) use ($depotId, $portId, $userId) {
                     $c->whereHas(
                         'latestTrack',
-                        fn(Builder $t) =>
-                        $t->where('status', TrackStatus::Hold->value)
+                        fn (Builder $t) => $t->where('status', TrackStatus::Hold->value)
                     )->where(function (Builder $ownAny) use ($depotId, $portId, $userId) {
                         if ($depotId) {
                             $ownAny->where('assigned_depot_id', $depotId)
@@ -236,8 +237,7 @@ class OperationalTasks extends Page implements HasTable
                             $ownAny->orWhere(function (Builder $dest) use ($portId) {
                                 $dest->where('pod_id', $portId)
                                     ->orWhereExists(
-                                        fn($v) =>
-                                        $v->from('voyages')
+                                        fn ($v) => $v->from('voyages')
                                             ->whereColumn('voyages.id', 'shipments.voyage_id')
                                             ->where('voyages.pod_id', $portId)
                                     );
@@ -247,10 +247,10 @@ class OperationalTasks extends Page implements HasTable
                 });
             })
             ->orderByDesc(
-                DB::raw("(SELECT tracked_at FROM shipment_tracks
+                DB::raw('(SELECT tracked_at FROM shipment_tracks
                           WHERE shipment_id = shipments.id
                             AND tracked_at IS NOT NULL
-                          ORDER BY tracked_at DESC LIMIT 1)")
+                          ORDER BY tracked_at DESC LIMIT 1)')
             );
     }
 
@@ -373,12 +373,11 @@ class OperationalTasks extends Page implements HasTable
                     ->label('Gate')
                     ->badge()
                     ->getStateUsing(
-                        fn(Shipment $record): string =>
-                        ShipmentOperationalGateResolver::resolve($record) === ShipmentOperationalGateResolver::DESTINATION
+                        fn (Shipment $record): string => ShipmentOperationalGateResolver::resolve($record) === ShipmentOperationalGateResolver::DESTINATION
                             ? 'TUJUAN'
                             : 'ASAL'
                     )
-                    ->color(fn(string $state): string => $state === 'TUJUAN' ? 'info' : 'warning'),
+                    ->color(fn (string $state): string => $state === 'TUJUAN' ? 'info' : 'warning'),
 
                 TextColumn::make('code')
                     ->label('Shipment')
@@ -387,8 +386,7 @@ class OperationalTasks extends Page implements HasTable
                     ->fontFamily('mono')
                     ->weight('bold')
                     ->url(
-                        fn(Shipment $record): string =>
-                        OperationalShipmentPage::getUrl(['record' => $record->getKey()])
+                        fn (Shipment $record): string => OperationalShipmentPage::getUrl(['record' => $record->getKey()])
                     )
                     ->openUrlInNewTab(),
 
@@ -401,28 +399,27 @@ class OperationalTasks extends Page implements HasTable
                     ->label('Status')
                     ->badge()
                     ->formatStateUsing(
-                        fn($state): string =>
-                        $state instanceof TrackStatus
+                        fn ($state): string => $state instanceof TrackStatus
                             ? $state->label()
                             : (TrackStatus::tryFrom((string) $state)?->label() ?? ((string) $state ?: 'Pending'))
                     )
-                    ->color(fn($state): string => match ((string) ($state instanceof TrackStatus ? $state->value : ($state ?? ''))) {
-                        TrackStatus::Pickup->value             => 'gray',
-                        TrackStatus::Handover->value           => 'gray',
+                    ->color(fn ($state): string => match ((string) ($state instanceof TrackStatus ? $state->value : ($state ?? ''))) {
+                        TrackStatus::Pickup->value => 'gray',
+                        TrackStatus::Handover->value => 'gray',
                         TrackStatus::Stuffing->value,
                         TrackStatus::DeliveryToPort->value,
                         TrackStatus::Stacking->value,
-                        TrackStatus::UnitLoading->value        => 'warning',
+                        TrackStatus::UnitLoading->value => 'warning',
                         TrackStatus::OnShip->value,
-                        TrackStatus::VesselDepart->value       => 'info',
-                        TrackStatus::VesselArrival->value      => 'primary',
-                        TrackStatus::Unloading->value          => 'warning',
-                        TrackStatus::HandoverTrucking->value   => 'primary',
+                        TrackStatus::VesselDepart->value => 'info',
+                        TrackStatus::VesselArrival->value => 'primary',
+                        TrackStatus::Unloading->value => 'warning',
+                        TrackStatus::HandoverTrucking->value => 'primary',
                         TrackStatus::DeliveryToCustomer->value => 'success',
-                        TrackStatus::Delivered->value          => 'success',
-                        TrackStatus::Hold->value               => 'danger',
-                        TrackStatus::Cancelled->value          => 'danger',
-                        default                                => 'gray',
+                        TrackStatus::Delivered->value => 'success',
+                        TrackStatus::Hold->value => 'danger',
+                        TrackStatus::Cancelled->value => 'danger',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('tahap_operasional')
@@ -430,65 +427,64 @@ class OperationalTasks extends Page implements HasTable
                     ->badge()
                     ->getStateUsing(function (Shipment $record): string {
                         $v = $record->latest_track_status?->value ?? '';
+
                         return match ($v) {
-                            TrackStatus::Pickup->value             => 'Pickup',
-                            TrackStatus::Handover->value           => 'Handover',
-                            TrackStatus::Stuffing->value           => 'Stuffing',
-                            TrackStatus::DeliveryToPort->value     => 'Port Delivery',
-                            TrackStatus::Stacking->value           => 'Stacking',
-                            TrackStatus::UnitLoading->value        => 'Loading',
-                            TrackStatus::OnShip->value             => 'On Ship',
-                            TrackStatus::VesselDepart->value       => 'Berangkat',
-                            TrackStatus::VesselArrival->value      => 'Arrival',
-                            TrackStatus::Unloading->value          => 'Unloading',
-                            TrackStatus::HandoverTrucking->value   => 'Selfdrive',
+                            TrackStatus::Pickup->value => 'Pickup',
+                            TrackStatus::Handover->value => 'Handover',
+                            TrackStatus::Stuffing->value => 'Stuffing',
+                            TrackStatus::DeliveryToPort->value => 'Port Delivery',
+                            TrackStatus::Stacking->value => 'Stacking',
+                            TrackStatus::UnitLoading->value => 'Loading',
+                            TrackStatus::OnShip->value => 'On Ship',
+                            TrackStatus::VesselDepart->value => 'Berangkat',
+                            TrackStatus::VesselArrival->value => 'Arrival',
+                            TrackStatus::Unloading->value => 'Unloading',
+                            TrackStatus::HandoverTrucking->value => 'Selfdrive',
                             TrackStatus::DeliveryToCustomer->value => 'Delivery',
-                            TrackStatus::Hold->value               => 'Ditahan',
-                            default                                => 'Menunggu',
+                            TrackStatus::Hold->value => 'Ditahan',
+                            default => 'Menunggu',
                         };
                     })
                     ->color(function (Shipment $record): string {
                         $v = $record->latest_track_status?->value ?? '';
+
                         return match ($v) {
                             TrackStatus::Pickup->value,
-                            TrackStatus::Handover->value           => 'gray',
+                            TrackStatus::Handover->value => 'gray',
                             TrackStatus::Stuffing->value,
                             TrackStatus::DeliveryToPort->value,
                             TrackStatus::Stacking->value,
-                            TrackStatus::UnitLoading->value        => 'warning',
+                            TrackStatus::UnitLoading->value => 'warning',
                             TrackStatus::OnShip->value,
-                            TrackStatus::VesselDepart->value       => 'info',
+                            TrackStatus::VesselDepart->value => 'info',
                             TrackStatus::VesselArrival->value,
-                            TrackStatus::Unloading->value          => 'primary',
+                            TrackStatus::Unloading->value => 'primary',
                             TrackStatus::HandoverTrucking->value,
                             TrackStatus::DeliveryToCustomer->value => 'success',
-                            TrackStatus::Hold->value               => 'danger',
-                            default                                => 'gray',
+                            TrackStatus::Hold->value => 'danger',
+                            default => 'gray',
                         };
                     }),
 
                 TextColumn::make('waiting_inspection_count')
                     ->label('Menunggu Inspeksi')
                     ->badge()
-                    ->getStateUsing(fn(Shipment $record): int => (int) ($record->waiting_inspection_count ?? 0))
-                    ->color(fn(Shipment $record): string => match (true) {
+                    ->getStateUsing(fn (Shipment $record): int => (int) ($record->waiting_inspection_count ?? 0))
+                    ->color(fn (Shipment $record): string => match (true) {
                         ((int) ($record->waiting_inspection_count ?? 0)) === 0 => 'success',
-                        ((int) ($record->waiting_inspection_count ?? 0)) <= 2  => 'warning',
-                        default                                                 => 'danger',
+                        ((int) ($record->waiting_inspection_count ?? 0)) <= 2 => 'warning',
+                        default => 'danger',
                     })
-                    ->sortable(query: fn(Builder $query, string $direction): Builder =>
-                        $query->reorder()->orderBy('waiting_inspection_count', $direction)
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->reorder()->orderBy('waiting_inspection_count', $direction)
                     ),
 
                 TextColumn::make('bermasalah_count')
                     ->label('Unit Bermasalah')
                     ->badge()
-                    ->getStateUsing(fn(Shipment $record): int => (int) ($record->bermasalah_count ?? 0))
-                    ->color(fn(Shipment $record): string =>
-                        ((int) ($record->bermasalah_count ?? 0)) === 0 ? 'success' : 'danger'
+                    ->getStateUsing(fn (Shipment $record): int => (int) ($record->bermasalah_count ?? 0))
+                    ->color(fn (Shipment $record): string => ((int) ($record->bermasalah_count ?? 0)) === 0 ? 'success' : 'danger'
                     )
-                    ->sortable(query: fn(Builder $query, string $direction): Builder =>
-                        $query->reorder()->orderBy('bermasalah_count', $direction)
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->reorder()->orderBy('bermasalah_count', $direction)
                     ),
 
                 TextColumn::make('readiness_pct')
@@ -496,17 +492,24 @@ class OperationalTasks extends Page implements HasTable
                     ->badge()
                     ->getStateUsing(function (Shipment $record): string {
                         $pct = $record->readiness_pct;
+
                         return $pct === null ? '—' : "{$pct}%";
                     })
                     ->color(function (Shipment $record): string {
                         $pct = $record->readiness_pct;
-                        if ($pct === null) return 'gray';
-                        if ($pct >= 100) return 'success';
-                        if ($pct >= 60) return 'warning';
+                        if ($pct === null) {
+                            return 'gray';
+                        }
+                        if ($pct >= 100) {
+                            return 'success';
+                        }
+                        if ($pct >= 60) {
+                            return 'warning';
+                        }
+
                         return 'danger';
                     })
-                    ->sortable(query: fn(Builder $query, string $direction): Builder =>
-                        $query->reorder()->orderBy('readiness_pct', $direction)
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->reorder()->orderBy('readiness_pct', $direction)
                     ),
 
                 TextColumn::make('container_status')
@@ -516,29 +519,37 @@ class OperationalTasks extends Page implements HasTable
                         $isVehicle = ($record->cargo_type instanceof CargoType)
                             ? $record->cargo_type === CargoType::Vehicle
                             : $record->cargo_type === CargoType::Vehicle->value;
-                        if (! $isVehicle) return '';
+                        if (! $isVehicle) {
+                            return '';
+                        }
                         $unassigned = (int) ($record->unassigned_container_count ?? -1);
-                        if ($unassigned < 0) return '';
+                        if ($unassigned < 0) {
+                            return '';
+                        }
+
                         return $unassigned === 0 ? 'Ready' : 'Belum Lengkap';
                     })
                     ->color(function (Shipment $record): string {
                         $isVehicle = ($record->cargo_type instanceof CargoType)
                             ? $record->cargo_type === CargoType::Vehicle
                             : $record->cargo_type === CargoType::Vehicle->value;
-                        if (! $isVehicle) return 'gray';
+                        if (! $isVehicle) {
+                            return 'gray';
+                        }
                         $unassigned = (int) ($record->unassigned_container_count ?? -1);
-                        if ($unassigned < 0) return 'gray';
+                        if ($unassigned < 0) {
+                            return 'gray';
+                        }
+
                         return $unassigned === 0 ? 'success' : 'warning';
                     })
-                    ->sortable(query: fn(Builder $query, string $direction): Builder =>
-                        $query->reorder()->orderBy('unassigned_container_count', $direction)
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->reorder()->orderBy('unassigned_container_count', $direction)
                     ),
 
                 TextColumn::make('voyage_no_display')
                     ->label('Voyage')
                     ->getStateUsing(
-                        fn(Shipment $record): string =>
-                        $record->getRelation('voyage')?->voyage_no ?? '—'
+                        fn (Shipment $record): string => $record->getRelation('voyage')?->voyage_no ?? '—'
                     )
                     ->badge()
                     ->color('gray'),
@@ -546,20 +557,20 @@ class OperationalTasks extends Page implements HasTable
                 TextColumn::make('voyage_eta_display')
                     ->label('ETA')
                     ->getStateUsing(
-                        fn(Shipment $record): string => blank($record->getRelation('voyage')?->eta)
+                        fn (Shipment $record): string => blank($record->getRelation('voyage')?->eta)
                             ? '—'
                             : \Carbon\Carbon::parse($record->getRelation('voyage')->eta)->format('d M Y')
                     ),
 
                 TextColumn::make('units_count')
                     ->label('Unit')
-                    ->getStateUsing(fn(Shipment $record): int => $record->getRelation('units')?->count() ?? 0)
+                    ->getStateUsing(fn (Shipment $record): int => $record->getRelation('units')?->count() ?? 0)
                     ->alignCenter(),
 
                 TextColumn::make('latestTrack.tracked_at')
                     ->label('Diperbarui')
                     ->formatStateUsing(
-                        fn($state): string => blank($state)
+                        fn ($state): string => blank($state)
                             ? '—'
                             : \Carbon\Carbon::parse($state)->format('d M Y H:i')
                     )
@@ -572,17 +583,17 @@ class OperationalTasks extends Page implements HasTable
                     ->label('Update')
                     ->icon('heroicon-m-pencil-square')
                     ->color('info')
-                    ->visible(fn(Shipment $record) => ShipmentOwnership::canEdit(Filament::auth()->user(), $record))
-                    ->form(fn(Shipment $record) => array_merge(
+                    ->visible(fn (Shipment $record) => ShipmentOwnership::canEdit(Filament::auth()->user(), $record))
+                    ->form(fn (Shipment $record) => array_merge(
                         ShipmentResource::trackUpdateForm(),
                         ShipmentResource::inspectionFormFields(),
                     ))
                     ->fillForm(function (Shipment $record): array {
                         $nextStatus = $record->nextTrackStatus();
-                        $stage      = $nextStatus ? InspectionDraftAutoCreate::resolveStage($nextStatus) : null;
+                        $stage = $nextStatus ? InspectionDraftAutoCreate::resolveStage($nextStatus) : null;
 
                         $data = [
-                            'track_status'     => $nextStatus?->value,
+                            'track_status' => $nextStatus?->value,
                             'inspection_stage' => $stage,
                         ];
 
@@ -593,35 +604,35 @@ class OperationalTasks extends Page implements HasTable
                             try {
                                 InspectionDraftAutoCreate::ensureForShipmentAndStage($record, $stage);
                             } catch (\Throwable $e) {
-                                \Illuminate\Support\Facades\Log::error('FC inspection draft generation failed', [
+                                Log::error('FC inspection draft generation failed', [
                                     'shipment_id' => $record->id,
-                                    'stage'       => $stage,
-                                    'error'       => $e->getMessage(),
+                                    'stage' => $stage,
+                                    'error' => $e->getMessage(),
                                 ]);
                             }
 
                             $units = $record->units()->with([
-                                'inspections' => fn($q) => $q->where('stage', $stage)->with('items'),
+                                'inspections' => fn ($q) => $q->where('stage', $stage)->with('items'),
                             ])->get();
 
                             // Flat list — avoids Filament v3 nested Repeater hydration bug
                             $flatItems = [];
                             foreach ($units as $unit) {
                                 $inspection = $unit->inspections->first();
-                                $unitLabel  = trim(implode(' · ', array_filter([$unit->model_no, $unit->chassis_no])))
-                                    ?: 'Unit #' . $unit->id;
+                                $unitLabel = trim(implode(' · ', array_filter([$unit->model_no, $unit->chassis_no])))
+                                    ?: 'Unit #'.$unit->id;
                                 foreach (($inspection?->items ?? collect()) as $item) {
                                     $flatItems[] = [
-                                        'item_id'            => $item->id,
-                                        'inspection_id'      => $inspection->id,
-                                        'unit_id'            => $unit->id,
-                                        'unit_label'         => $unitLabel,
+                                        'item_id' => $item->id,
+                                        'inspection_id' => $inspection->id,
+                                        'unit_id' => $unit->id,
+                                        'unit_label' => $unitLabel,
                                         'unit_label_display' => $unitLabel,
-                                        'category'           => $item->category,
-                                        'item_name'          => $item->item_name,
-                                        'result'             => $item->result ?? UnitInspectionItem::RESULT_OK,
-                                        'finding_type'       => $item->finding_type,
-                                        'notes'              => $item->notes,
+                                        'category' => $item->category,
+                                        'item_name' => $item->item_name,
+                                        'result' => $item->result ?? UnitInspectionItem::RESULT_OK,
+                                        'finding_type' => $item->finding_type,
+                                        'notes' => $item->notes,
                                     ];
                                 }
                             }
@@ -642,9 +653,10 @@ class OperationalTasks extends Page implements HasTable
                         if ($existing) {
                             Notification::make()
                                 ->title('Status sudah pernah dicapai')
-                                ->body("'{$status->label()}' sudah diupdate pada " . $existing->tracked_at->format('d M Y H:i') . '.')
+                                ->body("'{$status->label()}' sudah diupdate pada ".$existing->tracked_at->format('d M Y H:i').'.')
                                 ->warning()
                                 ->send();
+
                             return;
                         }
 
@@ -654,6 +666,7 @@ class OperationalTasks extends Page implements HasTable
                                 ->body('Status "Dimuat di Kapal" diupdate otomatis setelah loading checkpoint selesai.')
                                 ->warning()
                                 ->send();
+
                             return;
                         }
 
@@ -676,8 +689,8 @@ class OperationalTasks extends Page implements HasTable
                                     continue;
                                 }
 
-                                $unitId    = $rows->first()['unit_id'] ?? null;
-                                $unitLabel = $rows->first()['unit_label'] ?? ('Unit #' . $unitId);
+                                $unitId = $rows->first()['unit_id'] ?? null;
+                                $unitLabel = $rows->first()['unit_label'] ?? ('Unit #'.$unitId);
 
                                 // Persist each item result
                                 foreach ($rows as $itemData) {
@@ -687,34 +700,34 @@ class OperationalTasks extends Page implements HasTable
                                     }
                                     $isNg = ($itemData['result'] ?? '') === UnitInspectionItem::RESULT_NG;
                                     UnitInspectionItem::where('id', $itemId)->update([
-                                        'result'       => $itemData['result'] ?? UnitInspectionItem::RESULT_OK,
+                                        'result' => $itemData['result'] ?? UnitInspectionItem::RESULT_OK,
                                         'finding_type' => $isNg ? ($itemData['finding_type'] ?? null) : null,
-                                        'notes'        => $isNg ? ($itemData['notes'] ?? null) : null,
+                                        'notes' => $isNg ? ($itemData['notes'] ?? null) : null,
                                     ]);
                                 }
 
                                 // Evaluate gate decision
                                 $inspection->refresh();
                                 $gateDecision = app(InspectionGateEvaluator::class)->evaluate($inspection);
-                                $hasNg        = $inspection->items()
+                                $hasNg = $inspection->items()
                                     ->where('result', UnitInspectionItem::RESULT_NG)
                                     ->exists();
 
                                 $inspection->update([
-                                    'submitted_at'  => now(),
-                                    'checked_at'    => now(),
-                                    'checked_by'    => auth()->id(),
-                                    'status'        => $hasNg
+                                    'submitted_at' => now(),
+                                    'checked_at' => now(),
+                                    'checked_by' => auth()->id(),
+                                    'status' => $hasNg
                                         ? UnitInspection::STATUS_FAILED
                                         : UnitInspection::STATUS_PASSED,
                                     'gate_decision' => $gateDecision,
                                 ]);
 
                                 $checkRefs[] = [
-                                    'unit_id'       => $unitId,
+                                    'unit_id' => $unitId,
                                     'inspection_id' => $inspection->id,
-                                    'stage'         => $inspStage,
-                                    'status'        => $inspection->status,
+                                    'stage' => $inspStage,
+                                    'status' => $inspection->status,
                                     'gate_decision' => $gateDecision,
                                 ];
 
@@ -724,14 +737,10 @@ class OperationalTasks extends Page implements HasTable
                                         ->body("Unit {$unitLabel} memiliki kerusakan fisik. Track status tidak dapat dilanjutkan.")
                                         ->danger()
                                         ->send();
+
                                     return;
                                 }
                             }
-                        }
-
-                        $override = null;
-                        if (auth_user()?->isSuperAdmin() && ! empty($data['override_reason'])) {
-                            $override = ['reason' => $data['override_reason']];
                         }
 
                         try {
@@ -740,7 +749,7 @@ class OperationalTasks extends Page implements HasTable
                                 $data['note'] ?? null,
                                 null,
                                 null,
-                                $override,
+                                null,
                                 $data['checkseet'] ?? null,
                                 $data['plan_loading_time_at'] ?? null,
                                 $data['plan_closing_time_at'] ?? null,
@@ -774,7 +783,7 @@ class OperationalTasks extends Page implements HasTable
                         ->label('Set Menunggu')
                         ->icon('heroicon-m-clock')
                         ->color('gray')
-                        ->visible(fn(Shipment $record) => in_array(
+                        ->visible(fn (Shipment $record) => in_array(
                             $record->status?->value ?? (string) $record->status,
                             ['draft', 'hold'],
                             true
@@ -790,10 +799,10 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-truck')
                         ->color('info')
                         ->visible(
-                            fn(Shipment $record) => ($record->status?->value ?? (string) $record->status) === 'pending'
+                            fn (Shipment $record) => ($record->status?->value ?? (string) $record->status) === 'pending'
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data, $livewire) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             if (blank($record->coordinator_id)) {
@@ -803,6 +812,7 @@ class OperationalTasks extends Page implements HasTable
                                 $record->appendTrack(TrackStatus::Pickup, $data['note'] ?? null);
                             } catch (DomainException $e) {
                                 Notification::make()->title($e->getMessage())->danger()->send();
+
                                 return;
                             }
                             Notification::make()
@@ -818,8 +828,7 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-building-office')
                         ->color('info')
                         ->visible(
-                            fn(Shipment $record) =>
-                            $record->latest_track_status?->value === TrackStatus::Pickup->value
+                            fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::Pickup->value
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
                         ->fillForm(function (Shipment $record): array {
@@ -828,31 +837,31 @@ class OperationalTasks extends Page implements HasTable
                                 : $record->cargo_type === CargoType::Vehicle->value;
 
                             $unitContainers = [];
-                            $containerInfo  = '';
+                            $containerInfo = '';
 
                             if ($isVehicle) {
-                                $session        = ContainerReadinessSession::whereDate('session_date', today())->first();
-                                $numbers        = $session?->container_number_list ?? [];
-                                $containerInfo  = empty($numbers)
+                                $session = ContainerReadinessSession::whereDate('session_date', today())->first();
+                                $numbers = $session?->container_number_list ?? [];
+                                $containerInfo = empty($numbers)
                                     ? '(Belum dikonfigurasi — isi nomor container secara manual)'
                                     : implode('  ·  ', $numbers);
 
                                 $unitContainers = $record->units()->orderBy('id')->get()
-                                    ->map(fn($u) => [
-                                        'unit_id'           => $u->id,
-                                        'chassis_no'        => $u->chassis_no ?? '—',
-                                        'model_no'          => $u->model_no ?? '—',
+                                    ->map(fn ($u) => [
+                                        'unit_id' => $u->id,
+                                        'chassis_no' => $u->chassis_no ?? '—',
+                                        'model_no' => $u->model_no ?? '—',
                                         'container_display' => $u->container_display ?? '',
                                     ])->all();
                             }
 
                             return [
-                                'sjkb_no'           => '',
-                                'yard_slot'         => '',
-                                'note'              => '',
-                                'vehicle_loading'   => $record->vehicle_loading ?? '',
-                                'container_info'    => $containerInfo,
-                                'unit_containers'   => $unitContainers,
+                                'sjkb_no' => '',
+                                'yard_slot' => '',
+                                'note' => '',
+                                'vehicle_loading' => $record->vehicle_loading ?? '',
+                                'container_info' => $containerInfo,
+                                'unit_containers' => $unitContainers,
                             ];
                         })
                         ->form(function (Shipment $record): array {
@@ -884,16 +893,16 @@ class OperationalTasks extends Page implements HasTable
                                 Section::make('Planning Loading')
                                     ->description('Tentukan metode muat dan nomor container untuk setiap unit.')
                                     ->schema([
-                                        \Filament\Forms\Components\ToggleButtons::make('vehicle_loading')
+                                        ToggleButtons::make('vehicle_loading')
                                             ->label('Metode Muat Unit')
                                             ->options([
-                                                'regular'   => 'Reguler',
-                                                'rack'      => 'Rack',
+                                                'regular' => 'Reguler',
+                                                'rack' => 'Rack',
                                                 'flat_rack' => 'Flat Rack',
                                             ])
                                             ->colors([
-                                                'regular'   => 'info',
-                                                'rack'      => 'warning',
+                                                'regular' => 'info',
+                                                'rack' => 'warning',
                                                 'flat_rack' => 'warning',
                                             ])
                                             ->inline()
@@ -902,8 +911,7 @@ class OperationalTasks extends Page implements HasTable
 
                                         Placeholder::make('container_info')
                                             ->label('Container Tersedia Hari Ini')
-                                            ->content(fn(\Filament\Forms\Get $get): string =>
-                                                $get('container_info') ?: '(Belum dikonfigurasi)'
+                                            ->content(fn (Get $get): string => $get('container_info') ?: '(Belum dikonfigurasi)'
                                             )
                                             ->columnSpanFull(),
 
@@ -952,7 +960,7 @@ class OperationalTasks extends Page implements HasTable
                                 // ── Planning Loading: assign container per unit ──────────
                                 if ($isVehicle && ! empty($data['unit_containers'])) {
                                     foreach ($data['unit_containers'] as $row) {
-                                        $unitId      = $row['unit_id'] ?? null;
+                                        $unitId = $row['unit_id'] ?? null;
                                         $containerNo = strtoupper(trim($row['container_display'] ?? ''));
                                         if ($unitId) {
                                             $record->units()->whereKey($unitId)->update([
@@ -981,7 +989,7 @@ class OperationalTasks extends Page implements HasTable
                                     ->send();
 
                                 $livewire->redirect(OperationalShipmentPage::getUrl(['record' => $record->getKey()]));
-                            } catch (\DomainException $e) {
+                            } catch (DomainException $e) {
                                 Notification::make()->title($e->getMessage())->danger()->send();
                             }
                         }),
@@ -991,10 +999,18 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-wrench-screwdriver')
                         ->color('info')
                         ->visible(function (Shipment $record) {
-                            if (! ShipmentOwnership::canEdit(Filament::auth()->user(), $record)) return false;
-                            if ($record->latest_track_status?->value !== TrackStatus::Handover->value) return false;
-                            if (((int) ($record->waiting_inspection_count ?? 0)) > 0) return false;
-                            if (((int) ($record->bermasalah_count ?? 0)) > 0) return false;
+                            if (! ShipmentOwnership::canEdit(Filament::auth()->user(), $record)) {
+                                return false;
+                            }
+                            if ($record->latest_track_status?->value !== TrackStatus::Handover->value) {
+                                return false;
+                            }
+                            if (((int) ($record->waiting_inspection_count ?? 0)) > 0) {
+                                return false;
+                            }
+                            if (((int) ($record->bermasalah_count ?? 0)) > 0) {
+                                return false;
+                            }
                             if (! LoadingSessionAutoCreate::isRackShipment($record)) {
                                 // Vehicle cargo: hide stuffing button if container assignment incomplete
                                 $isVehicle = ($record->cargo_type instanceof CargoType)
@@ -1003,11 +1019,13 @@ class OperationalTasks extends Page implements HasTable
                                 if ($isVehicle && ((int) ($record->unassigned_container_count ?? 1)) > 0) {
                                     return false;
                                 }
+
                                 return true;
                             }
+
                             return false;
                         })
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             $record->appendTrack(TrackStatus::Stuffing, $data['note'] ?? null);
@@ -1024,29 +1042,46 @@ class OperationalTasks extends Page implements HasTable
                         ->modalSubmitAction(false)
                         ->modalCancelActionLabel('Tutup')
                         ->visible(function (Shipment $record) {
-                            if ($record->latest_track_status?->value !== TrackStatus::Handover->value) return false;
-                            if (((int) ($record->waiting_inspection_count ?? 0)) > 0) return false;
-                            if (((int) ($record->bermasalah_count ?? 0)) > 0) return false;
+                            if ($record->latest_track_status?->value !== TrackStatus::Handover->value) {
+                                return false;
+                            }
+                            if (((int) ($record->waiting_inspection_count ?? 0)) > 0) {
+                                return false;
+                            }
+                            if (((int) ($record->bermasalah_count ?? 0)) > 0) {
+                                return false;
+                            }
+
                             return LoadingSessionAutoCreate::isRackShipment($record);
                         })
-                        ->action(fn() => null),
+                        ->action(fn () => null),
 
                     Action::make('deliveryToPort')
                         ->label('Antar ke Pelabuhan')
                         ->icon('heroicon-m-arrow-up-right')
                         ->color('info')
                         ->visible(function (Shipment $record) {
-                            if (! ShipmentOwnership::canEdit(Filament::auth()->user(), $record)) return false;
+                            if (! ShipmentOwnership::canEdit(Filament::auth()->user(), $record)) {
+                                return false;
+                            }
                             $last = $record->latest_track_status?->value;
-                            if ($last === TrackStatus::Stuffing->value) return true;
-                            if ($last === TrackStatus::Handover->value && LoadingSessionAutoCreate::isRackShipment($record)) {
-                                if (((int) ($record->waiting_inspection_count ?? 0)) > 0) return false;
-                                if (((int) ($record->bermasalah_count ?? 0)) > 0) return false;
+                            if ($last === TrackStatus::Stuffing->value) {
                                 return true;
                             }
+                            if ($last === TrackStatus::Handover->value && LoadingSessionAutoCreate::isRackShipment($record)) {
+                                if (((int) ($record->waiting_inspection_count ?? 0)) > 0) {
+                                    return false;
+                                }
+                                if (((int) ($record->bermasalah_count ?? 0)) > 0) {
+                                    return false;
+                                }
+
+                                return true;
+                            }
+
                             return false;
                         })
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             $record->appendTrack(TrackStatus::DeliveryToPort, $data['note'] ?? null);
@@ -1058,11 +1093,10 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-rectangle-group')
                         ->color('info')
                         ->visible(
-                            fn(Shipment $record) =>
-                            $record->latest_track_status?->value === TrackStatus::DeliveryToPort->value
+                            fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::DeliveryToPort->value
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             $record->appendTrack(TrackStatus::Stacking, $data['note'] ?? null);
@@ -1075,8 +1109,13 @@ class OperationalTasks extends Page implements HasTable
                         ->color('success')
                         ->requiresConfirmation()
                         ->visible(function (Shipment $record) {
-                            if (! ShipmentOwnership::canEdit(Filament::auth()->user(), $record)) return false;
-                            if ($record->latest_track_status?->value !== TrackStatus::Stacking->value) return false;
+                            if (! ShipmentOwnership::canEdit(Filament::auth()->user(), $record)) {
+                                return false;
+                            }
+                            if ($record->latest_track_status?->value !== TrackStatus::Stacking->value) {
+                                return false;
+                            }
+
                             return ! LoadingSessionAutoCreate::isRackShipment($record);
                         })
                         ->action(function (Shipment $record, array $data) {
@@ -1095,21 +1134,23 @@ class OperationalTasks extends Page implements HasTable
                         ->modalSubmitAction(false)
                         ->modalCancelActionLabel('Tutup')
                         ->visible(function (Shipment $record) {
-                            if ($record->latest_track_status?->value !== TrackStatus::Stacking->value) return false;
+                            if ($record->latest_track_status?->value !== TrackStatus::Stacking->value) {
+                                return false;
+                            }
+
                             return LoadingSessionAutoCreate::isRackShipment($record);
                         })
-                        ->action(fn() => null),
+                        ->action(fn () => null),
 
                     Action::make('onShip')
                         ->label('On Ship')
                         ->icon('heroicon-m-rocket-launch')
                         ->color('info')
                         ->visible(
-                            fn(Shipment $record) =>
-                            $record->latest_track_status?->value === TrackStatus::UnitLoading->value
+                            fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::UnitLoading->value
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             $record->appendTrack(TrackStatus::OnShip, $data['note'] ?? null);
@@ -1121,11 +1162,10 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-paper-airplane')
                         ->color('info')
                         ->visible(
-                            fn(Shipment $record) =>
-                            $record->latest_track_status?->value === TrackStatus::OnShip->value
+                            fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::OnShip->value
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             $record->appendTrack(TrackStatus::VesselDepart, $data['note'] ?? null);
@@ -1137,11 +1177,10 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-flag')
                         ->color('info')
                         ->visible(
-                            fn(Shipment $record) =>
-                            $record->latest_track_status?->value === TrackStatus::VesselDepart->value
+                            fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::VesselDepart->value
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             $record->appendTrack(TrackStatus::VesselArrival, $data['note'] ?? null);
@@ -1153,11 +1192,10 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-arrow-down-tray')
                         ->color('info')
                         ->visible(
-                            fn(Shipment $record) =>
-                            $record->latest_track_status?->value === TrackStatus::VesselArrival->value
+                            fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::VesselArrival->value
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             try {
@@ -1173,11 +1211,10 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-arrow-trending-up')
                         ->color('info')
                         ->visible(
-                            fn(Shipment $record) =>
-                            $record->latest_track_status?->value === TrackStatus::Unloading->value
+                            fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::Unloading->value
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             $record->appendTrack(TrackStatus::HandoverTrucking, $data['note'] ?? null);
@@ -1189,11 +1226,10 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-user')
                         ->color('info')
                         ->visible(
-                            fn(Shipment $record) =>
-                            $record->latest_track_status?->value === TrackStatus::Unloading->value
+                            fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::Unloading->value
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             try {
@@ -1209,11 +1245,10 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-check-badge')
                         ->color('success')
                         ->visible(
-                            fn(Shipment $record) =>
-                            $record->latest_track_status?->value === TrackStatus::DeliveryToCustomer->value
+                            fn (Shipment $record) => $record->latest_track_status?->value === TrackStatus::DeliveryToCustomer->value
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Catatan')->rows(3)])
+                        ->form([Textarea::make('note')->label('Catatan')->rows(3)])
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             $record->appendTrack(TrackStatus::Delivered, $data['note'] ?? 'Terkirim');
@@ -1225,13 +1260,12 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-pause-circle')
                         ->color('warning')
                         ->visible(
-                            fn(Shipment $record) =>
-                            ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
+                            fn (Shipment $record) => ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                                 && $record->latest_track_status !== TrackStatus::Hold
                                 && ! in_array($record->latest_track_status, [TrackStatus::Delivered, TrackStatus::Cancelled], true)
                                 && $record->latest_track_status !== null
                         )
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Alasan')->rows(3)->required()])
+                        ->form([Textarea::make('note')->label('Alasan')->rows(3)->required()])
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
                             $record->appendTrack(TrackStatus::Hold, $data['note']);
@@ -1243,11 +1277,10 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-x-circle')
                         ->color('danger')
                         ->visible(
-                            fn(Shipment $record) =>
-                            $record->canCancel()
+                            fn (Shipment $record) => $record->canCancel()
                                 && ShipmentOwnership::canEdit(Filament::auth()->user(), $record)
                         )
-                        ->form([\Filament\Forms\Components\Textarea::make('note')->label('Alasan')->rows(3)->required()])
+                        ->form([Textarea::make('note')->label('Alasan')->rows(3)->required()])
                         ->requiresConfirmation()
                         ->action(function (Shipment $record, array $data) {
                             abort_unless(ShipmentOwnership::canEdit(Filament::auth()->user(), $record), 403);
@@ -1268,8 +1301,7 @@ class OperationalTasks extends Page implements HasTable
                         ->icon('heroicon-m-eye')
                         ->color('gray')
                         ->url(
-                            fn(Shipment $record): string =>
-                            OperationalShipmentPage::getUrl(['record' => $record->getKey()])
+                            fn (Shipment $record): string => OperationalShipmentPage::getUrl(['record' => $record->getKey()])
                         )
                         ->openUrlInNewTab(),
 
@@ -1277,25 +1309,25 @@ class OperationalTasks extends Page implements HasTable
                         ->label('Cetak Waybill')
                         ->icon('heroicon-m-printer')
                         ->color('primary')
-                        ->url(fn(Shipment $record): string => route('shipments.print.waybill', $record))
+                        ->url(fn (Shipment $record): string => route('shipments.print.waybill', $record))
                         ->openUrlInNewTab()
-                        ->visible(fn(Shipment $record) => auth()->user()?->can('print', $record)),
+                        ->visible(fn (Shipment $record) => auth()->user()?->can('print', $record)),
 
                     Action::make('printPackingList')
                         ->label('Cetak Packing List')
                         ->icon('heroicon-m-clipboard-document-list')
                         ->color('info')
-                        ->url(fn(Shipment $record): string => route('shipments.print.packing', $record))
+                        ->url(fn (Shipment $record): string => route('shipments.print.packing', $record))
                         ->openUrlInNewTab()
-                        ->visible(fn(Shipment $record) => auth()->user()?->can('print', $record)),
+                        ->visible(fn (Shipment $record) => auth()->user()?->can('print', $record)),
 
                     Action::make('printResi')
                         ->label('Cetak Resi')
                         ->icon('heroicon-m-document-text')
                         ->color('gray')
-                        ->url(fn(Shipment $record): string => route('shipments.resi', $record))
+                        ->url(fn (Shipment $record): string => route('shipments.resi', $record))
                         ->openUrlInNewTab()
-                        ->visible(fn(Shipment $record) => auth()->user()?->can('print', $record)),
+                        ->visible(fn (Shipment $record) => auth()->user()?->can('print', $record)),
                 ])->label('Lainnya')->icon('heroicon-m-ellipsis-vertical')->color('gray'),
 
             ])

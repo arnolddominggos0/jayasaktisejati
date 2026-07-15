@@ -1,17 +1,72 @@
 <x-filament-panels::page>
-    <div class="space-y-4">
+    <div>
+
+        @php
+            // WX2 — the operational LIFECYCLE is the primary axis. Zone
+            // assignment is a pure match() over already-loaded actual-time
+            // fields (the same "safe path" the old Fleet Board used to derive
+            // its own condition): no query, no TaskClassifier. A voyage sits
+            // in exactly one zone at a time and relocates as its actuals fill.
+            $zoneOf = fn ($v) => match (true) {
+                $v->ata_at !== null || $v->closing_at !== null => 4, // Kedatangan
+                $v->atd_at !== null                             => 3, // Pelayaran
+                $v->atb_at !== null                             => 2, // Keberangkatan
+                default                                          => 1, // Persiapan
+            };
+            $pipelineGroups = $rows->groupBy($zoneOf);
+
+            // WX4 — Decision Pointer. Same severity facts tam-pipeline.blade.php
+            // derives independently for its own per-zone sort/accent (WD3 "safe
+            // path": duplicated-but-trivial derivation from already-loaded
+            // fields, never TaskClassifier, never a query — same precedent as
+            // $zoneOf above). This is NOT Operational Brief revived: it never
+            // renders a full card, never lists more than two voyages, and says
+            // nothing when nothing is critical (quiet-when-healthy holds).
+            $sevScore = fn ($v) => match (true) {
+                $v->overdue_days > 0 || $v->eta_overdue => 3,
+                $v->sailing_risk || $v->milestones->where('is_overdue', true)->count() > 0 => 2,
+                default => 1,
+            };
+            $zoneLabel = [1 => 'Persiapan', 2 => 'Keberangkatan', 3 => 'Pelayaran', 4 => 'Kedatangan'];
+            $needsAttention = $rows
+                ->filter(fn ($v) => $sevScore($v) >= 2)
+                ->sortByDesc($sevScore)
+                ->take(2)
+                ->map(fn ($v) => [
+                    'id'   => $v->id,
+                    'name' => $v->vessel?->name,
+                    'zone' => $zoneLabel[$zoneOf($v)] ?? '',
+                ])
+                ->values();
+        @endphp
 
         {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- COMPACT HEADER                                                --}}
+        {{-- TOOLBAR — WX5(2) §1/§2/§7/§8                                   --}}
+        {{-- The module title is Filament's native chrome now — small,      --}}
+        {{-- label-only (no getSubheading(), removed this sprint: an        --}}
+        {{-- "explanatory paragraph" is exactly what §1 forbids). This is   --}}
+        {{-- the ONLY row before the pipeline: Decision Pointer (if any)    --}}
+        {{-- on the left, period/search on the right, one line. The old     --}}
+        {{-- standalone summary line ("N Voyage · N Persiapan · ...") is    --}}
+        {{-- removed outright — it duplicated the count already shown next  --}}
+        {{-- to each zone title below, which sits closer to what it         --}}
+        {{-- describes (OOD-1's finding). Pipeline starts immediately       --}}
+        {{-- after this one toolbar row.                                    --}}
         {{-- ═══════════════════════════════════════════════════════════════ --}}
-        <div class="flex items-center justify-between -mx-2">
-            <div class="flex items-center gap-3">
-                <h1 class="text-base font-bold text-gray-900 tracking-tight">Monitoring Vessel</h1>
-                <span class="text-xs text-gray-400">—</span>
-                <p class="text-xs text-gray-500">{{ \Illuminate\Support\Carbon::createFromFormat('Y-m', $period)->translatedFormat('F Y') }}</p>
+        <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 text-[11px] min-w-0">
+                @if ($needsAttention->isNotEmpty())
+                    <span class="text-gray-400 shrink-0">Perlu perhatian</span>
+                    @foreach ($needsAttention as $na)
+                        <a href="#pv-{{ $na['id'] }}"
+                            class="text-gray-700 font-medium hover:text-red-700 transition truncate">
+                            {{ $na['name'] }}<span class="text-gray-400 font-normal"> · {{ $na['zone'] }}</span>
+                        </a>
+                    @endforeach
+                @endif
             </div>
 
-            <div class="flex items-center gap-2 -my-1">
+            <div class="flex items-center gap-2 shrink-0">
                 <select wire:model.live="period"
                     class="rounded border-gray-200 text-xs font-medium focus:ring-0 focus:border-gray-300 py-1 pl-2 pr-6">
                     @foreach ($monthOptions as $value => $label)
@@ -26,220 +81,67 @@
 
 
         {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- COMPACT OPERATIONAL SUMMARY STRIP                          --}}
-        {{-- Critical: Delayed + Overdue dominant                       --}}
-        {{-- Informational: lighter tone                                --}}
-        {{-- KPI: lightest, white bg                                   --}}
+        {{-- OPERATIONAL PIPELINE — WX1 / WX2                               --}}
+        {{-- The single operational surface. Fleet Status, Operational      --}}
+        {{-- Brief, the standalone Fleet Board, and the separate Carrier    --}}
+        {{-- Readiness table are all retired here — they represented the    --}}
+        {{-- same voyages more than once and organized the page on          --}}
+        {{-- competing axes (severity vs. completeness vs. calendar). This  --}}
+        {{-- is ONE axis: the operational lifecycle. A voyage lives in      --}}
+        {{-- exactly one zone and travels through them over its life.       --}}
+        {{-- Engineering unchanged: same $rows, same Drawer, same Recording --}}
+        {{-- Modal, same actions — only composition changes.                --}}
         {{-- ═══════════════════════════════════════════════════════════════ --}}
-        @php
-            $delayed = $rows->filter(
-                fn($v) => $v->operational_status_enum === \App\Enums\VoyageOperationalStatus::DELAYED,
-            );
-
-            $sailing = $rows->filter(
-                fn($v) => $v->operational_status_enum === \App\Enums\VoyageOperationalStatus::SAILING,
-            );
-
-            $completed = $rows->filter(
-                fn($v) => $v->operational_status_enum === \App\Enums\VoyageOperationalStatus::COMPLETED,
-            );
-
-            $scheduled = $rows->filter(
-                fn($v) => $v->operational_status_enum === \App\Enums\VoyageOperationalStatus::SCHEDULED,
-            );
-
-            $total = $rows->count();
-            $otdOk = $rows->filter(fn($v) => $v->otd_status?->value === 'ontime')->count();
-            $otaOk = $rows->filter(fn($v) => $v->ota_status?->value === 'ontime')->count();
-            $overdueCount = $rows->sum(fn($v) => $v->milestones->where('is_overdue', true)->count());
-        @endphp
-
-        <div class="flex items-center gap-1 -my-1">
-            @if ($delayed->count())
-                <div class="bg-red-50 border border-red-200/70 rounded px-1.5 py-1">
-                    <span class="text-[9px] text-red-700 font-semibold uppercase tracking-wide">Delayed</span>
-                    <span class="ml-1 text-sm font-bold text-red-800">{{ $delayed->count() }}</span>
-                </div>
-            @endif
-
-            @if ($sailing->count())
-                <div class="bg-blue-50/40 border border-blue-100/50 rounded px-1.5 py-1">
-                    <span class="text-[9px] text-blue-600/80 font-medium uppercase tracking-wide">Sailing</span>
-                    <span class="ml-1 text-sm font-bold text-blue-700/80">{{ $sailing->count() }}</span>
-                </div>
-            @endif
-
-            @if ($completed->count())
-                <div class="bg-gray-50/40 border border-gray-100/50 rounded px-1.5 py-1">
-                    <span class="text-[9px] text-gray-500/80 font-medium uppercase tracking-wide">Done</span>
-                    <span class="ml-1 text-sm font-bold text-gray-600/80">{{ $completed->count() }}</span>
-                </div>
-            @endif
-
-            @if ($scheduled->count())
-                <div class="bg-gray-50/30 border border-gray-100/40 rounded px-1.5 py-1">
-                    <span class="text-[9px] text-gray-400/80 font-medium uppercase tracking-wide">Sched</span>
-                    <span class="ml-1 text-sm font-bold text-gray-500/80">{{ $scheduled->count() }}</span>
-                </div>
-            @endif
-
-            <span class="text-gray-300 mx-0.5">|</span>
-
-            @if ($overdueCount)
-                <div class="bg-orange-50 border border-orange-200/70 rounded px-1.5 py-1">
-                    <span class="text-[9px] text-orange-700 font-semibold uppercase tracking-wide">Overdue</span>
-                    <span class="ml-1 text-sm font-bold text-orange-800">{{ $overdueCount }}</span>
-                </div>
-            @endif
-
-            <span class="text-gray-300 mx-0.5">|</span>
-
-            <div class="bg-white border border-gray-100/50 rounded px-1.5 py-1">
-                <span class="text-[9px] text-gray-400 font-medium uppercase tracking-wide">OTD</span>
-                <span class="ml-1 text-sm font-bold text-gray-600">{{ $total > 0 ? round(($otdOk / $total) * 100) : 0 }}%</span>
-            </div>
-
-            <div class="bg-white border border-gray-100/50 rounded px-1.5 py-1">
-                <span class="text-[9px] text-gray-400 font-medium uppercase tracking-wide">OTA</span>
-                <span class="ml-1 text-sm font-bold text-gray-600">{{ $total > 0 ? round(($otaOk / $total) * 100) : 0 }}%</span>
-            </div>
+        <div class="mt-2">
+            @include('filament.pages.partials.tam-pipeline')
         </div>
 
 
         {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- CARRIER READINESS WIDGET                                      --}}
-        {{-- Scope: SEMUA voyage H-2/H-1 — TANPA filter shipment          --}}
-        {{-- Boundary: berbeda dari cargo monitoring grid di bawah         --}}
+        {{-- RETROSPECTIVE ZONE — Calendar + Evaluation (D2 §6, D3 §9)      --}}
+        {{-- Entirely outside the daily Brief↔Reference loop — a separate  --}}
+        {{-- cadence (periodic review), never part of "what do I do now."  --}}
+        {{-- Heading only renders when there's something to support — no   --}}
+        {{-- orphan heading.                                               --}}
         {{-- ═══════════════════════════════════════════════════════════════ --}}
-        @if (count($carrierReadiness))
-        @php
-            $crPending = collect($carrierReadiness)->where('status', 'pending')->count();
-            $crOk      = collect($carrierReadiness)->where('status', 'ok')->count();
-            $crLate    = collect($carrierReadiness)->where('status', 'late')->count();
-        @endphp
-        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-            {{-- Header --}}
-            <div class="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
-                <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-                    <h3 class="text-[11px] font-bold uppercase tracking-wider text-gray-600">
-                        Carrier Readiness
-                    </h3>
-                    <span class="text-[9px] text-gray-400 font-medium">H-2 / H-1</span>
-                </div>
-                {{-- Summary badges --}}
-                <div class="flex items-center gap-1.5">
-                    @if ($crPending)
-                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-gray-100 text-gray-600 border border-gray-200">
-                            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                            Pending {{ $crPending }}
-                        </span>
-                    @endif
-                    @if ($crOk)
-                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            OK {{ $crOk }}
-                        </span>
-                    @endif
-                    @if ($crLate)
-                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-50 text-red-700 border border-red-200">
-                            <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>
-                            Late {{ $crLate }}
-                        </span>
-                    @endif
-                </div>
+        @if (count($calendar) || !empty($evaluation))
+            <div class="mt-10 pt-6 border-t border-gray-100">
+                <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Informasi Pendukung</h2>
+                <p class="text-[11px] text-gray-400 mt-0.5">Kalender dan ringkasan performa bulan ini.</p>
             </div>
-
-            {{-- Table --}}
-            <table class="min-w-full text-[11px]">
-                <thead class="bg-gray-50/30 text-gray-400 font-medium text-[10px] border-b border-gray-100">
-                    <tr>
-                        <th class="px-4 py-1.5 text-left w-12">H</th>
-                        <th class="px-4 py-1.5 text-left">Kapal</th>
-                        <th class="px-4 py-1.5 text-left">Voyage</th>
-                        <th class="px-4 py-1.5 text-left">ETD</th>
-                        <th class="px-4 py-1.5 text-center w-24">Status</th>
-                        <th class="px-4 py-1.5 text-left">Alasan / Catatan</th>
-                        <th class="px-4 py-1.5 text-center w-28">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-50">
-                    @foreach ($carrierReadiness as $cr)
-                    <tr class="{{ $cr['status'] === 'late' ? 'bg-red-50/30' : '' }}">
-                        {{-- H badge --}}
-                        <td class="px-4 py-2">
-                            <span class="inline-block text-[9px] font-bold px-1.5 py-0.5 rounded
-                                {{ $cr['day_code'] === 'H-1' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">
-                                {{ $cr['day_code'] }}
-                            </span>
-                        </td>
-                        {{-- Vessel --}}
-                        <td class="px-4 py-2 font-medium text-gray-800">{{ $cr['vessel_name'] }}</td>
-                        {{-- Voyage no --}}
-                        <td class="px-4 py-2 text-gray-500 font-mono">{{ $cr['voyage_no'] }}</td>
-                        {{-- ETD --}}
-                        <td class="px-4 py-2 text-gray-500">{{ $cr['etd'] }}</td>
-                        {{-- Status --}}
-                        <td class="px-4 py-2 text-center">
-                            @if ($cr['status'] === 'ok')
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-100 text-emerald-700">✓ OK</span>
-                            @elseif ($cr['status'] === 'late')
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-100 text-red-700">! LATE</span>
-                            @else
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-semibold bg-gray-100 text-gray-500">— Pending</span>
-                            @endif
-                        </td>
-                        {{-- Reason / Note --}}
-                        <td class="px-4 py-2 text-gray-500 italic">
-                            @if ($cr['delay_reason'])
-                                <span class="text-red-600 not-italic font-medium">{{ $cr['delay_reason'] }}</span>
-                                @if ($cr['note'])
-                                    <span class="ml-1 text-gray-400">— {{ $cr['note'] }}</span>
-                                @endif
-                            @elseif ($cr['note'])
-                                {{ $cr['note'] }}
-                            @else
-                                —
-                            @endif
-                        </td>
-                        {{-- Action --}}
-                        <td class="px-4 py-2 text-center">
-                            <button wire:click="openOpModal({{ $cr['voyage_id'] }}, 'readiness')"
-                                class="px-2.5 py-1 rounded border text-[10px] font-medium transition
-                                    {{ $cr['status'] === 'pending'
-                                        ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
-                                        : 'border-gray-200 bg-gray-50 text-gray-500 hover:bg-gray-100' }}">
-                                {{ $cr['status'] === 'pending' ? 'Input' : 'Update' }}
-                            </button>
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
         @endif
 
+        {{-- Sprint B4.5: whether the Calendar grid actually has any chip
+             drives both (a) the partial's empty-state vs full-grid choice,
+             and (b) the gap into Evaluation right below — a fully empty
+             grid is visually short, so the gap after it is tightened to
+             match, keeping Calendar+Evaluation feeling like one zone
+             instead of leaving an oversized gap behind an "empty" table.
+             Only reads already-loaded $calendar data — no new query. --}}
+        @php
+            $calendarHasChips = false;
+            if (count($calendar)) {
+                foreach ($calendar['bucket'] ?? [] as $laneChips) {
+                    foreach ($laneChips as $dayChips) {
+                        if (! empty($dayChips)) {
+                            $calendarHasChips = true;
+                            break 2;
+                        }
+                    }
+                }
+            }
+        @endphp
 
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- OPERATIONAL MONITORING MATRIX (primary workspace)             --}}
-        {{-- Scope: voyage dengan shipment aktif (cargo monitoring)        --}}
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
-        @include('filament.pages.partials.tam-matrix-view')
-
-
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- OPERATIONAL CALENDAR (below matrix)                           --}}
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
         @if (count($calendar))
-            @include('filament.pages.partials.tam-calendar')
+            <div class="mt-4">
+                @include('filament.pages.partials.tam-calendar')
+            </div>
         @endif
 
-
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- OPERATIONAL EVALUATION                                        --}}
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
         @if (!empty($evaluation))
-            @include('filament.pages.partials.tam-evaluation')
+            <div class="{{ count($calendar) && ! $calendarHasChips ? 'mt-2' : 'mt-4' }}">
+                @include('filament.pages.partials.tam-evaluation')
+            </div>
         @endif
 
 
@@ -431,10 +333,12 @@
                                 </label>
                                 <div class="flex gap-3">
                                     <label class="flex items-center gap-1.5 cursor-pointer">
+                                        {{-- VI Sprint / VR1 WARNING 1 — recording "OK" is a
+                                             neutral confirmation, not a celebration. --}}
                                         <input type="radio" wire:model.live="actionForm.readiness"
                                             value="{{ \App\Enums\VesselCheckLogStatus::OK->value }}"
-                                            class="text-green-600 focus:ring-green-500">
-                                        <span class="text-xs font-medium text-green-700">OK</span>
+                                            class="text-gray-700 focus:ring-gray-400">
+                                        <span class="text-xs font-medium text-gray-700">OK</span>
                                     </label>
                                     <label class="flex items-center gap-1.5 cursor-pointer">
                                         <input type="radio" wire:model.live="actionForm.readiness"
@@ -569,11 +473,15 @@
                             {{-- Status badge --}}
                             @php
                                 $dvStatus = $dv->operational_status_enum;
+                                // VI Sprint / VR1 WARNING 1 — Drawer's status badge unified
+                                // with the Fleet Board's $position language: only Delay stays
+                                // red (severity); Sailing/Selesai are healthy states, quiet
+                                // graphite, distinguished by weight not by blue/green.
                                 $dvBadge = match ($dvStatus) {
                                     \App\Enums\VoyageOperationalStatus::DELAYED   => ['Delay', 'bg-red-50 text-red-700 border-red-200'],
-                                    \App\Enums\VoyageOperationalStatus::SAILING   => ['Sailing', 'bg-blue-50 text-blue-700 border-blue-200'],
-                                    \App\Enums\VoyageOperationalStatus::COMPLETED => ['Selesai', 'bg-green-50 text-green-700 border-green-200'],
-                                    default                                       => ['Terjadwal', 'bg-gray-50 text-gray-600 border-gray-200'],
+                                    \App\Enums\VoyageOperationalStatus::SAILING   => ['Sailing', 'bg-gray-50 text-gray-700 border-gray-200'],
+                                    \App\Enums\VoyageOperationalStatus::COMPLETED => ['Selesai', 'bg-gray-50 text-gray-500 border-gray-200'],
+                                    default                                       => ['Terjadwal', 'bg-gray-50 text-gray-400 border-gray-200'],
                                 };
                             @endphp
                             <div>
@@ -666,8 +574,11 @@
                                                     (bool) $ms->is_overdue  => 'late',
                                                     default                 => 'pending',
                                                 };
+                                                // VI Sprint / VR1 WARNING 2 — milestone completion is
+                                                // monochrome (VM2 §0.6): a completed stage is a
+                                                // quiet filled dot, not green. Only late stays red.
                                                 $msColor = match ($msStatus) {
-                                                    'done'    => 'bg-green-500',
+                                                    'done'    => 'bg-gray-600',
                                                     'late'    => 'bg-red-500',
                                                     default   => 'bg-gray-300',
                                                 };
@@ -717,6 +628,12 @@
                                 <button wire:click="openOpModal({{ $dv->id }}, 'readiness')"
                                     class="px-2.5 py-1 rounded border border-orange-200 bg-orange-50/40 text-[10px] text-orange-600 hover:bg-orange-50 transition">
                                     Readiness
+                                </button>
+                                {{-- WX2 — cargo actual recording relocated here from
+                                     the retired Fleet Board so its entry point survives. --}}
+                                <button wire:click="openOpModal({{ $dv->id }}, 'cargo')"
+                                    class="px-2.5 py-1 rounded border border-gray-200 bg-white text-[10px] text-gray-600 hover:border-gray-400 transition">
+                                    Cargo
                                 </button>
                             </div>
                         </div>

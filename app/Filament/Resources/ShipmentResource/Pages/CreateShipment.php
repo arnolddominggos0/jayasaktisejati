@@ -95,6 +95,17 @@ class CreateShipment extends CreateRecord
             ]);
         }
 
+        // Smart Origin by Office — backend protection (always override).
+        // Primary: resolve from authenticated user's branch.
+        // Fallback: resolve from the shipment's final branch_id (e.g. super admin SEA where branch came from POL).
+        $resolvedOrigin = ShipmentResource::resolveOriginCityFromUser();
+        if (! $resolvedOrigin['city_id'] && ! empty($data['branch_id'])) {
+            $resolvedOrigin = ShipmentResource::resolveOriginCityFromUser((int) $data['branch_id']);
+        }
+        if ($resolvedOrigin['city_id']) {
+            $data['origin_city_id'] = $resolvedOrigin['city_id'];
+        }
+
         // ── Code ───────────────────────────────────────────────────────────
         if (empty($data['code'])) {
             $data['code'] = Shipment::generateCode($data['mode'] ?? null);
