@@ -66,5 +66,27 @@ class AppServiceProvider extends ServiceProvider
                 Livewire::component($alias, $componentClass);
             }
         }
+
+        // ── TEMPORARY — OCR-01B Livewire payload investigation ─────────────
+        // Tap SETIAP mutasi property Livewire yang datang dari browser.
+        // Event 'update' dipicu di HandleComponents::updateProperty() SEBELUM
+        // pemeriksaan "public property not found" — jadi path beracun yang
+        // menyebabkan "Public property [$]" pasti terekam di sini, tepat pada
+        // request yang crash. HAPUS blok ini setelah OCR-01B selesai.
+        if (app()->environment('local')) {
+            \Livewire\on('update', function ($component, $fullPath, $value) {
+                $firstSegment = explode('.', (string) $fullPath)[0];
+
+                \Illuminate\Support\Facades\Log::info('OCR-01B UPDATE TAP', [
+                    'component'      => method_exists($component, 'getName') ? $component->getName() : get_class($component),
+                    'field_name'     => $firstSegment,
+                    'state_path'     => $fullPath,
+                    'update_payload' => is_scalar($value) || is_null($value)
+                        ? $value
+                        : get_debug_type($value),
+                    'SUSPICIOUS'     => $firstSegment === '' || str_contains((string) $fullPath, '$'),
+                ]);
+            });
+        }
     }
 }

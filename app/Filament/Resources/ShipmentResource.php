@@ -482,6 +482,18 @@ class ShipmentResource extends Resource
                                     ->maxLength(1000)
                                     ->columnSpan(['default' => 12, 'md' => 6]),
                             ])->columnSpan(12),
+
+                            // OCR-02 — Extraction Summary: bagian dari wizard
+                            // (bukan modal). Muncul hanya bila upload SPPB
+                            // menghasilkan IntakePrefill; form tidak berubah
+                            // sebelum admin menekan Terapkan.
+                            ViewField::make('intake_extraction_summary')
+                                ->view('filament.forms.intake.extraction-summary')
+                                ->dehydrated(false)
+                                ->visible(fn ($livewire) => property_exists($livewire, 'intakePrefill')
+                                    && $livewire->intakePrefill !== null
+                                    && ! $livewire->intakePrefill->isEmpty())
+                                ->columnSpan(12),
                             ]),
                     ])
                     ->compact(),

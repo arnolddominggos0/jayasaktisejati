@@ -8,10 +8,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
-/**
- * WS-01A/A.1 temporary smoke test — verifies the workspace shell renders.
- * Delete after the sprint verification (not part of the permanent suite).
- */
+
 class Ws01aShellSmokeTest extends TestCase
 {
     use RefreshDatabase;

@@ -34,9 +34,15 @@ final class IntakePrefill implements Wireable
      * @param array{channel: string, artifacts: array<int, string>, received_at: ?string} $source
      * @param array{number: ?string, date: ?string, confidence: array<string, float>} $document
      * @param array<string, array{value: mixed, confidence: float}> $copyFields
-     * @param array{detected_count: int, units: array<int, array<string, mixed>>} $manifest
+     * @param array{detected_count: int, claimed_count: ?int, units: array<int, array<string, mixed>>} $manifest
      * @param array<string, array{value: mixed, confidence: float, match: ?string}> $suggestions
      * @param array<int, array{code: string, message: string}> $warnings
+     * @param array{customer_text: ?string, receiver_text: ?string, pic_name: ?string, email: ?string} $parties
+     *        OCR-01E — klaim TEKS pihak-pihak dari dokumen. Belum di-resolve
+     *        ke entity; resolusi tetap milik blok suggestions.
+     * @param array{vessel_name: ?string, document_etd: ?string} $voyageHints
+     *        OCR-01E — hint pencocokan voyage. TIDAK PERNAH ditulis ke
+     *        Shipment (jadwal milik Voyage); hanya konteks untuk Review UI.
      */
     public function __construct(
         public readonly array $source,
@@ -45,6 +51,8 @@ final class IntakePrefill implements Wireable
         public readonly array $manifest,
         public readonly array $suggestions,
         public readonly array $warnings,
+        public readonly array $parties = ['customer_text' => null, 'receiver_text' => null, 'pic_name' => null, 'email' => null],
+        public readonly array $voyageHints = ['vessel_name' => null, 'document_etd' => null],
     ) {
     }
 
@@ -65,7 +73,7 @@ final class IntakePrefill implements Wireable
             ],
             document: ['number' => null, 'date' => null, 'confidence' => []],
             copyFields: [],
-            manifest: ['detected_count' => 0, 'units' => []],
+            manifest: ['detected_count' => 0, 'claimed_count' => null, 'units' => []],
             suggestions: [],
             warnings: [],
         );
@@ -77,15 +85,26 @@ final class IntakePrefill implements Wireable
             && $this->document['date'] === null
             && $this->copyFields === []
             && ($this->manifest['detected_count'] ?? 0) === 0
-            && $this->suggestions === [];
+            && $this->suggestions === []
+            && array_filter($this->parties) === []
+            && array_filter($this->voyageHints) === [];
     }
 
     public function detectedFieldCount(): int
     {
         return count($this->copyFields)
             + count($this->suggestions)
+            + count(array_filter($this->parties, fn ($v) => $v !== null))
+            + count(array_filter($this->voyageHints, fn ($v) => $v !== null))
             + ($this->document['number'] !== null ? 1 : 0)
             + ($this->document['date'] !== null ? 1 : 0);
+    }
+
+    public function claimedUnitCount(): ?int
+    {
+        $claimed = $this->manifest['claimed_count'] ?? null;
+
+        return $claimed === null ? null : (int) $claimed;
     }
 
     public function unitCount(): int
@@ -141,8 +160,28 @@ final class IntakePrefill implements Wireable
             ];
         }
 
+        foreach (['customer_text' => 'Customer (teks)', 'receiver_text' => 'Penerima (teks)', 'pic_name' => 'PIC', 'email' => 'Email'] as $key => $label) {
+            if (($this->parties[$key] ?? null) !== null) {
+                $items[] = ['status' => 'detected', 'label' => $label . ' terbaca: ' . $this->parties[$key]];
+            }
+        }
+
+        if (($this->voyageHints['vessel_name'] ?? null) !== null) {
+            $etd = $this->voyageHints['document_etd'] ?? null;
+            $items[] = [
+                'status' => 'detected',
+                'label'  => 'Kapal disebut di dokumen: ' . $this->voyageHints['vessel_name']
+                    . ($etd !== null ? " (ETD dokumen: {$etd})" : ''),
+            ];
+        }
+
         if ($this->unitCount() > 0) {
-            $items[] = ['status' => 'detected', 'label' => $this->unitCount() . ' unit terdeteksi'];
+            $claimed = $this->claimedUnitCount();
+            $items[] = [
+                'status' => 'detected',
+                'label'  => $this->unitCount() . ' unit terdeteksi'
+                    . ($claimed !== null ? " (dokumen menyatakan total {$claimed})" : ''),
+            ];
         }
 
         foreach ($this->warnings as $warning) {
@@ -164,6 +203,9 @@ final class IntakePrefill implements Wireable
             'destination_city_id' => 'Kota tujuan',
             'delivery_scope'      => 'Cakupan layanan',
             'notes'               => 'Catatan',
+            'destination'           => 'Tujuan',
+            'destination_city_hint' => 'Kota tujuan (hint)',
+            'pickup_location'       => 'Lokasi jemput unit',
             default               => ucfirst(str_replace('_', ' ', $field)),
         };
     }
@@ -179,6 +221,8 @@ final class IntakePrefill implements Wireable
             'manifest'    => $this->manifest,
             'suggestions' => $this->suggestions,
             'warnings'    => $this->warnings,
+            'parties'     => $this->parties,
+            'voyageHints' => $this->voyageHints,
         ];
     }
 
@@ -188,9 +232,11 @@ final class IntakePrefill implements Wireable
             source: $value['source'] ?? ['channel' => 'manual', 'artifacts' => [], 'received_at' => null],
             document: $value['document'] ?? ['number' => null, 'date' => null, 'confidence' => []],
             copyFields: $value['copyFields'] ?? [],
-            manifest: $value['manifest'] ?? ['detected_count' => 0, 'units' => []],
+            manifest: $value['manifest'] ?? ['detected_count' => 0, 'claimed_count' => null, 'units' => []],
             suggestions: $value['suggestions'] ?? [],
             warnings: $value['warnings'] ?? [],
+            parties: $value['parties'] ?? ['customer_text' => null, 'receiver_text' => null, 'pic_name' => null, 'email' => null],
+            voyageHints: $value['voyageHints'] ?? ['vessel_name' => null, 'document_etd' => null],
         );
     }
 }

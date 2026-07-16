@@ -11,31 +11,12 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-/**
- * SPPB Document Assist Service
- *
- * Processes uploaded SPPB/DO documents and produces an IntakePrefill —
- * the channel-neutral extraction envelope. Extraction is an ASSISTANT:
- * it never writes into form/Livewire state. Review (OCR-02) and Apply
- * (OCR-03) are separate, explicit steps owned by the Office Admin.
- *
- * Sprint 1.5: Infrastructure foundation (apply/assist pipeline, match helpers).
- * Sprint 1.6: Header extraction (doc_number, date, sender, receiver, destination, coverage, notes).
- *   - Lightweight PDF text-stream extraction (no external package).
- *   - Regex-based key-value pair parsing.
- *   - Match helpers resolve raw text to master data IDs.
- * Sprint OCR-01: extract()/assist() return IntakePrefill; apply() is no
- *   longer called automatically (kept for the explicit Apply in OCR-03).
- * Sprint 1.7 (future): Unit table extraction (model, VIN, engine, color, qty, DO, police).
- */
+
 class SppbAssistService
 {
     protected float $confidenceThreshold = 0.70;
 
-    /**
-     * Label keywords used to locate header fields in the document text.
-     * Each field maps to an ordered list of possible label patterns.
-     */
+
     protected const HEADER_LABELS = [
         'doc_number' => [
             'no\.?\s*(sppb|dokumen|surat|do)',
@@ -68,11 +49,17 @@ class SppbAssistService
             'kota',
         ],
         'delivery_scope' => [
+            'syarat\s*kirim', // OCR-01E — label yang dipakai SPPB Hasjrat
             'coverage',
             'cakupan',
             'layanan',
             'service',
             'scope',
+        ],
+        'pickup_location' => [ // OCR-01E — lokasi jemput unit
+            'lokasi\s*unit',
+            'lokasi\s*pickup',
+            'lokasi\s*penjemputan',
         ],
         'notes' => [
             'catatan',
@@ -84,25 +71,7 @@ class SppbAssistService
         ],
     ];
 
-    /**
-     * Raw suggestion keys that are ENTITY RESOLUTIONS (name → master-data id).
-     * These land in IntakePrefill->suggestions and are never auto-applied
-     * as links — the admin confirms the match (intake architecture review §4).
-     */
-    protected const RESOLUTION_FIELDS = [
-        'customer_id',
-        'receiver_id',
-        'destination_city_id',
-    ];
 
-    /**
-     * Process uploaded SPPB/DO document(s) into an IntakePrefill envelope.
-     *
-     * OCR-01: this method no longer returns form fields — it returns the
-     * intermediate extraction result. Nothing here touches Livewire state.
-     *
-     * @param array|string $filePaths  File path(s) relative to the upload disk.
-     */
     public function extract(array|string $filePaths): IntakePrefill
     {
         $paths = (array) $filePaths;
@@ -135,7 +104,7 @@ class SppbAssistService
                 source: $this->sourceMeta($artifacts),
                 document: ['number' => null, 'date' => null, 'confidence' => []],
                 copyFields: [],
-                manifest: ['detected_count' => 0, 'units' => []],
+                manifest: ['detected_count' => 0, 'claimed_count' => null, 'units' => []],
                 suggestions: [],
                 warnings: [[
                     'code'    => 'document_unreadable',
@@ -144,82 +113,453 @@ class SppbAssistService
             );
         }
 
-        $raw = $this->extractSuggestionsFromText($text);
-
-        return $this->buildPrefill($artifacts, $raw);
+        return $this->buildPrefillFromText($artifacts, $text);
     }
 
-    /**
-     * Classify raw suggestions into the envelope's field species.
-     * doc_number/requested_at → document; RESOLUTION_FIELDS → suggestions;
-     * everything else (scalar values) → copyFields.
-     */
-    protected function buildPrefill(array $artifacts, array $raw): IntakePrefill
+    /*
+    |--------------------------------------------------------------------------
+    | OCR-01E — DOMAIN EXTRACTION (Text → IntakePrefill)
+    |
+    | Ekstraksi dipecah per tanggung jawab domain:
+    |   DocumentExtractor    → document.number / document.date
+    |   PartyExtractor       → customer_text / receiver_text / pic / email
+    |   ShipmentExtractor    → destination / pickup_location / scope / notes
+    |   VoyageHintExtractor  → vessel_name / document_etd (hint, BUKAN field)
+    |   ManifestExtractor    → units[] ber-anchor VIN + claimed_count
+    | Resolusi entity (customer/receiver/city) tetap di layer suggestion.
+    |--------------------------------------------------------------------------
+    */
+
+    /** Orkestrator: teks parser → envelope IntakePrefill lengkap. */
+    protected function buildPrefillFromText(array $artifacts, string $text): IntakePrefill
     {
-        $document    = ['number' => null, 'date' => null, 'confidence' => []];
-        $copyFields  = [];
-        $suggestions = [];
+        $document    = $this->extractDocument($text);
+        $parties     = $this->extractParties($text);
+        $claims      = $this->extractShipmentClaims($text);
+        $voyageHints = $this->extractVoyageHints($text);
+        $manifest    = $this->extractManifest($text);
+        $suggestions = $this->resolveSuggestions($parties, $claims);
+        $copyFields  = $this->buildCopyFields($claims);
 
-        foreach ($raw as $field => $data) {
-            if ($field === 'doc_number') {
-                $document['number']               = $data['value'];
-                $document['confidence']['number'] = $data['confidence'];
-                continue;
-            }
+        $warnings = $this->collectWarnings($document, $copyFields, $suggestions, $parties, $voyageHints, $manifest);
 
-            if ($field === 'requested_at') {
-                $document['date']               = $data['value'];
-                $document['confidence']['date'] = $data['confidence'];
-                continue;
-            }
-
-            if (in_array($field, self::RESOLUTION_FIELDS, true)) {
-                $suggestions[$field] = [
-                    'value'      => $data['value'],
-                    'confidence' => $data['confidence'],
-                    'match'      => $data['match'] ?? null,
-                ];
-                continue;
-            }
-
-            $copyFields[$field] = [
-                'value'      => $data['value'],
-                'confidence' => $data['confidence'],
+        // vin_invalid — ada baris indeks unit ("1.", "2.", …) yang tidak
+        // menghasilkan row ber-VIN valid.
+        $indexRows = preg_match_all('/^\s*\d+\.\s*$/m', $text);
+        if ($indexRows > ($manifest['detected_count'] ?? 0)) {
+            $warnings[] = [
+                'code'    => 'vin_invalid',
+                'message' => 'Sebagian baris unit tidak memiliki VIN 17 karakter yang valid — periksa tabel unit.',
             ];
         }
 
-        $warnings = [];
-
-        $nothingDetected = $document['number'] === null
-            && $document['date'] === null
-            && $copyFields === []
-            && $suggestions === [];
-
-        if ($nothingDetected) {
-            $warnings[] = [
-                'code'    => 'no_fields_detected',
-                'message' => 'Tidak ada field yang terdeteksi dari dokumen — isi formulir secara manual.',
-            ];
-        } else {
-            // Unit-table extraction belum tersedia (Sprint 1.7) — nyatakan
-            // jujur supaya admin tahu manifest tetap diinput manual.
-            $warnings[] = [
-                'code'    => 'manifest_not_extracted',
-                'message' => 'Tabel unit belum terbaca otomatis — masukkan unit secara manual.',
-            ];
-        }
+        Log::info('SPPB AUDIT domain extraction', [
+            'stage'          => 'domain-extraction',
+            'document'       => $document['number'] !== null || $document['date'] !== null,
+            'parties'        => array_keys(array_filter($parties)),
+            'copy_fields'    => array_keys($copyFields),
+            'voyage_hints'   => array_keys(array_filter($voyageHints)),
+            'suggestions'    => array_keys($suggestions),
+            'manifest_rows'  => $manifest['detected_count'],
+            'claimed_count'  => $manifest['claimed_count'],
+            'warning_codes'  => array_column($warnings, 'code'),
+        ]);
 
         return new IntakePrefill(
             source: $this->sourceMeta($artifacts),
             document: $document,
             copyFields: $copyFields,
-            manifest: ['detected_count' => 0, 'units' => []],
+            manifest: $manifest,
             suggestions: $suggestions,
             warnings: $warnings,
+            parties: $parties,
+            voyageHints: $voyageHints,
         );
     }
 
-    /** Source block for the envelope (channel + artifact names). */
+    /** DocumentExtractor — identitas artefak. */
+    protected function extractDocument(string $text): array
+    {
+        $number = $this->extractDocNumber($text);
+        $date   = $this->extractDate($text);
+
+        $confidence = [];
+        if ($number !== null) {
+            $confidence['number'] = 0.95;
+        }
+        if ($date !== null) {
+            $confidence['date'] = 0.85;
+        }
+
+        return ['number' => $number, 'date' => $date, 'confidence' => $confidence];
+    }
+
+    /** PartyExtractor — klaim TEKS pihak; resolusi entity bukan di sini. */
+    protected function extractParties(string $text): array
+    {
+        // Customer = badan usaha pertama di kepala dokumen (penerbit SPPB).
+        $customer = null;
+        $lines = array_values(array_filter(array_map('trim', preg_split('/\r?\n/', $text) ?: [])));
+        foreach (array_slice($lines, 0, 6) as $line) {
+            if (preg_match('/^(?:PT|CV|UD|TB)\.?\s+\S+/i', $line) && mb_strlen($line) <= 80) {
+                $customer = $line;
+                break;
+            }
+        }
+
+        $pic = null;
+        if (preg_match('/^\s*UP\s*[:\-]\s*(.+)$/mi', $text, $m)) {
+            $pic = trim($m[1]);
+            $pic = ($pic !== '' && mb_strlen($pic) <= 80) ? $pic : null;
+        }
+
+        $email = null;
+        if (preg_match('/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i', $text, $m)) {
+            $email = strtolower($m[0]);
+        }
+
+        return [
+            'customer_text' => $customer,
+            'receiver_text' => $this->extractByLabel($text, self::HEADER_LABELS['receiver']),
+            'pic_name'      => $pic,
+            'email'         => $email,
+        ];
+    }
+
+    /** ShipmentExtractor — klaim teks field administratif. */
+    protected function extractShipmentClaims(string $text): array
+    {
+        $destination = $this->extractByLabel($text, self::HEADER_LABELS['destination']);
+
+        return [
+            'destination'           => $destination,
+            'destination_city_hint' => $this->deriveCityHint($destination),
+            'pickup_location'       => $this->extractByLabel($text, self::HEADER_LABELS['pickup_location']),
+            'delivery_scope'        => $this->extractByLabel($text, self::HEADER_LABELS['delivery_scope']),
+            'notes'                 => $this->extractByLabel($text, self::HEADER_LABELS['notes']),
+        ];
+    }
+
+    /**
+     * OCR-02B — turunkan hint KOTA dari teks tujuan secara GENERIK
+     * (tanpa aturan per-kota): buang token prefiks badan usaha
+     * (PT/CV/UD/TB) dan token singkatan pendek ber-kapital (≤3 huruf,
+     * mis. "HA" = Hasjrat Abadi); sisa teks = kandidat nama kota.
+     *
+     *   "PT. HA KOTAMOBAGU" → "KOTAMOBAGU"
+     *   "PT. HA MANADO"     → "MANADO"
+     *   "PT. HASJRAT ABADI MANADO" → "HASJRAT ABADI MANADO"
+     *     (multi-kata — lookup unik di sisi Apply yang memutuskan;
+     *      gagal unik → dibiarkan kosong untuk admin)
+     */
+    protected function deriveCityHint(?string $destination): ?string
+    {
+        if ($destination === null || trim($destination) === '') {
+            return null;
+        }
+
+        $tokens = preg_split('/\s+/', trim($destination)) ?: [];
+
+        $remaining = array_values(array_filter($tokens, function (string $token): bool {
+            if (preg_match('/^(?:PT|CV|UD|TB)\.?,?$/i', $token)) {
+                return false; // prefiks badan usaha
+            }
+            if (preg_match('/^[A-Z]{1,3}\.?$/', $token)) {
+                return false; // singkatan pendek (HA, HAB, dst.)
+            }
+
+            return true;
+        }));
+
+        $hint = trim(implode(' ', $remaining), " \t.,:-");
+
+        return ($hint !== '' && mb_strlen($hint) >= 3) ? $hint : null;
+    }
+
+    /**
+     * VoyageHintExtractor — hint pencocokan voyage untuk Review UI.
+     * TIDAK PERNAH mengisi field Shipment: jadwal milik Voyage (frozen rule).
+     */
+    protected function extractVoyageHints(string $text): array
+    {
+        $vessel = null;
+        if (preg_match('/nama\s*kapal\s*[:\-]?\s*(.+)$/mi', $text, $m)) {
+            $candidate = trim($m[1]);
+            $vessel = ($candidate !== '' && mb_strlen($candidate) <= 80) ? $candidate : null;
+        }
+
+        $etd = null;
+        if (preg_match('/\bETD[^:\n\r]*[:\-]\s*([0-9]{1,2}[\/\-][0-9]{1,2}[\/\-][0-9]{4})/i', $text, $m)) {
+            $etd = $this->extractDate($m[1]);
+        }
+
+        return ['vessel_name' => $vessel, 'document_etd' => $etd];
+    }
+
+    /**
+     * ManifestExtractor — tabel unit ber-anchor VIN 17 karakter (tanpa I/O/Q).
+     * Tidak bergantung posisi kolom: mendukung layout satu-field-per-baris
+     * (output parser saat ini) dan baris inline (fallback spasi berbeda).
+     */
+    protected function extractManifest(string $text): array
+    {
+        $lines = array_values(array_filter(
+            array_map('trim', preg_split('/\r?\n/', $text) ?: []),
+            fn ($l) => $l !== ''
+        ));
+
+        $units = [];
+
+        foreach ($lines as $i => $line) {
+            if (! preg_match('/\b([A-HJ-NPR-Z0-9]{17})\b/', $line, $m)) {
+                continue;
+            }
+
+            $vin = $m[1];
+            if (! preg_match('/\d/', $vin)) {
+                continue; // hindari "kata" 17 huruf tanpa digit
+            }
+
+            $unit = ($line === $vin)
+                ? $this->manifestRowFromBlock($lines, $i, $vin)
+                : $this->manifestRowFromInline($line, $vin);
+
+            if ($unit !== null) {
+                $units[] = $unit;
+            }
+        }
+
+        $claimed = null;
+        if (preg_match('/\bTotal\s*(?:Unit)?\s*[:\-]?\s*(\d{1,4})\b/i', $text, $m)) {
+            $claimed = (int) $m[1];
+        }
+
+        return [
+            'detected_count' => count($units),
+            'claimed_count'  => $claimed,
+            'units'          => $units,
+        ];
+    }
+
+    /** Row manifest dari layout satu-field-per-baris (VIN berdiri sendiri). */
+    protected function manifestRowFromBlock(array $lines, int $vinIndex, string $vin): ?array
+    {
+        $reg   = $lines[$vinIndex - 1] ?? null;
+        $model = $lines[$vinIndex - 2] ?? null;
+
+        // Baris indeks unit ("1.") bukan model/reg.
+        if ($model !== null && preg_match('/^\d+\.?$/', $model)) {
+            $model = null;
+        }
+        if ($reg !== null && preg_match('/^\d+\.?$/', $reg)) {
+            $reg = null;
+        }
+        // Reg selalu mengandung digit; jika tidak, baris itu sebenarnya model.
+        if ($reg !== null && ! preg_match('/\d/', $reg)) {
+            $model = $reg;
+            $reg   = null;
+        }
+
+        $engine = $lines[$vinIndex + 1] ?? null;
+        if ($engine !== null && (! preg_match('/\d/', $engine) || mb_strlen($engine) > 20)) {
+            $engine = null;
+        }
+
+        $color = $lines[$vinIndex + 2] ?? null;
+        if ($color !== null && ! preg_match('/^[A-Z][A-Z ]{2,30}$/', $color)) {
+            $color = null;
+        }
+
+        $do = $lines[$vinIndex + 3] ?? null;
+        if ($do !== null && ! str_contains($do, '/')) {
+            $do = null;
+        }
+
+        $qtyLine = $lines[$vinIndex + 4] ?? null;
+        $qty = ($qtyLine !== null && preg_match('/^\d{1,3}$/', $qtyLine)) ? (int) $qtyLine : 1;
+
+        return [
+            'model'     => $model,
+            'vin'       => $vin,
+            'reg_no'    => $reg,
+            'engine'    => $engine,
+            'color'     => $color,
+            'do_number' => $do,
+            'qty'       => $qty,
+        ];
+    }
+
+    /** Row manifest dari satu baris inline (fallback — tahan spasi berbeda). */
+    protected function manifestRowFromInline(string $line, string $vin): ?array
+    {
+        $parts = preg_split('/\s+/', trim($line)) ?: [];
+        $vinIdx = array_search($vin, $parts, true);
+        if ($vinIdx === false) {
+            return null;
+        }
+
+        $before = array_slice($parts, 0, $vinIdx);
+        $after  = array_values(array_slice($parts, $vinIdx + 1));
+
+        if (isset($before[0]) && preg_match('/^\d+\.?$/', $before[0])) {
+            array_shift($before); // buang nomor urut
+        }
+
+        $reg = null;
+        if ($before !== [] && preg_match('/\d/', (string) end($before))) {
+            $reg = array_pop($before);
+        }
+        $model = $before !== [] ? implode(' ', $before) : null;
+
+        $engine = $after[0] ?? null;
+
+        $do = null;
+        $doIdx = null;
+        foreach ($after as $idx => $tok) {
+            if ($idx === 0) {
+                continue;
+            }
+            if (str_contains($tok, '/')) {
+                $do = $tok;
+                $doIdx = $idx;
+                break;
+            }
+        }
+
+        $qty = 1;
+        if ($doIdx !== null && isset($after[$doIdx + 1]) && preg_match('/^\d{1,3}$/', $after[$doIdx + 1])) {
+            $qty = (int) $after[$doIdx + 1];
+        }
+
+        $colorTokens = $doIdx !== null ? array_slice($after, 1, $doIdx - 1) : array_slice($after, 1);
+        $color = $colorTokens !== [] ? implode(' ', $colorTokens) : null;
+
+        return [
+            'model'     => $model,
+            'vin'       => $vin,
+            'reg_no'    => $reg,
+            'engine'    => $engine,
+            'color'     => $color,
+            'do_number' => $do,
+            'qty'       => $qty,
+        ];
+    }
+
+    /** Layer suggestion (existing matchers) — resolusi teks → master data. */
+    protected function resolveSuggestions(array $parties, array $claims): array
+    {
+        $suggestions = [];
+
+        if ($parties['customer_text'] !== null && ($match = $this->matchCustomer($parties['customer_text'])) !== null) {
+            $suggestions['customer_id'] = $match;
+        }
+
+        if ($parties['receiver_text'] !== null && ($match = $this->matchReceiver($parties['receiver_text'])) !== null) {
+            $suggestions['receiver_id'] = $match;
+        }
+
+        if ($claims['destination'] !== null && ($match = $this->matchCity($claims['destination'])) !== null) {
+            $suggestions['destination_city_id'] = $match;
+        }
+
+        return $suggestions;
+    }
+
+    /** Klaim scalar yang siap di-Apply (OCR-03) — nilai teks/enum. */
+    protected function buildCopyFields(array $claims): array
+    {
+        $copy = [];
+
+        if ($claims['destination'] !== null) {
+            $copy['destination'] = ['value' => $claims['destination'], 'confidence' => 0.75];
+        }
+        if (($claims['destination_city_hint'] ?? null) !== null) {
+            // OCR-02B — hint kota untuk lookup Master City di sisi Apply.
+            $copy['destination_city_hint'] = ['value' => $claims['destination_city_hint'], 'confidence' => 0.70];
+        }
+        if ($claims['pickup_location'] !== null) {
+            $copy['pickup_location'] = ['value' => $claims['pickup_location'], 'confidence' => 0.75];
+        }
+        if ($claims['notes'] !== null) {
+            $copy['notes'] = ['value' => $claims['notes'], 'confidence' => 0.75];
+        }
+        if ($claims['delivery_scope'] !== null && ($scope = $this->matchDeliveryScope($claims['delivery_scope'])) !== null) {
+            $copy['delivery_scope'] = $scope;
+        }
+
+        return $copy;
+    }
+
+    /** Warnings OCR-01E — gap jujur, bukan exception. */
+    protected function collectWarnings(
+        array $document,
+        array $copyFields,
+        array $suggestions,
+        array $parties,
+        array $voyageHints,
+        array $manifest,
+    ): array {
+        $nothingDetected = $document['number'] === null
+            && $document['date'] === null
+            && $copyFields === []
+            && $suggestions === []
+            && array_filter($parties) === []
+            && array_filter($voyageHints) === []
+            && ($manifest['detected_count'] ?? 0) === 0;
+
+        if ($nothingDetected) {
+            return [[
+                'code'    => 'no_fields_detected',
+                'message' => 'Tidak ada field yang terdeteksi dari dokumen — isi formulir secara manual.',
+            ]];
+        }
+
+        $warnings = [];
+
+        if (! isset($copyFields['delivery_scope'])) {
+            $warnings[] = [
+                'code'    => 'delivery_scope_missing',
+                'message' => 'Syarat kirim tidak terdeteksi dari dokumen — pilih cakupan layanan secara manual.',
+            ];
+        }
+
+        if (($voyageHints['vessel_name'] ?? null) === null) {
+            $warnings[] = [
+                'code'    => 'vessel_not_found',
+                'message' => 'Nama kapal tidak ditemukan di dokumen — pilih voyage tanpa hint.',
+            ];
+        }
+
+        $detected = (int) ($manifest['detected_count'] ?? 0);
+        $claimed  = $manifest['claimed_count'] ?? null;
+
+        if ($detected === 0) {
+            $warnings[] = [
+                'code'    => 'manifest_empty',
+                'message' => 'Tabel unit tidak terdeteksi — masukkan unit secara manual.',
+            ];
+        } else {
+            if ($claimed !== null && (int) $claimed !== $detected) {
+                $warnings[] = [
+                    'code'    => 'unit_count_mismatch',
+                    'message' => "Jumlah unit terdeteksi ({$detected}) berbeda dengan total di dokumen ({$claimed}) — periksa tabel unit.",
+                ];
+            }
+
+            foreach ($manifest['units'] as $idx => $unit) {
+                if (($unit['do_number'] ?? null) === null) {
+                    $no = $idx + 1;
+                    $warnings[] = [
+                        'code'    => 'do_missing',
+                        'message' => "Unit #{$no}: nomor DO tidak terbaca dari dokumen.",
+                    ];
+                }
+            }
+        }
+
+        return $warnings;
+    }
+
     protected function sourceMeta(array $artifacts): array
     {
         return [
@@ -229,10 +569,6 @@ class SppbAssistService
         ];
     }
 
-    /**
-     * Normalize upload state entries to serializable artifact names —
-     * the envelope crosses the Livewire wire, so objects must not leak in.
-     */
     protected function artifactNames(array $paths): array
     {
         return array_values(array_map(function ($p) {
@@ -246,144 +582,6 @@ class SppbAssistService
         }, $paths));
     }
 
-    /**
-     * Regex + match phases over already-extracted text. Body unchanged from
-     * the pre-OCR-01 extract() — same patterns, same confidences, same logs.
-     *
-     * @return array  ['field_name' => ['value' => mixed, 'confidence' => float, ...], ...]
-     */
-    protected function extractSuggestionsFromText(string $text): array
-    {
-        $suggestions = [];
-
-        // --- Regex phase (Task 4) ---
-
-        $docNumber = $this->extractDocNumber($text);
-        Log::info('SPPB AUDIT extract() regex', [
-            'stage' => 'extract(regex)',
-            'field' => 'doc_number',
-            'result' => $docNumber,
-        ]);
-        if ($docNumber !== null) {
-            $suggestions['doc_number'] = ['value' => $docNumber, 'confidence' => 0.95];
-        }
-
-        $date = $this->extractDate($text);
-        Log::info('SPPB AUDIT extract() regex', [
-            'stage' => 'extract(regex)',
-            'field' => 'date',
-            'result' => $date,
-        ]);
-        if ($date !== null) {
-            $suggestions['requested_at'] = ['value' => $date, 'confidence' => 0.85];
-        }
-
-        $senderName = $this->extractByLabel($text, self::HEADER_LABELS['sender']);
-        Log::info('SPPB AUDIT extract() regex', [
-            'stage' => 'extract(regex)',
-            'field' => 'sender',
-            'result' => $senderName,
-        ]);
-
-        $receiverName = $this->extractByLabel($text, self::HEADER_LABELS['receiver']);
-        Log::info('SPPB AUDIT extract() regex', [
-            'stage' => 'extract(regex)',
-            'field' => 'receiver',
-            'result' => $receiverName,
-        ]);
-
-        $destName = $this->extractByLabel($text, self::HEADER_LABELS['destination']);
-        Log::info('SPPB AUDIT extract() regex', [
-            'stage' => 'extract(regex)',
-            'field' => 'destination',
-            'result' => $destName,
-        ]);
-
-        $scopeText = $this->extractByLabel($text, self::HEADER_LABELS['delivery_scope']);
-        Log::info('SPPB AUDIT extract() regex', [
-            'stage' => 'extract(regex)',
-            'field' => 'coverage',
-            'result' => $scopeText,
-        ]);
-
-        $notesText = $this->extractByLabel($text, self::HEADER_LABELS['notes']);
-        Log::info('SPPB AUDIT extract() regex', [
-            'stage' => 'extract(regex)',
-            'field' => 'notes',
-            'result' => $notesText,
-        ]);
-
-        // --- Match phase (Task 5) ---
-
-        if ($senderName !== null) {
-            $match = $this->matchCustomer($senderName);
-            Log::info('SPPB AUDIT extract() match', [
-                'stage' => 'extract(match)',
-                'field' => 'customer',
-                'input' => $senderName,
-                'result' => $match,
-            ]);
-            if ($match !== null) {
-                $suggestions['customer_id'] = $match;
-            }
-        }
-
-        if ($receiverName !== null) {
-            $match = $this->matchReceiver($receiverName);
-            Log::info('SPPB AUDIT extract() match', [
-                'stage' => 'extract(match)',
-                'field' => 'receiver',
-                'input' => $receiverName,
-                'result' => $match,
-            ]);
-            if ($match !== null) {
-                $suggestions['receiver_id'] = $match;
-            }
-        }
-
-        if ($destName !== null) {
-            $match = $this->matchCity($destName);
-            Log::info('SPPB AUDIT extract() match', [
-                'stage' => 'extract(match)',
-                'field' => 'city',
-                'input' => $destName,
-                'result' => $match,
-            ]);
-            if ($match !== null) {
-                $suggestions['destination_city_id'] = $match;
-            }
-        }
-
-        if ($scopeText !== null) {
-            $match = $this->matchDeliveryScope($scopeText);
-            Log::info('SPPB AUDIT extract() match', [
-                'stage' => 'extract(match)',
-                'field' => 'coverage',
-                'input' => $scopeText,
-                'result' => $match,
-            ]);
-            if ($match !== null) {
-                $suggestions['delivery_scope'] = $match;
-            }
-        }
-
-        if ($notesText !== null) {
-            $suggestions['notes'] = ['value' => $notesText, 'confidence' => 0.75];
-        }
-
-        Log::info('SPPB AUDIT extract() final suggestions', [
-            'stage' => 'extract',
-            'suggestion_count' => count($suggestions),
-            'suggestions' => $suggestions,
-        ]);
-
-        return $suggestions;
-    }
-
-    /**
-     * Extract document number (e.g., "0627/LOG-SBR/07/2026").
-     * These follow a consistent pattern of digits + slashes + alpha codes + year.
-     */
     protected function extractDocNumber(string $text): ?string
     {
         $patterns = [
@@ -405,9 +603,6 @@ class SppbAssistService
         return null;
     }
 
-    /**
-     * Extract a date in dd/mm/yyyy or dd-mm-yyyy format.
-     */
     protected function extractDate(string $text): ?string
     {
         $patterns = [
@@ -443,11 +638,6 @@ class SppbAssistService
         return null;
     }
 
-    /**
-     * Extract a value following any of the given label keywords.
-     * Reads the line where the label appears and returns the remainder
-     * after the label (and optional colon/dash separator).
-     */
     protected function extractByLabel(string $text, array $labels): ?string
     {
         $lines = preg_split('/\r?\n/', $text);
@@ -476,11 +666,6 @@ class SppbAssistService
         return null;
     }
 
-    /**
-     * Read text content from all uploaded files.
-     * Supports: plain text, PDF (lightweight text-stream extraction).
-     * Images and other binaries return empty — future sprint adds OCR.
-     */
     protected function extractTextFromFiles(array $paths): string
     {
         $parts = [];
@@ -551,69 +736,90 @@ class SppbAssistService
 
         return $combined;
     }
-
-    /**
-     * Lightweight PDF text extraction.
-     * Extracts text from PDF content streams using regex — no external package.
-     * Handles uncompressed text streams (common in digitally-generated PDFs).
-     */
+    
     protected function extractPdfText(string $pdfContent): string
     {
         $text = '';
 
-        $chunks = preg_split('/stream\s*/', $pdfContent);
-        if ($chunks === false) {
-            return '';
-        }
+        preg_match_all('/(?<!end)stream\r?\n?(.*?)endstream/s', $pdfContent, $streamMatches);
+        $streams = $streamMatches[1];
 
-        foreach ($chunks as $chunk) {
-            $endPos = strpos($chunk, 'endstream');
-            if ($endPos === false) {
-                continue;
-            }
+        $inflatedStreams = 0;
 
-            $stream = substr($chunk, 0, $endPos);
-
+        foreach ($streams as $stream) {
             if (function_exists('gzuncompress')) {
                 $uncompressed = @gzuncompress($stream);
+                if ($uncompressed === false) {
+                    $uncompressed = @gzinflate($stream);
+                }
                 if ($uncompressed !== false) {
                     $stream = $uncompressed;
+                    $inflatedStreams++;
                 }
             }
 
-            preg_match_all('/\(([^)]*)\)\s*Tj/', $stream, $tjMatches);
-            foreach ($tjMatches[1] as $str) {
-                $decoded = $this->decodePdfString($str);
+            preg_match_all(
+                '/\(([^)]*)\)\s*Tj|\[(.*?)\]\s*TJ|\b(Td|TD|ET)\b|(T\*)/s',
+                $stream,
+                $tokens,
+                PREG_SET_ORDER
+            );
+
+            foreach ($tokens as $token) {
+                if ((isset($token[3]) && $token[3] !== '') || (isset($token[4]) && $token[4] !== '')) {
+                    // Operator perpindahan baris → newline logis.
+                    $text .= "\n";
+                    continue;
+                }
+
+                if (isset($token[2]) && $token[2] !== '') {
+                    // [..]TJ — gabung potongan string di dalam array.
+                    preg_match_all('/\(([^)]*)\)/', $token[2], $inner);
+                    foreach ($inner[1] as $str) {
+                        $decoded = $this->decodePdfString($str);
+                        if ($decoded !== '') {
+                            $text .= $decoded . ' ';
+                        }
+                    }
+                    continue;
+                }
+
+                $decoded = $this->decodePdfString($token[1]);
                 if ($decoded !== '') {
                     $text .= $decoded . ' ';
                 }
             }
-
-            preg_match_all('/\[(.*?)\]\s*TJ/', $stream, $tjArrayMatches);
-            foreach ($tjArrayMatches[1] as $arr) {
-                preg_match_all('/\(([^)]*)\)/', $arr, $inner);
-                foreach ($inner[1] as $str) {
-                    $decoded = $this->decodePdfString($str);
-                    if ($decoded !== '') {
-                        $text .= $decoded . ' ';
-                    }
-                }
-            }
         }
 
-        if ($text === '') {
+        if (trim($text) === '') {
             preg_match_all('/\/Title\s*\(([^)]*)\)/', $pdfContent, $meta);
             foreach ($meta[1] as $str) {
                 $text .= $this->decodePdfString($str) . "\n";
             }
         }
 
-        return trim($text);
+        // Rapikan: buang spasi di tepi baris, padatkan newline & spasi ganda.
+        $text = preg_replace('/[ \t]*\n[ \t]*/', "\n", $text);
+        $text = preg_replace('/\n{2,}/', "\n", $text);
+        $text = preg_replace('/[ \t]{2,}/', ' ', $text);
+        $text = trim($text);
+
+        // ── TEMPORARY — OCR-01D parser verification. HAPUS setelah stabil. ─
+        $pageCount = preg_match_all('/\/Type\s*\/Page[^s]/', $pdfContent);
+        Log::info('OCR-01D PARSER', [
+            'parser'                  => 'lightweight-regex (built-in, boundary+line fix)',
+            'pdf_bytes'               => strlen($pdfContent),
+            'stream_count'            => count($streams),
+            'inflated_streams'        => $inflatedStreams,
+            'page_count'              => $pageCount,
+            'text_length'             => strlen($text),
+            'preview_first_300_chars' => mb_substr($text, 0, 300),
+            'preview_last_300_chars'  => mb_substr($text, -300),
+        ]);
+
+        return $text;
     }
 
-    /**
-     * Decode a PDF text string (handles escape sequences).
-     */
     protected function decodePdfString(string $str): string
     {
         $str = str_replace(
@@ -636,9 +842,6 @@ class SppbAssistService
         return $str;
     }
 
-    /**
-     * Match an extracted customer/sender name against master data.
-     */
     public function matchCustomer(?string $name): ?array
     {
         if (! $this->isValidText($name)) {
@@ -676,10 +879,6 @@ class SppbAssistService
         ];
     }
 
-    /**
-     * Match an extracted receiver name against master data.
-     * Receivers are Customer records linked via receiver_id FK.
-     */
     public function matchReceiver(?string $name): ?array
     {
         if (! $this->isValidText($name)) {
@@ -717,9 +916,6 @@ class SppbAssistService
         ];
     }
 
-    /**
-     * Match an extracted destination city name against active cities.
-     */
     public function matchCity(?string $name): ?array
     {
         if (! $this->isValidText($name)) {
@@ -759,9 +955,6 @@ class SppbAssistService
         return null;
     }
 
-    /**
-     * Match delivery scope from text (e.g., "door to door", "port to port").
-     */
     public function matchDeliveryScope(?string $text): ?array
     {
         if (! $this->isValidText($text)) {
@@ -793,31 +986,11 @@ class SppbAssistService
         return null;
     }
 
-    /**
-     * Build a direct suggestion entry (for fields extracted with known values).
-     */
     public function suggest(string $field, mixed $value, float $confidence = 0.75): array
     {
         return [$field => ['value' => $value, 'confidence' => $confidence]];
     }
 
-    /**
-     * Apply extracted suggestions to the form.
-     *
-     * OCR-01: NOT called automatically anymore. Retained for OCR-03, where
-     * the Office Admin's explicit "Terapkan" action will invoke it with the
-     * envelope's applicable fields. Do not wire this back into assist().
-     *
-     * Rules:
-     * - Only fill fields with confidence >= threshold.
-     * - Never overwrite fields that already have a value (respect admin's manual entry).
-     * - Returns list of field names that were filled.
-     *
-     * @param array $suggestions
-     * @param callable $get  Filament Get
-     * @param callable $set  Filament Set
-     * @return array  Field names that were auto-filled
-     */
     public function apply(array $suggestions, callable $get, callable $set): array
     {
         $filled = [];
@@ -876,13 +1049,6 @@ class SppbAssistService
         return $filled;
     }
 
-    /**
-     * OCR-01 pipeline: extract from files → return IntakePrefill → (wait).
-     *
-     * Apply is NO LONGER automatic. The envelope is held by the Livewire
-     * page ($livewire->intakePrefill) until the admin explicitly reviews
-     * (OCR-02) and applies (OCR-03). This method never touches form state.
-     */
     public function assist(array|string $filePaths): IntakePrefill
     {
         $paths = (array) $filePaths;
@@ -906,37 +1072,134 @@ class SppbAssistService
     }
 
     /**
-     * Get the file content for parsing.
-     * Returns raw content or null if file cannot be read.
+     * OCR-01A — baca konten file dari semua bentuk yang mungkin dikirim wizard:
+     * 1. Livewire TemporaryUploadedFile / objek upload lain (getRealPath + file_get_contents)
+     * 2. Path relatif Storage disk 'public'
+     * 3. Absolute path / string path biasa di filesystem
+     * Mengembalikan null bila tidak terbaca. Logging: tipe, real path, mime,
+     * ukuran, dan status keberhasilan baca.
      */
-    public function getFileContent(string $path): ?string
+    public function getFileContent(mixed $file): ?string
     {
-        try {
-            if (! Storage::disk('public')->exists($path)) {
-                return null;
+        // 1) Objek upload (TemporaryUploadedFile, UploadedFile, dsb.)
+        if (is_object($file) && method_exists($file, 'getRealPath')) {
+            $real    = $file->getRealPath();
+            $content = (is_string($real) && $real !== '' && is_readable($real))
+                ? @file_get_contents($real)
+                : false;
+            $via = 'getRealPath';
+
+            // Fallback: file di livewire-tmp bisa saja tidak resolvable sebagai
+            // real path lokal — coba pembacaan via storage milik objeknya.
+            if ($content === false && method_exists($file, 'get')) {
+                try {
+                    $fallback = $file->get();
+                    if (is_string($fallback)) {
+                        $content = $fallback;
+                        $via     = 'object->get()';
+                    }
+                } catch (\Throwable) {
+                    // tetap false — dilog di bawah
+                }
             }
 
-            return Storage::disk('public')->get($path);
-        } catch (\Throwable) {
+            Log::info('SPPB AUDIT getFileContent()', [
+                'stage'     => 'getFileContent',
+                'type'      => get_class($file),
+                'real_path' => $real,
+                'via'       => $via,
+                'mime'      => $this->getMimeType($file),
+                'size'      => $content === false ? null : strlen($content),
+                'readable'  => $content !== false,
+            ]);
+
+            return $content === false ? null : $content;
+        }
+
+        if (! is_string($file)) {
+            Log::info('SPPB AUDIT getFileContent() UNSUPPORTED', [
+                'stage' => 'getFileContent',
+                'type'  => get_debug_type($file),
+            ]);
             return null;
         }
+
+        // 2) Path relatif pada Storage disk 'public'
+        try {
+            if (Storage::disk('public')->exists($file)) {
+                $content = Storage::disk('public')->get($file);
+
+                Log::info('SPPB AUDIT getFileContent()', [
+                    'stage'     => 'getFileContent',
+                    'type'      => 'storage_public_path',
+                    'real_path' => Storage::disk('public')->path($file),
+                    'mime'      => $this->getMimeType($file),
+                    'size'      => strlen($content),
+                    'readable'  => true,
+                ]);
+
+                return $content;
+            }
+        } catch (\Throwable) {
+            // lanjut ke percobaan filesystem langsung
+        }
+
+        // 3) Absolute path / string path biasa
+        if (is_file($file) && is_readable($file)) {
+            $content = @file_get_contents($file);
+
+            Log::info('SPPB AUDIT getFileContent()', [
+                'stage'     => 'getFileContent',
+                'type'      => 'filesystem_path',
+                'real_path' => $file,
+                'mime'      => $this->getMimeType($file),
+                'size'      => $content === false ? null : strlen($content),
+                'readable'  => $content !== false,
+            ]);
+
+            return $content === false ? null : $content;
+        }
+
+        Log::info('SPPB AUDIT getFileContent() UNREADABLE', [
+            'stage'     => 'getFileContent',
+            'type'      => 'string_path',
+            'real_path' => $file,
+            'readable'  => false,
+        ]);
+
+        return null;
     }
 
     /**
-     * Get the MIME type of a file.
+     * OCR-01A — deteksi mime mengikuti bentuk input yang sama dengan
+     * getFileContent(): objek upload → getMimeType() bawaannya; storage
+     * public path → Storage::mimeType(); absolute path → mime_content_type().
      */
-    protected function getMimeType(string $path): string
+    protected function getMimeType(mixed $file): string
     {
         try {
-            return Storage::disk('public')->mimeType($path);
+            if (is_object($file) && method_exists($file, 'getMimeType')) {
+                return (string) ($file->getMimeType() ?? '');
+            }
+
+            if (! is_string($file)) {
+                return '';
+            }
+
+            if (Storage::disk('public')->exists($file)) {
+                return (string) (Storage::disk('public')->mimeType($file) ?: '');
+            }
+
+            if (is_file($file)) {
+                return (string) (@mime_content_type($file) ?: '');
+            }
         } catch (\Throwable) {
-            return '';
+            // fall through
         }
+
+        return '';
     }
 
-    /**
-     * Check if extracted text is valid for matching.
-     */
     protected function isValidText(?string $text): bool
     {
         return $text !== null

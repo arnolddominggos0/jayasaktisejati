@@ -2375,3 +2375,14 @@
 .ws-nav-row .vp-tab-bar {
     gap: 0.125rem;
 }
+
+/* =======================================================================
+   OCR-02 — Field highlight hasil ekstraksi (Extraction Summary → Apply)
+   Indikator halus pada field yang terisi dari IntakePrefill; dilepas
+   oleh script summary saat user mengubah field (tidak permanen).
+   ======================================================================= */
+.ws-ocr-filled {
+    box-shadow: inset 3px 0 0 0 #22C55E;
+    border-radius: 0.5rem;
+    transition: box-shadow 300ms ease;
+}

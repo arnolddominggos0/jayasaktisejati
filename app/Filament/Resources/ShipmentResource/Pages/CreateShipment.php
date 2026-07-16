@@ -2,9 +2,12 @@
 
 namespace App\Filament\Resources\ShipmentResource\Pages;
 
+use App\Enums\CargoType;
 use App\Enums\RequestType;
+use App\Enums\ShipmentMode;
 use App\Enums\ShipmentStatus;
 use App\Filament\Resources\ShipmentResource;
+use App\Models\Customer;
 use App\Models\Shipment;
 use App\Models\Voyage;
 use App\Services\ShipmentService;
@@ -24,11 +27,200 @@ class CreateShipment extends CreateRecord
     /**
      * OCR-01 — Review layer holder. Diisi oleh FileUpload::afterStateUpdated
      * (via SppbAssistService::assist) TANPA menyentuh form state. Envelope
-     * ini menunggu Review Summary (OCR-02) dan Apply eksplisit (OCR-03).
+     * ini menunggu keputusan eksplisit Office Admin di Extraction Summary.
      * Null / empty = perilaku wizard identik dengan entri manual.
      * IntakePrefill implements Wireable — aman menyeberangi request Livewire.
      */
     public ?IntakePrefill $intakePrefill = null;
+
+    /** OCR-02 — true setelah [Terapkan ke Formulir]; summary jadi ringkas. */
+    public bool $intakeApplied = false;
+
+    /*
+    |--------------------------------------------------------------------------
+    | OCR-02 — Review → Apply
+    |
+    | Aturan arsitektur: form TIDAK PERNAH berubah karena upload. Envelope
+    | pindah ke form state HANYA lewat aksi eksplisit di bawah. Voyage tidak
+    | pernah di-assign dari ekstraksi — hint tinggal di summary.
+    |--------------------------------------------------------------------------
+    */
+
+    /**
+     * [Terapkan ke Formulir] — pindahkan IntakePrefill ke form state.
+     * Default: tidak menimpa field yang sudah diisi manual oleh admin.
+     * $force = true ([Terapkan ulang]): nilai ekstraksi menimpa isi field.
+     */
+    public function applyIntakePrefill(bool $force = false): void
+    {
+        $prefill = $this->intakePrefill;
+
+        if ($prefill === null || $prefill->isEmpty()) {
+            return;
+        }
+
+        $appliedPaths = [];
+
+        $apply = function (string $key, mixed $value) use ($force, &$appliedPaths): void {
+            if ($value === null || $value === '') {
+                return;
+            }
+            if (! $force && ! empty($this->data[$key])) {
+                return; // hormati isian manual admin
+            }
+            $this->data[$key] = $value;
+            $appliedPaths[] = "data.{$key}";
+        };
+
+        // Document
+        $apply('doc_number', $prefill->document['number'] ?? null);
+
+        // requested_at ber-default "hari ini" dari form — default bukan
+        // isian manual, jadi tanggal dokumen boleh menggantikannya.
+        $docDate = $prefill->document['date'] ?? null;
+        if ($docDate !== null && ($this->data['requested_at'] ?? null) === now()->format('Y-m-d')) {
+            $this->data['requested_at'] = $docDate;
+            $appliedPaths[] = 'data.requested_at';
+        } else {
+            $apply('requested_at', $docDate);
+        }
+
+        // Copy fields (klaim scalar)
+        $apply('delivery_scope', $prefill->copyFields['delivery_scope']['value'] ?? null);
+        $apply('notes', $prefill->copyFields['notes']['value'] ?? null);
+
+        // OCR-02A Rule 2 & 3 — fakta dokumen, bukan keputusan user:
+        // SPPB adalah dokumen pengiriman kendaraan via laut ⇒ moda = Laut;
+        // manifest ber-VIN/engine/model ⇒ jenis muatan = Unit Kendaraan.
+        if (($prefill->source['channel'] ?? null) === RequestType::SPPB_DO->value) {
+            $apply('mode', ShipmentMode::Sea->value);
+        }
+        if (($prefill->manifest['detected_count'] ?? 0) > 0) {
+            $apply('cargo_type', CargoType::Vehicle->value);
+        }
+
+        // Rule 4 & 5 — suggestions (entity ter-resolve di master data) boleh
+        // masuk form KARENA admin sudah melihatnya di summary dan menekan
+        // Terapkan (explicit confirm). Tidak resolve → biarkan kosong;
+        // TIDAK PERNAH membuat customer baru.
+        $apply('customer_id', $prefill->suggestionFor('customer_id')['value'] ?? null);
+        $apply('receiver_id', $prefill->suggestionFor('receiver_id')['value'] ?? null);
+
+        // Rule 6 — Destination City dari RELASI MASTER DATA receiver
+        // (bukan hasil OCR kota). Hanya bila receiver ter-resolve dan
+        // punya city_id; selain itu biarkan admin memilih.
+        $receiverId = $this->data['receiver_id'] ?? null;
+        if (! empty($receiverId)) {
+            $receiverCityId = Customer::whereKey($receiverId)->value('city_id');
+            $apply('destination_city_id', $receiverCityId);
+        }
+
+        // OCR-02B — fallback: destination_city_hint → lookup Master City.
+        // Generik (hint diturunkan dari pola dokumen, bukan daftar kota).
+        // Diisi HANYA bila lookup menghasilkan TEPAT SATU kota; tidak
+        // ditemukan / ambigu → biarkan kosong, admin memilih manual.
+        if (empty($this->data['destination_city_id'])) {
+            $cityHint = $prefill->copyFields['destination_city_hint']['value'] ?? null;
+            $cityId   = $this->resolveCityIdFromHint($cityHint);
+            $apply('destination_city_id', $cityId);
+        }
+
+        // Rule 7 — pickup_location OCR hanya informasi di summary; Origin
+        // Office tetap mengikuti Smart Origin yang ada (tidak disentuh).
+
+        // Manifest → repeater units. Semua row tetap editable, tanpa lock.
+        $manifestUnits = $prefill->manifest['units'] ?? [];
+        if ($manifestUnits !== []) {
+            $existing = array_filter(
+                $this->data['units'] ?? [],
+                function ($row) {
+                    foreach (['model_no', 'reg_no', 'chassis_no', 'engine_no', 'color', 'do_number'] as $f) {
+                        if (! empty($row[$f])) {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                }
+            );
+
+            if ($force || $existing === []) {
+                $rows = [];
+                foreach ($manifestUnits as $unit) {
+                    $rows[(string) \Illuminate\Support\Str::uuid()] = [
+                        'model_no'          => $unit['model'] ?? null,
+                        'reg_no'            => $unit['reg_no'] ?? null,
+                        'chassis_no'        => $unit['vin'] ?? null,
+                        'engine_no'         => $unit['engine'] ?? null,
+                        'color'             => $unit['color'] ?? null,
+                        'do_number'         => $unit['do_number'] ?? null,
+                        'qty'               => $unit['qty'] ?? 1,
+                        'notes'             => null,
+                        'container_display' => null,
+                    ];
+                }
+                $this->data['units'] = $rows;
+            }
+        }
+
+        // Voyage: SENGAJA tidak di-set — hint tetap di summary (frozen rule).
+
+        $this->intakeApplied = true;
+
+        // §6 — highlight halus pada field hasil ekstraksi (hilang saat diedit).
+        $this->dispatch('intake-prefill-applied', fields: $appliedPaths);
+
+        \Filament\Notifications\Notification::make()
+            ->title('Hasil ekstraksi diterapkan ke formulir')
+            ->body(count($appliedPaths) . ' field terisi' . ($manifestUnits !== [] ? ', ' . count($manifestUnits) . ' unit masuk ke daftar.' : '.'))
+            ->success()
+            ->send();
+    }
+
+    /**
+     * OCR-02B — hint kota → city_id, hanya bila TEPAT SATU kota cocok.
+     * Mencoba hint utuh dulu; bila hint multi-kata dan gagal unik, coba
+     * kata terakhirnya (nama kota lazim berada di ekor teks tujuan).
+     * Tetap generik: tidak ada aturan per-kota.
+     */
+    protected function resolveCityIdFromHint(?string $hint): ?int
+    {
+        if ($hint === null || trim($hint) === '') {
+            return null;
+        }
+
+        $lookup = function (string $candidate): ?int {
+            $matches = \App\Models\City::query()
+                ->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower(trim($candidate)) . '%'])
+                ->where('is_active', true)
+                ->limit(2)
+                ->pluck('id');
+
+            return $matches->count() === 1 ? (int) $matches->first() : null;
+        };
+
+        $cityId = $lookup($hint);
+        if ($cityId !== null) {
+            return $cityId;
+        }
+
+        $words = preg_split('/\s+/', trim($hint)) ?: [];
+        if (count($words) > 1) {
+            $last = end($words);
+            if (is_string($last) && mb_strlen($last) >= 4) {
+                return $lookup($last);
+            }
+        }
+
+        return null;
+    }
+
+    /** [Abaikan] — buang envelope; form tetap kosong, isi manual. */
+    public function ignoreIntakePrefill(): void
+    {
+        $this->intakePrefill = null;
+        $this->intakeApplied = false;
+    }
 
     protected function getRedirectUrl(): string
     {
