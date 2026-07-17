@@ -28,6 +28,8 @@ class Shipment extends Model
     protected $fillable = [
         'code',
         'customer_id',
+        'dealer_id',        // DOMAIN-02 — Dealer (Vehicle Shipment only)
+        'pickup_location',  // DOMAIN-02 — snapshot lokasi jemput dari SPPB
         'receiver_id',
         'origin_city_id',
         'destination_city_id',
@@ -1012,6 +1014,12 @@ class Shipment extends Model
     public function customer()
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /** DOMAIN-02 — Dealer (jaringan distribusi customer; Vehicle Shipment). */
+    public function dealer()
+    {
+        return $this->belongsTo(Dealer::class);
     }
 
     public function branch()

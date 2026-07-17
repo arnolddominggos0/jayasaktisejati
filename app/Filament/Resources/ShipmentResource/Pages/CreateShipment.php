@@ -99,11 +99,20 @@ class CreateShipment extends CreateRecord
             $apply('cargo_type', CargoType::Vehicle->value);
         }
 
-        // Rule 4 & 5 — suggestions (entity ter-resolve di master data) boleh
-        // masuk form KARENA admin sudah melihatnya di summary dan menekan
-        // Terapkan (explicit confirm). Tidak resolve → biarkan kosong;
-        // TIDAK PERNAH membuat customer baru.
-        $apply('customer_id', $prefill->suggestionFor('customer_id')['value'] ?? null);
+        // DOMAIN-02 — Customer TIDAK berasal dari OCR. Kop dokumen adalah
+        // DEALER: resolve ke master Dealer → dealer_id, lalu customer_id
+        // DITURUNKAN dari dealer.customer_id. Dealer tak ditemukan →
+        // keduanya kosong, Office Admin memilih manual.
+        $dealerSuggestion = $prefill->suggestionFor('dealer_id');
+        if ($dealerSuggestion !== null) {
+            $apply('dealer_id', $dealerSuggestion['value'] ?? null);
+            $apply('customer_id', $dealerSuggestion['customer_id'] ?? null);
+        }
+
+        // Snapshot lokasi jemput dari dokumen (kolom baru DOMAIN-02).
+        $apply('pickup_location', $prefill->copyFields['pickup_location']['value'] ?? null);
+
+        // Kompatibilitas — receiver tetap seperti sebelumnya (bukan scope sprint).
         $apply('receiver_id', $prefill->suggestionFor('receiver_id')['value'] ?? null);
 
         // Rule 6 — Destination City dari RELASI MASTER DATA receiver
@@ -168,7 +177,13 @@ class CreateShipment extends CreateRecord
         $this->intakeApplied = true;
 
         // §6 — highlight halus pada field hasil ekstraksi (hilang saat diedit).
-        $this->dispatch('intake-prefill-applied', fields: $appliedPaths);
+        // UX-02: customer_id dikecualikan — status readonly-nya (terkunci saat
+        // dealer terisi) sudah menjadi indikator "sistem telah memahami";
+        // dua sinyal untuk satu pesan jadi redundan.
+        $this->dispatch('intake-prefill-applied', fields: array_values(array_filter(
+            $appliedPaths,
+            fn (string $path) => $path !== 'data.customer_id',
+        )));
 
         \Filament\Notifications\Notification::make()
             ->title('Hasil ekstraksi diterapkan ke formulir')

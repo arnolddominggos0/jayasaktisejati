@@ -28,10 +28,11 @@
 
     // OCR-02A: TO:/UP:/Email adalah metadata korespondensi internal SPPB,
     // bukan domain Shipment — tidak ditampilkan di summary.
+    // DOMAIN-02: kop dokumen = DEALER (bukan Commercial Customer).
     $rows = array_filter([
         'Nomor'           => $doc['number'] ?? null,
         'Tanggal'         => $fmtDate($doc['date'] ?? null),
-        'Customer'        => $parties['customer_text'] ?? null,
+        'Dealer'          => $parties['dealer_name'] ?? $parties['customer_text'] ?? null,
         'Pickup Location' => $copy['pickup_location']['value'] ?? null,
         'Destination'     => $copy['destination']['value'] ?? null,
         'Delivery Scope'  => isset($copy['delivery_scope']['value'])
@@ -99,6 +100,38 @@
             @endif
         </div>
     </div>
+
+    {{-- ── UX-02: mode ringkas pasca-Apply — identitas komersial + legenda.
+         Receiver sengaja tidak ditampilkan (bukan workflow utama Vehicle). --}}
+    @if ($applied)
+        @php
+            $dealerSug     = $prefill->suggestionFor('dealer_id');
+            $dealerLabel   = $dealerSug['match'] ?? ($parties['dealer_name'] ?? null);
+            $customerLabel = $dealerSug['customer_name'] ?? null;
+        @endphp
+        <div x-show="! expanded" class="border-t border-gray-200 px-4 py-3 dark:border-white/10 sm:px-6">
+            <dl class="grid grid-cols-1 gap-x-8 gap-y-1 sm:grid-cols-2">
+                @if ($dealerLabel)
+                    <div class="flex items-baseline gap-2">
+                        <dt class="w-20 shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">Dealer</dt>
+                        <dd class="text-sm text-gray-950 dark:text-white">{{ $dealerLabel }}</dd>
+                    </div>
+                @endif
+                @if ($customerLabel)
+                    <div class="flex items-baseline gap-2">
+                        <dt class="w-20 shrink-0 text-xs font-medium text-gray-500 dark:text-gray-400">Customer</dt>
+                        <dd class="text-sm text-gray-950 dark:text-white">{{ $customerLabel }}</dd>
+                    </div>
+                @endif
+            </dl>
+            @if ($prefill->unitCount() > 0)
+                <p class="mt-1.5 text-sm text-gray-700 dark:text-gray-300">{{ $prefill->unitCount() }} kendaraan berhasil dikenali.</p>
+            @endif
+            <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                Field bergaris hijau berasal dari hasil ekstraksi dokumen — hilang saat Anda mengubahnya.
+            </p>
+        </div>
+    @endif
 
     {{-- x-collapse sengaja tidak dipakai: plugin Alpine collapse tidak
          dimuat di halaman form panel — directive yang tak dikenal membuat

@@ -51,7 +51,7 @@ final class IntakePrefill implements Wireable
         public readonly array $manifest,
         public readonly array $suggestions,
         public readonly array $warnings,
-        public readonly array $parties = ['customer_text' => null, 'receiver_text' => null, 'pic_name' => null, 'email' => null],
+        public readonly array $parties = ['dealer_name' => null, 'customer_text' => null, 'receiver_text' => null, 'pic_name' => null, 'email' => null],
         public readonly array $voyageHints = ['vessel_name' => null, 'document_etd' => null],
     ) {
     }
@@ -160,7 +160,9 @@ final class IntakePrefill implements Wireable
             ];
         }
 
-        foreach (['customer_text' => 'Customer (teks)', 'receiver_text' => 'Penerima (teks)', 'pic_name' => 'PIC', 'email' => 'Email'] as $key => $label) {
+        // DOMAIN-02: kop dokumen = Dealer; customer_text di-skip agar tidak
+        // duplikat dengan dealer_name (nilai sama, makna sudah diluruskan).
+        foreach (['dealer_name' => 'Dealer (teks)', 'receiver_text' => 'Penerima (teks)', 'pic_name' => 'PIC', 'email' => 'Email'] as $key => $label) {
             if (($this->parties[$key] ?? null) !== null) {
                 $items[] = ['status' => 'detected', 'label' => $label . ' terbaca: ' . $this->parties[$key]];
             }
@@ -199,6 +201,7 @@ final class IntakePrefill implements Wireable
     {
         return match ($field) {
             'customer_id'         => 'Customer',
+            'dealer_id'           => 'Dealer',
             'receiver_id'         => 'Penerima',
             'destination_city_id' => 'Kota tujuan',
             'delivery_scope'      => 'Cakupan layanan',
@@ -235,7 +238,7 @@ final class IntakePrefill implements Wireable
             manifest: $value['manifest'] ?? ['detected_count' => 0, 'claimed_count' => null, 'units' => []],
             suggestions: $value['suggestions'] ?? [],
             warnings: $value['warnings'] ?? [],
-            parties: $value['parties'] ?? ['customer_text' => null, 'receiver_text' => null, 'pic_name' => null, 'email' => null],
+            parties: $value['parties'] ?? ['dealer_name' => null, 'customer_text' => null, 'receiver_text' => null, 'pic_name' => null, 'email' => null],
             voyageHints: $value['voyageHints'] ?? ['vessel_name' => null, 'document_etd' => null],
         );
     }

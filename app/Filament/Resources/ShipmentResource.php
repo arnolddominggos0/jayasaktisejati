@@ -203,13 +203,48 @@ class ShipmentResource extends Resource
                             Hidden::make('branch_id')
                                 ->default(fn() => Filament::auth()->user()?->effectiveBranchId())
                                 ->dehydrated(),
+                            // UX-02 — Informasi Komersial (Vehicle): Dealer
+                            // adalah keputusan primer, tampil PERTAMA; Customer
+                            // tepat di sampingnya sebagai turunan (readonly-ish).
+                            // General Cargo: dealer tersembunyi, urutan visual
+                            // tetap Pengirim → Penerima seperti sebelumnya.
+                            Group::make([
+                                Select::make('dealer_id')
+                                    ->label('Dealer')
+                                    ->relationship('dealer', 'name')
+                                    ->searchable()
+                                    ->preload()
+                                    ->live()
+                                    ->helperText('Sumber derivasi Customer.')
+                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                        if ($state && empty($get('customer_id'))) {
+                                            $set('customer_id', \App\Models\Dealer::whereKey($state)->value('customer_id'));
+                                        }
+                                    })
+                                    ->columnSpan(12),
+                            ])
+                                ->visible(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
+                                ->columnSpan(['default' => 12, 'md' => 6]),
                             Group::make([
                                 Select::make('customer_id')
-                                    ->label('Pengirim')
+                                    // UX-02: bahasa operasional — untuk Vehicle
+                                    // ini "Customer" (hubungan komersial), bukan
+                                    // "Pengirim". General Cargo tetap "Pengirim".
+                                    ->label(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value ? 'Customer' : 'Pengirim')
                                     ->relationship('customer', 'name')
                                     ->searchable()
                                     ->preload()
                                     ->reactive()
+                                    // Readonly-ish: terkunci saat dealer terisi
+                                    // (nilai turunan master data). Kosongkan
+                                    // dealer → kembali editable. dehydrated()
+                                    // wajib: disabled default-nya tidak ikut
+                                    // tersimpan.
+                                    ->disabled(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value && filled($get('dealer_id')))
+                                    ->dehydrated()
+                                    ->helperText(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value
+                                        ? 'Diturunkan otomatis dari Dealer.'
+                                        : null)
                                     ->afterStateUpdated(function ($state, Set $set) {
                                         $set('pickup_contact_use_custom', false);
                                     })
@@ -226,7 +261,12 @@ class ShipmentResource extends Resource
                                         $set('delivery_contact_use_custom', false);
                                     })
                                     ->columnSpan(12),
-                            ])->columnSpan(['default' => 12, 'md' => 6]),
+                            ])
+                                // UX-02: Receiver keluar dari workflow utama
+                                // Vehicle (kolom & seluruh konsumen lain TIDAK
+                                // berubah — hanya visibilitas form).
+                                ->visible(fn (Get $get) => $get('cargo_type') !== CargoType::Vehicle->value)
+                                ->columnSpan(['default' => 12, 'md' => 6]),
                             Placeholder::make('pickup_contact_summary')
                                 ->key('pickup_contact_summary')
                                 ->label('Kontak untuk Pickup')
@@ -501,6 +541,63 @@ class ShipmentResource extends Resource
                 Section::make('B. Informasi Rute & Moda')
                     ->columns(12)
                     ->schema([
+                        // ── DOMAIN-03 — Origin Office sebagai Source of Truth ──
+                        // Yang membuat shipment adalah Office/Cabang, bukan Kota.
+                        // Kota asal SELALU turunan (Office → City via Smart
+                        // Origin); tidak pernah dipilih user.
+
+                        // Super Admin: pilih Cabang Asal; kota diturunkan otomatis.
+                        Select::make('branch_id')
+                            ->label('Cabang Asal *')
+                            ->options(fn () => \App\Models\Branch::orderBy('name')->pluck('name', 'id'))
+                            ->required()
+                            ->live()
+                            ->visible(fn () => Filament::auth()->user()?->isSuperAdmin() ?? false)
+                            ->afterStateUpdated(function ($state, Set $set) {
+                                $set('origin_city_id', self::resolveOriginCityFromUser($state ? (int) $state : null)['city_id']);
+                            })
+                            ->helperText(function (Get $get) {
+                                if (! $get('branch_id')) {
+                                    return 'Kota asal akan diturunkan otomatis dari cabang.';
+                                }
+                                $resolved = self::resolveOriginCityFromUser((int) $get('branch_id'));
+
+                                return $resolved['city_name']
+                                    ? "Kota asal (turunan): {$resolved['city_name']}"
+                                    : 'Kota asal belum terdaftar pada Master Office cabang ini — perbarui Master Office.';
+                            })
+                            ->columnSpan(['default' => 12, 'md' => 6]),
+
+                        // Office Admin: Cabang Asal mengikuti akun login — readonly,
+                        // tanpa dropdown; kota tampil sebagai informasi turunan.
+                        Placeholder::make('origin_branch_display')
+                            ->label('Cabang Asal')
+                            ->visible(fn () => ! (Filament::auth()->user()?->isSuperAdmin() ?? false))
+                            ->content(function ($record) {
+                                if ($record && $record->originCity) {
+                                    $officeName = $record->originOffice?->name ?? $record->branch?->name ?? '';
+
+                                    return $officeName
+                                        ? "🏢 {$officeName} — Kota asal: {$record->originCity->name}"
+                                        : "Kota asal: {$record->originCity->name}";
+                                }
+
+                                $branchName = \App\Models\Branch::whereKey(Filament::auth()->user()?->effectiveBranchId())->value('name');
+                                $resolved   = self::resolveOriginCityFromUser();
+
+                                if ($resolved['city_name']) {
+                                    return '🏢 ' . ($branchName ?: $resolved['office_name'])
+                                        . " — Kota asal: {$resolved['city_name']}";
+                                }
+
+                                return ($branchName ? "🏢 {$branchName} — " : '')
+                                    . 'kota asal belum terdaftar di Master Office (hubungi Super Admin).';
+                            })
+                            ->extraAttributes([
+                                'class' => 'text-sm font-medium text-gray-700 dark:text-gray-300',
+                            ])
+                            ->columnSpan(['default' => 12, 'md' => 6]),
+
                         ToggleButtons::make('mode')
                             ->label('Moda Pengiriman *')
                             ->options([
@@ -577,38 +674,17 @@ class ShipmentResource extends Resource
                             })
                             ->columnSpan(12),
 
-                        Placeholder::make('origin_city_display')
-                            ->label('Kota Asal')
-                            ->content(function ($record) {
-                                if ($record && $record->originCity) {
-                                    $officeName = $record->originOffice?->name ?? $record->branch?->name ?? '';
-
-                                    return $officeName
-                                        ? "📍 {$record->originCity->name} (Berdasarkan Office {$officeName})"
-                                        : "📍 {$record->originCity->name}";
-                                }
-
-                                $resolved = self::resolveOriginCityFromUser();
-
-                                if ($resolved['city_name']) {
-                                    return $resolved['office_name']
-                                        ? "📍 {$resolved['city_name']} (Berdasarkan Office {$resolved['office_name']})"
-                                        : "📍 {$resolved['city_name']}";
-                                }
-
-                                return '— Cabang Anda belum dikaitkan ke kota —';
-                            })
-                            ->extraAttributes([
-                                'class' => 'text-sm font-medium text-gray-700 dark:text-gray-300',
-                            ])
-                            ->columnSpan(['default' => 12, 'md' => 6]),
-
+                        // DOMAIN-03: "Kota Asal" tidak lagi tampil sebagai field —
+                        // ia turunan Office (lihat Cabang Asal di atas). Nilai
+                        // tetap tersimpan di origin_city_id (hidden, derived).
                         Hidden::make('origin_city_id')
                             ->default(fn () => self::resolveOriginCityFromUser()['city_id'])
                             ->dehydrated(),
 
                         Select::make('destination_city_id')
-                            ->label('Tujuan (Kota Tujuan) *')
+                            // UX-02: Vehicle memakai bahasa operasional "Kota
+                            // Tujuan"; General Cargo mempertahankan label lama.
+                            ->label(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value ? 'Kota Tujuan *' : 'Tujuan (Kota Tujuan) *')
                             ->placeholder('Pilih Kota Tujuan')
                             ->relationship('destinationCity', 'name', fn ($query) => $query->active()->orderBy('name'))
                             ->searchable()
@@ -616,6 +692,34 @@ class ShipmentResource extends Resource
                             ->required()
                             ->helperText('cth: Manado')
                             ->columnSpan(['default' => 12, 'md' => 6]),
+
+                        // UX-02 — Lokasi Pickup berdampingan dengan Kota Tujuan:
+                        // keduanya satu cerita logistik (dari mana → ke mana).
+                        // Vehicle-only; General Cargo tidak melihat field ini.
+                        TextInput::make('pickup_location')
+                            ->label('Lokasi Pickup')
+                            ->placeholder('SEMPER')
+                            ->maxLength(150)
+                            ->helperText('Pada SPPB disebut "Lokasi Unit".')
+                            ->visible(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
+                            ->columnSpan(['default' => 12, 'md' => 6]),
+
+                        // UX-02 — salinan delivery_scope khusus Vehicle di grup
+                        // Informasi Pengiriman (statePath sama; instance General
+                        // Cargo tetap di section muatan — visibilitas eksklusif,
+                        // hanya satu yang dirender & divalidasi pada satu waktu).
+                        ToggleButtons::make('delivery_scope')
+                            ->label('Cakupan Layanan')
+                            ->options([
+                                DeliveryScope::PortToPort->value => DeliveryScope::PortToPort->label(),
+                                DeliveryScope::DoorToDoor->value => DeliveryScope::DoorToDoor->label(),
+                                DeliveryScope::DoorToPort->value => DeliveryScope::DoorToPort->label(),
+                                DeliveryScope::PortToDoor->value => DeliveryScope::PortToDoor->label(),
+                            ])
+                            ->inline()
+                            ->required()
+                            ->visible(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
+                            ->columnSpan(12),
 
                         ToggleButtons::make('cargo_type')
                             ->label('Jenis Muatan')
@@ -688,6 +792,10 @@ class ShipmentResource extends Resource
                                         }
                                     }),
 
+                                // UX-02: untuk Vehicle, delivery_scope tampil di
+                                // grup Informasi Pengiriman (Section B) — salinan
+                                // eksklusif di sana; instance ini hanya untuk
+                                // General Cargo agar layout GC tidak berubah.
                                 ToggleButtons::make('delivery_scope')
                                     ->label('Cakupan Layanan')
                                     ->options([
@@ -698,6 +806,7 @@ class ShipmentResource extends Resource
                                     ])
                                     ->inline()
                                     ->required()
+                                    ->visible(fn (Get $get) => $get('cargo_type') !== CargoType::Vehicle->value)
                                     ->columnSpan(12),
 
                                 Select::make('container_size')
@@ -896,6 +1005,17 @@ class ShipmentResource extends Resource
 
                                 Repeater::make('units')
                                     ->label('Unit Kendaraan (Laut)')
+                                    // UX-02: penanda asal-usul manifest — row
+                                    // adalah klaim dokumen yang perlu diperiksa.
+                                    ->helperText(function ($livewire) {
+                                        $prefill = $livewire->intakePrefill ?? null;
+                                        $applied = (bool) ($livewire->intakeApplied ?? false);
+                                        if (! $applied || ! $prefill || $prefill->unitCount() < 1) {
+                                            return null;
+                                        }
+
+                                        return $prefill->unitCount() . ' unit dari hasil ekstraksi dokumen — periksa sebelum melanjutkan.';
+                                    })
                                     // ->dehydrated(false)
                                     ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
                                     ->columns(12)
@@ -935,6 +1055,33 @@ class ShipmentResource extends Resource
                                             ->columnSpan(3),
                                     ])
                                     ->addActionLabel('Tambah Unit')
+                                    ->columnSpan(12),
+
+                                // UX-02 — Voyage Hint diulang TEPAT di atas
+                                // field keputusan: saat admin memilih kapal,
+                                // pembanding dari dokumen ada di depan mata.
+                                // Tidak pernah mengisi voyage otomatis.
+                                Placeholder::make('voyage_document_hint')
+                                    ->label('')
+                                    ->content(function ($livewire) {
+                                        // ?? menekan undefined-property di halaman
+                                        // tanpa holder envelope (mis. Edit).
+                                        $hints = ($livewire->intakePrefill ?? null)?->voyageHints ?? [];
+                                        $vessel = $hints['vessel_name'] ?? null;
+                                        if ($vessel === null) {
+                                            return '';
+                                        }
+                                        $etd = $hints['document_etd'] ?? null;
+                                        $etdLabel = $etd
+                                            ? Carbon::parse($etd)->translatedFormat('d F Y')
+                                            : null;
+
+                                        return '📄 Dokumen menyebut: ' . $vessel
+                                            . ($etdLabel ? " — ETD {$etdLabel}" : '')
+                                            . '. Digunakan sebagai pembanding — tidak diisi otomatis.';
+                                    })
+                                    ->visible(fn (Get $get, $livewire) => $get('mode') === ShipmentMode::Sea->value
+                                        && ((($livewire->intakePrefill ?? null)?->voyageHints['vessel_name'] ?? null) !== null))
                                     ->columnSpan(12),
 
                                 Select::make('voyage_id')
@@ -1279,6 +1426,28 @@ class ShipmentResource extends Resource
                         return $val === ShipmentMode::Sea->value ? 'Laut' : 'Darat';
                     }),
 
+                // UX-LIST-01 — kolom menampilkan Commercial Customer (bukan
+                // "pengirim"); sama seperti Section A form (DOMAIN-02/UX-02).
+                // Query/relasi tidak berubah, hanya label & posisi.
+                TextColumn::make('customer.name')
+                    ->label('Customer')
+                    ->badge()
+                    ->searchable()
+                    ->sortable(),
+
+                // UX-LIST-01 — jumlah unit langsung terlihat tanpa membuka
+                // detail. Relasi units() sudah ada (Shipment::units());
+                // withCount di getEloquentQuery agar tak N+1 di listing.
+                // General Cargo tidak punya baris units → tampil "—".
+                TextColumn::make('units_count')
+                    ->label('Unit')
+                    ->counts('units')
+                    ->badge()
+                    ->color('gray')
+                    ->formatStateUsing(fn (?int $state) => $state > 0 ? (string) $state : '—')
+                    ->alignCenter()
+                    ->sortable(),
+
                 TextColumn::make('priority')
                     ->label('Prioritas')
                     ->badge()
@@ -1326,18 +1495,6 @@ class ShipmentResource extends Resource
                     })
                     ->sortable(),
 
-                TextColumn::make('customer.name')
-                    ->label('Pengirim')
-                    ->badge()
-                    ->searchable()
-                    ->sortable(),
-
-                TextColumn::make('receiver.name')
-                    ->label('Penerima')
-                    ->badge()
-                    ->searchable()
-                    ->sortable(),
-
                 TextColumn::make('route')
                     ->label('Rute')
                     ->html()
@@ -1348,6 +1505,19 @@ class ShipmentResource extends Resource
                         return "<div class='font-medium'>{$oCity} &rarr; {$dCity}</div>";
                     })
                     ->toggleable(),
+
+                // UX-LIST-01 — dipertahankan (relasi & kolom tak berubah).
+                // Vehicle: receiver sering kosong (UX-02 — bukan lagi bagian
+                // workflow utama) → tampil "—" alih-alih badge kosong.
+                // Catatan: badge() pada kolom relasi mengabaikan
+                // formatStateUsing saat raw state null (loop badge berhenti
+                // lebih dulu) — placeholder() adalah jalur yang benar.
+                TextColumn::make('receiver.name')
+                    ->label('Penerima')
+                    ->badge()
+                    ->placeholder('—')
+                    ->searchable()
+                    ->sortable(),
 
                 TextColumn::make('service_type')
                     ->label('Layanan')

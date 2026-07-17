@@ -49,14 +49,14 @@ class SppbAssistService
             'kota',
         ],
         'delivery_scope' => [
-            'syarat\s*kirim', // OCR-01E — label yang dipakai SPPB Hasjrat
+            'syarat\s*kirim', 
             'coverage',
             'cakupan',
             'layanan',
             'service',
             'scope',
         ],
-        'pickup_location' => [ // OCR-01E — lokasi jemput unit
+        'pickup_location' => [ 
             'lokasi\s*unit',
             'lokasi\s*pickup',
             'lokasi\s*penjemputan',
@@ -116,21 +116,6 @@ class SppbAssistService
         return $this->buildPrefillFromText($artifacts, $text);
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | OCR-01E — DOMAIN EXTRACTION (Text → IntakePrefill)
-    |
-    | Ekstraksi dipecah per tanggung jawab domain:
-    |   DocumentExtractor    → document.number / document.date
-    |   PartyExtractor       → customer_text / receiver_text / pic / email
-    |   ShipmentExtractor    → destination / pickup_location / scope / notes
-    |   VoyageHintExtractor  → vessel_name / document_etd (hint, BUKAN field)
-    |   ManifestExtractor    → units[] ber-anchor VIN + claimed_count
-    | Resolusi entity (customer/receiver/city) tetap di layer suggestion.
-    |--------------------------------------------------------------------------
-    */
-
-    /** Orkestrator: teks parser → envelope IntakePrefill lengkap. */
     protected function buildPrefillFromText(array $artifacts, string $text): IntakePrefill
     {
         $document    = $this->extractDocument($text);
@@ -143,8 +128,6 @@ class SppbAssistService
 
         $warnings = $this->collectWarnings($document, $copyFields, $suggestions, $parties, $voyageHints, $manifest);
 
-        // vin_invalid — ada baris indeks unit ("1.", "2.", …) yang tidak
-        // menghasilkan row ber-VIN valid.
         $indexRows = preg_match_all('/^\s*\d+\.\s*$/m', $text);
         if ($indexRows > ($manifest['detected_count'] ?? 0)) {
             $warnings[] = [
@@ -219,6 +202,10 @@ class SppbAssistService
         }
 
         return [
+            // DOMAIN-02: badan usaha di kop SPPB adalah DEALER (penerbit
+            // dokumen), bukan Commercial Customer. dealer_name adalah klaim
+            // resmi; customer_text dipertahankan untuk kompatibilitas envelope.
+            'dealer_name'   => $customer,
             'customer_text' => $customer,
             'receiver_text' => $this->extractByLabel($text, self::HEADER_LABELS['receiver']),
             'pic_name'      => $pic,
@@ -445,13 +432,18 @@ class SppbAssistService
         ];
     }
 
-    /** Layer suggestion (existing matchers) — resolusi teks → master data. */
     protected function resolveSuggestions(array $parties, array $claims): array
     {
         $suggestions = [];
-
-        if ($parties['customer_text'] !== null && ($match = $this->matchCustomer($parties['customer_text'])) !== null) {
-            $suggestions['customer_id'] = $match;
+        $dealerName = $parties['dealer_name'] ?? null;
+        if ($dealerName !== null && ($dealer = \App\Models\Dealer::resolveFromText($dealerName)) !== null) {
+            $suggestions['dealer_id'] = [
+                'value'         => $dealer->id,
+                'confidence'    => 0.90,
+                'match'         => $dealer->name,
+                'customer_id'   => $dealer->customer_id,
+                'customer_name' => $dealer->customer?->name,
+            ];
         }
 
         if ($parties['receiver_text'] !== null && ($match = $this->matchReceiver($parties['receiver_text'])) !== null) {
@@ -465,7 +457,6 @@ class SppbAssistService
         return $suggestions;
     }
 
-    /** Klaim scalar yang siap di-Apply (OCR-03) — nilai teks/enum. */
     protected function buildCopyFields(array $claims): array
     {
         $copy = [];
@@ -1071,17 +1062,8 @@ class SppbAssistService
         return $prefill;
     }
 
-    /**
-     * OCR-01A — baca konten file dari semua bentuk yang mungkin dikirim wizard:
-     * 1. Livewire TemporaryUploadedFile / objek upload lain (getRealPath + file_get_contents)
-     * 2. Path relatif Storage disk 'public'
-     * 3. Absolute path / string path biasa di filesystem
-     * Mengembalikan null bila tidak terbaca. Logging: tipe, real path, mime,
-     * ukuran, dan status keberhasilan baca.
-     */
     public function getFileContent(mixed $file): ?string
     {
-        // 1) Objek upload (TemporaryUploadedFile, UploadedFile, dsb.)
         if (is_object($file) && method_exists($file, 'getRealPath')) {
             $real    = $file->getRealPath();
             $content = (is_string($real) && $real !== '' && is_readable($real))
@@ -1089,8 +1071,7 @@ class SppbAssistService
                 : false;
             $via = 'getRealPath';
 
-            // Fallback: file di livewire-tmp bisa saja tidak resolvable sebagai
-            // real path lokal — coba pembacaan via storage milik objeknya.
+
             if ($content === false && method_exists($file, 'get')) {
                 try {
                     $fallback = $file->get();
@@ -1099,7 +1080,6 @@ class SppbAssistService
                         $via     = 'object->get()';
                     }
                 } catch (\Throwable) {
-                    // tetap false — dilog di bawah
                 }
             }
 
@@ -1124,7 +1104,6 @@ class SppbAssistService
             return null;
         }
 
-        // 2) Path relatif pada Storage disk 'public'
         try {
             if (Storage::disk('public')->exists($file)) {
                 $content = Storage::disk('public')->get($file);
@@ -1141,10 +1120,8 @@ class SppbAssistService
                 return $content;
             }
         } catch (\Throwable) {
-            // lanjut ke percobaan filesystem langsung
         }
 
-        // 3) Absolute path / string path biasa
         if (is_file($file) && is_readable($file)) {
             $content = @file_get_contents($file);
 
@@ -1170,11 +1147,6 @@ class SppbAssistService
         return null;
     }
 
-    /**
-     * OCR-01A — deteksi mime mengikuti bentuk input yang sama dengan
-     * getFileContent(): objek upload → getMimeType() bawaannya; storage
-     * public path → Storage::mimeType(); absolute path → mime_content_type().
-     */
     protected function getMimeType(mixed $file): string
     {
         try {
@@ -1194,7 +1166,6 @@ class SppbAssistService
                 return (string) (@mime_content_type($file) ?: '');
             }
         } catch (\Throwable) {
-            // fall through
         }
 
         return '';

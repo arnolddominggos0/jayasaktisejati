@@ -93,6 +93,9 @@ class DomainExtractionTest extends TestCase
     {
         $parties = $this->call('extractParties', $this->hasjratText());
 
+        // DOMAIN-02: kop dokumen adalah DEALER (klaim resmi), customer_text
+        // dipertahankan untuk kompatibilitas envelope.
+        $this->assertSame('PT. HASJRAT ABADI', $parties['dealer_name']);
         $this->assertSame('PT. HASJRAT ABADI', $parties['customer_text']);
         $this->assertSame('SOMBAR SULAWESI', $parties['receiver_text']);
         $this->assertSame('BP. SONNY', $parties['pic_name']);
