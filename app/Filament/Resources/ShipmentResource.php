@@ -1782,6 +1782,15 @@ class ShipmentResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            // UX-LIST-02 — filter mengikuti terminologi domain terbaru:
+            // Customer (bukan Pengirim), Cabang Asal via branch_id (DOMAIN-03,
+            // bukan lagi origin_city), Dealer (DOMAIN-02). Penerima
+            // dipertahankan sebagai filter SEKUNDER (posisi terakhir).
+            // Toggle "TAM Manado" dikeluarkan: filter ber-hardcode satu
+            // customer tidak boleh jadi elemen struktural halaman generik —
+            // tempatnya di laporan KPI. Toggle "Sedang Berjalan" dihapus:
+            // fungsinya (status IN pending/pickup/transit) kini tercakup
+            // tab kerja + filter Status; lihat catatan sprint.
             ->filters([
                 SelectFilter::make('status')
                     ->label('Status')
@@ -1789,21 +1798,16 @@ class ShipmentResource extends Resource
                     ->native(false),
 
                 SelectFilter::make('customer_id')
-                    ->label('Pengirim')
+                    ->label('Customer')
                     ->relationship('customer', 'name')
                     ->searchable()
                     ->preload(),
 
-                SelectFilter::make('receiver_id')
-                    ->label('Penerima')
-                    ->relationship('receiver', 'name')
+                SelectFilter::make('dealer_id')
+                    ->label('Dealer')
+                    ->relationship('dealer', 'name')
                     ->searchable()
                     ->preload(),
-
-                Filter::make('in_progress')
-                    ->label('Sedang Berjalan')
-                    ->query(fn(Builder $query) => $query->whereIn('status', array_map(fn($e) => $e->value, ShipmentStatus::inProgress())))
-                    ->toggle(),
 
                 SelectFilter::make('service_type')
                     ->label('Jenis Layanan')
@@ -1814,11 +1818,10 @@ class ShipmentResource extends Resource
                     ])
                     ->native(false),
 
-                SelectFilter::make('origin_city_id')
-                    ->label('Kota Asal')
-                    ->relationship('originCity', 'name')
-                    ->searchable()
-                    ->preload(),
+                SelectFilter::make('branch_id')
+                    ->label('Cabang Asal')
+                    ->relationship('branch', 'name')
+                    ->native(false),
 
                 SelectFilter::make('destination_city_id')
                     ->label('Kota Tujuan')
@@ -1826,19 +1829,11 @@ class ShipmentResource extends Resource
                     ->searchable()
                     ->preload(),
 
-                Filter::make('tam_manado_kpi')
-                    ->label('Toyota Astra Motor (Manado)')
-                    ->query(function (Builder $query) {
-                        $cfg = config('jss_kpi.manado', []);
-                        $customerIds = array_map('intval', $cfg['customer_ids'] ?? []);
-
-                        if (empty($customerIds)) {
-                            return $query->whereRaw('1 = 0');
-                        }
-
-                        return $query->whereIn('customer_id', $customerIds);
-                    })
-                    ->toggle(),
+                SelectFilter::make('receiver_id')
+                    ->label('Penerima')
+                    ->relationship('receiver', 'name')
+                    ->searchable()
+                    ->preload(),
             ], layout: FiltersLayout::AboveContent)
             ->filtersFormColumns(4)
             ->defaultSort('priority', 'desc')

@@ -18,16 +18,7 @@
 --}}
 <x-filament-panels::page>
     <div
-        x-data="{
-            tab: new URLSearchParams(window.location.search).get('tab') ?? 'semua',
-            filtersOpen: false,
-            setTab(t) {
-                this.tab = t;
-                const url = new URL(window.location);
-                url.searchParams.set('tab', t);
-                window.history.replaceState({}, '', url);
-            },
-        }"
+        x-data="{ filtersOpen: false }"
         x-on:click.window="
             if (
                 filtersOpen
@@ -36,19 +27,25 @@
             ) filtersOpen = false
         "
     >
-        {{-- Tab Navigation — shell UI, URL state via ?tab= --}}
+        {{-- UX-LIST-02 — Tab dikendalikan Livewire (activeTab native
+             ListRecords) sehingga BENAR-BENAR menyaring query; URL state
+             (?tab=) via #[Url] di page class, bukan Alpine lagi. --}}
         <div class="vp-workspace-toolbar-row ws-nav-row">
             <nav class="vp-tab-bar" role="tablist" aria-label="Segmen permintaan pengiriman">
-                @foreach ($this->getWorkspaceTabs() as $key => $label)
+                @foreach ($this->getTabs() as $key => $tab)
+                    @php $isActive = $this->activeTab === (string) $key; @endphp
                     <button
                         type="button"
                         role="tab"
-                        class="vp-tab"
-                        :class="{ 'is-active': tab === @js($key) }"
-                        :aria-selected="tab === @js($key) ? 'true' : 'false'"
-                        @click="setTab(@js($key))"
+                        class="vp-tab {{ $isActive ? 'is-active' : '' }}"
+                        aria-selected="{{ $isActive ? 'true' : 'false' }}"
+                        wire:click="$set('activeTab', @js((string) $key))"
+                        wire:loading.attr="disabled"
                     >
-                        {{ $label }}
+                        {{ $tab->getLabel() }}
+                        @if (filled($badge = $tab->getBadge()))
+                            <span class="ws-tab-badge">{{ $badge }}</span>
+                        @endif
                     </button>
                 @endforeach
             </nav>

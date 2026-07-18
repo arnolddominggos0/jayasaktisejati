@@ -28,7 +28,7 @@ $headerBorder = OperationalUi::severityBorder($state->severity);
                 </h1>
 
                 <div class="mt-1 text-sm text-gray-500">
-                    Detail operasional voyage — untuk monitoring harian gunakan Monitoring Kapal TAM
+                    Detail operasional voyage — untuk monitoring harian gunakan Monitoring Kapal
                 </div>
             </div>
 

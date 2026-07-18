@@ -8,13 +8,25 @@ use App\Models\Shipment;
 use Filament\Actions;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
+use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Forms\Components\{Select, DatePicker};
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Livewire\Attributes\Url;
 
 class ListShipments extends ListRecords
 {
     protected static string $resource = ShipmentResource::class;
+
+    /**
+     * UX-LIST-02 — tab memakai mesin native ListRecords (activeTab +
+     * modifyQueryWithActiveTab) sehingga benar-benar menyaring query.
+     * Redeklarasi dengan #[Url] agar state bertahan di URL dengan nama
+     * param lama (?tab=) dari shell WS-01A.
+     */
+    #[Url(as: 'tab', except: 'semua')]
+    public ?string $activeTab = null;
 
     // WS-01A — Administrative Workspace shell: custom view membungkus
     // tab navigasi + workspace box (toolbar → table) di satu surface.
@@ -31,18 +43,44 @@ class ListShipments extends ListRecords
     }
 
     /**
-     * WS-01A shell only — label tab tanpa query logic (tab query = WS-01B).
-     * Key dipakai sebagai URL state (?tab=).
+     * UX-LIST-02 — definisi bisnis tab (hasil audit yang disetujui).
+     * Semua turunan ShipmentStatus yang ada; tanpa status baru:
      *
-     * @return array<string, string>
+     *   Semua                → tanpa filter (baseline lookup)
+     *   Menunggu Penjemputan → status = pending DAN belum ada track nyata
+     *                          (belum disentuh FC via startPickup — skeleton
+     *                          track ber-tracked_at NULL tidak dihitung)
+     *   Draft                → status = draft (strays/belum selesai)
+     *   Perlu Tindakan       → status = hold. Cancelled SENGAJA belum masuk:
+     *                          belum ada penanda follow-up di skema untuk
+     *                          membedakan "batal perlu tindak lanjut" vs
+     *                          "batal selesai" (catatan audit UX-LIST-02).
      */
-    public function getWorkspaceTabs(): array
+    public function getTabs(): array
     {
+        $base = fn (): Builder => ShipmentResource::getEloquentQuery();
+
         return [
-            'semua'                => 'Semua',
-            'menunggu-penjemputan' => 'Menunggu Penjemputan',
-            'draft'                => 'Draft',
-            'perlu-tindakan'       => 'Perlu Tindakan',
+            'semua' => Tab::make('Semua'),
+
+            'menunggu-penjemputan' => Tab::make('Menunggu Penjemputan')
+                ->modifyQueryUsing(fn (Builder $query) => $query
+                    ->where('status', ShipmentStatus::Pending->value)
+                    ->whereDoesntHave('tracks', fn (Builder $trackQuery) => $trackQuery->whereNotNull('tracked_at')))
+                ->badge(fn () => $base()
+                    ->where('status', ShipmentStatus::Pending->value)
+                    ->whereDoesntHave('tracks', fn (Builder $trackQuery) => $trackQuery->whereNotNull('tracked_at'))
+                    ->count() ?: null),
+
+            'draft' => Tab::make('Draft')
+                ->modifyQueryUsing(fn (Builder $query) => $query
+                    ->where('status', ShipmentStatus::Draft->value))
+                ->badge(fn () => $base()->where('status', ShipmentStatus::Draft->value)->count() ?: null),
+
+            'perlu-tindakan' => Tab::make('Perlu Tindakan')
+                ->modifyQueryUsing(fn (Builder $query) => $query
+                    ->where('status', ShipmentStatus::Hold->value))
+                ->badge(fn () => $base()->where('status', ShipmentStatus::Hold->value)->count() ?: null),
         ];
     }
 

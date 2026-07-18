@@ -528,7 +528,7 @@
                         </div>
                         <x-heroicon-m-arrow-right class="w-5 h-5 text-gray-300 group-hover:text-primary-600 group-hover:translate-x-1 transition-all" />
                     </div>
-                    <p class="jss-quick-title">Monitoring Kapal TAM</p>
+                    <p class="jss-quick-title">Monitoring Kapal</p>
                     <p class="jss-quick-desc">Monitoring kapal &amp; voyage</p>
                 </a>
 

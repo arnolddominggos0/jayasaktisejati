@@ -2386,3 +2386,26 @@
     border-radius: 0.5rem;
     transition: box-shadow 300ms ease;
 }
+
+/* =======================================================================
+   UX-LIST-02 — badge count pada tab kerja Shipment Index (WS-01 final
+   spec: "counts on work tabs"). Kecil & sekunder — bukan KPI.
+   ======================================================================= */
+.ws-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding-inline: 0.375rem;
+    border-radius: 9999px;
+    background: var(--mon-accent-50, #EFF6FF);
+    color: var(--mon-accent-600, #1D4ED8);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 1;
+}
+.vp-tab.is-active .ws-tab-badge {
+    background: var(--mon-accent-600, #1D4ED8);
+    color: #FFFFFF;
+}

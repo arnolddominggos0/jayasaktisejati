@@ -123,7 +123,7 @@ class MonitoringKapalTam extends Page
     {
         $periodLabel = Carbon::createFromFormat('Y-m', $this->period)->translatedFormat('F Y');
 
-        return "Monitoring Kapal TAM — {$periodLabel}";
+        return "Monitoring Kapal — {$periodLabel}";
     }
 
     // ═══════════════════════════════════════════════════════════════════
