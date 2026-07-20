@@ -36,6 +36,41 @@ class CreateShipment extends CreateRecord
     /** OCR-02 — true setelah [Terapkan ke Formulir]; summary jadi ringkas. */
     public bool $intakeApplied = false;
 
+    /**
+     * UX-RECOMPOSE-01 — Hero subheading. Judul "Permintaan Pengiriman"
+     * berasal dari resource label; ini melengkapinya dengan penjelasan
+     * konteks operasional + status draft. Presentasi murni — tidak ada
+     * perubahan workflow/validasi/data.
+     */
+    public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    {
+        // UX v2.1: hero ringkas — satu kalimat + badge status kecil.
+        return new \Illuminate\Support\HtmlString(
+            '<span class="jss-hero-lead">Buat permintaan baru berdasarkan <strong>SPPB</strong> atau '
+            . '<strong>Delivery Order</strong>.</span>'
+            . '<span class="jss-hero-status">🟢 Draft Baru</span>'
+        );
+    }
+
+    /**
+     * UX v2.1 — Primary action lebih dominan ("Buat Permintaan", size lg),
+     * "Batal" sekunder. Hanya label & ukuran; submit handler bawaan
+     * CreateRecord tidak diubah.
+     */
+    protected function getCreateFormAction(): \Filament\Actions\Action
+    {
+        return parent::getCreateFormAction()
+            ->label('Buat Permintaan')
+            ->icon('heroicon-m-paper-airplane')
+            ->size(\Filament\Support\Enums\ActionSize::Large);
+    }
+
+    protected function getCancelFormAction(): \Filament\Actions\Action
+    {
+        return parent::getCancelFormAction()
+            ->label('Batal');
+    }
+
     /*
     |--------------------------------------------------------------------------
     | OCR-02 — Review → Apply
@@ -135,7 +170,8 @@ class CreateShipment extends CreateRecord
         }
 
         // Rule 7 — pickup_location OCR hanya informasi di summary; Origin
-        // Office tetap mengikuti Smart Origin yang ada (tidak disentuh).
+        // (Cabang Asal) tetap mengikuti Smart Origin by Branch yang ada
+        // (tidak disentuh).
 
         // Manifest → repeater units. Semua row tetap editable, tanpa lock.
         $manifestUnits = $prefill->manifest['units'] ?? [];
@@ -312,7 +348,9 @@ class CreateShipment extends CreateRecord
             ]);
         }
 
-        // Smart Origin by Office — backend protection (always override).
+        // Smart Origin by Branch — backend protection (always override).
+        // Office is no longer involved in this flow (migrated 2026-07-20,
+        // see docs/master-office/SMART-ORIGIN-MIGRATION-BLOCKED-SCHEMA-GAP.md).
         // Primary: resolve from authenticated user's branch.
         // Fallback: resolve from the shipment's final branch_id (e.g. super admin SEA where branch came from POL).
         $resolvedOrigin = ShipmentResource::resolveOriginCityFromUser();

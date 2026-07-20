@@ -33,8 +33,6 @@ class Shipment extends Model
         'receiver_id',
         'origin_city_id',
         'destination_city_id',
-        'origin_office_id',
-        'destination_office_id',
         'branch_id',
         'pic_name',
         'pic_phone',
@@ -158,8 +156,6 @@ class Shipment extends Model
             if (blank($m->branch_id)) {
                 if (Auth::check() && Auth::user()->effectiveBranchId()) {
                     $m->branch_id = Auth::user()->effectiveBranchId();
-                } elseif ($m->origin_office_id) {
-                    $m->branch_id = Office::whereKey($m->origin_office_id)->value('branch_id');
                 }
             }
 
@@ -170,18 +166,15 @@ class Shipment extends Model
                 }
             }
 
-            // Smart Origin by Office: origin_city_id is derived from the
-            // branch's office city. Backend is the source of truth — always
-            // override regardless of what was sent in the request.
+            // Smart Origin by Branch: origin_city_id is derived directly
+            // from Branch.city_id. Office is no longer part of this flow —
+            // see docs/master-office/SMART-ORIGIN-MIGRATION-BLOCKED-SCHEMA-GAP.md.
+            // Backend is the source of truth — always override regardless
+            // of what was sent in the request.
             if ($m->branch_id) {
-                $officeCity = Office::where('branch_id', $m->branch_id)->value('city');
-                if ($officeCity) {
-                    $cityId = City::whereRaw('LOWER(name) = ?', [strtolower(trim($officeCity))])
-                        ->where('is_active', true)
-                        ->value('id');
-                    if ($cityId) {
-                        $m->origin_city_id = $cityId;
-                    }
+                $cityId = Branch::whereKey($m->branch_id)->value('city_id');
+                if ($cityId) {
+                    $m->origin_city_id = $cityId;
                 }
             }
         });
@@ -251,23 +244,18 @@ class Shipment extends Model
             if (blank($m->branch_id)) {
                 if (Auth::check() && Auth::user()->effectiveBranchId()) {
                     $m->branch_id = Auth::user()->effectiveBranchId();
-                } elseif ($m->origin_office_id) {
-                    $m->branch_id = Office::whereKey($m->origin_office_id)->value('branch_id');
                 }
             }
 
-            // Smart Origin by Office: origin_city_id is derived from the
-            // branch's office city. Backend is the source of truth — always
-            // override regardless of what was sent in the request.
+            // Smart Origin by Branch: origin_city_id is derived directly
+            // from Branch.city_id. Office is no longer part of this flow —
+            // see docs/master-office/SMART-ORIGIN-MIGRATION-BLOCKED-SCHEMA-GAP.md.
+            // Backend is the source of truth — always override regardless
+            // of what was sent in the request.
             if ($m->branch_id) {
-                $officeCity = Office::where('branch_id', $m->branch_id)->value('city');
-                if ($officeCity) {
-                    $cityId = City::whereRaw('LOWER(name) = ?', [strtolower(trim($officeCity))])
-                        ->where('is_active', true)
-                        ->value('id');
-                    if ($cityId) {
-                        $m->origin_city_id = $cityId;
-                    }
+                $cityId = Branch::whereKey($m->branch_id)->value('city_id');
+                if ($cityId) {
+                    $m->origin_city_id = $cityId;
                 }
             }
 
@@ -1066,11 +1054,6 @@ class Shipment extends Model
         return $this->belongsTo(User::class, 'last_edited_by');
     }
 
-    public function originOffice()
-    {
-        return $this->belongsTo(Office::class, 'origin_office_id');
-    }
-
     public function assignedDepot()
     {
         return $this->belongsTo(Depot::class, 'assigned_depot_id');
@@ -1090,11 +1073,6 @@ class Shipment extends Model
         }
 
         return Depot::where('port_id', $this->pod_id)->first();
-    }
-
-    public function destinationOffice()
-    {
-        return $this->belongsTo(Office::class, 'destination_office_id');
     }
 
     public function briefingSession()
@@ -1317,19 +1295,6 @@ class Shipment extends Model
     public function getContainerDisplayAttribute(): string
     {
         return collect($this->container_list)->implode(', ');
-    }
-
-    public function kpiBranchId(): ?int
-    {
-        $destOfficeBranchId = $this->destination_office_id
-            ? optional($this->destinationOffice)->branch_id
-            : null;
-
-        $destBranchId = property_exists($this, 'destination_branch_id')
-            ? ($this->destination_branch_id ?? null)
-            : null;
-
-        return (int) ($destOfficeBranchId ?? $destBranchId ?? $this->branch_id ?? 0) ?: null;
     }
 
     public function isManadoKpiTarget(): bool

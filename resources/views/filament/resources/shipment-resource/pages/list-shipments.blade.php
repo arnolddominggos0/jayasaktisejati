@@ -15,6 +15,14 @@
     default collapsed; dibuka dari tombol Filter toolbar via class
     .ws-filters-open (transisi + klik-luar menutup, lihat theme.css).
     Filter logic tidak disentuh — hanya presentasinya.
+
+    UX-POLISH-01 — heading "Filters" + link "Reset filters" merah bawaan
+    Filament disembunyikan via CSS (scoped ke .ws-shipment-workspace, lihat
+    theme.css) karena hanya tersisa 2 quick filter (Customer, Kota Tujuan).
+    Digantikan tombol "Atur ulang filter" kustom di toolbar (gray, kecil,
+    hanya tampil saat isFiltered() true) yang memanggil method Livewire
+    bawaan resetTableFiltersForm — sama persis dengan link native, tidak ada
+    logic filter baru.
 --}}
 <x-filament-panels::page>
     <div
@@ -69,6 +77,18 @@
                 </div>
 
                 <div class="ws-toolbar-utils">
+                    @if ($this->getTable()->isFiltered())
+                        <button
+                            type="button"
+                            wire:click="resetTableFiltersForm"
+                            wire:loading.attr="disabled"
+                            wire:target="resetTableFiltersForm"
+                            class="ws-filter-reset"
+                        >
+                            Atur ulang filter
+                        </button>
+                    @endif
+
                     <x-filament::button
                         color="gray"
                         icon="heroicon-m-funnel"

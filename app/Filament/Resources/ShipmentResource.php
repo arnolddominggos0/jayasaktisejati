@@ -20,7 +20,6 @@ use App\Models\City;
 use App\Models\Customer;
 use App\Models\Depot;
 use App\Models\Driver;
-use App\Models\Office;
 use App\Models\Shipment;
 use App\Models\Voyage;
 use App\Services\ShipmentService;
@@ -92,10 +91,11 @@ class ShipmentResource extends Resource
     }
 
     /**
-     * Smart Origin by Office: User -> Branch -> Office -> City -> origin_city_id.
-     *
-     * Returns ['city_id' => int|null, 'city_name' => string|null, 'office_name' => string|null].
-     * When $branchId is null, resolves from the authenticated user's effective branch.
+     * Smart Origin by Branch (migrated 2026-07-20 — Office no longer
+     * involved). Branch is the sole source of truth for Origin;
+     * origin_city_id is a direct FK read (Branch.city_id), not a
+     * string-match. See docs/master-office/SMART-ORIGIN-MIGRATION-BLOCKED-SCHEMA-GAP.md
+     * for the prior architecture and why it changed.
      */
     public static function resolveOriginCityFromUser(?int $branchId = null): array
     {
@@ -104,25 +104,19 @@ class ShipmentResource extends Resource
         }
 
         if (! $branchId) {
-            return ['city_id' => null, 'city_name' => null, 'office_name' => null];
+            return ['city_id' => null, 'city_name' => null, 'branch_name' => null];
         }
 
-        $office = Office::where('branch_id', $branchId)
-            ->select(['id', 'name', 'city'])
-            ->first();
+        $branch = \App\Models\Branch::with('city')->find($branchId);
 
-        if (! $office || ! $office->city) {
-            return ['city_id' => null, 'city_name' => null, 'office_name' => $office?->name];
+        if (! $branch) {
+            return ['city_id' => null, 'city_name' => null, 'branch_name' => null];
         }
-
-        $city = City::whereRaw('LOWER(name) = ?', [strtolower(trim($office->city))])
-            ->where('is_active', true)
-            ->first();
 
         return [
-            'city_id'     => $city?->id,
-            'city_name'   => $office->city,
-            'office_name' => $office->name,
+            'city_id'     => $branch->city?->id,
+            'city_name'   => $branch->city?->name,
+            'branch_name' => $branch->name,
         ];
     }
 
@@ -152,9 +146,14 @@ class ShipmentResource extends Resource
 
         $mode = strtolower($m->mode?->value ?? (string) $m->mode);
         $originBr = (int) ($m->branch_id ?? 0);
-        $destBr = (int) optional($m->destinationOffice)->branch_id ?: 0;
 
-        $matches = function (array $when) use ($mode, $originBr, $destBr): bool {
+        // Office Retirement (Phase 1, 2026-07-20): the `dest_branch_id_in`
+        // rule dimension has been removed. It was resolved from
+        // destinationOffice->branch_id, but destination_office_id is never
+        // written (always null), so that dimension could never match — it was
+        // dead. Origin branch (from Branch, the source of truth) + mode remain
+        // as the live rule dimensions. See AUDIT-OFFICE-LEGACY-RETIREMENT.md.
+        $matches = function (array $when) use ($mode, $originBr): bool {
             if (isset($when['mode']) && strtolower($when['mode']) !== $mode) {
                 return false;
             }
@@ -162,9 +161,6 @@ class ShipmentResource extends Resource
                 return false;
             }
             if (isset($when['not_branch_id_in']) && in_array($originBr, (array) $when['not_branch_id_in'], true)) {
-                return false;
-            }
-            if (isset($when['dest_branch_id_in']) && ! in_array($destBr, (array) $when['dest_branch_id_in'], true)) {
                 return false;
             }
 
@@ -197,7 +193,10 @@ class ShipmentResource extends Resource
 
         return $form
             ->schema([
-                Section::make('A. Data Customer & Dokumen')
+                Section::make('Customer')
+                    ->description('Pilih pengirim dan penerima.')
+                    ->icon('heroicon-m-user-group')
+                    ->extraAttributes(['class' => 'jss-section'])
                     ->schema([
                         Grid::make(12)->schema([
                             Hidden::make('branch_id')
@@ -427,9 +426,29 @@ class ShipmentResource extends Resource
                             Hidden::make('delivery_contact_name')->dehydrated(false),
                             Hidden::make('delivery_contact_phone')->dehydrated(false),
                             Hidden::make('delivery_contact_address')->dehydrated(false),
-                            Section::make('Detail Permintaan')
+                        ]),
+                    ])
+                    ->compact(),
+
+                // UX-RECOMPOSE-01: Section A dipecah menjadi dua konteks —
+                // "Customer" (di atas) dan "Dokumen" (di bawah). Keduanya
+                // konteks berpikir yang berbeda; tidak ada field/logic yang
+                // diubah, hanya batas visual section-nya.
+                Section::make('Dokumen')
+                    ->description('Unggah SPPB atau Delivery Order.')
+                    ->icon('heroicon-m-document-text')
+                    ->extraAttributes(['class' => 'jss-section'])
+                    ->schema([
+                        Grid::make(12)->schema([
+                            // UX v2.2: nested card "Detail Permintaan" dihapus —
+                            // dipisah lewat heading kecil + spacing, bukan panel.
+                            Placeholder::make('detail_heading')
+                                ->hiddenLabel()
+                                ->content(new \Illuminate\Support\HtmlString('<div class="jss-subheading">Detail Permintaan</div>'))
+                                ->columnSpan(12),
+                            Grid::make(12)
+                                ->extraAttributes(['class' => 'jss-field-grid'])
                                 ->schema([
-                                    Grid::make(12)->schema([
                                         Select::make('request_type')
                                             ->label('Tipe Permintaan')
                                             ->options(collect(RequestType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))
@@ -455,12 +474,10 @@ class ShipmentResource extends Resource
                                             ->required()
                                             ->columnSpan(['default' => 12, 'md' => 3]),
                                     ]),
-                                ])
-                                ->compact()
-                                ->columnSpan(12),
                             Grid::make(12)->schema([
                                 FileUpload::make('attachments')
-                                    ->label('Lampiran Dokumen')
+                                    ->label('Unggah Dokumen SPPB / Delivery Order')
+                                    ->helperText('Unggah SPPB atau Delivery Order untuk diproses.')
                                     ->multiple()
                                     ->disk('public')
                                     ->directory(fn() => 'shipments/' . now()->format('Y/m'))
@@ -468,7 +485,7 @@ class ShipmentResource extends Resource
                                     ->preserveFilenames()
                                     ->downloadable()
                                     ->openable()
-                                    ->imagePreviewHeight('160')
+                                    ->imagePreviewHeight('200')
                                     ->acceptedFileTypes([
                                         'image/*',
                                         'application/pdf',
@@ -515,12 +532,13 @@ class ShipmentResource extends Resource
                                             'warning_count' => count($livewire->intakePrefill->warnings),
                                         ]);
                                     })
-                                    ->columnSpan(['default' => 12, 'md' => 6]),
+                                    ->columnSpanFull()
+                                    ->extraAttributes(['class' => 'jss-doc-upload']),
                                 Textarea::make('notes')
                                     ->label('Keterangan tambahan')
-                                    ->rows(6)
+                                    ->rows(4)
                                     ->maxLength(1000)
-                                    ->columnSpan(['default' => 12, 'md' => 6]),
+                                    ->columnSpanFull(),
                             ])->columnSpan(12),
 
                             // OCR-02 — Extraction Summary: bagian dari wizard
@@ -538,13 +556,19 @@ class ShipmentResource extends Resource
                     ])
                     ->compact(),
 
-                Section::make('B. Informasi Rute & Moda')
+                Section::make('Rute & Moda')
+                    ->description('Tentukan tujuan dan moda pengiriman.')
+                    ->icon('heroicon-m-map')
+                    ->extraAttributes(['class' => 'jss-section'])
                     ->columns(12)
                     ->schema([
-                        // ── DOMAIN-03 — Origin Office sebagai Source of Truth ──
-                        // Yang membuat shipment adalah Office/Cabang, bukan Kota.
-                        // Kota asal SELALU turunan (Office → City via Smart
-                        // Origin); tidak pernah dipilih user.
+                        // ── DOMAIN-03 — Branch sebagai Source of Truth (migrasi
+                        // Office → Branch, 2026-07-20; lihat
+                        // docs/master-office/SMART-ORIGIN-MIGRATION-BLOCKED-SCHEMA-GAP.md) ──
+                        // Yang membuat shipment adalah Branch/Cabang, bukan Kota.
+                        // Kota asal SELALU turunan (Branch.city_id via Smart
+                        // Origin); tidak pernah dipilih user. Office TIDAK lagi
+                        // terlibat di jalur ini.
 
                         // Super Admin: pilih Cabang Asal; kota diturunkan otomatis.
                         Select::make('branch_id')
@@ -564,38 +588,49 @@ class ShipmentResource extends Resource
 
                                 return $resolved['city_name']
                                     ? "Kota asal (turunan): {$resolved['city_name']}"
-                                    : 'Kota asal belum terdaftar pada Master Office cabang ini — perbarui Master Office.';
+                                    : 'Kota asal belum diatur untuk cabang ini (hubungi Super Admin).';
                             })
                             ->columnSpan(['default' => 12, 'md' => 6]),
 
                         // Office Admin: Cabang Asal mengikuti akun login — readonly,
                         // tanpa dropdown; kota tampil sebagai informasi turunan.
+                        // UX-RECOMPOSE-01 — "Read Before Input": Cabang Asal
+                        // adalah informasi sistem (readonly, mengikuti akun
+                        // login), bukan field input. Ditampilkan sebagai kartu
+                        // informasi. Sumber data & logic (Smart Origin Branch→
+                        // City) TIDAK berubah — hanya presentasinya.
                         Placeholder::make('origin_branch_display')
                             ->label('Cabang Asal')
+                            ->hiddenLabel()
                             ->visible(fn () => ! (Filament::auth()->user()?->isSuperAdmin() ?? false))
                             ->content(function ($record) {
+                                // Office Retirement (Phase 2): Branch adalah satu-satunya
+                                // sumber nama cabang asal; origin_city_id turunan Branch.city_id.
                                 if ($record && $record->originCity) {
-                                    $officeName = $record->originOffice?->name ?? $record->branch?->name ?? '';
-
-                                    return $officeName
-                                        ? "🏢 {$officeName} — Kota asal: {$record->originCity->name}"
-                                        : "Kota asal: {$record->originCity->name}";
+                                    $branchName = $record->branch?->name ?: null;
+                                    $cityName   = $record->originCity->name;
+                                } else {
+                                    $branchName = \App\Models\Branch::whereKey(Filament::auth()->user()?->effectiveBranchId())->value('name');
+                                    $resolved   = self::resolveOriginCityFromUser();
+                                    $cityName   = $resolved['city_name'] ?: null;
+                                    $branchName = $branchName ?: ($resolved['branch_name'] ?? null);
                                 }
 
-                                $branchName = \App\Models\Branch::whereKey(Filament::auth()->user()?->effectiveBranchId())->value('name');
-                                $resolved   = self::resolveOriginCityFromUser();
+                                $branchLine = $branchName ?: '—';
+                                $cityLine   = $cityName ?: 'Belum diatur untuk cabang ini (hubungi Super Admin)';
+                                $cityCls    = $cityName ? 'jss-origin-card__city' : 'jss-origin-card__city jss-origin-card__city--empty';
 
-                                if ($resolved['city_name']) {
-                                    return '🏢 ' . ($branchName ?: $resolved['office_name'])
-                                        . " — Kota asal: {$resolved['city_name']}";
-                                }
-
-                                return ($branchName ? "🏢 {$branchName} — " : '')
-                                    . 'kota asal belum terdaftar di Master Office (hubungi Super Admin).';
+                                // UX v2.1: informasi sistem yang ringan —
+                                // typography > border, whitespace diutamakan.
+                                return new \Illuminate\Support\HtmlString(
+                                    '<div class="jss-origin-card">'
+                                    . '<div class="jss-origin-card__head">📍 Cabang Asal</div>'
+                                    . '<div class="jss-origin-card__branch">' . e($branchLine) . '</div>'
+                                    . '<div class="jss-origin-card__city-line">Kota Asal • '
+                                    . '<span class="' . $cityCls . '">' . e($cityLine) . '</span></div>'
+                                    . '</div>'
+                                );
                             })
-                            ->extraAttributes([
-                                'class' => 'text-sm font-medium text-gray-700 dark:text-gray-300',
-                            ])
                             ->columnSpan(['default' => 12, 'md' => 6]),
 
                         ToggleButtons::make('mode')
@@ -604,10 +639,6 @@ class ShipmentResource extends Resource
                                 ShipmentMode::Sea->value => 'Laut',
                                 ShipmentMode::Land->value => 'Darat',
                             ])
-                            ->colors([
-                                ShipmentMode::Sea->value => 'primary',
-                                ShipmentMode::Land->value => 'warning',
-                            ])
                             ->icons([
                                 ShipmentMode::Sea->value => 'heroicon-m-cog-8-tooth',
                                 ShipmentMode::Land->value => 'heroicon-m-truck',
@@ -615,6 +646,7 @@ class ShipmentResource extends Resource
                             ->inline()
                             ->required()
                             ->live()
+                            ->extraAttributes(['class' => 'jss-segmented'])
                             ->afterStateUpdated(function (Get $get, Set $set, $state) {
                                 foreach (
                                     [
@@ -675,7 +707,7 @@ class ShipmentResource extends Resource
                             ->columnSpan(12),
 
                         // DOMAIN-03: "Kota Asal" tidak lagi tampil sebagai field —
-                        // ia turunan Office (lihat Cabang Asal di atas). Nilai
+                        // ia turunan Branch (lihat Cabang Asal di atas). Nilai
                         // tetap tersimpan di origin_city_id (hidden, derived).
                         Hidden::make('origin_city_id')
                             ->default(fn () => self::resolveOriginCityFromUser()['city_id'])
@@ -690,6 +722,9 @@ class ShipmentResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
+                            // live() hanya untuk mereaktifkan panel Review di
+                            // Section akhir; tidak mengubah validasi/logic field.
+                            ->live()
                             ->helperText('cth: Manado')
                             ->columnSpan(['default' => 12, 'md' => 6]),
 
@@ -727,9 +762,16 @@ class ShipmentResource extends Resource
                                 CargoType::Vehicle->value => CargoType::Vehicle->label(),
                                 CargoType::General->value => CargoType::General->label(),
                             ])
+                            // UX v2.1: segmented control — ikon untuk pindai
+                            // cepat, tanpa warna mencolok (netral, nyaman harian).
+                            ->icons([
+                                CargoType::Vehicle->value => 'heroicon-m-truck',
+                                CargoType::General->value => 'heroicon-m-cube',
+                            ])
                             ->inline()
                             ->required()
                             ->live()
+                            ->extraAttributes(['class' => 'jss-segmented'])
                             ->afterStateUpdated(function (string $state, Get $get, Set $set) {
                                 if ($state === CargoType::Vehicle->value) {
                                     $rows = $get('units') ?? [];
@@ -1343,13 +1385,74 @@ class ShipmentResource extends Resource
                 Hidden::make('service_type')->dehydrated(),
                 Hidden::make('route_summary')->dehydrated(),
 
-                Section::make('C. Konfirmasi')
+                Section::make('Review Permintaan')
+                    ->description('Pastikan data sudah benar.')
+                    ->icon('heroicon-m-clipboard-document-check')
+                    ->extraAttributes(['class' => 'jss-section'])
                     ->columns(12)
                     ->schema([
+                        // UX-RECOMPOSE-01 — Ringkasan + Review dijadikan satu
+                        // panel otoritatif: operator melakukan review cepat
+                        // (Customer → Tujuan → Moda → Jenis → Status) sebelum
+                        // simpan. Reaktif dari state form (mode, cargo_type,
+                        // destination sudah live) — tanpa backend/field baru.
+                        Placeholder::make('review_summary')
+                            ->hiddenLabel()
+                            ->live()
+                            ->content(function (Get $get) {
+                                $customer = ($cid = (int) $get('customer_id')) > 0
+                                    ? (Customer::whereKey($cid)->value('name') ?: null) : null;
+                                $dest = ($did = (int) $get('destination_city_id')) > 0
+                                    ? (City::whereKey($did)->value('name') ?: null) : null;
+                                $mode = ($mv = $get('mode')) ? (ShipmentMode::tryFrom($mv)?->label() ?? $mv) : null;
+                                $cargo = ($cv = $get('cargo_type')) ? (CargoType::tryFrom($cv)?->label() ?? $cv) : null;
+
+                                // UX v2.2: empty state cerdas — selama belum ada
+                                // data apa pun, tampilkan pesan pengarah, bukan
+                                // 4× "Belum dipilih". Setelah user mulai mengisi,
+                                // ringkasan berkembang mengikuti progress.
+                                if (! ($customer || $dest || $mode || $cargo)) {
+                                    return new \Illuminate\Support\HtmlString(
+                                        '<div class="jss-review jss-review--empty">'
+                                        . '<div class="jss-review__title">Ringkasan</div>'
+                                        . '<div class="jss-review__empty-head">Ringkasan belum tersedia.</div>'
+                                        . '<div class="jss-review__empty-sub">Lengkapi Customer dan Tujuan terlebih dahulu. '
+                                        . 'Ringkasan akan diperbarui secara otomatis.</div>'
+                                        . '</div>'
+                                    );
+                                }
+
+                                // Summary card (label di atas, nilai di bawah) —
+                                // bukan tabel. Item yang belum terisi tetap tampil
+                                // "Belum dipilih" agar user tahu langkah berikutnya.
+                                $item = function (string $label, ?string $value): string {
+                                    $empty = $value === null || $value === '';
+                                    $cls = $empty ? 'jss-review__val jss-review__val--empty' : 'jss-review__val';
+                                    $val = $empty ? 'Belum dipilih' : e($value);
+                                    return '<div class="jss-review__item"><div class="jss-review__key">'
+                                        . e($label) . '</div><div class="' . $cls . '">' . $val . '</div></div>';
+                                };
+
+                                return new \Illuminate\Support\HtmlString(
+                                    '<div class="jss-review">'
+                                    . '<div class="jss-review__title">Ringkasan</div>'
+                                    . $item('Customer', $customer)
+                                    . $item('Tujuan', $dest)
+                                    . $item('Moda', $mode)
+                                    . $item('Jenis Muatan', $cargo)
+                                    . '<div class="jss-review__item"><div class="jss-review__key">Status</div>'
+                                    . '<div><span class="jss-review__badge">🟢 Draft Baru</span></div></div>'
+                                    . '</div>'
+                                );
+                            })
+                            ->columnSpan(12),
                         Checkbox::make('confirm_is_true')
                             ->label('Data sudah benar & sesuai dokumen.')
                             ->accepted()
                             ->required()
+                            // UX v2.2: beri jarak agar checkbox + submit tidak
+                            // menempel ke panel ringkasan (action area lebih lega).
+                            ->extraAttributes(['class' => 'jss-confirm'])
                             ->columnSpan(12),
                     ]),
             ]);
@@ -1393,7 +1496,6 @@ class ShipmentResource extends Resource
                 $query->with([
                     'originCity:id,name',
                     'destinationCity:id,name',
-                    'destinationOffice:id,branch_id',
                     'tracks:id,shipment_id,status,actual_at,tracked_at',
                     'units:id,shipment_id,reg_no,chassis_no,model_no,qty',
                 ]);
@@ -1782,60 +1884,39 @@ class ShipmentResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            // UX-LIST-02 — filter mengikuti terminologi domain terbaru:
-            // Customer (bukan Pengirim), Cabang Asal via branch_id (DOMAIN-03,
-            // bukan lagi origin_city), Dealer (DOMAIN-02). Penerima
-            // dipertahankan sebagai filter SEKUNDER (posisi terakhir).
-            // Toggle "TAM Manado" dikeluarkan: filter ber-hardcode satu
-            // customer tidak boleh jadi elemen struktural halaman generik —
-            // tempatnya di laporan KPI. Toggle "Sedang Berjalan" dihapus:
-            // fungsinya (status IN pending/pickup/transit) kini tercakup
-            // tab kerja + filter Status; lihat catatan sprint.
+            // UX-CLEANUP-01 — Quick Filter disederhanakan menjadi Search +
+            // Customer + Kota Tujuan saja. Status dihapus (sudah diwakili
+            // Tab — dua mekanisme filtering status tidak boleh hidup
+            // berdampingan). Dealer, Penerima, Cabang Asal, dan Jenis
+            // Layanan dihapus dari quick filter: Dealer & Penerima tetap
+            // bisa dicari lewat Search (customer.name / receiver.name sudah
+            // ->searchable() di kolom tabel di atas), Cabang Asal belum
+            // memberi nilai operasional yang cukup sebagai quick filter, dan
+            // Jenis Layanan dapat dipindahkan ke Advanced Filter bila suatu
+            // saat dibutuhkan kembali. Query/business logic filter yang
+            // dipertahankan tidak diubah — hanya jumlah filter yang tampil.
             ->filters([
-                SelectFilter::make('status')
-                    ->label('Status')
-                    ->options(collect(ShipmentStatus::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))
-                    ->native(false),
-
                 SelectFilter::make('customer_id')
                     ->label('Customer')
                     ->relationship('customer', 'name')
                     ->searchable()
                     ->preload(),
 
-                SelectFilter::make('dealer_id')
-                    ->label('Dealer')
-                    ->relationship('dealer', 'name')
-                    ->searchable()
-                    ->preload(),
-
-                SelectFilter::make('service_type')
-                    ->label('Jenis Layanan')
-                    ->options([
-                        ServiceType::SeaFreight->value => ServiceType::SeaFreight->label(),
-                        ServiceType::LandTrucking->value => ServiceType::LandTrucking->label(),
-                        ServiceType::CarCarrier->value => ServiceType::CarCarrier->label(),
-                    ])
-                    ->native(false),
-
-                SelectFilter::make('branch_id')
-                    ->label('Cabang Asal')
-                    ->relationship('branch', 'name')
-                    ->native(false),
-
                 SelectFilter::make('destination_city_id')
                     ->label('Kota Tujuan')
                     ->relationship('destinationCity', 'name')
                     ->searchable()
                     ->preload(),
-
-                SelectFilter::make('receiver_id')
-                    ->label('Penerima')
-                    ->relationship('receiver', 'name')
-                    ->searchable()
-                    ->preload(),
             ], layout: FiltersLayout::AboveContent)
-            ->filtersFormColumns(4)
+            ->filtersFormColumns(2)
+            // UX-POLISH-01 — empty state domain-spesifik (bukan generik "no
+            // records"). Sengaja TANPA action/tombol (amendment): "Buat
+            // Permintaan" di header (ListShipments::getHeaderActions()) sudah
+            // jadi satu-satunya primary CTA halaman ini — single primary
+            // action, tidak boleh ada duplikasi CTA dengan fungsi identik.
+            ->emptyStateIcon('heroicon-o-clipboard-document-list')
+            ->emptyStateHeading('Belum ada permintaan pengiriman')
+            ->emptyStateDescription('Mulai dengan membuat permintaan pengiriman baru atau unggah dokumen SPPB/DO untuk memulai proses operasional.')
             ->defaultSort('priority', 'desc')
             ->defaultSort('eta', 'asc')
             ->actions([
@@ -1847,7 +1928,10 @@ class ShipmentResource extends Resource
                     ->url(fn($record) => ArmadaAssignmentResource::getUrl('create', [
                         'prefill[shipment_id]' => $record->id,
                         'prefill[branch_id]' => $record->branch_id,
-                        'prefill[depot_id]' => $record->origin_office_id ?? $record->depot_id,
+                        // Office Retirement (Phase 1, 2026-07-20): dropped the
+                        // `origin_office_id ??` prefix — origin_office_id is never
+                        // written (always null), so this always resolved to depot_id.
+                        'prefill[depot_id]' => $record->depot_id,
                     ]))
                     ->visible(
                         fn(Shipment $record) => ($record->mode === ShipmentMode::Land)

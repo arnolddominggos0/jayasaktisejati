@@ -2299,11 +2299,13 @@
     padding: 0.625rem 1.5rem;
     border-bottom: 1px solid var(--mon-border-soft, #EEF2F7);
 }
-/* Search = interaksi primer Office Admin — ±48% lebar toolbar
-   (WS-01A.2 Search Dominance), tetap rata kiri. */
+/* Search = interaksi primer Office Admin — ±68% lebar toolbar. Amandemen
+   UX-POLISH-01 atas WS-01A.2 Search Dominance (sebelumnya 48%): Search
+   kini elemen visual utama, tombol Filter & Atur ulang filter tetap di
+   kanan (.ws-toolbar-utils), tetap rata kiri. */
 .ws-toolbar-search {
-    flex: 1 1 48%;
-    max-width: 48%;
+    flex: 1 1 68%;
+    max-width: 68%;
     min-width: 16rem;
 }
 .ws-toolbar-utils {
@@ -2324,9 +2326,11 @@
 
 /* Navigasi → workspace: rapatkan jarak agar tab terasa milik workspace
    di bawahnya. Nilai .vp-workspace-toolbar-row (1.125rem) TIDAK diubah —
-   design freeze Vessel Plan; override hanya lewat kelas pendamping ini. */
+   design freeze Vessel Plan; override hanya lewat kelas pendamping ini.
+   0.5rem → 0.25rem (UX-POLISH-01): Search dirapatkan lebih dekat ke Tab.
+   Padding internal .ws-toolbar (ritme divider, WS-01A.2) tidak disentuh. */
 .ws-nav-row {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.25rem;
 }
 
 /* Filter panel (FiltersLayout::AboveContent) — default COLLAPSED.
@@ -2408,4 +2412,284 @@
 .vp-tab.is-active .ws-tab-badge {
     background: var(--mon-accent-600, #1D4ED8);
     color: #FFFFFF;
+}
+
+/* =======================================================================
+   UX-POLISH-01 — Permintaan Pengiriman List Resource
+   Visual polish murni: tidak ada query/filter/tab/business logic yang
+   berubah lewat blok ini. Lihat juga UX-CLEANUP-01 (penyederhanaan filter
+   itu sendiri, di ->filters()) dan perubahan .ws-toolbar-search /
+   .ws-nav-row di atas (amandemen atas nilai WS-01A.2).
+   ======================================================================= */
+
+/* Heading "Filters" bawaan Filament + link "Reset filters" merah bawaan
+   (satu baris yang sama, lihat vendor filament/tables .../components/
+   filters/index.blade.php) disembunyikan: hanya tersisa 2 quick filter
+   (Customer, Kota Tujuan) sehingga heading generik tidak lagi diperlukan,
+   dan link reset merahnya digantikan tombol kustom .ws-filter-reset di
+   toolbar (lihat list-shipments.blade.php) yang hanya tampil saat filter
+   sedang aktif. Discoped ke .ws-shipment-workspace — resource Filament
+   lain yang masih memakai heading/reset bawaan tidak terdampak. */
+.ws-shipment-workspace .fi-ta-filters-above-content-ctn .fi-ta-filters > div:first-child {
+    display: none;
+}
+
+/* Pengganti link reset: secondary action (bukan danger merah), mengikuti
+   text-muted, ukuran lebih kecil dari teks toolbar. Visibility dikontrol
+   di Blade via Table::isFiltered() bawaan Filament (@if di
+   list-shipments.blade.php) — CSS tidak bisa tahu status filter, jadi
+   elemen ini murni styling, bukan show/hide logic. */
+.ws-filter-reset {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    color: var(--mon-neutral, #6B7280);
+    background: transparent;
+    border: none;
+    padding: 0.25rem 0.375rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 120ms ease;
+}
+.ws-filter-reset:hover {
+    color: var(--mon-navy-600, #1E3A5F);
+    text-decoration: underline;
+}
+.ws-filter-reset:focus-visible {
+    outline: 2px solid var(--mon-accent-600, #1D4ED8);
+    outline-offset: 1px;
+    border-radius: 0.25rem;
+}
+
+/* =======================================================================
+   UX v2.1 — Buat Permintaan Pengiriman (polish: lebih ringan)
+   "Less interface, more workflow": hierarki lewat spacing + typography,
+   bukan border. Seluruh selector di-scope ke class .jss-* / .jss-section /
+   .jss-segmented yang HANYA dipakai pada form Create Shipment — komponen
+   Filament global tidak terpengaruh.
+   ======================================================================= */
+
+/* =====================================================================
+   v2.3 — Section header design system. Hierarki header IDENTIK di keempat
+   section (Customer, Dokumen, Rute & Moda, Review). Semua ber-class
+   .jss-section → compact vs non-compact dinormalkan seragam di sini,
+   sehingga tinggi & pola header sama persis. Discoped ke form ini.
+   ===================================================================== */
+.jss-section { margin-top: 0.75rem; }
+
+/* Header: padding & tinggi seragam (override px-4/py-2.5 compact maupun
+   px-6/py-4 non-compact) → semua card punya header setinggi sama. */
+.jss-section .fi-section-header {
+    padding: 1.15rem 1.5rem;
+    gap: 0.375rem;
+    min-height: 4.5rem;
+    justify-content: center;
+    /* v2.3: pemisah SANGAT halus agar header "anchored", tidak mengambang. */
+    border-bottom: 1px solid #F1F5F9;
+}
+.dark .jss-section .fi-section-header { border-bottom-color: rgba(255, 255, 255, 0.05); }
+/* Baris icon + judul/subtitle: jarak icon↔teks sedikit lebih lega. */
+.jss-section .fi-section-header > .flex.items-center { gap: 0.75rem; }
+
+/* Judul: sedikit lebih besar & tegas (was text-base/600). */
+.jss-section .fi-section-header-heading {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: -0.006em;
+}
+
+/* Subtitle: lebih redup + line-height nyaman (was gray-500). */
+.jss-section .fi-section-header-description {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+    color: #94A3B8;
+}
+.dark .jss-section .fi-section-header-description { color: #64748B; }
+
+/* Icon: satu keluarga (heroicons mini), ukuran seragam ~20px, warna redup
+   yang konsisten — mengikat keempat section sebagai satu sistem desain. */
+/* Icon: sedikit lebih GELAP dari subtitle → kontras jelas (icon → title →
+   subtitle). Tetap satu keluarga heroicons mini, ukuran seragam ~20px. */
+.jss-section .fi-section-header-icon {
+    width: 1.25rem;
+    height: 1.25rem;
+    color: #475569;
+}
+
+/* Header↔konten: divider bawaan Filament tetap dihilangkan (garis tunggal
+   milik header sudah cukup); beri napas via padding-atas konten. */
+.jss-section .fi-section-content-ctn { border-top: 0; }
+.jss-section .fi-section-content { padding: 1rem 1.5rem 1.5rem; }
+
+/* Hero subheading + status badge (CreateShipment::getSubheading) */
+.jss-hero-lead {
+    display: block;
+    max-width: 64ch;
+    line-height: 1.6;
+    color: var(--mon-neutral, #6B7280);
+}
+.jss-hero-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    margin-top: 0.625rem;
+    padding: 0.2rem 0.625rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #047857;                 /* emerald-700 — status hidup, tidak mencolok */
+    background: #ECFDF5;            /* emerald-50 */
+}
+.dark .jss-hero-status { color: #6EE7B7; background: rgba(16, 185, 129, 0.12); }
+
+/* Sub-heading ringan (mis. "Detail Permintaan") — pengganti nested card.
+   Pemisah area lewat typography + spacing, bukan panel (v2.2 deliverable 1). */
+/* v2.3: label subsection — gaya IDENTIK dengan "RINGKASAN" (.jss-review__title):
+   uppercase kecil, letter-spacing tipis, abu gelap. Tanpa border → terbaca
+   sebagai bagian dari section, bukan section baru. */
+.jss-subheading {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748B;
+    margin-bottom: 0.375rem;
+}
+.dark .jss-subheading { color: #94A3B8; }
+
+/* Cabang Asal — informasi sistem RINGAN: MURNI typography + whitespace,
+   tanpa border/panel/ornament (v2.2 deliverable 3 & 7). */
+.jss-origin-card {
+    padding: 0.125rem 0;
+}
+.jss-origin-card__head {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--mon-neutral, #6B7280);
+}
+.jss-origin-card__branch {
+    margin-top: 0.125rem;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--mon-navy-600, #1E3A5F);
+}
+.jss-origin-card__city-line {
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    color: var(--mon-neutral, #6B7280);
+}
+.jss-origin-card__city { font-weight: 600; color: #334155; }
+.jss-origin-card__city--empty { color: #B45309; font-weight: 500; }
+.dark .jss-origin-card { border-left-color: rgba(255, 255, 255, 0.1); }
+.dark .jss-origin-card__branch { color: #E2E8F0; }
+.dark .jss-origin-card__city { color: #E2E8F0; }
+
+/* Review → summary card (label di atas, nilai di bawah). Pemisah tipis
+   antar item; BUKAN tabel (deliverable 5). Readability diutamakan. */
+.jss-review {
+    display: flex;
+    flex-direction: column;
+}
+.jss-review__title {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #64748B;             /* identik dengan .jss-subheading (satu sistem) */
+    margin-bottom: 0.375rem;
+}
+.jss-review__item {
+    padding: 0.625rem 0;
+    border-top: 1px solid var(--mon-border-soft, #F1F5F9);
+}
+.jss-review__item:first-of-type { border-top: 0; }
+.jss-review__key {
+    font-size: 0.75rem;
+    color: var(--mon-neutral, #6B7280);
+    margin-bottom: 0.15rem;
+}
+.jss-review__val {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #0F172A;
+}
+.jss-review__val--empty { color: #9CA3AF; font-weight: 500; font-style: italic; }
+.jss-review__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #047857;
+}
+.dark .jss-review__item { border-top-color: rgba(255, 255, 255, 0.06); }
+.dark .jss-review__val { color: #F1F5F9; }
+
+/* Review — empty state cerdas (v2.2 deliverable 4, prioritas): pesan
+   pengarah selama belum ada data, bukan placeholder berulang. */
+/* v2.3: hierarchy lewat ukuran + weight (bukan warna mencolok) — kalimat
+   utama dominan, kalimat pengarah lebih halus. */
+.jss-review__empty-head {
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: #1E293B;
+    margin-top: 0.25rem;
+}
+.jss-review__empty-sub {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: #94A3B8;
+    margin-top: 0.375rem;
+    max-width: 42ch;
+}
+.dark .jss-review__empty-head { color: #E2E8F0; }
+
+/* Detail Permintaan — sedikit ruang antar field (v2.2 deliverable 5). */
+.jss-field-grid { row-gap: 1rem; }
+
+/* Action area — penutup halaman: ruang vertikal lebih lega + garis
+   sangat halus agar terpisah dari panel Review, tidak menempel (v2.3). */
+.jss-confirm {
+    margin-top: 1.5rem;
+    padding-top: 1.15rem;
+    border-top: 1px solid #F1F5F9;
+}
+.dark .jss-confirm { border-top-color: rgba(255, 255, 255, 0.05); }
+
+/* Segmented control (Moda / Jenis Muatan): area klik lebih nyaman,
+   netral (deliverable 6). Discoped via extraAttributes(['class' =>
+   'jss-segmented']) — tidak menyentuh toggle di form lain. */
+.jss-segmented .fi-fo-toggle-buttons { gap: 0.625rem; }
+.jss-segmented .fi-btn {
+    padding-block: 0.5rem;
+    padding-inline: 1.05rem;
+    font-size: 0.875rem;
+}
+.jss-segmented .fi-btn .fi-btn-icon { width: 1.15rem; height: 1.15rem; }
+
+/* Upload dokumen — entry point OCR. v2.3: perbaiki selektor (FilePond nyata,
+   BUKAN .fi-fo-file-upload-dropzone yang tak ada), area sedikit lebih tinggi,
+   background lebih terang, hover lebih jelas, label lebih dominan. Minimal. */
+.jss-doc-upload { border-radius: 0.75rem; }
+.jss-doc-upload .filepond--root .filepond--drop-label { min-height: 6.5em; }
+.jss-doc-upload .filepond--panel-root {
+    background: #F8FAFC;
+    border: 1px dashed #CBD5E1;
+    transition: background 120ms ease, border-color 120ms ease;
+}
+.jss-doc-upload .filepond--root:hover .filepond--panel-root {
+    background: #F1F5F9;
+    border-color: #94A3B8;
+}
+.jss-doc-upload .filepond--drop-label label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #475569;
+}
+.dark .jss-doc-upload .filepond--panel-root {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.12);
 }
