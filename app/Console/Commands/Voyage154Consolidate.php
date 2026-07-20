@@ -244,7 +244,6 @@ class Voyage154Consolidate extends Command
                 $row->packages_total ?? 0, $row->unit_count, $row->track_count);
         }
 
-        // Cleanup temp audit files if still present
         foreach (['__precheck.php', '__fkcheck.php', '__mastercheck.php'] as $tmp) {
             $path = base_path($tmp);
             if (file_exists($path)) {

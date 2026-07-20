@@ -1,5 +1,5 @@
 {{--
-    List Vessel Plan — Sprint "UX Polish": Tahun sebagai context selector.
+    List Vessel Plan — Tahun sebagai context selector.
 
     Bukan bawaan Filament (filament-panels::resources.pages.list-records) —
     versi native selalu membawa <x-filament-panels::resources.tabs /> (tidak

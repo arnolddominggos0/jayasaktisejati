@@ -202,9 +202,9 @@ class SppbAssistService
         }
 
         return [
-            // DOMAIN-02: badan usaha di kop SPPB adalah DEALER (penerbit
-            // dokumen), bukan Commercial Customer. dealer_name adalah klaim
-            // resmi; customer_text dipertahankan untuk kompatibilitas envelope.
+            // Badan usaha di kop SPPB adalah Dealer (penerbit dokumen), bukan
+            // Commercial Customer. dealer_name adalah klaim resmi; customer_text
+            // dipertahankan untuk kompatibilitas envelope.
             'dealer_name'   => $customer,
             'customer_text' => $customer,
             'receiver_text' => $this->extractByLabel($text, self::HEADER_LABELS['receiver']),
@@ -228,8 +228,8 @@ class SppbAssistService
     }
 
     /**
-     * OCR-02B — turunkan hint KOTA dari teks tujuan secara GENERIK
-     * (tanpa aturan per-kota): buang token prefiks badan usaha
+     * Turunkan hint kota dari teks tujuan secara generik (tanpa aturan
+     * per-kota): buang token prefiks badan usaha
      * (PT/CV/UD/TB) dan token singkatan pendek ber-kapital (≤3 huruf,
      * mis. "HA" = Hasjrat Abadi); sisa teks = kandidat nama kota.
      *
@@ -263,10 +263,7 @@ class SppbAssistService
         return ($hint !== '' && mb_strlen($hint) >= 3) ? $hint : null;
     }
 
-    /**
-     * VoyageHintExtractor — hint pencocokan voyage untuk Review UI.
-     * TIDAK PERNAH mengisi field Shipment: jadwal milik Voyage (frozen rule).
-     */
+    /** Hint pencocokan voyage untuk Review UI. Tidak pernah mengisi field Shipment: jadwal milik Voyage. */
     protected function extractVoyageHints(string $text): array
     {
         $vessel = null;
@@ -465,7 +462,7 @@ class SppbAssistService
             $copy['destination'] = ['value' => $claims['destination'], 'confidence' => 0.75];
         }
         if (($claims['destination_city_hint'] ?? null) !== null) {
-            // OCR-02B — hint kota untuk lookup Master City di sisi Apply.
+            // Hint kota untuk lookup Master City di sisi Apply.
             $copy['destination_city_hint'] = ['value' => $claims['destination_city_hint'], 'confidence' => 0.70];
         }
         if ($claims['pickup_location'] !== null) {
@@ -481,7 +478,7 @@ class SppbAssistService
         return $copy;
     }
 
-    /** Warnings OCR-01E — gap jujur, bukan exception. */
+    /** Warnings — gap jujur, bukan exception. */
     protected function collectWarnings(
         array $document,
         array $copyFields,
@@ -795,7 +792,6 @@ class SppbAssistService
         $text = preg_replace('/[ \t]{2,}/', ' ', $text);
         $text = trim($text);
 
-        // ── TEMPORARY — OCR-01D parser verification. HAPUS setelah stabil. ─
         $pageCount = preg_match_all('/\/Type\s*\/Page[^s]/', $pdfContent);
         Log::info('OCR-01D PARSER', [
             'parser'                  => 'lightweight-regex (built-in, boundary+line fix)',

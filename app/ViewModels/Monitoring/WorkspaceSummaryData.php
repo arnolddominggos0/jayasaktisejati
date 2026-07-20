@@ -13,7 +13,7 @@ final readonly class WorkspaceSummaryData
         public readonly string $branch,
         public readonly Carbon $lastRefresh,
         public readonly int $filteredUnits,
-        /** Sprint 6.4.2: display label for the active period, e.g. "Juni 2026". */
+        /** Display label for the active period, e.g. "Juni 2026". */
         public readonly string $period,
     ) {}
 

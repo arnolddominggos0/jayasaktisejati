@@ -60,7 +60,7 @@ final class ExceptionEvaluator
     // ── Band aggregation ──────────────────────────────────────────────────────
 
     /**
-     * Build ExceptionBandData from raw aggregate counts (Sprint 6.2B).
+     * Build ExceptionBandData from raw aggregate counts.
      * Chips with count = 0 are excluded; priority order enforced via CHIP_DEFINITIONS.
      *
      * @param array{delay:int, hold:int, ng:int, demurrage:int, missing_voyage:int, stuck:int} $rawCounts

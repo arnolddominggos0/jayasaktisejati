@@ -5,8 +5,6 @@ namespace App\Support\Monitoring;
 use Illuminate\Support\HtmlString;
 
 /**
- * Sprint 6.4.3 — Search Experience.
- *
  * Reusable, case-insensitive search-term highlighter. Wraps every
  * occurrence of `$term` inside `$text` with a <mark class="mon-hl"> so
  * the operator can instantly see why a row matched their query.

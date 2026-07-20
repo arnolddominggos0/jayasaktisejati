@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * DOMAIN-02 — Dealer: jaringan distribusi milik Commercial Customer.
+ * Dealer: jaringan distribusi milik Commercial Customer.
  * Berlaku hanya untuk Vehicle Shipment; General Cargo tidak memakai master ini.
  *
  * Aturan domain (frozen): Customer = hubungan bisnis; Dealer = jaringan

@@ -10,26 +10,24 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class ShipmentStats extends BaseWidget
 {
-    protected int|string|array $columnSpan = 3;
+    protected int|string|array $columnSpan = 2;
 
 
     protected function getColumns(): int
     {
-        return 3;
+        return 2;
     }
 
     protected static ?string $pollingInterval = '30s';
 
     protected function getStats(): array
     {
-        $draft      = Shipment::where('status', ShipmentStatus::Draft->value)->count();
         $inProgress = Shipment::whereIn('status', ShipmentStatus::inProgress())->count();
         $delivered  = Shipment::where('status', ShipmentStatus::Delivered)->count();
 
         $days = CarbonPeriod::create(now()->subDays(6)->startOfDay(), '1 day', now()->endOfDay());
         $dailyDelivered = [];
         $dailyProgress  = [];
-        $dailyDraft     = [];
 
         foreach ($days as $day) {
             $start = $day->copy()->startOfDay();
@@ -39,9 +37,6 @@ class ShipmentStats extends BaseWidget
                 ->whereBetween('updated_at', [$start, $end])->count();
 
             $dailyProgress[] = Shipment::whereIn('status', ShipmentStatus::inProgress())
-                ->whereBetween('updated_at', [$start, $end])->count();
-
-            $dailyDraft[] = Shipment::where('status', ShipmentStatus::Draft)
                 ->whereBetween('updated_at', [$start, $end])->count();
         }
 
@@ -57,22 +52,7 @@ class ShipmentStats extends BaseWidget
             ->count();
         // $deltaProgress = $this->formatDelta($thisWeekProgress, $prevWeekProgress);
 
-        $thisWeekDraft = array_sum($dailyDraft);
-        $prevWeekDraft = Shipment::where('status', ShipmentStatus::Draft)
-            ->whereBetween('updated_at', [now()->subDays(13)->startOfDay(), now()->subDays(7)->endOfDay()])
-            ->count();
-        // $deltaDraft = $this->formatDelta($thisWeekDraft, $prevWeekDraft);
-
         return [
-            Stat::make('Draft', number_format($draft))
-                ->icon('heroicon-m-document')
-                ->color('gray')
-                // ->description($deltaDraft['text'])
-                // ->descriptionIcon($deltaDraft['icon'])
-                // ->descriptionColor($deltaDraft['color'])
-                ->chart($dailyDraft) // mini sparkline
-                ->extraAttributes(['class' => 'rounded-2xl shadow-sm ring-1 ring-gray-200 dark:ring-gray-800 py-4 px-4']),
-
             Stat::make('In Progress', number_format($inProgress))
                 ->icon('heroicon-m-arrow-path')
                 ->color('warning')

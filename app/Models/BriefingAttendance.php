@@ -313,7 +313,7 @@ class BriefingAttendance extends Model
     /**
      * Auto-evaluate fit_status from vitals.
      *
-     * Thresholds (SC.5D.2B):
+     * Thresholds:
      *   Temperature: 35.5 – 37.2 °C  (≥ 37.3 → recheck territory → TIDAK FIT)
      *   Systolic:    90 – 120 mmHg
      *   Diastolic:   60 – 80  mmHg

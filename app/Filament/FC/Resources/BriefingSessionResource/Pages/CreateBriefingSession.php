@@ -28,7 +28,7 @@ class CreateBriefingSession extends CreateRecord
     }
 
     /**
-     * Phase 2 — Auto-generate 4 stock APD rows after session is created.
+     * Auto-generate 4 stock APD rows after session is created.
      *
      * required_quantity is pre-filled from summary_headcount so FC only
      * needs to enter the actual stock_available per type.

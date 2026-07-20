@@ -7,13 +7,12 @@ use App\Support\Monitoring\PeriodResolver;
 final readonly class MonitoringFilter
 {
     public function __construct(
-        /** Sprint 6.4.2: workspace branch context. See applyBranch() in the query builders. */
+        /** Workspace branch context. See applyBranch() in the query builders. */
         public readonly ?int $branch_id,
         /**
-         * v2 extension point — not applied by v1 query builders.
-         * In v1 the mode is hard-pinned to 'sea' via MonitoringDomain.
-         * Re-enable in query builders and expose in the UI when land mode is added.
-         * See ADR-009.
+         * Extension point — not applied by the current query builders, where
+         * the mode is hard-pinned to 'sea' via MonitoringDomain. Re-enable in
+         * query builders and expose in the UI when land mode is added.
          */
         public readonly ?string $mode,
         public readonly ?string $route,
@@ -21,8 +20,7 @@ final readonly class MonitoringFilter
         public readonly string $search,
         public readonly string $group_mode,
         /**
-         * Sprint 6.4.1: replaces the old boolean `show_finished`. One of
-         * 'active' (default, hide finished), 'finished' (finished only),
+         * One of 'active' (default, hide finished), 'finished' (finished only),
          * or 'all' (no status restriction). See config('monitoring.status_options').
          */
         public readonly string $status,
@@ -30,9 +28,9 @@ final readonly class MonitoringFilter
         public readonly int $page,
         public readonly int $page_size,
         /**
-         * Sprint 6.4.2: workspace period context, format 'YYYY-MM'. The
-         * primary context filter — Search/Exception/Status/Summary all
-         * operate within this period, not the whole database.
+         * Workspace period context, format 'YYYY-MM'. The primary context
+         * filter — Search/Exception/Status/Summary all operate within this
+         * period, not the whole database.
          */
         public readonly string $period,
     ) {}
@@ -56,8 +54,8 @@ final readonly class MonitoringFilter
 
     public function cacheKey(): string
     {
-        // `mode` is excluded — v1 hard-pins sea mode in all query builders
-        // so varying on mode would produce duplicate cache entries. See ADR-009.
+        // `mode` is excluded — sea mode is hard-pinned in all query builders,
+        // so varying on mode would produce duplicate cache entries.
         return md5(serialize([
             $this->branch_id,
             $this->route,

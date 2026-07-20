@@ -6,7 +6,7 @@
         'logo' => null,
         'site' => env(
             'APP_BRAND_SITE',
-            env('COMPANY_URL', config('company.url', config('app.url', 'https://jayasaktisejati.com'))),
+            env('COMPANY_URL', config('company.url', config('app.url', 'https://jayasaktiapp.com'))),
         ),
         'phone' => env('COMPANY_PHONE', config('company.phone', '')),
         'addr' =>
@@ -62,11 +62,8 @@
     $isFcl = !empty($containerSize) && $containerQty > 0;
 
     $senderName = $shipment->customer?->name ?? '';
-    $senderPhone = $shipment->customer?->phone ?? ($shipment->customer?->pic_phone ?? '');
-
     $recvName = $shipment->receiver?->name ?? '';
-    $recvPhone = $shipment->receiver?->phone ?? ($shipment->receiver?->pic_phone ?? '');
-    $recvAddr = $shipment->receiver?->address ?? '';
+    $dealerName = $shipment->dealer?->name ?? '';
 
     $serviceTypeLabel =
         $shipment->service_type?->label() ?? (is_string($shipment->service_type) ? $shipment->service_type : '-');
@@ -85,7 +82,8 @@
 
     $createdOn = $fmtDate($shipment->created_at);
     $etaOn = filled($shipment->eta) ? $fmtDate($shipment->eta) : '-';
-    $etdOn = filled($shipment->etd) ? $fmtDate($shipment->etd) : '-';
+
+    $unitCount = filled($shipment->units) && is_iterable($shipment->units) ? count($shipment->units) : 0;
 @endphp
 
 <!DOCTYPE html>
@@ -104,7 +102,7 @@
             font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
             font-size: 9.5px;
             color: #111827;
-            line-height: 1.45
+            line-height: 1.4
         }
 
         .header {
@@ -113,8 +111,8 @@
             justify-content: space-between;
 
             border-bottom: 3px solid #0137A1;
-            padding-bottom: 8px;
-            margin-bottom: 10px
+            padding-bottom: 6px;
+            margin-bottom: 8px
         }
 
         .header-left {
@@ -171,15 +169,25 @@
             background: #fafafa
         }
 
+        .section-label {
+            font-size: 8px;
+            font-weight: 800;
+            color: #9ca3af;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin: 8px 0 4px
+        }
+
         .meta {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 8px;
+            gap: 6px;
             background: #f9fafb;
             border: 1px solid #e5e7eb;
             border-radius: 6px;
-            padding: 8px;
-            margin: 10px 0
+            padding: 7px;
+            margin: 6px 0;
+            page-break-inside: avoid
         }
 
         .meta .k {
@@ -195,28 +203,29 @@
             font-weight: 600
         }
 
-        .tracking-section {
+        .tracking-strip {
             display: flex;
-            gap: 12px;
-            background: #fafafa;
+            align-items: center;
+            gap: 10px;
             border: 1px solid #e5e7eb;
             border-radius: 6px;
-            padding: 10px;
-            margin-bottom: 10px
+            padding: 6px 8px;
+            margin: 10px 0 0;
+            page-break-inside: avoid
         }
 
         .qr-area {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             flex: 1;
             border-right: 1px dashed #d1d5db;
-            padding-right: 12px
+            padding-right: 10px
         }
 
         .qr-area svg {
-            width: 72px !important;
-            height: 72px !important
+            width: 44px !important;
+            height: 44px !important
         }
 
         .qr-info {
@@ -225,13 +234,13 @@
 
         .qr-info .title {
             font-weight: 800;
-            font-size: 10px;
-            margin-bottom: 2px;
+            font-size: 8.5px;
+            margin-bottom: 1px;
             color: #374151
         }
 
         .qr-info .url {
-            font-size: 8.5px;
+            font-size: 7.5px;
             color: #6b7280;
             word-break: break-all
         }
@@ -241,89 +250,39 @@
             text-align: center
         }
 
-        .barcode-area .title {
-            font-weight: 800;
-            font-size: 10px;
-            margin-bottom: 4px;
-            color: #374151
-        }
-
         .barcode-area img {
-            height: 52px;
-            margin-bottom: 3px
+            height: 30px;
+            margin-bottom: 1px
         }
 
         .barcode-area .code {
-            font-size: 8.5px;
+            font-size: 7.5px;
             color: #6b7280;
             font-family: monospace
-        }
-
-        .route-highlight {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
-            border: 1px solid #c7d2fe;
-            border-radius: 8px;
-            padding: 10px 12px;
-            margin-bottom: 10px
-        }
-
-        .route-point {
-            text-align: center;
-            flex: 1
-        }
-
-        .route-label {
-            font-size: 8.5px;
-
-            color: #0137A1;
-            margin-bottom: 3px;
-            font-weight: 700
-        }
-
-        .route-city {
-            font-size: 13px;
-            font-weight: 900;
-
-            color: #0137A1;
-            line-height: 1.2
-        }
-
-        .route-arrow {
-            font-size: 20px;
-            font-weight: 900;
-
-            color: #0137A1;
-            margin: 0 10px;
-            padding: 0 12px;
-            font-family: "DejaVu Sans",
-                Arial,
-                Helvetica,
-                sans-serif
         }
 
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 10px
+            gap: 8px;
+            margin-bottom: 8px;
+            page-break-inside: avoid
         }
 
         .card {
             border: 1px solid #e5e7eb;
             border-radius: 8px;
-            padding: 10px;
-            background: #fff
+            padding: 8px;
+            background: #fff;
+            page-break-inside: avoid
         }
 
         .card-header {
             font-weight: 900;
-            font-size: 11px;
+            font-size: 10.5px;
             color: #0f172a;
-            margin-bottom: 8px;
-            padding-bottom: 6px;
+            margin-bottom: 6px;
+            padding-bottom: 5px;
 
             border-bottom: 2px solid #0137A1;
         }
@@ -332,7 +291,7 @@
             display: grid;
             grid-template-columns: 40% 60%;
             gap: 8px;
-            margin-bottom: 5px
+            margin-bottom: 4px
         }
 
         .info-label {
@@ -357,7 +316,7 @@
         .items-table th,
         .items-table td {
             border: 1px solid #e5e7eb;
-            padding: 6px 8px;
+            padding: 5px 8px;
             text-align: left
         }
 
@@ -372,20 +331,24 @@
             font-size: 9px
         }
 
+        .items-table tr {
+            page-break-inside: avoid
+        }
+
         .items-table tbody tr:nth-child(even) {
             background: #fafafa
         }
 
         .notes-content {
-            min-height: 50px;
+            min-height: 20px;
             font-size: 9px;
             color: #374151;
             font-style: italic
         }
 
         .footer {
-            margin-top: 12px;
-            padding-top: 8px;
+            margin-top: 8px;
+            padding-top: 6px;
             border-top: 1px solid #e5e7eb;
             text-align: center;
             font-size: 8px;
@@ -442,8 +405,22 @@
 
     <div class="meta">
         <div>
-            <div class="k">ETD</div>
-            <div class="v">{{ $safe($etdOn) }}</div>
+            <div class="k">Customer</div>
+            <div class="v">{{ $safe($senderName) }}</div>
+        </div>
+        @if (filled($dealerName))
+            <div>
+                <div class="k">Dealer</div>
+                <div class="v">{{ $safe($dealerName) }}</div>
+            </div>
+        @endif
+        <div>
+            <div class="k">Rute</div>
+            <div class="v">{{ $safe($origin) }} &rarr; {{ $safe($dest) }}</div>
+        </div>
+        <div>
+            <div class="k">{{ $unitCount > 0 ? 'Jumlah Unit' : 'Jumlah Koli' }}</div>
+            <div class="v">{{ $unitCount > 0 ? $unitCount . ' unit' : ($packages > 0 ? number_format($packages) . ' koli' : '-') }}</div>
         </div>
         <div>
             <div class="k">ETA</div>
@@ -451,130 +428,39 @@
         </div>
     </div>
 
-    <div class="tracking-section">
-        <div class="qr-area">
-            <div>{!! $qrSvg !!}</div>
-            <div class="qr-info">
-                <div class="title">Lacak Pengiriman</div>
-                <div class="url">{{ e($trackUrl) }}</div>
-            </div>
-        </div>
-        <div class="barcode-area">
-            <div class="title">BARCODE</div>
-            <img alt="BARCODE" src="{{ $barcodeDataUri }}">
-            <div class="code">{{ e($shipment->code) }}</div>
-        </div>
-    </div>
+    <div class="section-label">{{ $cargoTypeLabel }}</div>
 
-    <div class="route-highlight">
-        <div class="route-point">
-            <div class="route-label">Asal</div>
-            <div class="route-city">{{ $safe($origin) }}</div>
-        </div>
-        <div class="route-arrow">&rarr;</div>
-        <div class="route-point">
-            <div class="route-label">Tujuan</div>
-            <div class="route-city">{{ $safe($dest) }}</div>
-        </div>
-    </div>
-
-    <div class="grid-2">
-        <div class="card">
-            <div class="card-header">Data Pengirim</div>
-            <div class="info-row">
-                <div class="info-label">Nama</div>
-                <div class="info-value">{{ $safe($senderName) }}</div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Telepon</div>
-                <div class="info-value">{{ $safe($senderPhone) }}</div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Cabang Asal</div>
-                <div class="info-value">{{ $safe($shipment->branch?->name ?? $shipment->originBranch?->name) }}</div>
-            </div>
-        </div>
-        <div class="card">
-            <div class="card-header">Data Penerima</div>
-            <div class="info-row">
-                <div class="info-label">Nama</div>
-                <div class="info-value">{{ $safe($recvName) }}</div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Telepon</div>
-                <div class="info-value">{{ $safe($recvPhone) }}</div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Alamat</div>
-                <div class="info-value">{{ $safe($recvAddr) }}</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="grid-2">
-        <div class="card">
-            <div class="card-header">Layanan & Moda</div>
-            <div class="info-row">
-                <div class="info-label">Moda</div>
-                <div class="info-value">{{ $modeLabel }}</div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Jenis Layanan</div>
-                <div class="info-value">{{ $serviceTypeLabel }}</div>
-            </div>
-            <div class="info-row">
-                <div class="info-label">Opsi</div>
-                <div class="info-value">{{ $serviceOption }}</div>
-            </div>
+    @if ($isFcl || (!$isFcl && ($packages > 0 || $weightKg > 0 || $volume > 0)))
+        <div class="meta" style="grid-template-columns:repeat(4,1fr)">
             @if ($isFcl && $containerSize)
-                <div class="info-row">
-                    <div class="info-label">Container</div>
-                    <div class="info-value">{{ $safe(strtoupper($containerSize)) }} × {{ $containerQty }}</div>
+                <div>
+                    <div class="k">Container</div>
+                    <div class="v">{{ $safe(strtoupper($containerSize)) }} × {{ $containerQty }}</div>
                 </div>
             @endif
             @if (!$isFcl && $packages > 0)
-                <div class="info-row">
-                    <div class="info-label">Jumlah Koli</div>
-                    <div class="info-value">{{ number_format($packages) }} koli</div>
+                <div>
+                    <div class="k">Jumlah Koli</div>
+                    <div class="v">{{ number_format($packages) }} koli</div>
                 </div>
             @endif
             @if (!$isFcl && $weightKg > 0)
-                <div class="info-row">
-                    <div class="info-label">Berat Total</div>
-                    <div class="info-value">{{ number_format($weightKg, 2) }} kg</div>
+                <div>
+                    <div class="k">Berat Total</div>
+                    <div class="v">{{ number_format($weightKg, 2) }} kg</div>
                 </div>
             @endif
             @if (!$isFcl && $volume > 0)
-                <div class="info-row">
-                    <div class="info-label">Volume</div>
-                    <div class="info-value">{{ number_format($volume, 3) }} CBM</div>
-                </div>
-            @endif
-            <div class="info-row">
-                <div class="info-label">Jenis Muatan</div>
-                <div class="info-value">{{ $cargoTypeLabel }}</div>
-            </div>
-            @if (filled($shipment->priority) && $shipment->priority !== 'normal')
-                <div class="info-row">
-                    <div class="info-label">Prioritas</div>
-                    <div class="info-value"><span
-                            class="badge badge-priority">{{ $safe(strtoupper($shipment->priority)) }}</span></div>
+                <div>
+                    <div class="k">Volume</div>
+                    <div class="v">{{ number_format($volume, 3) }} CBM</div>
                 </div>
             @endif
         </div>
-        <div class="card">
-            <div class="card-header">Informasi Tambahan</div>
-            @if (filled($shipment->doc_number))
-                <div class="info-row">
-                    <div class="info-label">No. Dokumen</div>
-                    <div class="info-value">{{ $safe($shipment->doc_number) }}</div>
-                </div>
-            @endif
-        </div>
-    </div>
+    @endif
 
     @if (filled($shipment->lcl_items) && is_iterable($shipment->lcl_items))
-        <div class="card">
+        <div class="card" style="margin-top:8px">
             <div class="card-header">Detail Barang (LCL)</div>
             <table class="items-table">
                 <thead>
@@ -611,7 +497,7 @@
     @endif
 
     @if (filled($shipment->units) && is_iterable($shipment->units))
-        <div class="card" style="margin-top:10px">
+        <div class="card" style="margin-top:8px">
             <div class="card-header">Detail Unit Kendaraan</div>
             <table class="items-table">
                 <thead>
@@ -642,10 +528,71 @@
         </div>
     @endif
 
-    <div class="grid-2" style="margin-top:10px">
-        <div class="card">
-            <div class="card-header">Catatan</div>
-            <div class="notes-content">{{ $safe($shipment->notes ?? 'Tidak ada catatan khusus', '') }}</div>
+    <div class="section-label">Informasi Operasional</div>
+
+    <div class="card">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <div>
+                @if (filled($shipment->branch?->name ?? $shipment->originBranch?->name))
+                    <div class="info-row">
+                        <div class="info-label">Cabang Asal</div>
+                        <div class="info-value">{{ $safe($shipment->branch?->name ?? $shipment->originBranch?->name) }}</div>
+                    </div>
+                @endif
+                <div class="info-row">
+                    <div class="info-label">Moda</div>
+                    <div class="info-value">{{ $modeLabel }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Jenis Layanan</div>
+                    <div class="info-value">{{ $serviceTypeLabel }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Opsi</div>
+                    <div class="info-value">{{ $serviceOption }}</div>
+                </div>
+            </div>
+            <div>
+                @if (filled($recvName))
+                    <div class="info-row">
+                        <div class="info-label">Penerima</div>
+                        <div class="info-value">{{ $safe($recvName) }}</div>
+                    </div>
+                @endif
+                @if (filled($shipment->doc_number))
+                    <div class="info-row">
+                        <div class="info-label">No. Dokumen</div>
+                        <div class="info-value">{{ $safe($shipment->doc_number) }}</div>
+                    </div>
+                @endif
+                @if (filled($shipment->priority) && $shipment->priority !== 'normal')
+                    <div class="info-row">
+                        <div class="info-label">Prioritas</div>
+                        <div class="info-value"><span
+                                class="badge badge-priority">{{ $safe(strtoupper($shipment->priority)) }}</span></div>
+                    </div>
+                @endif
+                @if (filled($shipment->notes))
+                    <div class="info-row">
+                        <div class="info-label">Catatan</div>
+                        <div class="info-value notes-content">{{ e($shipment->notes) }}</div>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+
+    <div class="tracking-strip">
+        <div class="qr-area">
+            <div>{!! $qrSvg !!}</div>
+            <div class="qr-info">
+                <div class="title">Lacak Pengiriman</div>
+                <div class="url">{{ e($trackUrl) }}</div>
+            </div>
+        </div>
+        <div class="barcode-area">
+            <img alt="BARCODE" src="{{ $barcodeDataUri }}">
+            <div class="code">{{ e($shipment->code) }}</div>
         </div>
     </div>
 

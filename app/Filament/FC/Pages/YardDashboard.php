@@ -28,7 +28,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Source of truth: shipment_tracks + unit_inspections + units + shipments.
  * briefing_sessions is NOT used here.
- * Exit-gate rules from SC.5C.5-D: rack → delivery_to_port, non-rack → stuffing.
+ * Exit-gate rules: rack → delivery_to_port, non-rack → stuffing.
  */
 class YardDashboard extends Page implements HasTable
 {
@@ -91,7 +91,7 @@ class YardDashboard extends Page implements HasTable
         };
     }
 
-    // ── Exit-gate SQL (SC.5C.5-D: rack → delivery_to_port, non-rack → stuffing) ──
+    // Exit-gate SQL: rack → delivery_to_port, non-rack → stuffing.
 
     private function exitNotExistsClosure(): \Closure
     {

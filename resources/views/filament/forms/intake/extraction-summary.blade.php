@@ -1,11 +1,11 @@
 {{--
-    OCR-02 — Extraction Summary (Review → Apply)
+    Extraction Summary (Review → Apply)
 
     Bagian dari wizard (bukan modal/popup): tampil setelah upload SPPB
-    menghasilkan IntakePrefill. Form TIDAK berubah sebelum Office Admin
+    menghasilkan IntakePrefill. Form tidak berubah sebelum Office Admin
     menekan [Terapkan ke Formulir]; [Abaikan] membuang envelope.
-    Setelah Apply → mode ringkas (§9) dengan [Terapkan ulang] &
-    [Lihat Ringkasan]. Voyage hanya hint — tidak pernah di-assign.
+    Setelah Apply → mode ringkas dengan [Terapkan ulang] & [Lihat Ringkasan].
+    Voyage hanya hint — tidak pernah di-assign.
 --}}
 @php
     /** @var \App\Support\Intake\IntakePrefill|null $prefill */
@@ -26,9 +26,9 @@
     $manifest = $prefill?->manifest ?? ['detected_count' => 0, 'units' => []];
     $warnings = $prefill?->warnings ?? [];
 
-    // OCR-02A: TO:/UP:/Email adalah metadata korespondensi internal SPPB,
-    // bukan domain Shipment — tidak ditampilkan di summary.
-    // DOMAIN-02: kop dokumen = DEALER (bukan Commercial Customer).
+    // TO:/UP:/Email adalah metadata korespondensi internal SPPB, bukan domain
+    // Shipment — tidak ditampilkan di summary. Kop dokumen = Dealer, bukan
+    // Commercial Customer.
     $rows = array_filter([
         'Nomor'           => $doc['number'] ?? null,
         'Tanggal'         => $fmtDate($doc['date'] ?? null),
@@ -49,8 +49,8 @@
 @if ($prefill !== null && ! $prefill->isEmpty())
 <div
     x-data="{ expanded: @js(! $applied) }"
-    {{-- §6 highlight: registrasi via x-init (script dari morph tidak
-         dieksekusi Livewire; Alpine mengevaluasi node morph — pasti jalan). --}}
+    {{-- Highlight: registrasi via x-init (script dari morph tidak dieksekusi
+         Livewire; Alpine mengevaluasi node morph — pasti jalan). --}}
     x-init="
         if (! window.__intakeHighlight) {
             window.__intakeHighlight = true;
@@ -101,8 +101,8 @@
         </div>
     </div>
 
-    {{-- ── UX-02: mode ringkas pasca-Apply — identitas komersial + legenda.
-         Receiver sengaja tidak ditampilkan (bukan workflow utama Vehicle). --}}
+    {{-- Mode ringkas pasca-Apply — identitas komersial + legenda. Receiver
+         sengaja tidak ditampilkan (bukan workflow utama Vehicle). --}}
     @if ($applied)
         @php
             $dealerSug     = $prefill->suggestionFor('dealer_id');
@@ -149,7 +149,7 @@
             </dl>
         </div>
 
-        {{-- ── Voyage Hint (§5: hanya hint, tidak pernah auto-assign) ──── --}}
+        {{-- Voyage Hint: hanya hint, tidak pernah auto-assign. --}}
         @if (($hints['vessel_name'] ?? null) !== null)
             <div class="border-t border-gray-200 px-4 py-3 dark:border-white/10 sm:px-6">
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">Voyage Hint</p>
@@ -165,7 +165,7 @@
             </div>
         @endif
 
-        {{-- ── Manifest ringkas (§3) ──────────────────────────────────── --}}
+        {{-- Manifest ringkas. --}}
         <div class="border-t border-gray-200 px-4 py-3 dark:border-white/10 sm:px-6">
             <p class="text-xs font-medium text-gray-500 dark:text-gray-400">Manifest</p>
             @if (($manifest['detected_count'] ?? 0) > 0)
@@ -188,7 +188,7 @@
             @endif
         </div>
 
-        {{-- ── Warnings — hanya dirender bila ada (OCR-02A) ───────────── --}}
+        {{-- Warnings — hanya dirender bila ada. --}}
         @if ($warnings !== [])
             <div class="border-t border-gray-200 px-4 py-3 dark:border-white/10 sm:px-6">
                 <p class="text-xs font-medium text-gray-500 dark:text-gray-400">Warnings</p>

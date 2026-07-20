@@ -24,39 +24,20 @@ class CreateShipment extends CreateRecord
 
     protected static bool $canCreateAnother = false;
 
-    /**
-     * OCR-01 — Review layer holder. Diisi oleh FileUpload::afterStateUpdated
-     * (via SppbAssistService::assist) TANPA menyentuh form state. Envelope
-     * ini menunggu keputusan eksplisit Office Admin di Extraction Summary.
-     * Null / empty = perilaku wizard identik dengan entri manual.
-     * IntakePrefill implements Wireable — aman menyeberangi request Livewire.
-     */
     public ?IntakePrefill $intakePrefill = null;
 
-    /** OCR-02 — true setelah [Terapkan ke Formulir]; summary jadi ringkas. */
     public bool $intakeApplied = false;
 
-    /**
-     * UX-RECOMPOSE-01 — Hero subheading. Judul "Permintaan Pengiriman"
-     * berasal dari resource label; ini melengkapinya dengan penjelasan
-     * konteks operasional + status draft. Presentasi murni — tidak ada
-     * perubahan workflow/validasi/data.
-     */
+
     public function getSubheading(): string|\Illuminate\Contracts\Support\Htmlable|null
     {
-        // UX v2.1: hero ringkas — satu kalimat + badge status kecil.
         return new \Illuminate\Support\HtmlString(
             '<span class="jss-hero-lead">Buat permintaan baru berdasarkan <strong>SPPB</strong> atau '
             . '<strong>Delivery Order</strong>.</span>'
-            . '<span class="jss-hero-status">🟢 Draft Baru</span>'
+            . '<span class="jss-hero-status">🟢 Menunggu Penjemputan</span>'
         );
     }
 
-    /**
-     * UX v2.1 — Primary action lebih dominan ("Buat Permintaan", size lg),
-     * "Batal" sekunder. Hanya label & ukuran; submit handler bawaan
-     * CreateRecord tidak diubah.
-     */
     protected function getCreateFormAction(): \Filament\Actions\Action
     {
         return parent::getCreateFormAction()
@@ -71,21 +52,22 @@ class CreateShipment extends CreateRecord
             ->label('Batal');
     }
 
-    /*
-    |--------------------------------------------------------------------------
-    | OCR-02 — Review → Apply
-    |
-    | Aturan arsitektur: form TIDAK PERNAH berubah karena upload. Envelope
-    | pindah ke form state HANYA lewat aksi eksplisit di bawah. Voyage tidak
-    | pernah di-assign dari ekstraksi — hint tinggal di summary.
-    |--------------------------------------------------------------------------
-    */
+    protected function getCreatedNotification(): ?\Filament\Notifications\Notification
+    {
+        return \Filament\Notifications\Notification::make()
+            ->success()
+            ->title('Permintaan pengiriman berhasil dibuat')
+            ->body('Status: Menunggu Penjemputan.')
+            ->actions([
+                \Filament\Notifications\Actions\Action::make('print_resi')
+                    ->label('Cetak Resi')
+                    ->icon('heroicon-o-document-text')
+                    ->url(route('shipments.resi', ['shipment' => $this->record->id]) . '?download=1')
+                    ->openUrlInNewTab()
+                    ->button(),
+            ]);
+    }
 
-    /**
-     * [Terapkan ke Formulir] — pindahkan IntakePrefill ke form state.
-     * Default: tidak menimpa field yang sudah diisi manual oleh admin.
-     * $force = true ([Terapkan ulang]): nilai ekstraksi menimpa isi field.
-     */
     public function applyIntakePrefill(bool $force = false): void
     {
         $prefill = $this->intakePrefill;
@@ -110,8 +92,7 @@ class CreateShipment extends CreateRecord
         // Document
         $apply('doc_number', $prefill->document['number'] ?? null);
 
-        // requested_at ber-default "hari ini" dari form — default bukan
-        // isian manual, jadi tanggal dokumen boleh menggantikannya.
+
         $docDate = $prefill->document['date'] ?? null;
         if ($docDate !== null && ($this->data['requested_at'] ?? null) === now()->format('Y-m-d')) {
             $this->data['requested_at'] = $docDate;
@@ -120,13 +101,9 @@ class CreateShipment extends CreateRecord
             $apply('requested_at', $docDate);
         }
 
-        // Copy fields (klaim scalar)
         $apply('delivery_scope', $prefill->copyFields['delivery_scope']['value'] ?? null);
         $apply('notes', $prefill->copyFields['notes']['value'] ?? null);
 
-        // OCR-02A Rule 2 & 3 — fakta dokumen, bukan keputusan user:
-        // SPPB adalah dokumen pengiriman kendaraan via laut ⇒ moda = Laut;
-        // manifest ber-VIN/engine/model ⇒ jenis muatan = Unit Kendaraan.
         if (($prefill->source['channel'] ?? null) === RequestType::SPPB_DO->value) {
             $apply('mode', ShipmentMode::Sea->value);
         }
@@ -134,46 +111,28 @@ class CreateShipment extends CreateRecord
             $apply('cargo_type', CargoType::Vehicle->value);
         }
 
-        // DOMAIN-02 — Customer TIDAK berasal dari OCR. Kop dokumen adalah
-        // DEALER: resolve ke master Dealer → dealer_id, lalu customer_id
-        // DITURUNKAN dari dealer.customer_id. Dealer tak ditemukan →
-        // keduanya kosong, Office Admin memilih manual.
         $dealerSuggestion = $prefill->suggestionFor('dealer_id');
         if ($dealerSuggestion !== null) {
             $apply('dealer_id', $dealerSuggestion['value'] ?? null);
             $apply('customer_id', $dealerSuggestion['customer_id'] ?? null);
         }
 
-        // Snapshot lokasi jemput dari dokumen (kolom baru DOMAIN-02).
         $apply('pickup_location', $prefill->copyFields['pickup_location']['value'] ?? null);
 
-        // Kompatibilitas — receiver tetap seperti sebelumnya (bukan scope sprint).
         $apply('receiver_id', $prefill->suggestionFor('receiver_id')['value'] ?? null);
-
-        // Rule 6 — Destination City dari RELASI MASTER DATA receiver
-        // (bukan hasil OCR kota). Hanya bila receiver ter-resolve dan
-        // punya city_id; selain itu biarkan admin memilih.
         $receiverId = $this->data['receiver_id'] ?? null;
         if (! empty($receiverId)) {
             $receiverCityId = Customer::whereKey($receiverId)->value('city_id');
             $apply('destination_city_id', $receiverCityId);
         }
 
-        // OCR-02B — fallback: destination_city_hint → lookup Master City.
-        // Generik (hint diturunkan dari pola dokumen, bukan daftar kota).
-        // Diisi HANYA bila lookup menghasilkan TEPAT SATU kota; tidak
-        // ditemukan / ambigu → biarkan kosong, admin memilih manual.
         if (empty($this->data['destination_city_id'])) {
             $cityHint = $prefill->copyFields['destination_city_hint']['value'] ?? null;
             $cityId   = $this->resolveCityIdFromHint($cityHint);
             $apply('destination_city_id', $cityId);
         }
 
-        // Rule 7 — pickup_location OCR hanya informasi di summary; Origin
-        // (Cabang Asal) tetap mengikuti Smart Origin by Branch yang ada
-        // (tidak disentuh).
 
-        // Manifest → repeater units. Semua row tetap editable, tanpa lock.
         $manifestUnits = $prefill->manifest['units'] ?? [];
         if ($manifestUnits !== []) {
             $existing = array_filter(
@@ -208,14 +167,9 @@ class CreateShipment extends CreateRecord
             }
         }
 
-        // Voyage: SENGAJA tidak di-set — hint tetap di summary (frozen rule).
 
         $this->intakeApplied = true;
 
-        // §6 — highlight halus pada field hasil ekstraksi (hilang saat diedit).
-        // UX-02: customer_id dikecualikan — status readonly-nya (terkunci saat
-        // dealer terisi) sudah menjadi indikator "sistem telah memahami";
-        // dua sinyal untuk satu pesan jadi redundan.
         $this->dispatch('intake-prefill-applied', fields: array_values(array_filter(
             $appliedPaths,
             fn (string $path) => $path !== 'data.customer_id',
@@ -228,12 +182,7 @@ class CreateShipment extends CreateRecord
             ->send();
     }
 
-    /**
-     * OCR-02B — hint kota → city_id, hanya bila TEPAT SATU kota cocok.
-     * Mencoba hint utuh dulu; bila hint multi-kata dan gagal unik, coba
-     * kata terakhirnya (nama kota lazim berada di ekor teks tujuan).
-     * Tetap generik: tidak ada aturan per-kota.
-     */
+
     protected function resolveCityIdFromHint(?string $hint): ?int
     {
         if ($hint === null || trim($hint) === '') {
@@ -290,16 +239,9 @@ class CreateShipment extends CreateRecord
     {
         $mode = $data['mode'] ?? null;
 
-        // ── Branch + Depot resolution ──────────────────────────────────────
-        // Source of truth for SEA: POL (Port of Loading — origin port) from the Voyage.
-        // Source of truth for LAND: the logged-in user's effective branch.
-        // Never derive branch from the admin user's account for SEA shipments.
-
         if ($mode === 'sea') {
             $polId = null;
 
-            // Snapshot voyage fields into shipment — voyage is the source of truth,
-            // shipment must carry its own copy so gate resolution never depends on voyage FK.
             if (! empty($data['voyage_id'])) {
                 $voyage = Voyage::whereKey($data['voyage_id'])->first(['pol_id', 'pod_id']);
                 if ($voyage) {
@@ -315,12 +257,9 @@ class CreateShipment extends CreateRecord
             }
 
             if ($polId) {
-                // Ownership follows origin depot (POL), not destination.
                 $resolved = app(ShipmentService::class)->resolveByPol($polId);
 
                 if ($resolved) {
-                    // Always override — form pre-fill may have used POD (wrong).
-                    // Server-side POL resolution is the canonical source of truth.
                     $data['branch_id']         = $resolved['branch_id'];
                     $data['assigned_depot_id'] = $resolved['depot_id'];
 
@@ -348,11 +287,6 @@ class CreateShipment extends CreateRecord
             ]);
         }
 
-        // Smart Origin by Branch — backend protection (always override).
-        // Office is no longer involved in this flow (migrated 2026-07-20,
-        // see docs/master-office/SMART-ORIGIN-MIGRATION-BLOCKED-SCHEMA-GAP.md).
-        // Primary: resolve from authenticated user's branch.
-        // Fallback: resolve from the shipment's final branch_id (e.g. super admin SEA where branch came from POL).
         $resolvedOrigin = ShipmentResource::resolveOriginCityFromUser();
         if (! $resolvedOrigin['city_id'] && ! empty($data['branch_id'])) {
             $resolvedOrigin = ShipmentResource::resolveOriginCityFromUser((int) $data['branch_id']);
@@ -361,7 +295,6 @@ class CreateShipment extends CreateRecord
             $data['origin_city_id'] = $resolvedOrigin['city_id'];
         }
 
-        // ── Code ───────────────────────────────────────────────────────────
         if (empty($data['code'])) {
             $data['code'] = Shipment::generateCode($data['mode'] ?? null);
         }

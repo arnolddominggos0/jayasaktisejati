@@ -1,4 +1,4 @@
-{{-- SC.5D.2E — Health Log Timeline --}}
+{{-- Health Log Timeline --}}
 {{-- $state = Collection<AttendanceHealthLog> with attendance.manpower eager-loaded --}}
 
 @if($state->isEmpty())

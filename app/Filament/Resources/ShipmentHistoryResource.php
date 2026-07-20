@@ -260,15 +260,15 @@ class ShipmentHistoryResource extends Resource
                     ->color('gray')
                     ->url(fn($record) => static::getUrl('view', ['record' => $record])),
 
+                Action::make('print_resi')
+                    ->label('Cetak Resi')
+                    ->icon('heroicon-o-document-text')
+                    ->color('primary')
+                    ->url(fn($record) => route('shipments.resi', $record) . '?download=1')
+                    ->openUrlInNewTab(),
+
                 // Secondary actions grouped
                 ActionGroup::make([
-                    Action::make('print_resi')
-                        ->label('Print Resi')
-                        ->icon('heroicon-o-document-text')
-                        ->color('gray')
-                        ->url(fn($record) => route('shipments.resi', $record) . '?download=1')
-                        ->openUrlInNewTab(),
-
                     Action::make('print_waybill')
                         ->label('Waybill')
                         ->icon('heroicon-o-printer')
@@ -289,7 +289,7 @@ class ShipmentHistoryResource extends Resource
                         ->color('warning')
                         ->visible(fn() => auth_user()?->isSuperAdmin() === true)
                         ->url(fn($record) => ShipmentResource::getUrl('edit', ['record' => $record])),
-                ])->icon('heroicon-m-ellipsis-horizontal')->color('gray'),
+                ])->label('Dokumen Lain')->icon('heroicon-m-ellipsis-horizontal')->color('gray'),
             ]);
     }
 

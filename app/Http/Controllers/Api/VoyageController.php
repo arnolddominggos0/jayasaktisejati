@@ -24,7 +24,6 @@ class VoyageController extends Controller
     {
         $query = Voyage::query()->with('vessel');
 
-        // Apply filters
         if ($request->has('search')) {
             $search = $request->get('search');
             $query->where('voyage_number', 'like', "%{$search}%");

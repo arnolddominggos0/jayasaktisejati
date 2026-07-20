@@ -12,16 +12,8 @@ use App\Models\Voyage;
  * Canonical workflow policy for voyage operational actions.
  *
  * Every action that changes state or requires authorization must be
- * evaluated through this policy.  Blade templates, Filament actions,
- * and notification rules MUST delegate here instead of duplicating
- * conditions.
- *
- * WHY: Previously, button visibility, action validation, escalation
- * permissions, and delay-case creation were scattered across Blade
- * conditionals, Livewire methods, and Filament actions with inline
- * status checks.  Any change to the rules required hunting through
- * every file.  Centralizing here ensures a single source of truth
- * for every workflow transition.
+ * evaluated through this policy, so the rules are not duplicated across
+ * Blade templates, Filament actions, and notification rules.
  */
 final class VoyageWorkflowPolicy
 {

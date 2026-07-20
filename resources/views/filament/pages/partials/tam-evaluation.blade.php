@@ -10,14 +10,11 @@
 
     <div class="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4">
 
-        {{-- ── Delay Summary — WX5 §3/§4/§5 ─────────────────────────────
-             Number-first hierarchy (angka → label → satuan), flat — no
-             card/border/shadow. All four cells share the exact same
-             treatment, including the fourth (previously a red-tinted box
-             that outweighed its neighbors): "Terlambat Terlama" is a
-             historical statistic, not a live severity alert, so it gets
-             no reserve-hue treatment — equal visual weight across all
-             four, per WX5 §5. --}}
+        {{-- Delay Summary — number-first hierarchy (angka → label → satuan),
+             flat, no card/border/shadow. All four cells share the same
+             treatment: "Terlambat Terlama" is a historical statistic, not a
+             live severity alert, so it gets no reserve-hue treatment — equal
+             visual weight across all four. --}}
         <div class="space-y-2">
             <p class="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Ringkasan Keterlambatan</p>
             <div class="grid grid-cols-2 gap-4">

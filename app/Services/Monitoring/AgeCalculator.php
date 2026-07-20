@@ -14,8 +14,8 @@ final class AgeCalculator
      * Stuck = no track activity for > stuck_days, or no track and total age > stuck_days.
      * Fallback = requested_at used because lastTrackedAt is null → label suffix "(est)".
      *
-     * ADR-009: the $mode parameter was removed — v1 is sea-only and age calculation
-     * has no sea/land branching. Add it back in v2 if land-mode semantics differ.
+     * The $mode parameter was removed — sea-only, and age calculation has no
+     * sea/land branching. Add it back if land-mode semantics ever differ.
      */
     public function calculate(
         ?Carbon $lastTrackedAt,

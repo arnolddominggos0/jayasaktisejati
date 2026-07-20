@@ -26,12 +26,10 @@
 
         $lastRefreshFormatted = $summary->lastRefresh->format('H:i:s');
 
-        // Sprint 6.4.3-R1: KPI vs Table consistency UX - presentation-only.
-        // KPI (workspace summary) deliberately ignores search/exception by
-        // design (see audit Sprint 6.4.3); these two booleans drive a small
-        // explanatory context bar + empty-state copy so that's visible to
-        // the operator instead of looking like a bug. No query/filter logic
-        // here - both values already exist on the page (search, exception_filter).
+        // KPI (workspace summary) deliberately ignores search/exception; these
+        // two booleans drive a small explanatory context bar + empty-state copy
+        // so that's visible to the operator instead of looking like a bug. Both
+        // values already exist on the page (search, exception_filter).
         $exceptionLabels = [
             'hold'           => 'Hold',
             'ng'             => 'NG',
@@ -224,9 +222,9 @@
 
                 {{-- Right: compact live status metrics (hierarchy via weight, not card) --}}
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-2 lg:shrink-0">
-                    {{-- Sprint 6.4.3-R1: explains the KPI is a workspace-wide
-                         summary (period/branch/route/mode only), not affected
-                         by search/exception - only shown while one of those
+                    {{-- Explains the KPI is a workspace-wide summary
+                         (period/branch/route/mode only), not affected by
+                         search/exception - only shown while one of those
                          drill-down filters is active, so the default view is
                          untouched (Acceptance: "KPI tidak berubah saat search"). --}}
                     @if ($drilldownActive)
@@ -369,21 +367,17 @@
             @endif
         </section>
 
-        {{-- ==============================================================
-             2.5 ACTIVE FILTER CHIPS (Sprint 6.4.1)
-             Removable chips for non-default filters (search/status/view/
-             sort/route). Exception is intentionally excluded - it already
-             has its own chip+reset in the exception band above.
-             Only renders when a filter is actually active - the result
-             count pill is contextual to "this is what your filters
-             produced", not a permanent fixture (Sprint 6.4.2-R1 cleanup;
-             that count would otherwise duplicate the header's aktif/selesai
-             metrics on the default, unfiltered view).
-        ============================================================== --}}
+        {{-- Active filter chips: removable chips for non-default filters
+             (search/status/view/sort/route). Exception is intentionally
+             excluded - it already has its own chip+reset in the exception band
+             above. Only renders when a filter is actually active - the result
+             count pill is contextual to "this is what your filters produced",
+             not a permanent fixture (it would otherwise duplicate the header's
+             aktif/selesai metrics on the default, unfiltered view). --}}
         @if (! empty($filterChips))
             <section class="jss-mon-active-filters" aria-label="Hasil dan filter aktif">
                 <div class="flex flex-wrap items-center gap-2">
-                    {{-- Sprint 6.4.3: Result count - from paginator total, no extra query --}}
+                    {{-- Result count - from paginator total, no extra query --}}
                     @if ($rows && $rows->total() > 0)
                         <span class="mon-result-count" aria-live="polite" role="status">
                             {{ $rows->total() }} hasil
@@ -458,16 +452,8 @@
                     </div>
                 </div>
 
-                {{-- -- Sprint 6.4.3-R1: Drill-down context bar --
-                     "Tepat di atas tabel" - tells the operator the table
-                     below is a filtered view (search/exception), distinct
-                     from the workspace-wide KPI above. Presentation only;
-                     $resultCount comes from the existing paginator total,
-                     no extra query. Disappears the instant search/exception
-                     is cleared (chip X, empty-state CTA, or the field itself)
-                     since it's purely derived from $this->search /
-                     $exceptionFilter - same reactive state Livewire already
-                     re-renders on every filter change. --}}
+                {{-- Drill-down context bar: tells the operator the table below is
+                     a filtered view, distinct from the workspace-wide KPI above. --}}
                 @if ($drilldownActive)
                     <div class="mon-context-bar" role="status" aria-live="polite">
                         @if ($searchActive && $exceptionActive)

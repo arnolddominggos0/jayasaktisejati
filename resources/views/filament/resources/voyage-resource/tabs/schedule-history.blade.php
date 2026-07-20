@@ -24,7 +24,7 @@
 // ── Source data ───────────────────────────────────────────────────────────────
 $__isVoyage = isset($v) && $v instanceof \App\Models\Voyage;
 
-// Query langsung agar tidak bergantung pada Livewire re-hydration state.
+// Query langsung agar tidak bergantung pada state Livewire.
 $histories = $__isVoyage
     ? \App\Models\VoyageScheduleHistory::where('voyage_id', $v->id)
         ->orderBy('schedule_type')

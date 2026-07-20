@@ -28,8 +28,8 @@ class Shipment extends Model
     protected $fillable = [
         'code',
         'customer_id',
-        'dealer_id',        // DOMAIN-02 — Dealer (Vehicle Shipment only)
-        'pickup_location',  // DOMAIN-02 — snapshot lokasi jemput dari SPPB
+        'dealer_id',        // Dealer (Vehicle Shipment only)
+        'pickup_location',  // snapshot lokasi jemput dari SPPB
         'receiver_id',
         'origin_city_id',
         'destination_city_id',
@@ -166,11 +166,8 @@ class Shipment extends Model
                 }
             }
 
-            // Smart Origin by Branch: origin_city_id is derived directly
-            // from Branch.city_id. Office is no longer part of this flow —
-            // see docs/master-office/SMART-ORIGIN-MIGRATION-BLOCKED-SCHEMA-GAP.md.
-            // Backend is the source of truth — always override regardless
-            // of what was sent in the request.
+            // Origin city is derived from the branch and always overridden by
+            // the backend, so it can never be spoofed from the request.
             if ($m->branch_id) {
                 $cityId = Branch::whereKey($m->branch_id)->value('city_id');
                 if ($cityId) {
@@ -247,11 +244,8 @@ class Shipment extends Model
                 }
             }
 
-            // Smart Origin by Branch: origin_city_id is derived directly
-            // from Branch.city_id. Office is no longer part of this flow —
-            // see docs/master-office/SMART-ORIGIN-MIGRATION-BLOCKED-SCHEMA-GAP.md.
-            // Backend is the source of truth — always override regardless
-            // of what was sent in the request.
+            // Origin city is derived from the branch and always overridden by
+            // the backend, so it can never be spoofed from the request.
             if ($m->branch_id) {
                 $cityId = Branch::whereKey($m->branch_id)->value('city_id');
                 if ($cityId) {
@@ -386,8 +380,8 @@ class Shipment extends Model
     }
 
     /**
-     * @deprecated SC.5D.0B — This method belongs to the legacy 1-shipment = 1-briefing-session model
-     * (pre-SC.3B.19). It keys on shipment_id which has a UNIQUE constraint on briefing_sessions.
+     * @deprecated This method belongs to the legacy 1-shipment = 1-briefing-session
+     * model. It keys on shipment_id which has a UNIQUE constraint on briefing_sessions.
      *
      * The active path is sendToFc(), which uses firstOrCreate(['depot_id','date']) and attaches
      * shipments via the briefing_session_shipments pivot (BelongsToMany). One session per depot
@@ -1004,7 +998,7 @@ class Shipment extends Model
         return $this->belongsTo(Customer::class);
     }
 
-    /** DOMAIN-02 — Dealer (jaringan distribusi customer; Vehicle Shipment). */
+    /** Dealer (jaringan distribusi customer; Vehicle Shipment). */
     public function dealer()
     {
         return $this->belongsTo(Dealer::class);

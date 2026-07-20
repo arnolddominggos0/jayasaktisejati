@@ -60,11 +60,11 @@ class BackfillVoyage154Cities extends Command
             $this->newLine();
         }
 
-        // ─── Step 1: Load cities dari database (case-insensitive lookup) ───
+        // Step 1: Load cities dari database (case-insensitive lookup)
         $cityRows = DB::table('cities')->get(['id', 'name']);
         $cityByName = $cityRows->keyBy(fn ($c) => strtolower(trim($c->name)));
 
-        // ─── Step 2: Resolve semua city yang dibutuhkan ───
+        // Step 2: Resolve semua city yang dibutuhkan
         $neededNames = array_unique(array_merge(
             ['jakarta'],
             array_map('strtolower', array_values(self::CHASSIS_TO_DEST_CITY))
@@ -88,7 +88,7 @@ class BackfillVoyage154Cities extends Command
 
         $jakartaCity = $cityByName->get('jakarta');
 
-        // ─── Step 3: Load shipments V154 + units ───
+        // Step 3: Load shipments V154 + units
         $shipmentRows = DB::table('shipments as s')
             ->join('units as u', 'u.shipment_id', '=', 's.id')
             ->where('s.voyage_id', 1)   // Voyage 154 (codes refactored to JSS0526SH-series)
@@ -110,7 +110,7 @@ class BackfillVoyage154Cities extends Command
             return self::FAILURE;
         }
 
-        // ─── Step 4: Build mapping plan ───
+        // Step 4: Build mapping plan
         $plan       = [];
         $warnings   = [];
         $cityTally  = []; // untuk distribusi per kota
@@ -151,7 +151,7 @@ class BackfillVoyage154Cities extends Command
             $cityTally[$destCityName] = ($cityTally[$destCityName] ?? 0) + 1;
         }
 
-        // ─── Step 5: Verification report ───
+        // Step 5: Verification report
         $this->line('┌─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐');
         $this->line('│ VERIFICATION REPORT                                                                                                                     │');
         $this->line('└─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘');
@@ -194,7 +194,7 @@ class BackfillVoyage154Cities extends Command
             $this->newLine();
         }
 
-        // ─── Step 6: Distribusi per kota ───
+        // Step 6: Distribusi per kota
         $this->line('  Distribusi Destination City:');
         arsort($cityTally);
         foreach ($cityTally as $city => $count) {
@@ -203,20 +203,20 @@ class BackfillVoyage154Cities extends Command
         }
         $this->newLine();
 
-        // ─── Step 7: Summary angka ───
+        // Step 7: Summary angka
         $this->line(sprintf('  Total shipment V154   : %d', $shipmentRows->count()));
         $this->line(sprintf('  Akan di-update        : %d', count($plan)));
         $this->line(sprintf('  Dilewati (no mapping) : %d', count($warnings)));
         $this->newLine();
 
-        // ─── Step 8: Dry-run berhenti di sini ───
+        // Step 8: Dry-run berhenti di sini
         if ($isDryRun) {
             $this->warn('  DRY-RUN selesai. Tidak ada perubahan yang disimpan.');
             $this->newLine();
             return self::SUCCESS;
         }
 
-        // ─── Step 9: Konfirmasi (kecuali --force) ───
+        // Step 9: Konfirmasi (kecuali --force)
         if (! $isForce) {
             if (! $this->confirm('  Lanjutkan dan simpan perubahan ke database?', false)) {
                 $this->line('  Dibatalkan oleh user.');
@@ -226,7 +226,7 @@ class BackfillVoyage154Cities extends Command
             $this->newLine();
         }
 
-        // ─── Step 10: Eksekusi update dalam satu transaksi ───
+        // Step 10: Eksekusi update dalam satu transaksi
         $updated = 0;
 
         DB::transaction(function () use ($plan, &$updated) {
@@ -248,7 +248,7 @@ class BackfillVoyage154Cities extends Command
 
         $this->newLine();
 
-        // ─── Step 11: Post-update verification ───
+        // Step 11: Post-update verification
         $this->line('┌─────────────────────────────────────────────┐');
         $this->line('│ POST-UPDATE VERIFICATION                    │');
         $this->line('└─────────────────────────────────────────────┘');

@@ -267,7 +267,7 @@ class OperationalTasks extends Page implements HasTable
         ];
     }
 
-    // ── Unit-status subqueries (SC.5D.10A) ────────────────────────────────────
+    // Unit-status subqueries.
 
     private function unitStatusSubqueries(): array
     {

@@ -113,7 +113,6 @@ class ShipmentTrack extends Model
             return;
         }
 
-        // Check if note is provided and not empty
         $note = trim((string) $this->note);
         if (strlen($note) < 10) {
             throw ValidationException::withMessages([
@@ -253,8 +252,8 @@ class ShipmentTrack extends Model
             ]);
 
             if (!$hasRealTracking) {
-                // Pending + skeleton tracks (tracked_at = null) is a valid post-sendToFc
-                // state introduced in SC.3B.20. Do NOT revert — shipment is in the FC
+                // Pending + skeleton tracks (tracked_at = null) is a valid
+                // post-sendToFc state. Do NOT revert — shipment is in the FC
                 // queue awaiting its first real tracking event.
                 if ($currentStatus === ShipmentStatus::Draft || $currentStatus === ShipmentStatus::Pending) {
                     return;

@@ -41,8 +41,8 @@ final class UnitMonitoringQueryBuilder
     ";
 
     /**
-     * Sprint 6.4.4: root changed from Shipment to Unit. All Shipment fields are
-     * accessed via the JOIN to shipments on units.shipment_id. Filter pipeline and
+     * Rooted on Unit. All Shipment fields are accessed via the JOIN to
+     * shipments on units.shipment_id. Filter pipeline and
      * sort expressions are unchanged — they still reference the same column names
      * via the joined shipments table.
      *
@@ -90,9 +90,9 @@ final class UnitMonitoringQueryBuilder
     }
 
     /**
-     * Hard-pins the v1 domain constraint: sea mode only.
-     * See ADR-009 — MonitoringDomain::applyTo() targets shipments.mode,
-     * which is available via the JOIN.
+     * Hard-pins the domain constraint: sea mode only.
+     * MonitoringDomain::applyTo() targets shipments.mode, which is available
+     * via the JOIN.
      */
     private function applyModeFilter(Builder $q): void
     {
@@ -150,13 +150,12 @@ final class UnitMonitoringQueryBuilder
     // ── Computed columns ──────────────────────────────────────────────────────
 
     /**
-     * SELECT units.* only — Shipment data comes via the eager-loaded $unit->shipment
-     * relation in MonitoringRowBuilder. The shipments JOIN is only needed for
-     * WHERE/ORDER BY expressions, not for hydration. Selecting shipments.* here
-     * would cause column collisions on id/created_at/updated_at.
+     * SELECT units.* only — Shipment data comes via the eager-loaded
+     * $unit->shipment relation. Selecting shipments.* here would collide on
+     * id/created_at/updated_at.
      *
      * has_ng_inspection: direct check on this unit's inspections — no correlated
-     * subquery through units table needed (we're already on a unit row).
+     * subquery needed since we're already on a unit row.
      */
     private function applyComputedColumns(Builder $q): void
     {

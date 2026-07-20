@@ -24,7 +24,7 @@ class PelacakanMonitoring extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    // Navigation handled by ShipmentTrackingResource/WorkspaceShell (Sprint 6.3A).
+    // Navigation handled by ShipmentTrackingResource/WorkspaceShell.
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationIcon = 'heroicon-o-rocket-launch';
@@ -35,7 +35,7 @@ class PelacakanMonitoring extends Page implements HasForms
 
     protected ?string $maxContentWidth = 'full';
 
-    // ── Public state (Livewire) — Sprint 6.4.1: URL-stateable filters ──────
+    // Public state (Livewire): URL-stateable filters.
 
     #[Url(as: 'branch', except: null)]
     public ?int $branch_id = null;
@@ -67,7 +67,7 @@ class PelacakanMonitoring extends Page implements HasForms
     #[Url(as: 'per_page', except: 50)]
     public int $page_size = 50;
 
-    /** Sprint 6.4.2: workspace period context, format 'YYYY-MM'. */
+    /** Workspace period context, format 'YYYY-MM'. */
     #[Url(as: 'period')]
     public string $period = '';
 
@@ -103,8 +103,7 @@ class PelacakanMonitoring extends Page implements HasForms
 
     protected function getFormSchema(): array
     {
-        // v1 domain: sea-mode TAM only. Mode select is removed — see ADR-009.
-        // Exception options match Sprint 6.2B (stuck replaces pdi_pending).
+        // Sea-mode TAM only; mode select is removed.
         return [
             Grid::make()
                 ->columns(['default' => 1, 'sm' => 2, 'lg' => 12])
@@ -255,7 +254,7 @@ class PelacakanMonitoring extends Page implements HasForms
 
     protected function getViewData(): array
     {
-        // Recompute any protected data lost across Livewire round-trips
+        // Protected data is lost between requests; rebuild it when missing.
         if ($this->rows === null || $this->exceptionBand === null || $this->workspaceSummary === null) {
             $filter = $this->buildFilter();
             $this->rows             ??= app(MonitoringQueryService::class)->paginate($filter);

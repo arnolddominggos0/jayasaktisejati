@@ -117,7 +117,6 @@ class JanAprHistorySeeder extends Seeder
         ['date' => '2026-04-30', 'unit' => 13],
     ];
 
-    // ═════════════════════════════════════════════════════════════════════════
 
     public function run(): void
     {
@@ -388,9 +387,7 @@ class JanAprHistorySeeder extends Seeder
             ];
         }
 
-        // ══════════════════════════════════════════════════════════════════
         // OUTPUT
-        // ══════════════════════════════════════════════════════════════════
 
         $this->command->line("Attendance lama dihapus : {$totalDeleted} baris");
         if ($skipped) {

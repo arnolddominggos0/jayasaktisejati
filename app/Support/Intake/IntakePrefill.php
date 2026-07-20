@@ -5,14 +5,14 @@ namespace App\Support\Intake;
 use Livewire\Wireable;
 
 /**
- * IntakePrefill — channel-neutral extraction envelope (Sprint OCR-01).
+ * IntakePrefill — channel-neutral extraction envelope.
  *
  * The single boundary object between "what an intake artifact CLAIMS"
  * and "what the Office Admin ASSERTS into the Shipment form".
  *
- *   Upload → Extract → IntakePrefill → Review (OCR-02) → Apply (OCR-03) → Form
+ *   Upload → Extract → IntakePrefill → Review → Apply → Form
  *
- * Frozen architecture rules this object enforces:
+ * Architecture rules this object enforces:
  * - Extraction is an ASSISTANT, never a creator: nothing in this object
  *   touches Livewire/form state. Applying is a separate, explicit act.
  * - Channel-neutral: SPPB/OCR is only the first producer. Manual entry,
@@ -20,7 +20,7 @@ use Livewire\Wireable;
  *   exact same shape. No producer-specific naming in the structure.
  * - Immutable: producers build it once; consumers only read it.
  *
- * Field species (see SPPB Intake architecture review):
+ * Field species:
  * - document:    identity of the source artifact (number, date).
  * - copyFields:  scalar values copied from the artifact (safe to prefill).
  * - manifest:    claimed cargo rows + claimed count (cardinality check!).
@@ -38,11 +38,11 @@ final class IntakePrefill implements Wireable
      * @param array<string, array{value: mixed, confidence: float, match: ?string}> $suggestions
      * @param array<int, array{code: string, message: string}> $warnings
      * @param array{customer_text: ?string, receiver_text: ?string, pic_name: ?string, email: ?string} $parties
-     *        OCR-01E — klaim TEKS pihak-pihak dari dokumen. Belum di-resolve
-     *        ke entity; resolusi tetap milik blok suggestions.
+     *        Klaim teks pihak-pihak dari dokumen. Belum di-resolve ke entity;
+     *        resolusi tetap milik blok suggestions.
      * @param array{vessel_name: ?string, document_etd: ?string} $voyageHints
-     *        OCR-01E — hint pencocokan voyage. TIDAK PERNAH ditulis ke
-     *        Shipment (jadwal milik Voyage); hanya konteks untuk Review UI.
+     *        Hint pencocokan voyage. Tidak pernah ditulis ke Shipment (jadwal
+     *        milik Voyage); hanya konteks untuk Review UI.
      */
     public function __construct(
         public readonly array $source,
@@ -58,8 +58,7 @@ final class IntakePrefill implements Wireable
 
     /**
      * Empty envelope — the manual-entry baseline. With an empty prefill the
-     * wizard behaves exactly as if no extraction ever happened (OCR-01
-     * backward-compatibility contract).
+     * wizard behaves exactly as if no extraction ever happened.
      */
     public static function empty(string $channel = 'manual', array $artifacts = []): self
     {
@@ -127,8 +126,8 @@ final class IntakePrefill implements Wireable
     }
 
     /**
-     * Pre-computed data for the Review Summary (rendered in OCR-02 — no
-     * second extraction needed). Each item:
+     * Pre-computed data for the Review Summary (no second extraction needed).
+     * Each item:
      *   ['status' => 'detected'|'warning', 'label' => string]
      */
     public function summaryItems(): array
@@ -160,8 +159,8 @@ final class IntakePrefill implements Wireable
             ];
         }
 
-        // DOMAIN-02: kop dokumen = Dealer; customer_text di-skip agar tidak
-        // duplikat dengan dealer_name (nilai sama, makna sudah diluruskan).
+        // Kop dokumen = Dealer; customer_text di-skip agar tidak duplikat
+        // dengan dealer_name (nilai sama).
         foreach (['dealer_name' => 'Dealer (teks)', 'receiver_text' => 'Penerima (teks)', 'pic_name' => 'PIC', 'email' => 'Email'] as $key => $label) {
             if (($this->parties[$key] ?? null) !== null) {
                 $items[] = ['status' => 'detected', 'label' => $label . ' terbaca: ' . $this->parties[$key]];
@@ -212,8 +211,6 @@ final class IntakePrefill implements Wireable
             default               => ucfirst(str_replace('_', ' ', $field)),
         };
     }
-
-    // ── Livewire round-trip (page holds $this->intakePrefill) ───────────────
 
     public function toLivewire(): array
     {

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ShipmentResource\Pages;
 
 use App\Enums\ShipmentMode;
+use App\Enums\ShipmentStatus;
 use App\Filament\Resources\ShipmentResource;
 use App\Filament\Resources\UnitResource;
 use App\Models\UnitInspection;
@@ -13,6 +14,7 @@ use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Illuminate\Support\Facades\DB;
 
 class ViewShipment extends ViewRecord
@@ -132,21 +134,32 @@ class ViewShipment extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('print_waybill')
-                ->label('Cetak Waybill')
+            Action::make('print_resi')
+                ->label('Cetak Resi')
                 ->icon('heroicon-o-document-text')
-                ->color('success')
-                ->url(fn ($record) => route('shipments.print.waybill', ['shipment' => $record->id, 'download' => 1]))
+                ->color('primary')
+                ->url(fn ($record) => route('shipments.resi', ['shipment' => $record->id]) . '?download=1')
                 ->openUrlInNewTab()
-                ->visible(fn ($record) => $record->mode === ShipmentMode::Sea),
+                ->visible(fn ($record) => $record->status !== ShipmentStatus::Draft),
 
-            Action::make('print_packing_list')
-                ->label('Cetak Packing List')
-                ->icon('heroicon-o-clipboard-document-list')
-                ->color('warning')
-                ->url(fn ($record) => route('shipments.print.packing', ['shipment' => $record->id, 'download' => 1]))
-                ->openUrlInNewTab()
-                ->visible(fn ($record) => $record->mode === ShipmentMode::Sea),
+            ActionGroup::make([
+                Action::make('print_waybill')
+                    ->label('Cetak Waybill')
+                    ->icon('heroicon-o-printer')
+                    ->url(fn ($record) => route('shipments.print.waybill', ['shipment' => $record->id, 'download' => 1]))
+                    ->openUrlInNewTab()
+                    ->visible(fn ($record) => $record->mode === ShipmentMode::Sea),
+
+                Action::make('print_packing_list')
+                    ->label('Cetak Packing List')
+                    ->icon('heroicon-o-clipboard-document-list')
+                    ->url(fn ($record) => route('shipments.print.packing', ['shipment' => $record->id, 'download' => 1]))
+                    ->openUrlInNewTab()
+                    ->visible(fn ($record) => $record->mode === ShipmentMode::Sea),
+            ])
+                ->label('Dokumen Lain')
+                ->icon('heroicon-o-ellipsis-vertical')
+                ->color('gray'),
 
             Action::make('create_loading')
                 ->label('Buat Loading Session')

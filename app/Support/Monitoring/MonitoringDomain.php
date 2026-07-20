@@ -5,13 +5,11 @@ namespace App\Support\Monitoring;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Encodes the v1 domain constraint for Pelacakan & Monitoring.
+ * Encodes the domain constraint for Pelacakan & Monitoring: sea-mode TAM
+ * shipments only. All query builders call applyTo() at the boundary; no
+ * individual mode branching is needed downstream.
  *
- * ADR-009 decision: v1 covers sea-mode TAM shipments only.
- * All query builders call applyTo() at the boundary; no individual
- * mode branching is needed downstream.
- *
- * Extension protocol (v2 — when land mode is added):
+ * Extension protocol (when land mode is added):
  *   1. Change SHIPMENT_MODE or accept mode as a parameter here
  *   2. Restore mode branching in StageResolver (orderLand vs orderSea)
  *   3. Add land-specific exception types in ExceptionEvaluator
@@ -20,7 +18,7 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class MonitoringDomain
 {
-    /** v1 hard-pin: sea freight only. See ADR-009. */
+    /** Hard-pin: sea freight only. */
     public const SHIPMENT_MODE = 'sea';
 
     /**

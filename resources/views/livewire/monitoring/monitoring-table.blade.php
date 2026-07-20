@@ -1,7 +1,7 @@
 @php
     /**
-     * Operational Control Tower - Monitoring Grid (Sprint 6.3B + 6.3C)
-     * --------------------------------------------------------------------------
+     * Operational Control Tower - Monitoring Grid
+     *
      * Pure Blade partial - bound to App\ViewModels\Monitoring\MonitoringRowData
      * objects. NO queries, NO business logic here. Every cell renders from the
      * ViewModel. Lives inside WorkspaceShell's Livewire template, so wire:*
@@ -13,10 +13,10 @@
      *  - $search           : string  (active search term, for highlight only)
      *  - $pageSize         : int
      *  - $groupMode        : string
-     *  - $hasActiveFilters : bool (Sprint 6.4.1 - distinguishes "filtered empty"
-     *                        from "database empty" in the empty state)
-     *  - $exceptionFilter  : ?string (Sprint 6.4.3-R1 - drives the exception-
-     *                        specific empty state copy; null when "Semua")
+     *  - $hasActiveFilters : bool (distinguishes "filtered empty" from
+     *                        "database empty" in the empty state)
+     *  - $exceptionFilter  : ?string (drives the exception-specific empty
+     *                        state copy; null when "Semua")
      *  - $exceptionLabel   : ?string (human-readable label, e.g. "Delay")
      */
 
@@ -24,7 +24,7 @@
     use App\ViewModels\Monitoring\ExceptionChipData;
     use App\Support\Monitoring\SearchHighlighter;
 
-    /** Map StageResolver flow_zone -> mon-badge colour (presentation only). */
+    /** Map StageResolver flow_zone -> mon-badge colour. */
     $flowZoneBadge = [
         'pickup'   => 'mon-badge-accent',
         'depot'    => 'mon-badge-warning',
@@ -35,7 +35,7 @@
         'cancelled'=> 'mon-badge-danger',
     ];
 
-    /** Exception priority per Task 7 spec (highest first). */
+    /** Exception priority (highest first). */
     $exceptionPriority = [
         'hold', 'ng', 'demurrage', 'delay', 'stuck', 'missing_voyage',
     ];
@@ -43,15 +43,13 @@
     $activeSearch = is_string($search ?? null) && trim($search ?? '') !== '';
     $term = $activeSearch ? trim($search) : '';
 
-    // Sprint 6.4.3-R1: KPI vs Table consistency UX - empty state explains
-    // *why* the table is empty (search vs exception vs both) instead of a
-    // generic "no unit" message, since the KPI above intentionally doesn't
-    // reflect these two drill-down filters. Presentation only - no query change.
+    // Empty state explains *why* the table is empty (search vs exception vs
+    // both) instead of a generic "no unit" message, since the KPI above
+    // intentionally doesn't reflect these two drill-down filters.
     $exceptionFilter = $exceptionFilter ?? null;
     $exceptionActive = filled($exceptionFilter);
     $exceptionLabel = $exceptionLabel ?? null;
 
-    /** Sprint 6.4.3: reusable highlight helper (app/Support/Monitoring/SearchHighlighter). */
 
     $visibleRows = is_array($rows) ? $rows : [];
     $total = $paginator?->total() ?? count($visibleRows);
@@ -147,7 +145,7 @@
                                 $ageLabel .= ' (est)';
                             }
 
-                            // Exceptions (Task 7) - priority-sorted chips
+                            // Exceptions - priority-sorted chips
                             $sortedExceptions = collect($row->exceptions)
                                 ->sortBy(fn(ExceptionChipData $c) =>
                                     array_search($c->type, $exceptionPriority, true) === false
@@ -217,7 +215,7 @@
                                 <span class="mon-age {{ $ageClass }}">{{ $ageLabel }}</span>
                             </td>
 
-                            {{-- Exception (Task 7) - priority chips or em-dash --}}
+                            {{-- Exception - priority chips or em-dash --}}
                             <td role="cell">
                                 @if ($sortedExceptions->isNotEmpty())
                                     <div class="flex flex-wrap gap-1" role="list" aria-label="Exceptions">
@@ -261,15 +259,15 @@
 
                 @else
 
-                    {{-- -- Empty state (Task 7 / Sprint 6.4.1) - enterprise-calm with CTA.
-                         Distinguishes "no filter matches" from "database genuinely empty". -- --}}
+                    {{-- Empty state - enterprise-calm with CTA. Distinguishes
+                         "no filter matches" from "database genuinely empty". --}}
                     @php $filtersActive = $hasActiveFilters ?? false; @endphp
                     <tr role="row">
                         <td colspan="9" role="cell">
                             @if ($activeSearch && $exceptionActive)
-                                {{-- Sprint 6.4.3-R1: search + exception both active -
-                                     combined message, no need to spell out both values
-                                     here since the context bar above already shows them. --}}
+                                {{-- Search + exception both active - combined message,
+                                     no need to spell out both values here since the
+                                     context bar above already shows them. --}}
                                 <div class="mon-empty" role="status" aria-label="Tidak ada shipment yang cocok dengan filter yang dipilih">
                                     <div class="mon-empty-icon">
                                         <x-heroicon-o-funnel class="w-8 h-8" />
@@ -305,7 +303,7 @@
                                     </button>
                                 </div>
                             @elseif ($exceptionActive)
-                                {{-- Sprint 6.4.3-R1: exception-only empty state (new). --}}
+                                {{-- Exception-only empty state. --}}
                                 <div class="mon-empty" role="status" aria-label="Tidak ada shipment dengan exception {{ $exceptionLabel }}">
                                     <div class="mon-empty-icon">
                                         <x-heroicon-o-funnel class="w-8 h-8" />

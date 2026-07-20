@@ -36,9 +36,9 @@ use Illuminate\Support\Facades\DB;
  */
 class VoyageScheduleHistoryFeb2026Seeder extends Seeder
 {
-    // ──────────────────────────────────────────────────────────────────────
+    // 
     // Data historis yang sudah diverifikasi
-    // ──────────────────────────────────────────────────────────────────────
+    // 
 
     private array $voyages = [
         [
@@ -126,7 +126,7 @@ class VoyageScheduleHistoryFeb2026Seeder extends Seeder
         ],
     ];
 
-    // ──────────────────────────────────────────────────────────────────────
+    // 
 
     public function run(): void
     {
@@ -136,13 +136,13 @@ class VoyageScheduleHistoryFeb2026Seeder extends Seeder
         $this->line('╚══════════════════════════════════════════════════════════╝');
         $this->line('');
 
-        // ── Resolve shared references ────────────────────────────────────
+        // Resolve shared references
         $shippingLineId = ShippingLine::where('code', 'TANTO')->value('id');
         $samplePlan     = VesselPlan::orderBy('id')->first();
         $polId          = $samplePlan?->pol_id ?? 1;
         $podId          = $samplePlan?->pod_id ?? 2;
 
-        // ── PHASE 1 — Audit ───────────────────────────────────────────────
+        // Audit
         $this->line('PHASE 1 — AUDIT VOYAGE EXISTING');
         $this->line(str_repeat('─', 62));
 
@@ -187,7 +187,7 @@ class VoyageScheduleHistoryFeb2026Seeder extends Seeder
 
         $this->line('');
 
-        // ── PHASE 2-6 — Backfill ──────────────────────────────────────────
+        // Backfill
         $this->line('PHASE 2–6 — BACKFILL SCHEDULE HISTORIES');
         $this->line(str_repeat('─', 62));
         $this->line(sprintf(
@@ -228,7 +228,7 @@ class VoyageScheduleHistoryFeb2026Seeder extends Seeder
                 ) {
                     $voyage = $audit['voyage'];
 
-                    // ── CREATE historical voyage jika belum ada ──────────
+                    // CREATE historical voyage jika belum ada
                     if ($action === 'create') {
                         /** @var Vessel $vessel */
                         $vessel  = $audit['vessel'];
@@ -264,7 +264,7 @@ class VoyageScheduleHistoryFeb2026Seeder extends Seeder
                     } else {
                         $stats['found']++;
 
-                        // ── PHASE 4 — Update atd_at/ata_at jika kosong ──
+                        // Update atd_at/ata_at jika kosong
                         $needsSave = false;
 
                         if (blank($voyage->atd_at)) {
@@ -286,7 +286,7 @@ class VoyageScheduleHistoryFeb2026Seeder extends Seeder
                         }
                     }
 
-                    // ── PHASE 3A — Draft History ─────────────────────────
+                    // Draft History
                     $draftEtd = $row['draft']['etd'];
                     $draftEta = $row['draft']['eta'];   // null untuk draft
 
@@ -306,7 +306,7 @@ class VoyageScheduleHistoryFeb2026Seeder extends Seeder
                     );
                     $stats['draft']++;
 
-                    // ── PHASE 3B — Final History ─────────────────────────
+                    // Final History
                     $finalEtd = $row['final']['etd'];
                     $finalEta = $row['final']['eta'];
 
@@ -326,7 +326,7 @@ class VoyageScheduleHistoryFeb2026Seeder extends Seeder
                     );
                     $stats['final']++;
 
-                    // ── PHASE 3C — Actual History ────────────────────────
+                    // Actual History
                     $actualAtd = $row['actual']['atd'];
                     $actualAta = $row['actual']['ata'];
 
@@ -366,7 +366,7 @@ class VoyageScheduleHistoryFeb2026Seeder extends Seeder
             }
         }
 
-        // ── PHASE 7 — Summary ────────────────────────────────────────────
+        // Summary
         $this->line('');
         $this->line(str_repeat('─', 62));
         $this->line('PHASE 7 — SUMMARY');
@@ -395,9 +395,9 @@ class VoyageScheduleHistoryFeb2026Seeder extends Seeder
         $this->line('');
     }
 
-    // ──────────────────────────────────────────────────────────────────────
+    // 
     // Helper — output shortcuts
-    // ──────────────────────────────────────────────────────────────────────
+    // 
 
     private function line(string $text): void
     {

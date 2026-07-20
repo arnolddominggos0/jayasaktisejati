@@ -262,12 +262,12 @@
 </head>
 <body>
 
-{{-- ══ PAGE FOOTER (repeats on every page) ══════════════════════════════════ --}}
+{{-- PAGE FOOTER (repeats on every page) --}}
 <div class="page-footer">
     {{ $brand['name'] }} &bull; {{ $qr_ref }} &bull; Quick Report Evaluasi Voyage &bull; Dicetak: {{ $generated_at }}
 </div>
 
-{{-- ══ DOCUMENT HEADER ══════════════════════════════════════════════════════ --}}
+{{-- DOCUMENT HEADER --}}
 <div class="doc-header">
     <table style="width:100%; border-collapse:collapse;">
         <tr>
@@ -294,7 +294,7 @@
     </table>
 </div>
 
-{{-- ══ A. INFORMASI DASAR ═══════════════════════════════════════════════════ --}}
+{{-- A. INFORMASI DASAR --}}
 <div class="section">
     <div class="section-header">A. Informasi Dasar</div>
     <div class="section-body">
@@ -358,7 +358,7 @@
     </div>
 </div>
 
-{{-- ══ B. DETAIL MASALAH ════════════════════════════════════════════════════ --}}
+{{-- B. DETAIL MASALAH --}}
 <div class="section">
     <div class="section-header">
         B. Detail Masalah &mdash; Unit Berstatus NG
@@ -417,7 +417,7 @@
     </div>
 </div>
 
-{{-- ══ ALL UNITS SUMMARY (compact) ═════════════════════════════════════════ --}}
+{{-- ALL UNITS SUMMARY (compact) --}}
 @if(count($allRows) > 0 && count($ngRows) < count($allRows))
 <div class="section">
     <div class="section-header" style="background:#374151;">
@@ -460,7 +460,7 @@
 </div>
 @endif
 
-{{-- ══ C. ANALISIS MASALAH ══════════════════════════════════════════════════ --}}
+{{-- C. ANALISIS MASALAH --}}
 <div class="section page-break">
     <div class="section-header">C. Analisis Masalah &amp; Root Cause</div>
     <div class="section-body">
@@ -552,7 +552,7 @@
     </div>
 </div>
 
-{{-- ══ D. TINDAKAN PERBAIKAN ════════════════════════════════════════════════ --}}
+{{-- D. TINDAKAN PERBAIKAN --}}
 <div class="section">
     <div class="section-header">D. Tindakan Perbaikan (Countermeasure)</div>
     <div class="section-body">
@@ -565,7 +565,7 @@
     </div>
 </div>
 
-{{-- ══ E. ACHIEVEMENT ══════════════════════════════════════════════════════ --}}
+{{-- E. ACHIEVEMENT --}}
 <div class="section page-break">
     <div class="section-header">E. Achievement</div>
     <div class="section-body">
@@ -715,7 +715,7 @@
     </div>
 </div>
 
-{{-- ══ F. EVIDENCE ═════════════════════════════════════════════════════════ --}}
+{{-- F. EVIDENCE --}}
 <div class="section page-break">
     <div class="section-header">F. Evidence ({{ count($evidence_items) }} file)</div>
     <div class="section-body">
@@ -766,7 +766,7 @@
     </div>
 </div>
 
-{{-- ══ G. PENGESAHAN ════════════════════════════════════════════════════════ --}}
+{{-- G. PENGESAHAN --}}
 <div class="section">
     <div class="section-header">G. Pengesahan</div>
     <div class="section-body">

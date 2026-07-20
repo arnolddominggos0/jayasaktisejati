@@ -34,14 +34,6 @@
             return $q->orderBy('name')->value('id');
         }
 
-        /**
-         * Resolve origin branch_id, depot_id, and coordinator_id for a SEA shipment
-         * from the POL (Port of Loading — origin port).
-         *
-         * Ownership always follows the origin depot, not the destination.
-         * Returns ['branch_id' => int, 'depot_id' => int, 'coordinator_id' => int|null]
-         * or null if no depot is configured for that port.
-         */
         public function resolveByPol(?int $polId): ?array
         {
             if (! $polId) {
@@ -64,14 +56,7 @@
                 'coordinator_id' => $depot->coordinator_user_id ? (int) $depot->coordinator_user_id : null,
             ];
         }
-
-        /**
-         * Resolve branch_id and depot_id for a SEA shipment from the POD (Port of Discharge).
-         *
-         * Kept for gate resolver and destination-depot lookups.
-         * NOT used for shipment ownership — use resolveByPol() for ownership.
-         * Returns ['branch_id' => int, 'depot_id' => int] or null if not found.
-         */
+        
         public function resolveByPod(?int $podId): ?array
         {
             if (! $podId) {
@@ -192,17 +177,12 @@
             $updated  = 0;
             $deleted  = 0;
 
-            // Track whether at least one valid unit row was processed.
-            // Guards against blank-row-only submissions (e.g. the Repeater's
-            // afterStateHydrated default of [['qty'=>1]]) from nuking all
-            // existing units via the diff-delete logic below.
+            // Guard: a submission of only blank rows must not delete existing units.
             $hasAnyValidUnit = false;
 
             foreach ($units as $u) {
-                // Require at least one identifying field to treat the row as a real
-                // unit. Previously only `qty` was checked, and a blank row with
-                // qty=1 (the afterStateHydrated default) would pass the check and
-                // delete all existing units as a side-effect.
+                // Require an identifying field so a blank row (qty defaults to 1)
+                // is not treated as a real unit.
                 $hasIdentifier = ! empty($u['chassis_no'])
                     || ! empty($u['engine_no'])
                     || ! empty($u['model_no'])

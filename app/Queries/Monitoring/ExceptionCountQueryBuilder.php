@@ -13,9 +13,9 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Sprint 6.4.4: root changed from Shipment to Unit.
- * Exception counts now represent Units (vehicles) affected, not Shipments (SPPB).
- * e.g. "5 Hold" means 5 vehicles whose shipment is in Hold — not 5 SPPBs.
+ * Rooted on Unit: exception counts represent Units (vehicles) affected, not
+ * Shipments (SPPB). e.g. "5 Hold" means 5 vehicles whose shipment is in Hold
+ * — not 5 SPPBs.
  *
  * NG is now a direct check on unit_inspections (unit_id = units.id) instead of
  * a correlated subquery joining through units. All other exceptions read from
@@ -34,7 +34,7 @@ final class ExceptionCountQueryBuilder
     }
 
     /**
-     * Single aggregate query — one round-trip, no correlated subqueries.
+     * Single aggregate query, no correlated subqueries.
      *
      * NG check: LEFT JOIN to a pre-aggregated set of unit_ids with failed
      * inspections so the planner can hash-join once.
@@ -111,7 +111,7 @@ final class ExceptionCountQueryBuilder
 
         $query->whereNotIn('shipments.status', [ShipmentStatus::Draft->value]);
 
-        // v1 domain constraint: sea mode only. See ADR-009 and MonitoringDomain.
+        // Domain constraint: sea mode only.
         MonitoringDomain::applyTo($query);
 
         if ($filter->branch_id) {

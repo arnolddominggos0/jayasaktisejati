@@ -1,6 +1,6 @@
 {{--
-    Sprint 6.5.1 - Operational Detail Panel
-    -----------------------------------------------------------------------
+    Operational Detail Panel
+
     Livewire root is always in the DOM. Visibility is driven by CSS class
     `is-open` toggled by Alpine — no x-show, so the transform animation
     runs on the real element without Alpine needing to insert/remove it.
@@ -32,7 +32,7 @@
     }"
 >
 
-    {{-- ==================== Backdrop ==================== --}}
+    {{-- Backdrop --}}
     <div
         class="jss-detail-overlay"
         :class="{ 'is-open': isOpen }"
@@ -40,7 +40,7 @@
         @click="$dispatch('panel-close-requested')"
     ></div>
 
-    {{-- ==================== Panel ==================== --}}
+    {{-- Panel --}}
     <div
         class="jss-detail-panel"
         :class="{ 'is-open': isOpen }"
@@ -301,7 +301,7 @@
                         @endif
                     </div>
 
-                    {{-- Timeline — Sprint 6.5.3 --}}
+                    {{-- Timeline --}}
                     <div class="jss-detail-section">
                         <div class="jss-detail-section-head">
                             <span class="jss-detail-section-title">Timeline</span>
@@ -310,7 +310,7 @@
                         @include('livewire.monitoring.unit-timeline', ['timeline' => $unitDetail->timeline])
                     </div>
 
-                    {{-- Inspeksi (placeholder — Sprint 6.5.x) --}}
+                    {{-- Inspeksi (placeholder) --}}
                     <div class="jss-detail-section">
                         <div class="jss-detail-section-head">
                             <span class="jss-detail-section-title">Inspeksi</span>

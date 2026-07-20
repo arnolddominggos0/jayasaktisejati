@@ -67,12 +67,7 @@ class AppServiceProvider extends ServiceProvider
             }
         }
 
-        // ── TEMPORARY — OCR-01B Livewire payload investigation ─────────────
-        // Tap SETIAP mutasi property Livewire yang datang dari browser.
-        // Event 'update' dipicu di HandleComponents::updateProperty() SEBELUM
-        // pemeriksaan "public property not found" — jadi path beracun yang
-        // menyebabkan "Public property [$]" pasti terekam di sini, tepat pada
-        // request yang crash. HAPUS blok ini setelah OCR-01B selesai.
+        // Logs every Livewire property mutation from the browser, local-only.
         if (app()->environment('local')) {
             \Livewire\on('update', function ($component, $fullPath, $value) {
                 $firstSegment = explode('.', (string) $fullPath)[0];

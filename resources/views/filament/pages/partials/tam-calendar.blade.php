@@ -12,8 +12,8 @@
         </div>
     </div>
 
-    {{-- Sprint B4.5: when there's genuinely nothing on the calendar (no
-         chips in any lane/day), showing the full multi-row grid just reads
+    {{-- When there's genuinely nothing on the calendar (no chips in any
+         lane/day), showing the full multi-row grid just reads
          as a large blank area. Swap to a compact, intentional empty state
          instead — same lightweight treatment as Matrix's empty state, no
          illustration/icon. $calendarHasChips computed once in the parent

@@ -85,15 +85,8 @@ final class VoyageOperationalSnapshot
 
     // ═════════════════════════════════════════════════════════════════
     // Collection-level categorization
-    // ═════════════════════════════════════════════════════════════════
-    // WHY: Previously, tam-monitoring-table, monitoring-kapal-tam, and
-    // other templates each had their own inline filter chains:
-    //   - $rows->filter(fn($v) => $v->operational_status_enum === DELAYED)
-    //   - $sailing->filter(fn($v) => $v->eta_overdue || $v->sailing_risk)
-    //   - $scheduled->filter(fn($v) => ... readiness condition ...)
-    // These were duplicated business rules.  Centralizing them here
-    // means a single source of truth for categorization logic, and
-    // Blade templates become PRESENTATION ONLY.
+    // Single source of truth for voyage categorization, so the rules are not
+    // duplicated as inline filter chains across Blade templates.
 
     /**
      * Categorize a collection of voyages into operational groups.

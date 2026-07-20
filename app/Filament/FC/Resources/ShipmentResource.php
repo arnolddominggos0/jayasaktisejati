@@ -220,8 +220,8 @@ class ShipmentResource extends Resource
     /**
      * Reusable inspection form fields for embedding in OperationalTasks updateTrack action.
      *
-     * Uses a flat single Repeater (inspection_items_flat) instead of nested Repeaters
-     * to work around Filament v3's failure to hydrate inner Repeater items from fillForm().
+     * Uses a flat single Repeater (inspection_items_flat) because Filament v3
+     * fails to hydrate nested Repeater items from fillForm().
      *
      * Each row carries: item_id, inspection_id, unit_id, unit_label, category, item_name,
      * result, finding_type, notes.

@@ -54,7 +54,7 @@ Route::prefix('jsl')->name('jsl.')->group(function () {
     Route::get('/contact/success', [ContactController::class, 'success'])->name('contact.success');
 });
 
-// ── TEMPORARY — UX-LIST-02 verification only (local env), HAPUS setelah selesai ─
+// Local-only debug login route.
 if (app()->environment('local')) {
     Route::get('/_uxlist02-login', function () {
         auth()->loginUsingId(5);

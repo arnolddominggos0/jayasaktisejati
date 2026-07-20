@@ -13,8 +13,8 @@ final class StageResolver
      * Resolve the current stage from a Shipment with latestTrack eager-loaded.
      * No DB queries — all data must be on the model or its relations.
      *
-     * ADR-009: v1 is sea-mode only — TrackStatus::orderSea() is used directly.
-     * When v2 adds land mode, restore orderForMode() branching here.
+     * Sea-mode only — TrackStatus::orderSea() is used directly. When land mode
+     * is added, restore orderForMode() branching here.
      */
     public function resolve(Shipment $shipment): CurrentStageData
     {

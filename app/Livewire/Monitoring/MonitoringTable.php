@@ -7,7 +7,6 @@ use Livewire\Component;
 class MonitoringTable extends Component
 {
     // Scalar props only — Livewire 3 cannot serialize LengthAwarePaginator.
-    // Sprint 6.3B will wire these to a real computed paginator.
     public int $totalRows = 0;
 
     public int $perPage = 50;
@@ -44,7 +43,7 @@ class MonitoringTable extends Component
 
     public function handleKeyboard(string $key): void
     {
-        // TODO Sprint 6.3B: implement j/k/Enter/Esc
+        // TODO: implement j/k/Enter/Esc
     }
 
     public function render(): \Illuminate\View\View

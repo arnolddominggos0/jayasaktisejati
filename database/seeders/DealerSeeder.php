@@ -7,7 +7,7 @@ use App\Models\Dealer;
 use Illuminate\Database\Seeder;
 
 /**
- * DOMAIN-02 — master Dealer awal: jaringan distribusi Toyota Astra Motor.
+ * Master Dealer awal: jaringan distribusi Toyota Astra Motor.
  * Idempotent (firstOrCreate by name).
  */
 class DealerSeeder extends Seeder

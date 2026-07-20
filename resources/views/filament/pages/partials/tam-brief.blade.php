@@ -1,26 +1,21 @@
 {{--
-    Operational Brief / "Status Armada" — Sprint X→I1 (task-indexed),
-    redesigned Sprint WD1 §4 + UI1 Phase 2/3 (voyage-indexed cards).
+    Operational Brief / "Status Armada" — voyage-indexed cards.
 
-    TaskClassifier (getBrief()) is still invoked exactly once (ES1 §10,
-    unchanged). This partial only renders — voyage grouping/dominance
-    ranking happens in MonitoringKapalTam::getVoyageCards(), never here
-    ("Never reclassify in Blade" — UI1 Phase 3's explicit rule).
+    TaskClassifier (getBrief()) is invoked exactly once. This partial only
+    renders — voyage grouping/dominance ranking happens in
+    MonitoringKapalTam::getVoyageCards(), never reclassified in Blade.
 
-    Each card shows ONE voyage's dominant Task, reusing the existing
-    <x-operational.task-item> component unchanged, with an optional
-    secondary-responsibility disclosure line beneath it (WD1 §4/§9,
-    WD3 §9) — no Task is ever dropped, no second card is ever created
-    for the same voyage.
+    Each card shows one voyage's dominant Task, reusing the existing
+    <x-operational.task-item> component, with an optional
+    secondary-responsibility disclosure line beneath it — no Task is ever
+    dropped, no second card is ever created for the same voyage.
 --}}
 @php
     $brief = $this->getBrief();
 
-    // VI Sprint / VR1 WARNING 1 — healthy state is QUIET, not celebrated.
-    // Green removed: healthy = neutral graphite (VP1 Phase 9, VM2 §0.4
-    // "green is not the healthy signal"). Only the two reserve hues
-    // remain: red (critical) + amber (busy). Healthy speaks by isolation
-    // + type size (VC1 Phase 3), never by color.
+    // Healthy state is quiet, not celebrated: green is not the healthy signal.
+    // Only the two reserve hues remain: red (critical) + amber (busy). Healthy
+    // speaks by isolation + type size, never by color.
     $healthStyle = match ($brief['health']['state']) {
         'critical' => ['dot' => 'bg-red-500', 'text' => 'text-red-700'],
         'busy'     => ['dot' => 'bg-amber-400', 'text' => 'text-amber-700'],
@@ -33,13 +28,10 @@
 
 <div class="bg-white border border-gray-200/60 rounded-lg overflow-hidden">
 
-    {{-- STATUS ARMADA (Fleet Status, WD1 §3 / VD1 §4) — Condition
-         sentence first (P9), plain-language counts second, never a
-         percentage, never a KPI card. --}}
-    {{-- VC1 Phase 3: strongest visual anchor on the page — achieved
-         through type scale/weight (16px bold vs. everything else's
-         13px-and-under), not through a new colored panel/icon. Still
-         one condition word + one plain sentence, never a KPI card. --}}
+    {{-- STATUS ARMADA (Fleet Status) — condition sentence first,
+         plain-language counts second, never a percentage, never a KPI card.
+         Strongest visual anchor on the page via type scale/weight (16px bold
+         vs. everything else's 13px-and-under), not a new colored panel/icon. --}}
     <div class="px-4 py-4 border-b border-gray-100">
         <div class="flex items-baseline gap-2">
             <span class="w-2.5 h-2.5 rounded-full {{ $healthStyle['dot'] }} self-center"></span>

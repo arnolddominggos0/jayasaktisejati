@@ -1,23 +1,21 @@
 {{--
     TaskItem — the one reusable component representing exactly one
-    Operational Task (P2, P3). Rendered identically regardless of
-    whether it is classified as Action / Awaiting / Checkpoint
-    (Sprint DS1 §5, ES1 §16's "smallest reusable building block").
+    Operational Task. Rendered identically regardless of whether it is
+    classified as Action / Awaiting / Checkpoint.
 
-    All branching (label, action button, invocation type) is
-    pre-computed by TaskClassifier (MonitoringKapalTam::getBrief*())
-    into a normalized item shape — this component performs zero
-    domain logic, only rendering (DS1 §2, ES1 §8: "rendering
-    components must never mutate data, must never classify").
+    All branching (label, action button, invocation type) is pre-computed
+    by TaskClassifier (MonitoringKapalTam::getBrief*()) into a normalized
+    item shape — this component performs zero domain logic, only rendering:
+    it must never mutate data and never classify.
 
     Props:
       item — normalized array:
              voyage_id, vessel_name, label, severity,
              action_label, action_type ('modal'|'drawer'), modal_type
       tone — 'action' | 'awaiting' | 'checkpoint' — display-only,
-             supplied by the caller (which list is rendering it),
-             never derived from the item's own data (severity and
-             tone are independent axes — P8 §7/DS1 §7).
+             supplied by the caller (which list is rendering it), never
+             derived from the item's own data (severity and tone are
+             independent axes).
 --}}
 @props([
     'item',
@@ -25,8 +23,8 @@
 ])
 
 @php
-    // VC1 Phase 4: the "action" tone's button now carries a filled
-    // background at rest (not just border+hover) — the Coordinator must
+    // The "action" tone's button carries a filled background at rest
+    // (not just border+hover) — the Coordinator must
     // find the one thing to click within one second, without the button
     // relying on a hover state to read as clickable. Awaiting/Checkpoint
     // stay lighter (they are not "click me now" affordances).

@@ -325,14 +325,7 @@ final class VoyageOperationalState
         return $this->voyage->delay_label;
     }
 
-    // ═════════════════════════════════════════════════════════════════
-    // Display convenience methods
-    // ═════════════════════════════════════════════════════════════════
-    // WHY: Previously, Blade computed badge labels, severity display
-    // strings, and issue descriptors inline — duplicating Tailwind
-    // classes and conditional logic across multiple templates.  These
-    // methods give Blade a single source of truth for WHAT to show,
-    // while OperationalUi controls HOW to show it.
+    // Display convenience methods: a single source of truth for what Blade shows.
 
     public function delayOverdueDays(): ?int
     {

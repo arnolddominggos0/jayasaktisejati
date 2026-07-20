@@ -20,9 +20,7 @@ use App\Models\VoyageMilestone;
  */
 final class OperationalUi
 {
-    // ═════════════════════════════════════════════════════════════════
     // Severity system
-    // ═════════════════════════════════════════════════════════════════
 
     public static function severityBadge(string $severity): string
     {
@@ -55,9 +53,7 @@ final class OperationalUi
         };
     }
 
-    // ═════════════════════════════════════════════════════════════════
     // Operational status (light variant for dense tables)
-    // ═════════════════════════════════════════════════════════════════
 
     public static function operationalStatusLight(VoyageOperationalStatus $status): array
     {
@@ -69,9 +65,7 @@ final class OperationalUi
         };
     }
 
-    // ═════════════════════════════════════════════════════════════════
     // KPI badge (OK / NG)
-    // ═════════════════════════════════════════════════════════════════
 
     public static function kpiBadge(?SlaStatus $status, string $label): string
     {
@@ -95,9 +89,7 @@ final class OperationalUi
         );
     }
 
-    // ═════════════════════════════════════════════════════════════════
     // Circular indicator (used in matrix cells)
-    // ═════════════════════════════════════════════════════════════════
 
     public static function indicatorClasses(string $type): string
     {
@@ -109,9 +101,7 @@ final class OperationalUi
         };
     }
 
-    // ═════════════════════════════════════════════════════════════════
     // Milestone chip
-    // ═════════════════════════════════════════════════════════════════
 
     public static function milestoneChip(VoyageMilestone $m): array
     {
@@ -153,9 +143,7 @@ final class OperationalUi
         ];
     }
 
-    // ═════════════════════════════════════════════════════════════════
     // Checkpoint / readiness cell
-    // ═════════════════════════════════════════════════════════════════
 
     public static function checkpointCell(VoyageCheckpoint $cp): array
     {
@@ -199,9 +187,7 @@ final class OperationalUi
         return 'default';
     }
 
-    // ═════════════════════════════════════════════════════════════════
     // Next-action badge (matrix view)
-    // ═════════════════════════════════════════════════════════════════
 
     public static function readinessDot(?object $d1, ?object $h1): array
     {
@@ -245,9 +231,7 @@ final class OperationalUi
         };
     }
 
-    // ═════════════════════════════════════════════════════════════════
     // Operational section heading
-    // ═════════════════════════════════════════════════════════════════
     // WHY: Section headings with colored dots were duplicated across
     // tam-monitoring-table with hardcoded Tailwind classes.  Now
     // centralized here for consistent dot+label styling.
@@ -282,9 +266,7 @@ final class OperationalUi
         );
     }
 
-    // ═════════════════════════════════════════════════════════════════
     // Vessel check display (replaces inline status comparison in Blade)
-    // ═════════════════════════════════════════════════════════════════
     // WHY: view-voyage.blade.php was comparing $vc->status?->value === 'on_schedule'
     // inline.  Now uses isOnSchedule() and gets canonical display.
 
@@ -304,9 +286,7 @@ final class OperationalUi
         ];
     }
 
-    // ═════════════════════════════════════════════════════════════════
     // SlaStatus badge for timeline reuse (replaces inline logic)
-    // ═════════════════════════════════════════════════════════════════
 
     public static function slaStatusDisplay(?SlaStatus $status): array
     {
@@ -321,9 +301,7 @@ final class OperationalUi
         };
     }
 
-    // ═════════════════════════════════════════════════════════════════
     // Vessel check timeline display (replaces inline match in Blade)
-    // ═════════════════════════════════════════════════════════════════
 
     public static function vesselCheckTimelineState(object $vc): array
     {

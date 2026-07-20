@@ -16,10 +16,8 @@ class Branch extends Model
     }
 
     /**
-     * Smart Origin Migration (Office -> Branch, 2026-07-20): Branch is now
-     * the sole source of truth for Origin. City is a direct attribute of
-     * Branch — no Office involved in this relation. See
-     * docs/master-office/SMART-ORIGIN-MIGRATION-BLOCKED-SCHEMA-GAP.md.
+     * Branch is the sole source of truth for Origin. City is a direct
+     * attribute of Branch.
      */
     public function city(): BelongsTo
     {

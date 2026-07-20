@@ -70,6 +70,14 @@ class ShipmentPolicy
      */
     public function print(User $user, Shipment $shipment): bool
     {
+        if ($user->hasRole('office_admin')) {
+            if ($user->effectiveBranchId() && $shipment->branch_id !== null) {
+                return $shipment->branch_id === $user->effectiveBranchId();
+            }
+
+            return true;
+        }
+
         return $this->view($user, $shipment);
     }
 

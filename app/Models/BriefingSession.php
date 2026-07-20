@@ -21,7 +21,7 @@ class BriefingSession extends Model
 
         // session
         'appsheet_id',
-        'shipment_id', // @deprecated SC.5D.0B — legacy 1:1 key, superseded by briefing_session_shipments pivot
+        'shipment_id', // @deprecated legacy 1:1 key, superseded by briefing_session_shipments pivot
         'date',
         'depot_id',
         'coordinator_user_id',
@@ -80,9 +80,9 @@ class BriefingSession extends Model
     */
 
     /**
-     * @deprecated SC.5D.0B — legacy 1:1 relation keyed on briefing_sessions.shipment_id.
+     * @deprecated legacy 1:1 relation keyed on briefing_sessions.shipment_id.
      * Active relation: shipments() BelongsToMany via briefing_session_shipments pivot.
-     * Only kept for getDisplayLabelAttribute() fallback on pre-SC.3B.19 records.
+     * Only kept for getDisplayLabelAttribute() fallback on legacy records.
      */
     public function shipment(): BelongsTo
     {

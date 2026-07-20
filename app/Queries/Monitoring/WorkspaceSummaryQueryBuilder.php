@@ -14,8 +14,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Sprint 6.4.4: root changed from Shipment to Unit.
- * KPI counts now represent Units (vehicles), not Shipments (SPPB).
+ * Rooted on Unit: KPI counts represent Units (vehicles), not Shipments (SPPB).
  * All filter conditions still reference shipments.* via the JOIN.
  */
 final class WorkspaceSummaryQueryBuilder
@@ -59,7 +58,7 @@ final class WorkspaceSummaryQueryBuilder
 
         $query->whereNotIn('shipments.status', [ShipmentStatus::Draft->value]);
 
-        // v1 domain constraint: sea mode only. See ADR-009 and MonitoringDomain.
+        // Domain constraint: sea mode only.
         MonitoringDomain::applyTo($query);
 
         if ($filter->branch_id) {

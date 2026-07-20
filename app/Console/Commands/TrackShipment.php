@@ -124,7 +124,7 @@ class TrackShipment extends Command
             Auth::login($fc);
         }
 
-        // Check if track already exists (informational only — appendTrack() guards duplication)
+        // Informational only — appendTrack() guards duplication.
         $existingTrack = $shipment->tracks()->where('status', $trackStatus->value)->first();
         if ($existingTrack && $existingTrack->tracked_at) {
             $this->warn("Status '{$statusConfig['label']}' already recorded at {$existingTrack->tracked_at->format('d M Y H:i')}");

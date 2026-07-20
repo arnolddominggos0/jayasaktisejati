@@ -50,7 +50,6 @@ class ListShipments extends ListRecords
      *   Menunggu Penjemputan → status = pending DAN belum ada track nyata
      *                          (belum disentuh FC via startPickup — skeleton
      *                          track ber-tracked_at NULL tidak dihitung)
-     *   Draft                → status = draft (strays/belum selesai)
      *   Perlu Tindakan       → status = hold. Cancelled SENGAJA belum masuk:
      *                          belum ada penanda follow-up di skema untuk
      *                          membedakan "batal perlu tindak lanjut" vs
@@ -71,11 +70,6 @@ class ListShipments extends ListRecords
                     ->where('status', ShipmentStatus::Pending->value)
                     ->whereDoesntHave('tracks', fn (Builder $trackQuery) => $trackQuery->whereNotNull('tracked_at'))
                     ->count() ?: null),
-
-            'draft' => Tab::make('Draft')
-                ->modifyQueryUsing(fn (Builder $query) => $query
-                    ->where('status', ShipmentStatus::Draft->value))
-                ->badge(fn () => $base()->where('status', ShipmentStatus::Draft->value)->count() ?: null),
 
             'perlu-tindakan' => Tab::make('Perlu Tindakan')
                 ->modifyQueryUsing(fn (Builder $query) => $query

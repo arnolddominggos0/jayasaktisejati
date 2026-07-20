@@ -90,13 +90,6 @@ class ShipmentResource extends Resource
         return Filament::auth()->user()?->effectiveBranchId();
     }
 
-    /**
-     * Smart Origin by Branch (migrated 2026-07-20 — Office no longer
-     * involved). Branch is the sole source of truth for Origin;
-     * origin_city_id is a direct FK read (Branch.city_id), not a
-     * string-match. See docs/master-office/SMART-ORIGIN-MIGRATION-BLOCKED-SCHEMA-GAP.md
-     * for the prior architecture and why it changed.
-     */
     public static function resolveOriginCityFromUser(?int $branchId = null): array
     {
         if (! $branchId) {
@@ -147,12 +140,6 @@ class ShipmentResource extends Resource
         $mode = strtolower($m->mode?->value ?? (string) $m->mode);
         $originBr = (int) ($m->branch_id ?? 0);
 
-        // Office Retirement (Phase 1, 2026-07-20): the `dest_branch_id_in`
-        // rule dimension has been removed. It was resolved from
-        // destinationOffice->branch_id, but destination_office_id is never
-        // written (always null), so that dimension could never match — it was
-        // dead. Origin branch (from Branch, the source of truth) + mode remain
-        // as the live rule dimensions. See AUDIT-OFFICE-LEGACY-RETIREMENT.md.
         $matches = function (array $when) use ($mode, $originBr): bool {
             if (isset($when['mode']) && strtolower($when['mode']) !== $mode) {
                 return false;
@@ -193,8 +180,888 @@ class ShipmentResource extends Resource
 
         return $form
             ->schema([
+                Section::make('Dokumen')
+                    ->icon('heroicon-m-document-text')
+                    ->extraAttributes(['class' => 'jss-section'])
+                    ->schema([
+                        Grid::make(12)->schema([
+                            Placeholder::make('detail_heading')
+                                ->hiddenLabel()
+                                ->content(new \Illuminate\Support\HtmlString('<div class="jss-subheading">Detail Permintaan</div>'))
+                                ->columnSpan(12),
+                            Grid::make(12)
+                                ->extraAttributes(['class' => 'jss-field-grid'])
+                                ->schema([
+                                    Select::make('request_type')
+                                        ->label('Tipe Permintaan')
+                                        ->options(collect(RequestType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))
+                                        ->default(RequestType::SPPB_DO->value)
+                                        ->required()
+                                        ->live()
+                                        ->selectablePlaceholder(false)
+                                        ->columnSpan(['default' => 12, 'md' => 2]),
+                                    TextInput::make('doc_number')
+                                        ->label('No. Dokumen')
+                                        ->maxLength(50)
+                                        ->visible(fn(Get $get) => $get('request_type') === 'sppb_do')
+                                        ->required(fn(Get $get) => $get('request_type') === 'sppb_do')
+                                        ->columnSpan(['default' => 12, 'md' => 5]),
+                                    Select::make('priority')
+                                        ->label('Prioritas')
+                                        ->options(['normal' => 'Normal', 'urgent' => 'Mendesak'])
+                                        ->default('normal')
+                                        ->columnSpan(['default' => 12, 'md' => 2]),
+                                    DatePicker::make('requested_at')
+                                        ->label('Tanggal Permintaan')
+                                        ->default(now())
+                                        ->required()
+                                        ->columnSpan(['default' => 12, 'md' => 3]),
+                                ]),
+                            Grid::make(12)->schema([
+                                FileUpload::make('attachments')
+                                    ->label('Unggah Dokumen SPPB / Delivery Order')
+                                    ->helperText('Unggah SPPB atau Delivery Order untuk diproses.')
+                                    ->multiple()
+                                    ->disk('public')
+                                    ->directory(fn() => 'shipments/' . now()->format('Y/m'))
+                                    ->visibility('public')
+                                    ->preserveFilenames()
+                                    ->downloadable()
+                                    ->openable()
+                                    ->imagePreviewHeight('200')
+                                    ->acceptedFileTypes([
+                                        'image/*',
+                                        'application/pdf',
+                                        'application/msword',
+                                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                        'application/vnd.ms-excel',
+                                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                        'text/plain',
+                                    ])
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Get $get, $livewire) {
+                                        $requestType = $get('request_type');
+
+                                        if ($requestType !== RequestType::SPPB_DO->value) {
+                                            Log::info('SPPB AUDIT afterStateUpdated() SKIP', [
+                                                'reason' => 'request_type is not sppb_do',
+                                                'request_type' => $requestType,
+                                            ]);
+                                            return;
+                                        }
+
+                                        if (empty($state)) {
+                                            Log::info('SPPB AUDIT afterStateUpdated() SKIP', [
+                                                'reason' => 'state is empty',
+                                            ]);
+                                            return;
+                                        }
+
+                                        if (! property_exists($livewire, 'intakePrefill')) {
+                                            return;
+                                        }
+
+                                        $livewire->intakePrefill = app(\App\Services\SppbAssistService::class)
+                                            ->assist($state);
+
+                                        Log::info('SPPB AUDIT afterStateUpdated() RESULT', [
+                                            'detected_field_count' => $livewire->intakePrefill->detectedFieldCount(),
+                                            'warning_count' => count($livewire->intakePrefill->warnings),
+                                        ]);
+                                    })
+                                    ->columnSpanFull()
+                                    ->extraAttributes(['class' => 'jss-doc-upload']),
+                                Textarea::make('notes')
+                                    ->label('Keterangan tambahan')
+                                    ->rows(4)
+                                    ->maxLength(1000)
+                                    ->columnSpanFull(),
+                            ])->columnSpan(12),
+
+                            ViewField::make('intake_extraction_summary')
+                                ->view('filament.forms.intake.extraction-summary')
+                                ->dehydrated(false)
+                                ->visible(fn($livewire) => property_exists($livewire, 'intakePrefill')
+                                    && $livewire->intakePrefill !== null
+                                    && ! $livewire->intakePrefill->isEmpty())
+                                ->columnSpan(12),
+                        ]),
+                    ])
+                    ->compact(),
+
+                Section::make('Rute & Moda')
+                    ->icon('heroicon-m-map')
+                    ->extraAttributes(['class' => 'jss-section'])
+                    ->columns(12)
+                    ->schema([
+                        Select::make('branch_id')
+                            ->label('Cabang Asal *')
+                            ->options(fn() => \App\Models\Branch::orderBy('name')->pluck('name', 'id'))
+                            ->required()
+                            ->live()
+                            ->visible(fn() => Filament::auth()->user()?->isSuperAdmin() ?? false)
+                            ->afterStateUpdated(function ($state, Set $set) {
+                                $set('origin_city_id', self::resolveOriginCityFromUser($state ? (int) $state : null)['city_id']);
+                            })
+                            ->helperText(function (Get $get) {
+                                if (! $get('branch_id')) {
+                                    return 'Kota asal akan diturunkan otomatis dari cabang.';
+                                }
+                                $resolved = self::resolveOriginCityFromUser((int) $get('branch_id'));
+
+                                return $resolved['city_name']
+                                    ? "Kota asal (turunan): {$resolved['city_name']}"
+                                    : 'Kota asal belum diatur untuk cabang ini (hubungi Super Admin).';
+                            })
+                            ->columnSpan(['default' => 12, 'md' => 6]),
+
+                        Placeholder::make('origin_branch_display')
+                            ->label('Cabang Asal')
+                            ->hiddenLabel()
+                            ->visible(fn() => ! (Filament::auth()->user()?->isSuperAdmin() ?? false))
+                            ->content(function ($record) {
+                                if ($record && $record->originCity) {
+                                    $branchName = $record->branch?->name ?: null;
+                                    $cityName   = $record->originCity->name;
+                                } else {
+                                    $branchName = \App\Models\Branch::whereKey(Filament::auth()->user()?->effectiveBranchId())->value('name');
+                                    $resolved   = self::resolveOriginCityFromUser();
+                                    $cityName   = $resolved['city_name'] ?: null;
+                                    $branchName = $branchName ?: ($resolved['branch_name'] ?? null);
+                                }
+
+                                $branchLine = $branchName ?: '—';
+                                $cityLine   = $cityName ?: 'Belum diatur untuk cabang ini (hubungi Super Admin)';
+                                $cityCls    = $cityName ? 'jss-origin-card__city' : 'jss-origin-card__city jss-origin-card__city--empty';
+
+                                return new \Illuminate\Support\HtmlString(
+                                    '<div class="jss-origin-card">'
+                                        . '<div class="jss-origin-card__head">📍 Cabang Asal</div>'
+                                        . '<div class="jss-origin-card__branch">' . e($branchLine) . '</div>'
+                                        . '<div class="jss-origin-card__city-line">Kota Asal • '
+                                        . '<span class="' . $cityCls . '">' . e($cityLine) . '</span></div>'
+                                        . '</div>'
+                                );
+                            })
+                            ->columnSpan(['default' => 12, 'md' => 6]),
+
+                        ToggleButtons::make('mode')
+                            ->label('Moda Pengiriman *')
+                            ->options([
+                                ShipmentMode::Sea->value => 'Laut',
+                                ShipmentMode::Land->value => 'Darat',
+                            ])
+                            ->icons([
+                                ShipmentMode::Sea->value => 'heroicon-m-cog-8-tooth',
+                                ShipmentMode::Land->value => 'heroicon-m-truck',
+                            ])
+                            ->inline()
+                            ->required()
+                            ->live()
+                            ->extraAttributes(['class' => 'jss-segmented'])
+                            ->afterStateUpdated(function (Get $get, Set $set, $state) {
+                                foreach (
+                                    [
+                                        'vessel_name',
+                                        'voyage',
+                                        'pol',
+                                        'pod',
+                                        'etd',
+                                        'eta',
+                                        'vehicle_type',
+                                        'vehicle_plate',
+                                        'driver_name',
+                                        'driver_phone',
+                                        'pickup_date',
+                                        'service_option',
+                                        'voyage_id',
+                                        'driver_id',
+                                        'lcl_items',
+                                        'cbm_total',
+                                        'packages_total',
+                                        'weight_total',
+                                        'weight_total_input',
+                                        'container_size',
+                                        'container_qty',
+                                        'container_size_vehicle',
+                                        'container_qty_vehicle',
+                                    ] as $f
+                                ) {
+                                    $set($f, null);
+                                }
+
+                                $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->effectiveBranchId());
+                                $depotId = self::resolveDepotId($branchId, $state, $get('voyage_id'));
+
+                                $set('assigned_depot_id', $depotId);
+                            })
+                            ->rules(function (Get $get) {
+                                return [
+                                    function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        $state = $get();
+
+                                        if ($value === ShipmentMode::Sea->value) {
+                                            $voy = $state['voyage_id'] ?? null;
+                                            $pol = trim((string) ($state['pol'] ?? ''));
+                                            $pod = trim((string) ($state['pod'] ?? ''));
+
+                                            if (! $voy && ($pol === '' && $pod === '')) {
+                                                $fail('Untuk moda laut, isi Voyage atau minimal POL/POD.');
+                                            }
+
+                                            if ($voy && empty($state['etd'])) {
+                                                $fail('ETD dari Voyage tidak terbaca. Pastikan Voyage punya ETD.');
+                                            }
+                                        }
+                                    },
+                                ];
+                            })
+                            ->columnSpan(12),
+
+                        Hidden::make('origin_city_id')
+                            ->default(fn() => self::resolveOriginCityFromUser()['city_id'])
+                            ->dehydrated(),
+
+                        Select::make('destination_city_id')
+                            ->label(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value ? 'Kota Tujuan *' : 'Tujuan (Kota Tujuan) *')
+                            ->placeholder('Pilih Kota Tujuan')
+                            ->relationship('destinationCity', 'name', fn($query) => $query->active()->orderBy('name'))
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->live()
+                            ->helperText('cth: Manado')
+                            ->columnSpan(['default' => 12, 'md' => 6]),
+
+                        TextInput::make('pickup_location')
+                            ->label('Lokasi Pickup')
+                            ->placeholder('SEMPER')
+                            ->maxLength(150)
+                            ->helperText('Pada SPPB disebut "Lokasi Unit".')
+                            ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
+                            ->columnSpan(['default' => 12, 'md' => 6]),
+
+                        ToggleButtons::make('delivery_scope')
+                            ->label('Cakupan Layanan')
+                            ->options([
+                                DeliveryScope::PortToPort->value => DeliveryScope::PortToPort->label(),
+                                DeliveryScope::DoorToDoor->value => DeliveryScope::DoorToDoor->label(),
+                                DeliveryScope::DoorToPort->value => DeliveryScope::DoorToPort->label(),
+                                DeliveryScope::PortToDoor->value => DeliveryScope::PortToDoor->label(),
+                            ])
+                            ->inline()
+                            ->required()
+                            ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
+                            ->columnSpan(12),
+
+                        ToggleButtons::make('cargo_type')
+                            ->label('Jenis Muatan')
+                            ->options([
+                                CargoType::Vehicle->value => CargoType::Vehicle->label(),
+                                CargoType::General->value => CargoType::General->label(),
+                            ])
+                            ->icons([
+                                CargoType::Vehicle->value => 'heroicon-m-truck',
+                                CargoType::General->value => 'heroicon-m-cube',
+                            ])
+                            ->inline()
+                            ->required()
+                            ->live()
+                            ->extraAttributes(['class' => 'jss-segmented'])
+                            ->afterStateUpdated(function (string $state, Get $get, Set $set) {
+                                if ($state === CargoType::Vehicle->value) {
+                                    $rows = $get('units') ?? [];
+                                    if (count($rows) === 0) {
+                                        $set('units', [['qty' => 1]]);
+                                    }
+
+                                    $set('service_option', null);
+                                    $set('cbm_total', null);
+                                    $set('packages_total', null);
+                                    $set('weight_total', null);
+                                    $set('weight_total_input', null);
+                                } else {
+                                    if (($get('service_option') ?? 'fcl') === 'lcl') {
+                                        $items = $get('lcl_items') ?? [];
+                                        if (count($items) === 0) {
+                                            $set('lcl_items', [['qty' => 1]]);
+                                        }
+                                    }
+
+                                    $set('units', null);
+                                }
+                            })
+                            ->columnSpan(12),
+
+                        // SEA SECTION
+                        Group::make()
+                            ->columnSpan(12)
+                            ->columns(12)
+                            ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value)
+                            ->schema([
+                                ViewField::make('mode_badge_sea')
+                                    ->view('filament.forms.fields.mode-badge-sea')
+                                    ->columnSpan(12),
+
+                                ToggleButtons::make('service_option')
+                                    ->label('Opsi Layanan Laut')
+                                    ->options(['fcl' => 'FCL', 'lcl' => 'LCL'])
+                                    ->inline()
+                                    ->live()
+                                    ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value && $get('cargo_type') === CargoType::General->value)
+                                    ->required(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value && $get('cargo_type') === CargoType::General->value)
+                                    ->afterStateUpdated(function (string $state, Get $get, Set $set) {
+                                        if ($state === 'lcl' && $get('cargo_type') === CargoType::General->value) {
+                                            $items = $get('lcl_items') ?? [];
+                                            if (count($items) === 0) {
+                                                $set('lcl_items', [['qty' => 1]]);
+                                            }
+                                        } else {
+                                            $set('lcl_items', null);
+                                            $set('cbm_total', null);
+                                            $set('packages_total', null);
+                                            $set('weight_total', null);
+                                            $set('weight_total_input', null);
+                                        }
+
+                                        if ($state === 'fcl') {
+                                            $set('container_size', null);
+                                            $set('container_qty', null);
+                                        }
+                                    }),
+
+                                ToggleButtons::make('delivery_scope')
+                                    ->label('Cakupan Layanan')
+                                    ->options([
+                                        DeliveryScope::PortToPort->value => DeliveryScope::PortToPort->label(),
+                                        DeliveryScope::DoorToDoor->value => DeliveryScope::DoorToDoor->label(),
+                                        DeliveryScope::DoorToPort->value => DeliveryScope::DoorToPort->label(),
+                                        DeliveryScope::PortToDoor->value => DeliveryScope::PortToDoor->label(),
+                                    ])
+                                    ->inline()
+                                    ->required()
+                                    ->visible(fn(Get $get) => $get('cargo_type') !== CargoType::Vehicle->value)
+                                    ->columnSpan(12),
+
+                                Select::make('container_size')
+                                    ->label('Ukuran Kontainer (FCL • General)')
+                                    ->options(ContainerSize::options())
+                                    ->native(false)
+                                    ->searchable()
+                                    ->visible(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
+                                    ->required(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
+                                    ->columnSpan(4),
+
+                                TextInput::make('container_qty')
+                                    ->label('Jumlah Kontainer (FCL • General)')
+                                    ->numeric()
+                                    ->minValue(1)
+                                    ->default(1)
+                                    ->visible(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
+                                    ->required(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
+                                    ->columnSpan(4),
+
+                                TextInput::make('container_no')
+                                    ->label('No. Kontainer')
+                                    ->maxLength(20)
+                                    ->visible(
+                                        fn(Get $get, $record) =>
+                                        $get('mode') === ShipmentMode::Sea->value
+                                            && $get('cargo_type') !== CargoType::Vehicle->value
+                                            && ($record === null || empty($record->container_display))
+                                    )
+                                    ->required(
+                                        fn(Get $get, $record) =>
+                                        $get('mode') === ShipmentMode::Sea->value
+                                            && $get('cargo_type') !== CargoType::Vehicle->value
+                                            && ($record === null || empty($record->container_display))
+                                    )
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(function (Get $get, Set $set) {
+                                        $label = app(ShipmentService::class)->fanOutContainerNo(
+                                            $get('container_no'),
+                                            $get('seal_no')
+                                        );
+
+                                        $items = $get('lcl_items') ?? [];
+                                        foreach ($items as $i => $row) {
+                                            $items[$i]['container_display'] = $label;
+                                        }
+                                        $set('lcl_items', $items);
+                                    })
+                                    ->columnSpan(4),
+
+                                Placeholder::make('container_digunakan')
+                                    ->label('Container Digunakan')
+                                    ->content(fn($record) => $record?->container_display ?: '—')
+                                    ->visible(
+                                        fn(Get $get, $record) =>
+                                        $get('mode') === ShipmentMode::Sea->value
+                                            && $record !== null
+                                            && !empty($record->container_display)
+                                    )
+                                    ->columnSpan(4),
+
+                                TextInput::make('seal_no')
+                                    ->label('Seal No.')
+                                    ->maxLength(20)
+                                    ->visible(
+                                        fn(Get $get) =>
+                                        $get('mode') === ShipmentMode::Sea->value
+                                            && $get('cargo_type') !== CargoType::Vehicle->value
+                                    )
+                                    ->required(
+                                        fn(Get $get) =>
+                                        $get('mode') === ShipmentMode::Sea->value
+                                            && $get('cargo_type') !== CargoType::Vehicle->value
+                                    )
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(function (Get $get, Set $set) {
+                                        $label = app(ShipmentService::class)->fanOutContainerNo(
+                                            $get('container_no'),
+                                            $get('seal_no')
+                                        );
+
+                                        $items = $get('lcl_items') ?? [];
+                                        foreach ($items as $i => $row) {
+                                            $items[$i]['container_display'] = $label;
+                                        }
+                                        $set('lcl_items', $items);
+                                    })
+                                    ->columnSpan(4),
+
+                                Repeater::make('lcl_items')
+                                    ->label('Item Muatan (LCL • General)')
+                                    ->visible(fn(Get $get) => $get('service_option') === 'lcl'
+                                        && $get('cargo_type') === CargoType::General->value)
+                                    ->defaultItems(1)
+                                    ->minItems(1)
+                                    ->reorderable(false)
+                                    ->columns(['default' => 12, 'md' => 6, 'lg' => 12])
+                                    ->afterStateHydrated(function (Get $get, Set $set) {
+                                        $items = $get('lcl_items') ?? [];
+                                        if (count($items) === 0) {
+                                            $items = [['qty' => 1]];
+                                        }
+
+                                        $no = trim((string) ($get('container_no') ?? ''));
+                                        $seal = trim((string) ($get('seal_no') ?? ''));
+                                        $label = ($no === '' && $seal === '') ? '–' : ($seal !== '' ? "{$no} • {$seal}" : $no);
+
+                                        foreach ($items as $i => $r) {
+                                            $p = (float) ($r['length_cm'] ?? 0);
+                                            $l = (float) ($r['width_cm'] ?? 0);
+                                            $t = (float) ($r['height_cm'] ?? 0);
+                                            $query = (int) ($r['qty'] ?? 0);
+
+                                            $cbm = ($p * $l * $t * $query) / 1_000_000;
+                                            $items[$i]['cbm_item'] = $cbm > 0 ? number_format(round($cbm, 3), 3, '.', '') : null;
+                                            $items[$i]['container_display'] = $r['container_display'] ?? $label;
+                                        }
+
+                                        $set('lcl_items', $items);
+                                    })
+                                    ->schema([
+                                        TextInput::make('description')->label('Deskripsi')->maxLength(120)->columnSpan(3),
+                                        TextInput::make('length_cm')->label('P (cm)')->numeric()->minValue(0.01)->live(onBlur: true)->columnSpan(2),
+                                        TextInput::make('width_cm')->label('L (cm)')->numeric()->minValue(0.01)->live(onBlur: true)->columnSpan(2),
+                                        TextInput::make('height_cm')->label('T (cm)')->numeric()->minValue(0.01)->live(onBlur: true)->columnSpan(2),
+                                        TextInput::make('qty')->label('Koli')->numeric()->minValue(1)->default(1)->live(onBlur: true)->columnSpan(1),
+                                        TextInput::make('weight_kg')->label('Berat/pcs (kg)')->numeric()->minValue(0)->live(onBlur: true)->columnSpan(2),
+                                        TextInput::make('container_display')->label('Dalam Kontainer')->disabled()->dehydrated(false)->columnSpan(3),
+                                        TextInput::make('cbm_item')->label('CBM')->disabled()->dehydrated(false)->columnSpan(2),
+                                    ])
+                                    ->addActionLabel('Tambah Item')
+                                    ->columnSpan(12),
+
+                                Section::make('Detail LCL (General)')
+                                    ->visible(fn(Get $get) => $get('service_option') === 'lcl' && $get('cargo_type') === CargoType::General->value)
+                                    ->columns(12)
+                                    ->schema([
+                                        TextInput::make('weight_total_input')
+                                            ->label('Total Berat (opsional)')
+                                            ->suffix('kg')
+                                            ->numeric()
+                                            ->minValue(0)
+                                            ->placeholder('Total (kg)')
+                                            ->dehydrated(false)
+                                            ->live(onBlur: true)
+                                            ->afterStateUpdated(function ($state, Set $set, Get $get) use ($recalcLclTotals) {
+                                                $recalcLclTotals($get, $set);
+                                            })
+                                            ->columnSpan(6),
+                                        Grid::make(12)
+                                            ->columnSpanFull()
+                                            ->schema([
+                                                Placeholder::make('sum_packages')->label('Total Koli')->live()
+                                                    ->content(fn(Get $get) => (string) ($get('packages_total') ?? 0))->columnSpan(4),
+                                                Placeholder::make('sum_cbm')->label('Total CBM')->live()
+                                                    ->content(fn(Get $get) => number_format((float) ($get('cbm_total') ?? 0), 3, '.', ''))->columnSpan(4),
+                                                Placeholder::make('sum_weight')->label('Total Berat (kg)')->live()
+                                                    ->content(function (Get $get) {
+                                                        $w = $get('weight_total');
+
+                                                        return is_null($w) ? '—' : number_format((float) $w, 2, '.', '');
+                                                    })->columnSpan(4),
+                                            ]),
+                                        Hidden::make('cbm_total')->dehydrated(),
+                                        Hidden::make('packages_total')->dehydrated(),
+                                        Hidden::make('weight_total')->dehydrated(),
+                                    ]),
+
+                                ToggleButtons::make('vehicle_kind')
+                                    ->label('Jenis Unit')
+                                    ->options(['car' => 'Mobil', 'motorcycle' => 'Motor'])
+                                    ->inline()
+                                    ->hidden(true)
+                                    ->required(false)
+                                    ->dehydrated(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
+                                    ->columnSpan(6),
+
+                                ToggleButtons::make('vehicle_loading')
+                                    ->label('Metode Muat Unit')
+                                    ->options(['regular' => 'Reguler', 'rack' => 'Dengan Rack', 'flat_rack' => 'Flat Rack'])
+                                    ->inline()
+                                    ->hidden(true)
+                                    ->required(false)
+                                    ->dehydrated(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
+                                    ->columnSpan(6),
+
+                                Repeater::make('units')
+                                    ->label('Unit Kendaraan (Laut)')
+                                    ->helperText(function ($livewire) {
+                                        $prefill = $livewire->intakePrefill ?? null;
+                                        $applied = (bool) ($livewire->intakeApplied ?? false);
+
+                                        if (! $applied || ! $prefill || $prefill->unitCount() < 1) {
+                                            return null;
+                                        }
+
+                                        return $prefill->unitCount() . ' unit dari hasil ekstraksi dokumen — periksa sebelum melanjutkan.';
+                                    })
+                                    // ->dehydrated(false)
+                                    ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
+                                    ->columns(12)
+                                    ->defaultItems(1)
+                                    ->minItems(1)
+                                    ->reorderable(false)
+                                    ->mutateDehydratedStateUsing(fn($state) => array_values(array_filter($state ?? [], function ($r) {
+                                        foreach (['model_no', 'reg_no', 'chassis_no', 'engine_no', 'color', 'do_number', 'qty', 'notes'] as $f) {
+                                            if (! empty($r[$f])) {
+                                                return true;
+                                            }
+                                        }
+
+                                        return false;
+                                    })))
+                                    ->afterStateHydrated(function (Get $get, Set $set) {
+                                        $rows = $get('units') ?? [];
+
+                                        if (count($rows) === 0) {
+                                            $rows = [['qty' => 1]];
+                                        }
+
+                                        $set('units', $rows);
+                                    })
+                                    ->schema([
+                                        TextInput::make('model_no')->label('Model No.')->maxLength(60)->columnSpan(3),
+                                        TextInput::make('reg_no')->label('No. Polisi / Reg')->maxLength(30)->columnSpan(3),
+                                        TextInput::make('chassis_no')->label('Rangka No.')->maxLength(60)->columnSpan(3),
+                                        TextInput::make('engine_no')->label('Mesin No.')->maxLength(60)->columnSpan(3),
+                                        TextInput::make('color')->label('Warna')->maxLength(30)->columnSpan(4),
+                                        TextInput::make('do_number')->label('No. DO')->maxLength(60)->columnSpan(2),
+                                        TextInput::make('qty')->label('Qty')->numeric()->minValue(1)->default(1)->columnSpan(1),
+                                        TextInput::make('notes')->label('Ket')->maxLength(120)->columnSpan(5),
+                                        TextInput::make('container_display')
+                                            ->label('Container No')
+                                            ->maxLength(30)
+                                            ->placeholder('TAKU 000000-0')
+                                            ->hidden(true)
+                                            ->columnSpan(3),
+                                    ])
+                                    ->addActionLabel('Tambah Unit')
+                                    ->columnSpan(12),
+
+                                Placeholder::make('voyage_document_hint')
+                                    ->label('')
+                                    ->content(function ($livewire) {
+                                        $hints = ($livewire->intakePrefill ?? null)?->voyageHints ?? [];
+                                        $vessel = $hints['vessel_name'] ?? null;
+                                        if ($vessel === null) {
+                                            return '';
+                                        }
+                                        $etd = $hints['document_etd'] ?? null;
+                                        $etdLabel = $etd
+                                            ? Carbon::parse($etd)->translatedFormat('d F Y')
+                                            : null;
+
+                                        return '📄 Dokumen menyebut: ' . $vessel
+                                            . ($etdLabel ? " — ETD {$etdLabel}" : '')
+                                            . '. Digunakan sebagai pembanding — tidak diisi otomatis.';
+                                    })
+                                    ->visible(fn(Get $get, $livewire) => $get('mode') === ShipmentMode::Sea->value
+                                        && ((($livewire->intakePrefill ?? null)?->voyageHints['vessel_name'] ?? null) !== null))
+                                    ->columnSpan(12),
+
+                                Select::make('voyage_id')
+                                    ->label('Jadwal Kapal *')
+                                    ->native(false)
+                                    ->searchable()
+                                    ->required(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value)
+                                    ->hidden(fn(Get $get) => $get('mode') !== ShipmentMode::Sea->value)
+                                    ->options(function () {
+                                        return Voyage::with(['vessel', 'pol', 'pod'])
+                                            ->whereNull('atd_at')
+                                            ->where('etd', '>=', now()->startOfDay())
+                                            ->where('etd', '<=', now()->addMonth()->endOfMonth())
+                                            ->orderBy('etd', 'asc')
+                                            ->limit(50)
+                                            ->get()
+                                            ->mapWithKeys(function ($v) {
+                                                $name = $v->vessel?->name ?: '(kapal tidak diketahui)';
+                                                if ($v->voyage_no) {
+                                                    $name .= ' ' . $v->voyage_no;
+                                                }
+                                                return [
+                                                    $v->id => sprintf(
+                                                        '%s | ETD %s | %s → %s',
+                                                        $name,
+                                                        $v->etd ? Carbon::parse($v->etd)->format('d M Y') : '-',
+                                                        $v->pol?->name ?: $v->pol?->code ?: '-',
+                                                        $v->pod?->name ?: $v->pod?->code ?: '-',
+                                                    ),
+                                                ];
+                                            })->toArray();
+                                    })
+                                    ->getSearchResultsUsing(function (string $search) {
+                                        return Voyage::with(['vessel', 'pol', 'pod'])
+                                            ->whereNull('atd_at')
+                                            ->where('etd', '>=', now()->startOfDay())
+                                            ->where('etd', '<=', now()->addMonth()->endOfMonth())
+                                            ->where(
+                                                fn($q) => $q
+                                                    ->where('voyage_no', 'ilike', "%{$search}%")
+                                                    ->orWhereHas('vessel', fn($query) => $query->where('name', 'ilike', "%{$search}%"))
+                                                    ->orWhereHas('pol', fn($query) => $query
+                                                        ->where('code', 'ilike', "%{$search}%")
+                                                        ->orWhere('name', 'ilike', "%{$search}%"))
+                                                    ->orWhereHas('pod', fn($query) => $query
+                                                        ->where('code', 'ilike', "%{$search}%")
+                                                        ->orWhere('name', 'ilike', "%{$search}%"))
+                                            )
+                                            ->orderBy('etd', 'asc')
+                                            ->limit(50)
+                                            ->get()
+                                            ->mapWithKeys(function ($v) {
+                                                $name = $v->vessel?->name ?: '(kapal tidak diketahui)';
+                                                if ($v->voyage_no) {
+                                                    $name .= ' ' . $v->voyage_no;
+                                                }
+                                                return [
+                                                    $v->id => sprintf(
+                                                        '%s | ETD %s | %s → %s',
+                                                        $name,
+                                                        $v->etd ? Carbon::parse($v->etd)->format('d M Y') : '-',
+                                                        $v->pol?->name ?: $v->pol?->code ?: '-',
+                                                        $v->pod?->name ?: $v->pod?->code ?: '-',
+                                                    ),
+                                                ];
+                                            })->toArray();
+                                    })
+                                    ->getOptionLabelUsing(function ($value) {
+                                        $v = Voyage::with(['vessel', 'pol', 'pod'])->find($value);
+                                        if (! $v) return null;
+                                        $name = $v->vessel?->name ?: '(kapal tidak diketahui)';
+                                        if ($v->voyage_no) {
+                                            $name .= ' ' . $v->voyage_no;
+                                        }
+                                        return sprintf(
+                                            '%s | ETD %s | %s → %s',
+                                            $name,
+                                            $v->etd ? Carbon::parse($v->etd)->format('d M Y') : '-',
+                                            $v->pol?->name ?: $v->pol?->code ?: '-',
+                                            $v->pod?->name ?: $v->pod?->code ?: '-',
+                                        );
+                                    })
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
+                                        if (! $state) {
+                                            foreach (['vessel_name', 'voyage', 'pol', 'pod', 'etd', 'eta'] as $f) {
+                                                $set($f, null);
+                                            }
+                                            $set('assigned_depot_id', null);
+                                            return;
+                                        }
+
+                                        $v = Voyage::with(['vessel', 'pol', 'pod'])->find($state);
+                                        if ($v) {
+                                            $set('vessel_name', $v->vessel?->name);
+                                            $set('voyage', $v->voyage_no);
+                                            $set('pol', $v->pol?->code ?: $v->pol?->name);
+                                            $set('pod', $v->pod?->code ?: $v->pod?->name);
+                                            $set('etd', optional($v->etd)->toDateTimeString());
+                                            $set('eta', optional($v->eta)->toDateTimeString());
+
+                                            $resolved = $v->pol_id
+                                                ? app(\App\Services\ShipmentService::class)->resolveByPol($v->pol_id)
+                                                : null;
+
+                                            if ($resolved) {
+                                                $set('branch_id', $resolved['branch_id']);
+                                                $set('assigned_depot_id', $resolved['depot_id']);
+                                            } else {
+                                                $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->effectiveBranchId());
+                                                $set('assigned_depot_id', self::resolveDepotId($branchId, $get('mode'), $state));
+                                            }
+                                        }
+                                    })
+                                    ->columnSpan(12),
+
+                                Hidden::make('vessel_name')->dehydrated(),
+                                Hidden::make('voyage')->dehydrated(),
+                                Hidden::make('etd')->dehydrated(),
+                                Hidden::make('eta')->dehydrated(),
+                                Hidden::make('pol')->dehydrated(),
+                                Hidden::make('pod')->dehydrated(),
+
+                                Hidden::make('assigned_depot_id')->dehydrated(),
+
+                                Placeholder::make('voyage_info_card')
+                                    ->label('Voyage Terpilih')
+                                    ->content(function (Get $get): string {
+                                        if (! $get('voyage_id')) {
+                                            return '— Pilih jadwal kapal untuk melihat detail —';
+                                        }
+                                        $vessel   = $get('vessel_name') ?: '—';
+                                        $voyageNo = $get('voyage') ?: '—';
+                                        $pol      = $get('pol') ?: '—';
+                                        $pod      = $get('pod') ?: '—';
+                                        $etd      = $get('etd') ? Carbon::parse($get('etd'))->format('d M Y H:i') : '—';
+                                        $eta      = $get('eta') ? Carbon::parse($get('eta'))->format('d M Y H:i') : '—';
+
+                                        return "{$vessel} / {$voyageNo} | {$pol} → {$pod} | ETD: {$etd} | ETA: {$eta}";
+                                    })
+                                    ->columnSpan(12),
+
+                                Placeholder::make('auto_depot_display')
+                                    ->label('Depo Penugasan')
+                                    ->content(function (Get $get) {
+                                        $depotId = $get('assigned_depot_id');
+
+                                        if ($depotId) {
+                                            return Depot::whereKey($depotId)->value('name') ?: '—';
+                                        }
+
+                                        return '— Pilih voyage untuk menentukan depo —';
+                                    })
+                                    ->columnSpan(['default' => 12, 'md' => 6]),
+
+                                Placeholder::make('destination_routing_preview')
+                                    ->label('Rute Tujuan')
+                                    ->content(function (Get $get): string {
+                                        $voyageId   = $get('voyage_id');
+                                        $destCityId = $get('destination_city_id');
+
+                                        if (! $voyageId) {
+                                            return '— Pilih voyage untuk melihat rute tujuan —';
+                                        }
+
+                                        $v = Voyage::with(['pod'])->find($voyageId);
+
+                                        if (! $v || ! $v->pod_id) {
+                                            return '— POD voyage belum dikonfigurasi —';
+                                        }
+
+                                        $podName   = $v->pod?->name ?: ($v->pod?->code ?: '—');
+                                        $destDepot = Depot::where('port_id', $v->pod_id)
+                                            ->where('mode', 'sea')
+                                            ->value('name');
+                                        $cityName  = $destCityId
+                                            ? City::whereKey($destCityId)->value('name')
+                                            : null;
+
+                                        $parts = array_filter([$cityName, $podName, $destDepot]);
+
+                                        return $parts ? implode(' → ', $parts) : '—';
+                                    })
+                                    ->columnSpan(['default' => 12, 'md' => 6]),
+                            ]),
+                    ]),
+
+                // LAND SECTION
+                Group::make()
+                    ->columnSpan(12)
+                    ->columns(['default' => 12, 'md' => 6, 'lg' => 12])
+                    ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Land->value)
+                    ->schema([
+                        ViewField::make('mode_badge_land')
+                            ->view('filament.forms.fields.mode-badge-land')
+                            ->columnSpan(12),
+
+                        Select::make('armada_id')
+                            ->label('Pilih Armada')
+                            ->relationship('armada', 'code')
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(function ($state, Set $set) {
+                                if (! $state) {
+                                    $set('vehicle_plate', null);
+                                    $set('service_option', null);
+
+                                    return;
+                                }
+
+                                $armada = Armada::find($state);
+                                $set('vehicle_plate', $armada?->plate_number);
+                                $set('service_option', match ($armada?->type) {
+                                    'car_carrier' => 'car_carrier',
+                                    'towing' => 'towing',
+                                    'truck' => 'truck',
+                                    default => null,
+                                });
+                            })
+                            ->columnSpan(6),
+
+                        TextInput::make('vehicle_plate')
+                            ->label('No. Polisi')
+                            ->disabled()
+                            ->dehydrated()
+                            ->columnSpan(6),
+
+                        Select::make('driver_id')
+                            ->label('Pilih Supir')
+                            ->relationship('driver', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->native(false)
+                            ->live()
+                            ->afterStateUpdated(function ($state, Set $set) {
+                                if (! $state) {
+                                    $set('driver_name', null);
+                                    $set('driver_phone', null);
+
+                                    return;
+                                }
+
+                                $driver = Driver::find($state);
+                                $set('driver_name', $driver?->name);
+                                $set('driver_phone', $driver?->phone);
+                            })
+                            ->columnSpan(6),
+
+                        TextInput::make('driver_phone')
+                            ->label('No. HP Sopir')
+                            ->disabled()
+                            ->dehydrated()
+                            ->columnSpan(6),
+                    ]),
+
+                Hidden::make('service_type')->dehydrated(),
+                Hidden::make('route_summary')->dehydrated(),
+
                 Section::make('Customer')
-                    ->description('Pilih pengirim dan penerima.')
                     ->icon('heroicon-m-user-group')
                     ->extraAttributes(['class' => 'jss-section'])
                     ->schema([
@@ -202,11 +1069,6 @@ class ShipmentResource extends Resource
                             Hidden::make('branch_id')
                                 ->default(fn() => Filament::auth()->user()?->effectiveBranchId())
                                 ->dehydrated(),
-                            // UX-02 — Informasi Komersial (Vehicle): Dealer
-                            // adalah keputusan primer, tampil PERTAMA; Customer
-                            // tepat di sampingnya sebagai turunan (readonly-ish).
-                            // General Cargo: dealer tersembunyi, urutan visual
-                            // tetap Pengirim → Penerima seperti sebelumnya.
                             Group::make([
                                 Select::make('dealer_id')
                                     ->label('Dealer')
@@ -222,26 +1084,18 @@ class ShipmentResource extends Resource
                                     })
                                     ->columnSpan(12),
                             ])
-                                ->visible(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
+                                ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
                                 ->columnSpan(['default' => 12, 'md' => 6]),
                             Group::make([
                                 Select::make('customer_id')
-                                    // UX-02: bahasa operasional — untuk Vehicle
-                                    // ini "Customer" (hubungan komersial), bukan
-                                    // "Pengirim". General Cargo tetap "Pengirim".
-                                    ->label(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value ? 'Customer' : 'Pengirim')
+                                    ->label(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value ? 'Customer' : 'Pengirim')
                                     ->relationship('customer', 'name')
                                     ->searchable()
                                     ->preload()
                                     ->reactive()
-                                    // Readonly-ish: terkunci saat dealer terisi
-                                    // (nilai turunan master data). Kosongkan
-                                    // dealer → kembali editable. dehydrated()
-                                    // wajib: disabled default-nya tidak ikut
-                                    // tersimpan.
-                                    ->disabled(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value && filled($get('dealer_id')))
+                                    ->disabled(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value && filled($get('dealer_id')))
                                     ->dehydrated()
-                                    ->helperText(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value
+                                    ->helperText(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value
                                         ? 'Diturunkan otomatis dari Dealer.'
                                         : null)
                                     ->afterStateUpdated(function ($state, Set $set) {
@@ -261,10 +1115,7 @@ class ShipmentResource extends Resource
                                     })
                                     ->columnSpan(12),
                             ])
-                                // UX-02: Receiver keluar dari workflow utama
-                                // Vehicle (kolom & seluruh konsumen lain TIDAK
-                                // berubah — hanya visibilitas form).
-                                ->visible(fn (Get $get) => $get('cargo_type') !== CargoType::Vehicle->value)
+                                ->visible(fn(Get $get) => $get('cargo_type') !== CargoType::Vehicle->value)
                                 ->columnSpan(['default' => 12, 'md' => 6]),
                             Placeholder::make('pickup_contact_summary')
                                 ->key('pickup_contact_summary')
@@ -430,972 +1281,11 @@ class ShipmentResource extends Resource
                     ])
                     ->compact(),
 
-                // UX-RECOMPOSE-01: Section A dipecah menjadi dua konteks —
-                // "Customer" (di atas) dan "Dokumen" (di bawah). Keduanya
-                // konteks berpikir yang berbeda; tidak ada field/logic yang
-                // diubah, hanya batas visual section-nya.
-                Section::make('Dokumen')
-                    ->description('Unggah SPPB atau Delivery Order.')
-                    ->icon('heroicon-m-document-text')
-                    ->extraAttributes(['class' => 'jss-section'])
-                    ->schema([
-                        Grid::make(12)->schema([
-                            // UX v2.2: nested card "Detail Permintaan" dihapus —
-                            // dipisah lewat heading kecil + spacing, bukan panel.
-                            Placeholder::make('detail_heading')
-                                ->hiddenLabel()
-                                ->content(new \Illuminate\Support\HtmlString('<div class="jss-subheading">Detail Permintaan</div>'))
-                                ->columnSpan(12),
-                            Grid::make(12)
-                                ->extraAttributes(['class' => 'jss-field-grid'])
-                                ->schema([
-                                        Select::make('request_type')
-                                            ->label('Tipe Permintaan')
-                                            ->options(collect(RequestType::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()]))
-                                            ->default(RequestType::SPPB_DO->value)
-                                            ->required()
-                                            ->live()
-                                            ->selectablePlaceholder(false)
-                                            ->columnSpan(['default' => 12, 'md' => 2]),
-                                        TextInput::make('doc_number')
-                                            ->label('No. Dokumen')
-                                            ->maxLength(50)
-                                            ->visible(fn(Get $get) => $get('request_type') === 'sppb_do')
-                                            ->required(fn(Get $get) => $get('request_type') === 'sppb_do')
-                                            ->columnSpan(['default' => 12, 'md' => 5]),
-                                        Select::make('priority')
-                                            ->label('Prioritas')
-                                            ->options(['normal' => 'Normal', 'urgent' => 'Mendesak'])
-                                            ->default('normal')
-                                            ->columnSpan(['default' => 12, 'md' => 2]),
-                                        DatePicker::make('requested_at')
-                                            ->label('Tanggal Permintaan')
-                                            ->default(now())
-                                            ->required()
-                                            ->columnSpan(['default' => 12, 'md' => 3]),
-                                    ]),
-                            Grid::make(12)->schema([
-                                FileUpload::make('attachments')
-                                    ->label('Unggah Dokumen SPPB / Delivery Order')
-                                    ->helperText('Unggah SPPB atau Delivery Order untuk diproses.')
-                                    ->multiple()
-                                    ->disk('public')
-                                    ->directory(fn() => 'shipments/' . now()->format('Y/m'))
-                                    ->visibility('public')
-                                    ->preserveFilenames()
-                                    ->downloadable()
-                                    ->openable()
-                                    ->imagePreviewHeight('200')
-                                    ->acceptedFileTypes([
-                                        'image/*',
-                                        'application/pdf',
-                                        'application/msword',
-                                        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                                        'application/vnd.ms-excel',
-                                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                                        'text/plain',
-                                    ])
-                                    ->live()
-                                    ->afterStateUpdated(function ($state, Get $get, $livewire) {
-                                        // OCR-01: ekstraksi TIDAK menulis ke form.
-                                        // Hasilnya (IntakePrefill) ditampung di page
-                                        // Livewire ($livewire->intakePrefill) menunggu
-                                        // Review (OCR-02) dan Apply eksplisit (OCR-03).
-                                        $requestType = $get('request_type');
-
-                                        if ($requestType !== RequestType::SPPB_DO->value) {
-                                            Log::info('SPPB AUDIT afterStateUpdated() SKIP', [
-                                                'reason' => 'request_type is not sppb_do',
-                                                'request_type' => $requestType,
-                                            ]);
-                                            return;
-                                        }
-
-                                        if (empty($state)) {
-                                            Log::info('SPPB AUDIT afterStateUpdated() SKIP', [
-                                                'reason' => 'state is empty',
-                                            ]);
-                                            return;
-                                        }
-
-                                        // Halaman tanpa penampung envelope (mis. Edit)
-                                        // tidak menjalankan ekstraksi sama sekali.
-                                        if (! property_exists($livewire, 'intakePrefill')) {
-                                            return;
-                                        }
-
-                                        $livewire->intakePrefill = app(\App\Services\SppbAssistService::class)
-                                            ->assist($state);
-
-                                        Log::info('SPPB AUDIT afterStateUpdated() RESULT', [
-                                            'detected_field_count' => $livewire->intakePrefill->detectedFieldCount(),
-                                            'warning_count' => count($livewire->intakePrefill->warnings),
-                                        ]);
-                                    })
-                                    ->columnSpanFull()
-                                    ->extraAttributes(['class' => 'jss-doc-upload']),
-                                Textarea::make('notes')
-                                    ->label('Keterangan tambahan')
-                                    ->rows(4)
-                                    ->maxLength(1000)
-                                    ->columnSpanFull(),
-                            ])->columnSpan(12),
-
-                            // OCR-02 — Extraction Summary: bagian dari wizard
-                            // (bukan modal). Muncul hanya bila upload SPPB
-                            // menghasilkan IntakePrefill; form tidak berubah
-                            // sebelum admin menekan Terapkan.
-                            ViewField::make('intake_extraction_summary')
-                                ->view('filament.forms.intake.extraction-summary')
-                                ->dehydrated(false)
-                                ->visible(fn ($livewire) => property_exists($livewire, 'intakePrefill')
-                                    && $livewire->intakePrefill !== null
-                                    && ! $livewire->intakePrefill->isEmpty())
-                                ->columnSpan(12),
-                            ]),
-                    ])
-                    ->compact(),
-
-                Section::make('Rute & Moda')
-                    ->description('Tentukan tujuan dan moda pengiriman.')
-                    ->icon('heroicon-m-map')
-                    ->extraAttributes(['class' => 'jss-section'])
-                    ->columns(12)
-                    ->schema([
-                        // ── DOMAIN-03 — Branch sebagai Source of Truth (migrasi
-                        // Office → Branch, 2026-07-20; lihat
-                        // docs/master-office/SMART-ORIGIN-MIGRATION-BLOCKED-SCHEMA-GAP.md) ──
-                        // Yang membuat shipment adalah Branch/Cabang, bukan Kota.
-                        // Kota asal SELALU turunan (Branch.city_id via Smart
-                        // Origin); tidak pernah dipilih user. Office TIDAK lagi
-                        // terlibat di jalur ini.
-
-                        // Super Admin: pilih Cabang Asal; kota diturunkan otomatis.
-                        Select::make('branch_id')
-                            ->label('Cabang Asal *')
-                            ->options(fn () => \App\Models\Branch::orderBy('name')->pluck('name', 'id'))
-                            ->required()
-                            ->live()
-                            ->visible(fn () => Filament::auth()->user()?->isSuperAdmin() ?? false)
-                            ->afterStateUpdated(function ($state, Set $set) {
-                                $set('origin_city_id', self::resolveOriginCityFromUser($state ? (int) $state : null)['city_id']);
-                            })
-                            ->helperText(function (Get $get) {
-                                if (! $get('branch_id')) {
-                                    return 'Kota asal akan diturunkan otomatis dari cabang.';
-                                }
-                                $resolved = self::resolveOriginCityFromUser((int) $get('branch_id'));
-
-                                return $resolved['city_name']
-                                    ? "Kota asal (turunan): {$resolved['city_name']}"
-                                    : 'Kota asal belum diatur untuk cabang ini (hubungi Super Admin).';
-                            })
-                            ->columnSpan(['default' => 12, 'md' => 6]),
-
-                        // Office Admin: Cabang Asal mengikuti akun login — readonly,
-                        // tanpa dropdown; kota tampil sebagai informasi turunan.
-                        // UX-RECOMPOSE-01 — "Read Before Input": Cabang Asal
-                        // adalah informasi sistem (readonly, mengikuti akun
-                        // login), bukan field input. Ditampilkan sebagai kartu
-                        // informasi. Sumber data & logic (Smart Origin Branch→
-                        // City) TIDAK berubah — hanya presentasinya.
-                        Placeholder::make('origin_branch_display')
-                            ->label('Cabang Asal')
-                            ->hiddenLabel()
-                            ->visible(fn () => ! (Filament::auth()->user()?->isSuperAdmin() ?? false))
-                            ->content(function ($record) {
-                                // Office Retirement (Phase 2): Branch adalah satu-satunya
-                                // sumber nama cabang asal; origin_city_id turunan Branch.city_id.
-                                if ($record && $record->originCity) {
-                                    $branchName = $record->branch?->name ?: null;
-                                    $cityName   = $record->originCity->name;
-                                } else {
-                                    $branchName = \App\Models\Branch::whereKey(Filament::auth()->user()?->effectiveBranchId())->value('name');
-                                    $resolved   = self::resolveOriginCityFromUser();
-                                    $cityName   = $resolved['city_name'] ?: null;
-                                    $branchName = $branchName ?: ($resolved['branch_name'] ?? null);
-                                }
-
-                                $branchLine = $branchName ?: '—';
-                                $cityLine   = $cityName ?: 'Belum diatur untuk cabang ini (hubungi Super Admin)';
-                                $cityCls    = $cityName ? 'jss-origin-card__city' : 'jss-origin-card__city jss-origin-card__city--empty';
-
-                                // UX v2.1: informasi sistem yang ringan —
-                                // typography > border, whitespace diutamakan.
-                                return new \Illuminate\Support\HtmlString(
-                                    '<div class="jss-origin-card">'
-                                    . '<div class="jss-origin-card__head">📍 Cabang Asal</div>'
-                                    . '<div class="jss-origin-card__branch">' . e($branchLine) . '</div>'
-                                    . '<div class="jss-origin-card__city-line">Kota Asal • '
-                                    . '<span class="' . $cityCls . '">' . e($cityLine) . '</span></div>'
-                                    . '</div>'
-                                );
-                            })
-                            ->columnSpan(['default' => 12, 'md' => 6]),
-
-                        ToggleButtons::make('mode')
-                            ->label('Moda Pengiriman *')
-                            ->options([
-                                ShipmentMode::Sea->value => 'Laut',
-                                ShipmentMode::Land->value => 'Darat',
-                            ])
-                            ->icons([
-                                ShipmentMode::Sea->value => 'heroicon-m-cog-8-tooth',
-                                ShipmentMode::Land->value => 'heroicon-m-truck',
-                            ])
-                            ->inline()
-                            ->required()
-                            ->live()
-                            ->extraAttributes(['class' => 'jss-segmented'])
-                            ->afterStateUpdated(function (Get $get, Set $set, $state) {
-                                foreach (
-                                    [
-                                        'vessel_name',
-                                        'voyage',
-                                        'pol',
-                                        'pod',
-                                        'etd',
-                                        'eta',
-                                        'vehicle_type',
-                                        'vehicle_plate',
-                                        'driver_name',
-                                        'driver_phone',
-                                        'pickup_date',
-                                        'service_option',
-                                        'voyage_id',
-                                        'driver_id',
-                                        'lcl_items',
-                                        'cbm_total',
-                                        'packages_total',
-                                        'weight_total',
-                                        'weight_total_input',
-                                        'container_size',
-                                        'container_qty',
-                                        'container_size_vehicle',
-                                        'container_qty_vehicle',
-                                    ] as $f
-                                ) {
-                                    $set($f, null);
-                                }
-
-                                $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->effectiveBranchId());
-                                $depotId = self::resolveDepotId($branchId, $state, $get('voyage_id'));
-
-                                $set('assigned_depot_id', $depotId);
-                            })
-                            ->rules(function (Get $get) {
-                                return [
-                                    function (string $attribute, $value, \Closure $fail) use ($get) {
-                                        $state = $get();
-
-                                        if ($value === ShipmentMode::Sea->value) {
-                                            $voy = $state['voyage_id'] ?? null;
-                                            $pol = trim((string) ($state['pol'] ?? ''));
-                                            $pod = trim((string) ($state['pod'] ?? ''));
-
-                                            if (! $voy && ($pol === '' && $pod === '')) {
-                                                $fail('Untuk moda laut, isi Voyage atau minimal POL/POD.');
-                                            }
-
-                                            if ($voy && empty($state['etd'])) {
-                                                $fail('ETD dari Voyage tidak terbaca. Pastikan Voyage punya ETD.');
-                                            }
-                                        }
-                                    },
-                                ];
-                            })
-                            ->columnSpan(12),
-
-                        // DOMAIN-03: "Kota Asal" tidak lagi tampil sebagai field —
-                        // ia turunan Branch (lihat Cabang Asal di atas). Nilai
-                        // tetap tersimpan di origin_city_id (hidden, derived).
-                        Hidden::make('origin_city_id')
-                            ->default(fn () => self::resolveOriginCityFromUser()['city_id'])
-                            ->dehydrated(),
-
-                        Select::make('destination_city_id')
-                            // UX-02: Vehicle memakai bahasa operasional "Kota
-                            // Tujuan"; General Cargo mempertahankan label lama.
-                            ->label(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value ? 'Kota Tujuan *' : 'Tujuan (Kota Tujuan) *')
-                            ->placeholder('Pilih Kota Tujuan')
-                            ->relationship('destinationCity', 'name', fn ($query) => $query->active()->orderBy('name'))
-                            ->searchable()
-                            ->preload()
-                            ->required()
-                            // live() hanya untuk mereaktifkan panel Review di
-                            // Section akhir; tidak mengubah validasi/logic field.
-                            ->live()
-                            ->helperText('cth: Manado')
-                            ->columnSpan(['default' => 12, 'md' => 6]),
-
-                        // UX-02 — Lokasi Pickup berdampingan dengan Kota Tujuan:
-                        // keduanya satu cerita logistik (dari mana → ke mana).
-                        // Vehicle-only; General Cargo tidak melihat field ini.
-                        TextInput::make('pickup_location')
-                            ->label('Lokasi Pickup')
-                            ->placeholder('SEMPER')
-                            ->maxLength(150)
-                            ->helperText('Pada SPPB disebut "Lokasi Unit".')
-                            ->visible(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
-                            ->columnSpan(['default' => 12, 'md' => 6]),
-
-                        // UX-02 — salinan delivery_scope khusus Vehicle di grup
-                        // Informasi Pengiriman (statePath sama; instance General
-                        // Cargo tetap di section muatan — visibilitas eksklusif,
-                        // hanya satu yang dirender & divalidasi pada satu waktu).
-                        ToggleButtons::make('delivery_scope')
-                            ->label('Cakupan Layanan')
-                            ->options([
-                                DeliveryScope::PortToPort->value => DeliveryScope::PortToPort->label(),
-                                DeliveryScope::DoorToDoor->value => DeliveryScope::DoorToDoor->label(),
-                                DeliveryScope::DoorToPort->value => DeliveryScope::DoorToPort->label(),
-                                DeliveryScope::PortToDoor->value => DeliveryScope::PortToDoor->label(),
-                            ])
-                            ->inline()
-                            ->required()
-                            ->visible(fn (Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
-                            ->columnSpan(12),
-
-                        ToggleButtons::make('cargo_type')
-                            ->label('Jenis Muatan')
-                            ->options([
-                                CargoType::Vehicle->value => CargoType::Vehicle->label(),
-                                CargoType::General->value => CargoType::General->label(),
-                            ])
-                            // UX v2.1: segmented control — ikon untuk pindai
-                            // cepat, tanpa warna mencolok (netral, nyaman harian).
-                            ->icons([
-                                CargoType::Vehicle->value => 'heroicon-m-truck',
-                                CargoType::General->value => 'heroicon-m-cube',
-                            ])
-                            ->inline()
-                            ->required()
-                            ->live()
-                            ->extraAttributes(['class' => 'jss-segmented'])
-                            ->afterStateUpdated(function (string $state, Get $get, Set $set) {
-                                if ($state === CargoType::Vehicle->value) {
-                                    $rows = $get('units') ?? [];
-                                    if (count($rows) === 0) {
-                                        $set('units', [['qty' => 1]]);
-                                    }
-
-                                    $set('service_option', null);
-                                    $set('cbm_total', null);
-                                    $set('packages_total', null);
-                                    $set('weight_total', null);
-                                    $set('weight_total_input', null);
-                                } else {
-                                    if (($get('service_option') ?? 'fcl') === 'lcl') {
-                                        $items = $get('lcl_items') ?? [];
-                                        if (count($items) === 0) {
-                                            $set('lcl_items', [['qty' => 1]]);
-                                        }
-                                    }
-
-                                    $set('units', null);
-                                }
-                            })
-                            ->columnSpan(12),
-
-                        // SEA SECTION
-                        Group::make()
-                            ->columnSpan(12)
-                            ->columns(12)
-                            ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value)
-                            ->schema([
-                                ViewField::make('mode_badge_sea')
-                                    ->view('filament.forms.fields.mode-badge-sea')
-                                    ->columnSpan(12),
-
-                                ToggleButtons::make('service_option')
-                                    ->label('Opsi Layanan Laut')
-                                    ->options(['fcl' => 'FCL', 'lcl' => 'LCL'])
-                                    ->inline()
-                                    ->live()
-                                    ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value && $get('cargo_type') === CargoType::General->value)
-                                    ->required(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value && $get('cargo_type') === CargoType::General->value)
-                                    ->afterStateUpdated(function (string $state, Get $get, Set $set) {
-                                        if ($state === 'lcl' && $get('cargo_type') === CargoType::General->value) {
-                                            $items = $get('lcl_items') ?? [];
-                                            if (count($items) === 0) {
-                                                $set('lcl_items', [['qty' => 1]]);
-                                            }
-                                        } else {
-                                            $set('lcl_items', null);
-                                            $set('cbm_total', null);
-                                            $set('packages_total', null);
-                                            $set('weight_total', null);
-                                            $set('weight_total_input', null);
-                                        }
-
-                                        if ($state === 'fcl') {
-                                            $set('container_size', null);
-                                            $set('container_qty', null);
-                                        }
-                                    }),
-
-                                // UX-02: untuk Vehicle, delivery_scope tampil di
-                                // grup Informasi Pengiriman (Section B) — salinan
-                                // eksklusif di sana; instance ini hanya untuk
-                                // General Cargo agar layout GC tidak berubah.
-                                ToggleButtons::make('delivery_scope')
-                                    ->label('Cakupan Layanan')
-                                    ->options([
-                                        DeliveryScope::PortToPort->value => DeliveryScope::PortToPort->label(),
-                                        DeliveryScope::DoorToDoor->value => DeliveryScope::DoorToDoor->label(),
-                                        DeliveryScope::DoorToPort->value => DeliveryScope::DoorToPort->label(),
-                                        DeliveryScope::PortToDoor->value => DeliveryScope::PortToDoor->label(),
-                                    ])
-                                    ->inline()
-                                    ->required()
-                                    ->visible(fn (Get $get) => $get('cargo_type') !== CargoType::Vehicle->value)
-                                    ->columnSpan(12),
-
-                                Select::make('container_size')
-                                    ->label('Ukuran Kontainer (FCL • General)')
-                                    ->options(ContainerSize::options())
-                                    ->native(false)
-                                    ->searchable()
-                                    ->visible(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
-                                    ->required(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
-                                    ->columnSpan(4),
-
-                                TextInput::make('container_qty')
-                                    ->label('Jumlah Kontainer (FCL • General)')
-                                    ->numeric()
-                                    ->minValue(1)
-                                    ->default(1)
-                                    ->visible(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
-                                    ->required(fn(Get $get) => $get('service_option') === 'fcl' && $get('cargo_type') === CargoType::General->value)
-                                    ->columnSpan(4),
-
-                                // Shown only when the shipment has NO unit-relation rows yet
-                                // (new shipment, or legacy single-container FCL/LCL).
-                                // For SPPB shipments the truth lives in units.container_display.
-                                TextInput::make('container_no')
-                                    ->label('No. Kontainer')
-                                    ->maxLength(20)
-                                    ->visible(fn(Get $get, $record) =>
-                                        $get('mode') === ShipmentMode::Sea->value
-                                        && $get('cargo_type') !== CargoType::Vehicle->value
-                                        && ($record === null || empty($record->container_display))
-                                    )
-                                    ->required(fn(Get $get, $record) =>
-                                        $get('mode') === ShipmentMode::Sea->value
-                                        && $get('cargo_type') !== CargoType::Vehicle->value
-                                        && ($record === null || empty($record->container_display))
-                                    )
-                                    ->live(onBlur: true)
-                                    ->afterStateUpdated(function (Get $get, Set $set) {
-                                        $label = app(ShipmentService::class)->fanOutContainerNo(
-                                            $get('container_no'),
-                                            $get('seal_no')
-                                        );
-
-                                        // Fan-out to LCL general items only.
-                                        // Vehicle units manage their own container_display per unit.
-                                        $items = $get('lcl_items') ?? [];
-                                        foreach ($items as $i => $row) {
-                                            $items[$i]['container_display'] = $label;
-                                        }
-                                        $set('lcl_items', $items);
-                                    })
-                                    ->columnSpan(4),
-
-                                // Readonly info shown when units already carry container_display.
-                                // Replaces the editable container_no field for SPPB / multi-container shipments.
-                                Placeholder::make('container_digunakan')
-                                    ->label('Container Digunakan')
-                                    ->content(fn($record) => $record?->container_display ?: '—')
-                                    ->visible(fn(Get $get, $record) =>
-                                        $get('mode') === ShipmentMode::Sea->value
-                                        && $record !== null
-                                        && !empty($record->container_display)
-                                    )
-                                    ->columnSpan(4),
-
-                                // Seal No belongs to the container, not to individual vehicle units.
-                                // For vehicle cargo: stored in sea_containers.seal_no (SeaContainer model).
-                                // For LCL/FCL general cargo: stored here at shipment level (single-container legacy).
-                                // Not required for vehicle cargo — seal is captured at container level.
-                                TextInput::make('seal_no')
-                                    ->label('Seal No.')
-                                    ->maxLength(20)
-                                    ->visible(fn(Get $get) =>
-                                        $get('mode') === ShipmentMode::Sea->value
-                                        && $get('cargo_type') !== CargoType::Vehicle->value
-                                    )
-                                    ->required(fn(Get $get) =>
-                                        $get('mode') === ShipmentMode::Sea->value
-                                        && $get('cargo_type') !== CargoType::Vehicle->value
-                                    )
-                                    ->live(onBlur: true)
-                                    ->afterStateUpdated(function (Get $get, Set $set) {
-                                        $label = app(ShipmentService::class)->fanOutContainerNo(
-                                            $get('container_no'),
-                                            $get('seal_no')
-                                        );
-
-                                        // Fan-out to LCL general items only.
-                                        // Vehicle units manage their own container_display per unit.
-                                        $items = $get('lcl_items') ?? [];
-                                        foreach ($items as $i => $row) {
-                                            $items[$i]['container_display'] = $label;
-                                        }
-                                        $set('lcl_items', $items);
-                                    })
-                                    ->columnSpan(4),
-
-                                Repeater::make('lcl_items')
-                                    ->label('Item Muatan (LCL • General)')
-                                    ->visible(fn(Get $get) => $get('service_option') === 'lcl'
-                                        && $get('cargo_type') === CargoType::General->value)
-                                    ->defaultItems(1)
-                                    ->minItems(1)
-                                    ->reorderable(false)
-                                    ->columns(['default' => 12, 'md' => 6, 'lg' => 12])
-                                    ->afterStateHydrated(function (Get $get, Set $set) {
-                                        $items = $get('lcl_items') ?? [];
-                                        if (count($items) === 0) {
-                                            $items = [['qty' => 1]];
-                                        }
-
-                                        $no = trim((string) ($get('container_no') ?? ''));
-                                        $seal = trim((string) ($get('seal_no') ?? ''));
-                                        $label = ($no === '' && $seal === '') ? '–' : ($seal !== '' ? "{$no} • {$seal}" : $no);
-
-                                        foreach ($items as $i => $r) {
-                                            $p = (float) ($r['length_cm'] ?? 0);
-                                            $l = (float) ($r['width_cm'] ?? 0);
-                                            $t = (float) ($r['height_cm'] ?? 0);
-                                            $query = (int) ($r['qty'] ?? 0);
-
-                                            $cbm = ($p * $l * $t * $query) / 1_000_000;
-                                            $items[$i]['cbm_item'] = $cbm > 0 ? number_format(round($cbm, 3), 3, '.', '') : null;
-                                            $items[$i]['container_display'] = $r['container_display'] ?? $label;
-                                        }
-
-                                        $set('lcl_items', $items);
-                                    })
-                                    ->schema([
-                                        TextInput::make('description')->label('Deskripsi')->maxLength(120)->columnSpan(3),
-                                        TextInput::make('length_cm')->label('P (cm)')->numeric()->minValue(0.01)->live(onBlur: true)->columnSpan(2),
-                                        TextInput::make('width_cm')->label('L (cm)')->numeric()->minValue(0.01)->live(onBlur: true)->columnSpan(2),
-                                        TextInput::make('height_cm')->label('T (cm)')->numeric()->minValue(0.01)->live(onBlur: true)->columnSpan(2),
-                                        TextInput::make('qty')->label('Koli')->numeric()->minValue(1)->default(1)->live(onBlur: true)->columnSpan(1),
-                                        TextInput::make('weight_kg')->label('Berat/pcs (kg)')->numeric()->minValue(0)->live(onBlur: true)->columnSpan(2),
-                                        TextInput::make('container_display')->label('Dalam Kontainer')->disabled()->dehydrated(false)->columnSpan(3),
-                                        TextInput::make('cbm_item')->label('CBM')->disabled()->dehydrated(false)->columnSpan(2),
-                                    ])
-                                    ->addActionLabel('Tambah Item')
-                                    ->columnSpan(12),
-
-                                Section::make('Detail LCL (General)')
-                                    ->visible(fn(Get $get) => $get('service_option') === 'lcl' && $get('cargo_type') === CargoType::General->value)
-                                    ->columns(12)
-                                    ->schema([
-                                        TextInput::make('weight_total_input')
-                                            ->label('Total Berat (opsional)')
-                                            ->suffix('kg')
-                                            ->numeric()
-                                            ->minValue(0)
-                                            ->placeholder('Total (kg)')
-                                            ->dehydrated(false)
-                                            ->live(onBlur: true)
-                                            ->afterStateUpdated(function ($state, Set $set, Get $get) use ($recalcLclTotals) {
-                                                $recalcLclTotals($get, $set);
-                                            })
-                                            ->columnSpan(6),
-                                        Grid::make(12)
-                                            ->columnSpanFull()
-                                            ->schema([
-                                                Placeholder::make('sum_packages')->label('Total Koli')->live()
-                                                    ->content(fn(Get $get) => (string) ($get('packages_total') ?? 0))->columnSpan(4),
-                                                Placeholder::make('sum_cbm')->label('Total CBM')->live()
-                                                    ->content(fn(Get $get) => number_format((float) ($get('cbm_total') ?? 0), 3, '.', ''))->columnSpan(4),
-                                                Placeholder::make('sum_weight')->label('Total Berat (kg)')->live()
-                                                    ->content(function (Get $get) {
-                                                        $w = $get('weight_total');
-
-                                                        return is_null($w) ? '—' : number_format((float) $w, 2, '.', '');
-                                                    })->columnSpan(4),
-                                            ]),
-                                        Hidden::make('cbm_total')->dehydrated(),
-                                        Hidden::make('packages_total')->dehydrated(),
-                                        Hidden::make('weight_total')->dehydrated(),
-                                    ]),
-
-                                // vehicle_kind dan vehicle_loading ditentukan oleh FC saat Handover.
-                                // Office Admin tidak memilih metode muat — field ini disembunyikan.
-                                ToggleButtons::make('vehicle_kind')
-                                    ->label('Jenis Unit')
-                                    ->options(['car' => 'Mobil', 'motorcycle' => 'Motor'])
-                                    ->inline()
-                                    ->hidden(true)
-                                    ->required(false)
-                                    ->dehydrated(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
-                                    ->columnSpan(6),
-
-                                ToggleButtons::make('vehicle_loading')
-                                    ->label('Metode Muat Unit')
-                                    ->options(['regular' => 'Reguler', 'rack' => 'Dengan Rack', 'flat_rack' => 'Flat Rack'])
-                                    ->inline()
-                                    ->hidden(true)
-                                    ->required(false)
-                                    ->dehydrated(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
-                                    ->columnSpan(6),
-
-                                Repeater::make('units')
-                                    ->label('Unit Kendaraan (Laut)')
-                                    // UX-02: penanda asal-usul manifest — row
-                                    // adalah klaim dokumen yang perlu diperiksa.
-                                    ->helperText(function ($livewire) {
-                                        $prefill = $livewire->intakePrefill ?? null;
-                                        $applied = (bool) ($livewire->intakeApplied ?? false);
-                                        if (! $applied || ! $prefill || $prefill->unitCount() < 1) {
-                                            return null;
-                                        }
-
-                                        return $prefill->unitCount() . ' unit dari hasil ekstraksi dokumen — periksa sebelum melanjutkan.';
-                                    })
-                                    // ->dehydrated(false)
-                                    ->visible(fn(Get $get) => $get('cargo_type') === CargoType::Vehicle->value)
-                                    ->columns(12)
-                                    ->defaultItems(1)
-                                    ->minItems(1)
-                                    ->reorderable(false)
-                                    ->mutateDehydratedStateUsing(fn($state) => array_values(array_filter($state ?? [], function ($r) {
-                                        foreach (['model_no', 'reg_no', 'chassis_no', 'engine_no', 'color', 'do_number', 'qty', 'notes'] as $f) {
-                                            if (! empty($r[$f])) {
-                                                return true;
-                                            }
-                                        }
-
-                                        return false;
-                                    })))
-                                    ->afterStateHydrated(function (Get $get, Set $set) {
-                                        $rows = $get('units') ?? [];
-                                        if (count($rows) === 0) {
-                                            $rows = [['qty' => 1]];
-                                        }
-                                        $set('units', $rows);
-                                    })
-                                    ->schema([
-                                        TextInput::make('model_no')->label('Model No.')->maxLength(60)->columnSpan(3),
-                                        TextInput::make('reg_no')->label('No. Polisi / Reg')->maxLength(30)->columnSpan(3),
-                                        TextInput::make('chassis_no')->label('Rangka No.')->maxLength(60)->columnSpan(3),
-                                        TextInput::make('engine_no')->label('Mesin No.')->maxLength(60)->columnSpan(3),
-                                        TextInput::make('color')->label('Warna')->maxLength(30)->columnSpan(4),
-                                        TextInput::make('do_number')->label('No. DO')->maxLength(60)->columnSpan(2),
-                                        TextInput::make('qty')->label('Qty')->numeric()->minValue(1)->default(1)->columnSpan(1),
-                                        TextInput::make('notes')->label('Ket')->maxLength(120)->columnSpan(5),
-                                        TextInput::make('container_display')
-                                            ->label('Container No')
-                                            ->maxLength(30)
-                                            ->placeholder('TAKU 000000-0')
-                                            ->hidden(true)
-                                            ->columnSpan(3),
-                                    ])
-                                    ->addActionLabel('Tambah Unit')
-                                    ->columnSpan(12),
-
-                                // UX-02 — Voyage Hint diulang TEPAT di atas
-                                // field keputusan: saat admin memilih kapal,
-                                // pembanding dari dokumen ada di depan mata.
-                                // Tidak pernah mengisi voyage otomatis.
-                                Placeholder::make('voyage_document_hint')
-                                    ->label('')
-                                    ->content(function ($livewire) {
-                                        // ?? menekan undefined-property di halaman
-                                        // tanpa holder envelope (mis. Edit).
-                                        $hints = ($livewire->intakePrefill ?? null)?->voyageHints ?? [];
-                                        $vessel = $hints['vessel_name'] ?? null;
-                                        if ($vessel === null) {
-                                            return '';
-                                        }
-                                        $etd = $hints['document_etd'] ?? null;
-                                        $etdLabel = $etd
-                                            ? Carbon::parse($etd)->translatedFormat('d F Y')
-                                            : null;
-
-                                        return '📄 Dokumen menyebut: ' . $vessel
-                                            . ($etdLabel ? " — ETD {$etdLabel}" : '')
-                                            . '. Digunakan sebagai pembanding — tidak diisi otomatis.';
-                                    })
-                                    ->visible(fn (Get $get, $livewire) => $get('mode') === ShipmentMode::Sea->value
-                                        && ((($livewire->intakePrefill ?? null)?->voyageHints['vessel_name'] ?? null) !== null))
-                                    ->columnSpan(12),
-
-                                Select::make('voyage_id')
-                                    ->label('Jadwal Kapal *')
-                                    ->native(false)
-                                    ->searchable()
-                                    ->required(fn(Get $get) => $get('mode') === ShipmentMode::Sea->value)
-                                    ->hidden(fn(Get $get) => $get('mode') !== ShipmentMode::Sea->value)
-                                    ->options(function () {
-                                        return Voyage::with(['vessel', 'pol', 'pod'])
-                                            ->whereNull('atd_at')
-                                            ->where('etd', '>=', now()->startOfDay())
-                                            ->where('etd', '<=', now()->addMonth()->endOfMonth())
-                                            ->orderBy('etd', 'asc')
-                                            ->limit(50)
-                                            ->get()
-                                            ->mapWithKeys(function ($v) {
-                                                $name = $v->vessel?->name ?: '(kapal tidak diketahui)';
-                                                if ($v->voyage_no) {
-                                                    $name .= ' ' . $v->voyage_no;
-                                                }
-                                                return [
-                                                    $v->id => sprintf(
-                                                        '%s | ETD %s | %s → %s',
-                                                        $name,
-                                                        $v->etd ? Carbon::parse($v->etd)->format('d M Y') : '-',
-                                                        $v->pol?->name ?: $v->pol?->code ?: '-',
-                                                        $v->pod?->name ?: $v->pod?->code ?: '-',
-                                                    ),
-                                                ];
-                                            })->toArray();
-                                    })
-                                    ->getSearchResultsUsing(function (string $search) {
-                                        return Voyage::with(['vessel', 'pol', 'pod'])
-                                            ->whereNull('atd_at')
-                                            ->where('etd', '>=', now()->startOfDay())
-                                            ->where('etd', '<=', now()->addMonth()->endOfMonth())
-                                            ->where(fn ($q) => $q
-                                                ->where('voyage_no', 'ilike', "%{$search}%")
-                                                ->orWhereHas('vessel', fn ($query) => $query->where('name', 'ilike', "%{$search}%"))
-                                                ->orWhereHas('pol', fn ($query) => $query
-                                                    ->where('code', 'ilike', "%{$search}%")
-                                                    ->orWhere('name', 'ilike', "%{$search}%"))
-                                                ->orWhereHas('pod', fn ($query) => $query
-                                                    ->where('code', 'ilike', "%{$search}%")
-                                                    ->orWhere('name', 'ilike', "%{$search}%"))
-                                            )
-                                            ->orderBy('etd', 'asc')
-                                            ->limit(50)
-                                            ->get()
-                                            ->mapWithKeys(function ($v) {
-                                                $name = $v->vessel?->name ?: '(kapal tidak diketahui)';
-                                                if ($v->voyage_no) {
-                                                    $name .= ' ' . $v->voyage_no;
-                                                }
-                                                return [
-                                                    $v->id => sprintf(
-                                                        '%s | ETD %s | %s → %s',
-                                                        $name,
-                                                        $v->etd ? Carbon::parse($v->etd)->format('d M Y') : '-',
-                                                        $v->pol?->name ?: $v->pol?->code ?: '-',
-                                                        $v->pod?->name ?: $v->pod?->code ?: '-',
-                                                    ),
-                                                ];
-                                            })->toArray();
-                                    })
-                                    ->getOptionLabelUsing(function ($value) {
-                                        $v = Voyage::with(['vessel', 'pol', 'pod'])->find($value);
-                                        if (! $v) return null;
-                                        $name = $v->vessel?->name ?: '(kapal tidak diketahui)';
-                                        if ($v->voyage_no) {
-                                            $name .= ' ' . $v->voyage_no;
-                                        }
-                                        return sprintf(
-                                            '%s | ETD %s | %s → %s',
-                                            $name,
-                                            $v->etd ? Carbon::parse($v->etd)->format('d M Y') : '-',
-                                            $v->pol?->name ?: $v->pol?->code ?: '-',
-                                            $v->pod?->name ?: $v->pod?->code ?: '-',
-                                        );
-                                    })
-                                    ->live()
-                                    ->afterStateUpdated(function ($state, Get $get, Set $set) {
-                                        if (! $state) {
-                                            foreach (['vessel_name', 'voyage', 'pol', 'pod', 'etd', 'eta'] as $f) {
-                                                $set($f, null);
-                                            }
-                                            $set('assigned_depot_id', null);
-                                            return;
-                                        }
-
-                                        $v = Voyage::with(['vessel', 'pol', 'pod'])->find($state);
-                                        if ($v) {
-                                            $set('vessel_name', $v->vessel?->name);
-                                            $set('voyage', $v->voyage_no);
-                                            $set('pol', $v->pol?->code ?: $v->pol?->name);
-                                            $set('pod', $v->pod?->code ?: $v->pod?->name);
-                                            $set('etd', optional($v->etd)->toDateTimeString());
-                                            $set('eta', optional($v->eta)->toDateTimeString());
-
-                                            // Ownership selalu dari POL (origin port), bukan POD.
-                                            $resolved = $v->pol_id
-                                                ? app(\App\Services\ShipmentService::class)->resolveByPol($v->pol_id)
-                                                : null;
-
-                                            if ($resolved) {
-                                                $set('branch_id', $resolved['branch_id']);
-                                                $set('assigned_depot_id', $resolved['depot_id']);
-                                            } else {
-                                                // Fallback: POL tidak punya depot, gunakan branch_id dari form
-                                                $branchId = (int) ($get('branch_id') ?: Filament::auth()->user()?->effectiveBranchId());
-                                                $set('assigned_depot_id', self::resolveDepotId($branchId, $get('mode'), $state));
-                                            }
-                                        }
-                                    })
-                                    ->columnSpan(12),
-
-                                Hidden::make('vessel_name')->dehydrated(),
-                                Hidden::make('voyage')->dehydrated(),
-                                Hidden::make('etd')->dehydrated(),
-                                Hidden::make('eta')->dehydrated(),
-                                Hidden::make('pol')->dehydrated(),
-                                Hidden::make('pod')->dehydrated(),
-
-                                Hidden::make('assigned_depot_id')->dehydrated(),
-
-                                Placeholder::make('voyage_info_card')
-                                    ->label('Voyage Terpilih')
-                                    ->content(function (Get $get): string {
-                                        if (! $get('voyage_id')) {
-                                            return '— Pilih jadwal kapal untuk melihat detail —';
-                                        }
-                                        $vessel   = $get('vessel_name') ?: '—';
-                                        $voyageNo = $get('voyage') ?: '—';
-                                        $pol      = $get('pol') ?: '—';
-                                        $pod      = $get('pod') ?: '—';
-                                        $etd      = $get('etd') ? Carbon::parse($get('etd'))->format('d M Y H:i') : '—';
-                                        $eta      = $get('eta') ? Carbon::parse($get('eta'))->format('d M Y H:i') : '—';
-
-                                        return "{$vessel} / {$voyageNo} | {$pol} → {$pod} | ETD: {$etd} | ETA: {$eta}";
-                                    })
-                                    ->columnSpan(12),
-
-                                Placeholder::make('auto_depot_display')
-                                    ->label('Depo Penugasan')
-                                    ->content(function (Get $get) {
-                                        $depotId = $get('assigned_depot_id');
-
-                                        if ($depotId) {
-                                            return Depot::whereKey($depotId)->value('name') ?: '—';
-                                        }
-
-                                        return '— Pilih voyage untuk menentukan depo —';
-                                    })
-                                    ->columnSpan(['default' => 12, 'md' => 6]),
-
-                                Placeholder::make('destination_routing_preview')
-                                    ->label('Rute Tujuan')
-                                    ->content(function (Get $get): string {
-                                        $voyageId   = $get('voyage_id');
-                                        $destCityId = $get('destination_city_id');
-
-                                        if (! $voyageId) {
-                                            return '— Pilih voyage untuk melihat rute tujuan —';
-                                        }
-
-                                        $v = Voyage::with(['pod'])->find($voyageId);
-
-                                        if (! $v || ! $v->pod_id) {
-                                            return '— POD voyage belum dikonfigurasi —';
-                                        }
-
-                                        $podName   = $v->pod?->name ?: ($v->pod?->code ?: '—');
-                                        $destDepot = Depot::where('port_id', $v->pod_id)
-                                            ->where('mode', 'sea')
-                                            ->value('name');
-                                        $cityName  = $destCityId
-                                            ? City::whereKey($destCityId)->value('name')
-                                            : null;
-
-                                        $parts = array_filter([$cityName, $podName, $destDepot]);
-
-                                        return $parts ? implode(' → ', $parts) : '—';
-                                    })
-                                    ->columnSpan(['default' => 12, 'md' => 6]),
-                            ]),
-                    ]),
-
-                // LAND SECTION
-                Group::make()
-                    ->columnSpan(12)
-                    ->columns(['default' => 12, 'md' => 6, 'lg' => 12])
-                    ->visible(fn(Get $get) => $get('mode') === ShipmentMode::Land->value)
-                    ->schema([
-                        ViewField::make('mode_badge_land')
-                            ->view('filament.forms.fields.mode-badge-land')
-                            ->columnSpan(12),
-
-                        Select::make('armada_id')
-                            ->label('Pilih Armada')
-                            ->relationship('armada', 'code')
-                            ->searchable()
-                            ->preload()
-                            ->native(false)
-                            ->live()
-                            ->afterStateUpdated(function ($state, Set $set) {
-                                if (! $state) {
-                                    $set('vehicle_plate', null);
-                                    $set('service_option', null);
-
-                                    return;
-                                }
-
-                                $armada = Armada::find($state);
-                                $set('vehicle_plate', $armada?->plate_number);
-                                $set('service_option', match ($armada?->type) {
-                                    'car_carrier' => 'car_carrier',
-                                    'towing' => 'towing',
-                                    'truck' => 'truck',
-                                    default => null,
-                                });
-                            })
-                            ->columnSpan(6),
-
-                        TextInput::make('vehicle_plate')
-                            ->label('No. Polisi')
-                            ->disabled()
-                            ->dehydrated()
-                            ->columnSpan(6),
-
-                        Select::make('driver_id')
-                            ->label('Pilih Supir')
-                            ->relationship('driver', 'name')
-                            ->searchable()
-                            ->preload()
-                            ->native(false)
-                            ->live()
-                            ->afterStateUpdated(function ($state, Set $set) {
-                                if (! $state) {
-                                    $set('driver_name', null);
-                                    $set('driver_phone', null);
-
-                                    return;
-                                }
-
-                                $driver = Driver::find($state);
-                                $set('driver_name', $driver?->name);
-                                $set('driver_phone', $driver?->phone);
-                            })
-                            ->columnSpan(6),
-
-                        TextInput::make('driver_phone')
-                            ->label('No. HP Sopir')
-                            ->disabled()
-                            ->dehydrated()
-                            ->columnSpan(6),
-                    ]),
-
-                Hidden::make('service_type')->dehydrated(),
-                Hidden::make('route_summary')->dehydrated(),
-
                 Section::make('Review Permintaan')
-                    ->description('Pastikan data sudah benar.')
                     ->icon('heroicon-m-clipboard-document-check')
                     ->extraAttributes(['class' => 'jss-section'])
                     ->columns(12)
                     ->schema([
-                        // UX-RECOMPOSE-01 — Ringkasan + Review dijadikan satu
-                        // panel otoritatif: operator melakukan review cepat
-                        // (Customer → Tujuan → Moda → Jenis → Status) sebelum
-                        // simpan. Reaktif dari state form (mode, cargo_type,
-                        // destination sudah live) — tanpa backend/field baru.
                         Placeholder::make('review_summary')
                             ->hiddenLabel()
                             ->live()
@@ -1406,25 +1296,17 @@ class ShipmentResource extends Resource
                                     ? (City::whereKey($did)->value('name') ?: null) : null;
                                 $mode = ($mv = $get('mode')) ? (ShipmentMode::tryFrom($mv)?->label() ?? $mv) : null;
                                 $cargo = ($cv = $get('cargo_type')) ? (CargoType::tryFrom($cv)?->label() ?? $cv) : null;
-
-                                // UX v2.2: empty state cerdas — selama belum ada
-                                // data apa pun, tampilkan pesan pengarah, bukan
-                                // 4× "Belum dipilih". Setelah user mulai mengisi,
-                                // ringkasan berkembang mengikuti progress.
                                 if (! ($customer || $dest || $mode || $cargo)) {
                                     return new \Illuminate\Support\HtmlString(
                                         '<div class="jss-review jss-review--empty">'
-                                        . '<div class="jss-review__title">Ringkasan</div>'
-                                        . '<div class="jss-review__empty-head">Ringkasan belum tersedia.</div>'
-                                        . '<div class="jss-review__empty-sub">Lengkapi Customer dan Tujuan terlebih dahulu. '
-                                        . 'Ringkasan akan diperbarui secara otomatis.</div>'
-                                        . '</div>'
+                                            . '<div class="jss-review__title">Ringkasan</div>'
+                                            . '<div class="jss-review__empty-head">Ringkasan belum tersedia.</div>'
+                                            . '<div class="jss-review__empty-sub">Lengkapi Customer dan Tujuan terlebih dahulu. '
+                                            . 'Ringkasan akan diperbarui secara otomatis.</div>'
+                                            . '</div>'
                                     );
                                 }
 
-                                // Summary card (label di atas, nilai di bawah) —
-                                // bukan tabel. Item yang belum terisi tetap tampil
-                                // "Belum dipilih" agar user tahu langkah berikutnya.
                                 $item = function (string $label, ?string $value): string {
                                     $empty = $value === null || $value === '';
                                     $cls = $empty ? 'jss-review__val jss-review__val--empty' : 'jss-review__val';
@@ -1435,14 +1317,14 @@ class ShipmentResource extends Resource
 
                                 return new \Illuminate\Support\HtmlString(
                                     '<div class="jss-review">'
-                                    . '<div class="jss-review__title">Ringkasan</div>'
-                                    . $item('Customer', $customer)
-                                    . $item('Tujuan', $dest)
-                                    . $item('Moda', $mode)
-                                    . $item('Jenis Muatan', $cargo)
-                                    . '<div class="jss-review__item"><div class="jss-review__key">Status</div>'
-                                    . '<div><span class="jss-review__badge">🟢 Draft Baru</span></div></div>'
-                                    . '</div>'
+                                        . '<div class="jss-review__title">Ringkasan</div>'
+                                        . $item('Customer', $customer)
+                                        . $item('Tujuan', $dest)
+                                        . $item('Moda', $mode)
+                                        . $item('Jenis Muatan', $cargo)
+                                        . '<div class="jss-review__item"><div class="jss-review__key">Status</div>'
+                                        . '<div><span class="jss-review__badge">🟢 Menunggu Penjemputan</span></div></div>'
+                                        . '</div>'
                                 );
                             })
                             ->columnSpan(12),
@@ -1450,14 +1332,10 @@ class ShipmentResource extends Resource
                             ->label('Data sudah benar & sesuai dokumen.')
                             ->accepted()
                             ->required()
-                            // UX v2.2: beri jarak agar checkbox + submit tidak
-                            // menempel ke panel ringkasan (action area lebih lega).
-                            ->extraAttributes(['class' => 'jss-confirm'])
                             ->columnSpan(12),
                     ]),
             ]);
     }
-
     public static function table(Table $table): Table
     {
         return $table
@@ -1481,7 +1359,6 @@ class ShipmentResource extends Resource
                                 ->orWhereNull('branch_id');
                         });
                     } elseif ($user->isOfficeAdmin()) {
-                        // office_admin without branch is a misconfiguration — deny all rows
                         $query->whereRaw('1 = 0');
                     }
 
@@ -1528,25 +1405,18 @@ class ShipmentResource extends Resource
                         return $val === ShipmentMode::Sea->value ? 'Laut' : 'Darat';
                     }),
 
-                // UX-LIST-01 — kolom menampilkan Commercial Customer (bukan
-                // "pengirim"); sama seperti Section A form (DOMAIN-02/UX-02).
-                // Query/relasi tidak berubah, hanya label & posisi.
                 TextColumn::make('customer.name')
                     ->label('Customer')
                     ->badge()
                     ->searchable()
                     ->sortable(),
 
-                // UX-LIST-01 — jumlah unit langsung terlihat tanpa membuka
-                // detail. Relasi units() sudah ada (Shipment::units());
-                // withCount di getEloquentQuery agar tak N+1 di listing.
-                // General Cargo tidak punya baris units → tampil "—".
                 TextColumn::make('units_count')
                     ->label('Unit')
                     ->counts('units')
                     ->badge()
                     ->color('gray')
-                    ->formatStateUsing(fn (?int $state) => $state > 0 ? (string) $state : '—')
+                    ->formatStateUsing(fn(?int $state) => $state > 0 ? (string) $state : '—')
                     ->alignCenter()
                     ->sortable(),
 
@@ -1608,12 +1478,6 @@ class ShipmentResource extends Resource
                     })
                     ->toggleable(),
 
-                // UX-LIST-01 — dipertahankan (relasi & kolom tak berubah).
-                // Vehicle: receiver sering kosong (UX-02 — bukan lagi bagian
-                // workflow utama) → tampil "—" alih-alih badge kosong.
-                // Catatan: badge() pada kolom relasi mengabaikan
-                // formatStateUsing saat raw state null (loop badge berhenti
-                // lebih dulu) — placeholder() adalah jalur yang benar.
                 TextColumn::make('receiver.name')
                     ->label('Penerima')
                     ->badge()
@@ -1884,17 +1748,7 @@ class ShipmentResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            // UX-CLEANUP-01 — Quick Filter disederhanakan menjadi Search +
-            // Customer + Kota Tujuan saja. Status dihapus (sudah diwakili
-            // Tab — dua mekanisme filtering status tidak boleh hidup
-            // berdampingan). Dealer, Penerima, Cabang Asal, dan Jenis
-            // Layanan dihapus dari quick filter: Dealer & Penerima tetap
-            // bisa dicari lewat Search (customer.name / receiver.name sudah
-            // ->searchable() di kolom tabel di atas), Cabang Asal belum
-            // memberi nilai operasional yang cukup sebagai quick filter, dan
-            // Jenis Layanan dapat dipindahkan ke Advanced Filter bila suatu
-            // saat dibutuhkan kembali. Query/business logic filter yang
-            // dipertahankan tidak diubah — hanya jumlah filter yang tampil.
+
             ->filters([
                 SelectFilter::make('customer_id')
                     ->label('Customer')
@@ -1909,14 +1763,17 @@ class ShipmentResource extends Resource
                     ->preload(),
             ], layout: FiltersLayout::AboveContent)
             ->filtersFormColumns(2)
-            // UX-POLISH-01 — empty state domain-spesifik (bukan generik "no
-            // records"). Sengaja TANPA action/tombol (amendment): "Buat
-            // Permintaan" di header (ListShipments::getHeaderActions()) sudah
-            // jadi satu-satunya primary CTA halaman ini — single primary
-            // action, tidak boleh ada duplikasi CTA dengan fungsi identik.
             ->emptyStateIcon('heroicon-o-clipboard-document-list')
-            ->emptyStateHeading('Belum ada permintaan pengiriman')
-            ->emptyStateDescription('Mulai dengan membuat permintaan pengiriman baru atau unggah dokumen SPPB/DO untuk memulai proses operasional.')
+            ->emptyStateHeading(fn ($livewire) => match ($livewire->activeTab ?? 'semua') {
+                'menunggu-penjemputan' => 'Tidak ada permintaan yang menunggu penjemputan',
+                'perlu-tindakan' => 'Tidak ada permintaan yang memerlukan tindakan',
+                default => 'Belum ada permintaan pengiriman',
+            })
+            ->emptyStateDescription(fn ($livewire) => match ($livewire->activeTab ?? 'semua') {
+                'menunggu-penjemputan' => 'Semua permintaan pengiriman telah diproses atau belum ada permintaan baru yang siap dijemput.',
+                'perlu-tindakan' => 'Semua permintaan pengiriman berada pada kondisi normal. Tidak ada tindak lanjut yang diperlukan saat ini.',
+                default => 'Mulai dengan membuat permintaan pengiriman baru atau unggah dokumen SPPB/DO untuk memulai proses operasional.',
+            })
             ->defaultSort('priority', 'desc')
             ->defaultSort('eta', 'asc')
             ->actions([
@@ -1928,9 +1785,6 @@ class ShipmentResource extends Resource
                     ->url(fn($record) => ArmadaAssignmentResource::getUrl('create', [
                         'prefill[shipment_id]' => $record->id,
                         'prefill[branch_id]' => $record->branch_id,
-                        // Office Retirement (Phase 1, 2026-07-20): dropped the
-                        // `origin_office_id ??` prefix — origin_office_id is never
-                        // written (always null), so this always resolved to depot_id.
                         'prefill[depot_id]' => $record->depot_id,
                     ]))
                     ->visible(
@@ -1945,6 +1799,7 @@ class ShipmentResource extends Resource
                 \Filament\Tables\Actions\Action::make('print_resi')
                     ->label('Cetak Resi')
                     ->icon('heroicon-m-printer')
+                    ->color('primary')
                     ->url(fn($record) => route('shipments.resi', ['shipment' => $record->id]) . '?download=1')
                     ->openUrlInNewTab(),
 
@@ -2095,8 +1950,6 @@ class ShipmentResource extends Resource
 
     public static function canViewAny(): bool
     {
-        // Admin panel resource — Office Admin & Super Admin only.
-        // FC uses app/Filament/FC/Resources/ShipmentResource.php via the /fc panel.
         return auth_user()?->isOfficeUser() ?? false;
     }
 
@@ -2112,7 +1965,6 @@ class ShipmentResource extends Resource
 
         if ($user->isSuperAdmin()) return true;
 
-        // office_admin: branch-scoped
         if ($user->effectiveBranchId() && $record->branch_id !== null) {
             return (int) $record->branch_id === (int) $user->effectiveBranchId();
         }
@@ -2127,7 +1979,6 @@ class ShipmentResource extends Resource
 
         if ($user->isSuperAdmin()) return true;
 
-        // office_admin: can edit shipments within their own branch
         if ($user->isOfficeAdmin()) {
             if ($user->effectiveBranchId() && $record->branch_id !== null) {
                 return (int) $record->branch_id === (int) $user->effectiveBranchId();
@@ -2142,5 +1993,4 @@ class ShipmentResource extends Resource
     {
         return auth_user()?->isSuperAdmin() ?? false;
     }
-
 }

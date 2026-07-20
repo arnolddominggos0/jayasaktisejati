@@ -31,11 +31,7 @@ class SignaturePad extends Field
     {
         parent::setUp();
 
-        /*
-         * Dehydrate: convert base64 PNG data URL → stored file.
-         * Called automatically by Filament before the form data is passed
-         * to the action/model-save handler.
-         */
+        // On save, convert the base64 PNG data URL to a stored file.
         $this->dehydrateStateUsing(static function (?string $state): ?string {
             if (blank($state)) {
                 return null;

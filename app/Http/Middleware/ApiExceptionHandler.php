@@ -19,7 +19,6 @@ class ApiExceptionHandler
     {
         $response = $next($request);
 
-        // Check if response is an error and request expects JSON
         if (!$response->isSuccessful() && $request->expectsJson()) {
             $this->formatErrorResponse($response);
         }
@@ -32,7 +31,6 @@ class ApiExceptionHandler
      */
     public function terminate(Request $request, Response $response): void
     {
-        // Cleanup if needed
     }
 
     /**

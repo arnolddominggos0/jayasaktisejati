@@ -6,8 +6,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
 /**
- * Sprint 6.4.2 — Workspace Context.
- *
  * Resolves the `period` filter (format: 'YYYY-MM') to a half-open date range
  * [start of month, start of next month) and generates the rolling option
  * list for the Period selector. Shared by UnitMonitoringQueryBuilder,

@@ -52,7 +52,6 @@ class TrackingController extends Controller
                 ->with('error', 'Nomor resi tidak ditemukan. Silakan periksa kembali nomor resi Anda.');
         }
 
-        // Format response data
         $data = [
             'success' => true,
             'shipment' => [

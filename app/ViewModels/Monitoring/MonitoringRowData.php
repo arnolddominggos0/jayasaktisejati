@@ -5,8 +5,8 @@ namespace App\ViewModels\Monitoring;
 use App\Enums\ShipmentMode;
 
 /**
- * Sprint 6.4.4: unit_id is now the primary identifier (non-nullable int).
- * shipment_id is the Shipment context. unit_count removed — each row is one Unit.
+ * unit_id is the primary identifier (non-nullable int); shipment_id is the
+ * Shipment context. Each row is one Unit.
  */
 final readonly class MonitoringRowData
 {

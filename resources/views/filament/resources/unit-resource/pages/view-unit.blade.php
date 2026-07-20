@@ -116,9 +116,7 @@ $qualityBadge = match($qualityStatus) {
             </button>
         </div>
 
-        {{-- ══════════════════════════════════════════════════════════════════
-             TAB 1 — Identitas Unit
-        ══════════════════════════════════════════════════════════════════════ --}}
+        {{-- TAB 1 — Identitas Unit --}}
         <div x-show="tab === 'identitas'" x-cloak class="space-y-4">
 
             {{-- Unit identity card --}}
@@ -274,9 +272,7 @@ $qualityBadge = match($qualityStatus) {
         </div>
         {{-- /tab:identitas --}}
 
-        {{-- ══════════════════════════════════════════════════════════════════
-             TAB 2 — Checksheet Perjalanan
-        ══════════════════════════════════════════════════════════════════════ --}}
+        {{-- TAB 2 — Checksheet Perjalanan --}}
         <div x-show="tab === 'checksheet'" x-cloak class="space-y-4">
 
             {{-- Quality summary strip --}}

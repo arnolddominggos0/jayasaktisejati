@@ -1,8 +1,8 @@
 {{--
-    Operational Pipeline — Sprint WX1/WX2, composition finalized WX4.
+    Operational Pipeline.
 
-    The workspace's primary axis is the operational LIFECYCLE, not
-    severity and not stacked widgets. Every voyage lives in exactly ONE
+    The workspace's primary axis is the operational lifecycle, not
+    severity and not stacked widgets. Every voyage lives in exactly one
     of four sequential zones (Persiapan → Keberangkatan → Pelayaran →
     Kedatangan), determined purely from already-loaded timestamps. A
     voyage is never rendered twice; it relocates from zone to zone as its
@@ -10,31 +10,24 @@
 
     This partial is presentation only:
       • Zone assignment ($pipelineGroups) is computed in the parent page
-        from $rows via a match() over atb/atd/ata/closing — the same
-        "safe path" independent derivation the old Fleet Board used
-        (never TaskClassifier, never a new query).
-      • Severity (WX2) is a SECONDARY visual layer: it only re-orders
-        voyages inside a zone and tints the accent/action — it is not the
+        from $rows via a match() over atb/atd/ata/closing — an independent
+        derivation, never TaskClassifier, never a new query.
+      • Severity is a secondary visual layer: it only re-orders voyages
+        inside a zone and tints the accent/action — it is not the
         organizing structure.
       • Every recording entry point is preserved: the zone's primary
         button covers the most-likely next action; all other actions
         (ATB, ATA, Delay, Readiness, Cargo, Milestone) remain reachable
-        through the unchanged Drawer (vessel name → openDrawer).
-
-    WX4 additions (composition only, no logic touched):
+        through the Drawer (vessel name → openDrawer).
       • One unified empty state when the whole period is empty, instead
-        of four repeated "tidak ada" messages (WX3.10 finding).
-      • Zone headers lost their border-bottom — they are chapter markers
-        now (title + count), not section dividers.
-      • A quiet "↓" connector between zones reinforces the single flow
-        (Persiapan → Keberangkatan → Pelayaran → Kedatangan) instead of
-        four independent-feeling blocks.
+        of four repeated "tidak ada" messages.
+      • Zone headers are chapter markers (title + count), not dividers.
+      • A quiet "↓" connector between zones reinforces the single flow.
       • Each row carries id="pv-{id}" so the header's Decision Pointer
-        (WX4 §6, in the parent page) can anchor-scroll straight to it.
+        can anchor-scroll straight to it.
 
-    Glyph grammar (monochrome; VR1's no-green rule holds — green is never
-    "done"): ✓ done (gray) · ○ pending (gray) · ! late (red, severity) ·
-    — not-applicable / no data (gray).
+    Glyph grammar (monochrome; green is never "done"): ✓ done (gray) ·
+    ○ pending (gray) · ! late (red, severity) · — not-applicable / no data.
 --}}
 @php
     $zones = [
@@ -69,7 +62,7 @@
 @endphp
 
 @if ($pipelineGroups->isEmpty())
-    {{-- WX4 §5 — one workspace-level message, not four repeated ones. --}}
+    {{-- One workspace-level message, not four repeated ones. --}}
     <div class="py-6 text-center">
         <p class="text-[12px] font-medium text-gray-500">
             Tidak ada aktivitas operasional untuk {{ \Illuminate\Support\Carbon::createFromFormat('Y-m', $period)->translatedFormat('F Y') }}.
@@ -88,7 +81,7 @@
 
             <section wire:key="zone-{{ $zoneNum }}" class="{{ $zoneNum > 1 ? 'mt-4' : '' }}">
                 {{-- Chapter marker — title + count only, no border, no
-                     subtitle, no copy (WX4 §4). --}}
+                     subtitle, no copy. --}}
                 <div class="flex items-baseline gap-2 mb-1.5">
                     <h2 class="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{{ $zoneMeta['title'] }}</h2>
                     @if ($voyages->count())
@@ -112,7 +105,7 @@
                                 // Zone-relevant date. Its color IS the delay signal
                                 // (red when the window has passed and the actual is
                                 // not yet recorded) — no paragraph, no "X hari" text;
-                                // exact figures live in the Drawer (WX2 row rules).
+                                // exact figures live in the Drawer.
                                 if ($zoneNum <= 2) {
                                     $date = $v->etd; $dateLabel = 'ETD';
                                     $dateOverdue = $date && $date->isPast() && ! $v->atd_at;
@@ -123,7 +116,7 @@
 
                                 // D-2 / D-1 folded in from the retired Carrier
                                 // Readiness table — per-voyage, from already-loaded
-                                // vesselChecks (H-2/H-1), labelled D-2/D-1 per WX2.
+                                // vesselChecks (H-2/H-1), labelled D-2/D-1.
                                 $vcCol = collect($v->vesselChecks ?? []);
                                 $checkState = function ($code) use ($vcCol) {
                                     $c = $vcCol->first(fn ($x) => $x->day_code && strtoupper($x->day_code) === $code);
@@ -138,7 +131,7 @@
                                 $mMap = collect($v->milestones ?? [])->keyBy(fn ($m) => strtolower($m->code));
 
                                 // Checklist items per zone: [label, state, milestoneId?].
-                                // Each zone shows ONLY its own stage's items (WX2).
+                                // Each zone shows only its own stage's items.
                                 $items = match ($zoneNum) {
                                     1 => [
                                         ['Cargo Plan', $v->cargo_plan !== null ? 'done' : 'pending', null],
@@ -172,8 +165,8 @@
                             @endphp
 
                             {{-- One operational worksheet row. id= is the anchor
-                                 target for the header's Decision Pointer (WX4 §6).
-                                 Verification settle (VR1 item 6) reused unchanged. --}}
+                                 target for the header's Decision Pointer.
+                                 Verification settle reused unchanged. --}}
                             <div id="pv-{{ $v->id }}" wire:key="pv-{{ $v->id }}"
                                 @if ($recentlyUpdatedVoyageId === $v->id)
                                     x-data
@@ -226,8 +219,8 @@
                 @endif
             </section>
 
-            {{-- WX4 §1/§8 — quiet flow connector between zones. Not a
-                 divider (no line, no border): a single muted glyph that
+            {{-- Quiet flow connector between zones. Not a divider (no line,
+                 no border): a single muted glyph that
                  reads as "leads into", reinforcing the pipeline direction
                  without adding visual weight or a section boundary. --}}
             @if (! $loop->last)

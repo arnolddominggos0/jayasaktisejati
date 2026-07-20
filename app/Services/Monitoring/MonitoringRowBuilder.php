@@ -12,8 +12,8 @@ use App\ViewModels\Monitoring\MonitoringRowData;
  * No database queries allowed here — all data must be on the unit or its
  * eager-loaded shipment relation.
  *
- * Sprint 6.4.4: root changed from Shipment to Unit. All Shipment fields are
- * accessed via $unit->shipment. Unit fields are accessed directly on $unit.
+ * Rooted on Unit. All Shipment fields are accessed via $unit->shipment.
+ * Unit fields are accessed directly on $unit.
  */
 final class MonitoringRowBuilder
 {

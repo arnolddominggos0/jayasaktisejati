@@ -31,12 +31,11 @@ class ShipmentController extends Controller
         $query = Shipment::query()
             ->with(['customer', 'receiver', 'voyageRecord.vessel', 'branch', 'tracks']);
 
-        // Apply branch scoping for non-super-admins
+        // Super admin sees all branches; others are scoped to their own.
         if (!$request->user()->hasRole('super_admin')) {
             $query->where(fn ($w) => $w->where('branch_id', $request->user()->effectiveBranchId())->orWhereNull('branch_id'));
         }
 
-        // Apply filters
         if (!empty($validated['search'])) {
             $search = $validated['search'];
             $query->where(function ($q) use ($search) {
@@ -73,7 +72,6 @@ class ShipmentController extends Controller
             $query->whereDate('created_at', '<=', $validated['date_to']);
         }
 
-        // Apply sorting
         $sortBy = $validated['sort_by'] ?? 'created_at';
         $sortOrder = $validated['sort_order'] ?? 'desc';
         $query->orderBy($sortBy, $sortOrder);

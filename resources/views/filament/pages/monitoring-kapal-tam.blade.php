@@ -2,11 +2,10 @@
     <div>
 
         @php
-            // WX2 — the operational LIFECYCLE is the primary axis. Zone
-            // assignment is a pure match() over already-loaded actual-time
-            // fields (the same "safe path" the old Fleet Board used to derive
-            // its own condition): no query, no TaskClassifier. A voyage sits
-            // in exactly one zone at a time and relocates as its actuals fill.
+            // The operational lifecycle is the primary axis. Zone assignment is
+            // a pure match() over already-loaded actual-time fields: no query,
+            // no TaskClassifier. A voyage sits in exactly one zone at a time and
+            // relocates as its actuals fill.
             $zoneOf = fn ($v) => match (true) {
                 $v->ata_at !== null || $v->closing_at !== null => 4, // Kedatangan
                 $v->atd_at !== null                             => 3, // Pelayaran
@@ -15,13 +14,11 @@
             };
             $pipelineGroups = $rows->groupBy($zoneOf);
 
-            // WX4 — Decision Pointer. Same severity facts tam-pipeline.blade.php
-            // derives independently for its own per-zone sort/accent (WD3 "safe
-            // path": duplicated-but-trivial derivation from already-loaded
-            // fields, never TaskClassifier, never a query — same precedent as
-            // $zoneOf above). This is NOT Operational Brief revived: it never
-            // renders a full card, never lists more than two voyages, and says
-            // nothing when nothing is critical (quiet-when-healthy holds).
+            // Decision Pointer: the same severity facts tam-pipeline.blade.php
+            // derives independently for its own per-zone sort/accent — a trivial
+            // derivation from already-loaded fields, never TaskClassifier, never
+            // a query. It never renders a full card, never lists more than two
+            // voyages, and says nothing when nothing is critical.
             $sevScore = fn ($v) => match (true) {
                 $v->overdue_days > 0 || $v->eta_overdue => 3,
                 $v->sailing_risk || $v->milestones->where('is_overdue', true)->count() > 0 => 2,
@@ -40,19 +37,11 @@
                 ->values();
         @endphp
 
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- TOOLBAR — WX5(2) §1/§2/§7/§8                                   --}}
-        {{-- The module title is Filament's native chrome now — small,      --}}
-        {{-- label-only (no getSubheading(), removed this sprint: an        --}}
-        {{-- "explanatory paragraph" is exactly what §1 forbids). This is   --}}
-        {{-- the ONLY row before the pipeline: Decision Pointer (if any)    --}}
-        {{-- on the left, period/search on the right, one line. The old     --}}
-        {{-- standalone summary line ("N Voyage · N Persiapan · ...") is    --}}
-        {{-- removed outright — it duplicated the count already shown next  --}}
-        {{-- to each zone title below, which sits closer to what it         --}}
-        {{-- describes (OOD-1's finding). Pipeline starts immediately       --}}
-        {{-- after this one toolbar row.                                    --}}
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
+        {{-- TOOLBAR — the only row before the pipeline: Decision Pointer (if
+             any) on the left, period/search on the right, one line. The old
+             standalone summary line ("N Voyage · N Persiapan · ...") is removed:
+             it duplicated the count already shown next to each zone title below,
+             which sits closer to what it describes. --}}
         <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 text-[11px] min-w-0">
                 @if ($needsAttention->isNotEmpty())
@@ -80,30 +69,17 @@
         </div>
 
 
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- OPERATIONAL PIPELINE — WX1 / WX2                               --}}
-        {{-- The single operational surface. Fleet Status, Operational      --}}
-        {{-- Brief, the standalone Fleet Board, and the separate Carrier    --}}
-        {{-- Readiness table are all retired here — they represented the    --}}
-        {{-- same voyages more than once and organized the page on          --}}
-        {{-- competing axes (severity vs. completeness vs. calendar). This  --}}
-        {{-- is ONE axis: the operational lifecycle. A voyage lives in      --}}
-        {{-- exactly one zone and travels through them over its life.       --}}
-        {{-- Engineering unchanged: same $rows, same Drawer, same Recording --}}
-        {{-- Modal, same actions — only composition changes.                --}}
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
+        {{-- OPERATIONAL PIPELINE — the single operational surface, organized
+             on one axis: the operational lifecycle. A voyage lives in exactly
+             one zone and travels through them over its life. --}}
         <div class="mt-2">
             @include('filament.pages.partials.tam-pipeline')
         </div>
 
 
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
-        {{-- RETROSPECTIVE ZONE — Calendar + Evaluation (D2 §6, D3 §9)      --}}
-        {{-- Entirely outside the daily Brief↔Reference loop — a separate  --}}
-        {{-- cadence (periodic review), never part of "what do I do now."  --}}
-        {{-- Heading only renders when there's something to support — no   --}}
-        {{-- orphan heading.                                               --}}
-        {{-- ═══════════════════════════════════════════════════════════════ --}}
+        {{-- RETROSPECTIVE ZONE — Calendar + Evaluation. A separate cadence
+             (periodic review), never part of "what do I do now." Heading only
+             renders when there's something to support — no orphan heading. --}}
         @if (count($calendar) || !empty($evaluation))
             <div class="mt-10 pt-6 border-t border-gray-100">
                 <h2 class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Informasi Pendukung</h2>
@@ -111,7 +87,7 @@
             </div>
         @endif
 
-        {{-- Sprint B4.5: whether the Calendar grid actually has any chip
+        {{-- Whether the Calendar grid actually has any chip
              drives both (a) the partial's empty-state vs full-grid choice,
              and (b) the gap into Evaluation right below — a fully empty
              grid is visually short, so the gap after it is tightened to
@@ -333,8 +309,8 @@
                                 </label>
                                 <div class="flex gap-3">
                                     <label class="flex items-center gap-1.5 cursor-pointer">
-                                        {{-- VI Sprint / VR1 WARNING 1 — recording "OK" is a
-                                             neutral confirmation, not a celebration. --}}
+                                        {{-- Recording "OK" is a neutral confirmation,
+                                             not a celebration. --}}
                                         <input type="radio" wire:model.live="actionForm.readiness"
                                             value="{{ \App\Enums\VesselCheckLogStatus::OK->value }}"
                                             class="text-gray-700 focus:ring-gray-400">
@@ -473,8 +449,8 @@
                             {{-- Status badge --}}
                             @php
                                 $dvStatus = $dv->operational_status_enum;
-                                // VI Sprint / VR1 WARNING 1 — Drawer's status badge unified
-                                // with the Fleet Board's $position language: only Delay stays
+                                // Drawer's status badge is unified with the Fleet
+                                // Board's $position language: only Delay stays
                                 // red (severity); Sailing/Selesai are healthy states, quiet
                                 // graphite, distinguished by weight not by blue/green.
                                 $dvBadge = match ($dvStatus) {
@@ -574,9 +550,9 @@
                                                     (bool) $ms->is_overdue  => 'late',
                                                     default                 => 'pending',
                                                 };
-                                                // VI Sprint / VR1 WARNING 2 — milestone completion is
-                                                // monochrome (VM2 §0.6): a completed stage is a
-                                                // quiet filled dot, not green. Only late stays red.
+                                                // Milestone completion is monochrome: a
+                                                // completed stage is a quiet filled dot,
+                                                // not green. Only late stays red.
                                                 $msColor = match ($msStatus) {
                                                     'done'    => 'bg-gray-600',
                                                     'late'    => 'bg-red-500',
@@ -629,8 +605,8 @@
                                     class="px-2.5 py-1 rounded border border-orange-200 bg-orange-50/40 text-[10px] text-orange-600 hover:bg-orange-50 transition">
                                     Readiness
                                 </button>
-                                {{-- WX2 — cargo actual recording relocated here from
-                                     the retired Fleet Board so its entry point survives. --}}
+                                {{-- Cargo actual recording lives here so its entry
+                                     point survives. --}}
                                 <button wire:click="openOpModal({{ $dv->id }}, 'cargo')"
                                     class="px-2.5 py-1 rounded border border-gray-200 bg-white text-[10px] text-gray-600 hover:border-gray-400 transition">
                                     Cargo

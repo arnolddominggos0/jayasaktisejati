@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ShipmentHistoryResource\Pages;
 use App\Filament\Resources\ShipmentHistoryResource;
 use App\Models\Voyage;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Infolists\Infolist;
 use App\Enums\CargoType;
@@ -16,21 +17,14 @@ class ViewShipmentHistory extends ViewRecord
 {
     protected static string $resource = ShipmentHistoryResource::class;
 
-    // ── Voyage relation loader ────────────────────────────────────────────
-    // Called in mount() AND in the Livewire hydrate hook so relations survive
-    // every re-render, not just the initial page load.
     private function loadVoyageRelations(): void
     {
         if (! $this->record->voyage_id) {
             return;
         }
 
-        // Use load() with a nested constraint — NOT loadMissing(['voyage.xxx']).
-        // loadMissing on a dot-path calls Collection::pluck('voyage') internally,
-        // which hits getAttribute('voyage') and returns the string snapshot column
-        // instead of the Voyage model, causing "relationLoaded() on string".
-        // load() with a closure constraint loads the relation and all its children
-        // in a single step, bypassing pluck() entirely.
+        // Use load() with a closure, not loadMissing() on a dot-path: loadMissing
+        // plucks the string snapshot column and throws "relationLoaded() on string".
         $this->record->load([
             'voyage' => fn ($q) => $q->with([
                 'vessel',
@@ -48,8 +42,7 @@ class ViewShipmentHistory extends ViewRecord
         $this->loadVoyageRelations();
     }
 
-    // Filament/Livewire re-hydrates the model on every request without calling
-    // mount() again. Ensure voyage relations are always available.
+    // Livewire re-hydrates the model without calling mount(), so reload relations here.
     public function hydrate(): void
     {
         $this->loadVoyageRelations();
@@ -64,23 +57,26 @@ class ViewShipmentHistory extends ViewRecord
             Action::make('print_resi')
                 ->label('Cetak Resi')
                 ->icon('heroicon-o-document-text')
-                ->color('gray')
+                ->color('primary')
                 ->url(route('shipments.resi', ['shipment' => $record->id]) . '?download=1')
                 ->openUrlInNewTab(),
 
-            Action::make('print_waybill')
-                ->label('Cetak Waybill')
-                ->icon('heroicon-o-printer')
-                ->color('gray')
-                ->url(route('shipments.print.waybill', $record))
-                ->openUrlInNewTab(),
+            ActionGroup::make([
+                Action::make('print_waybill')
+                    ->label('Cetak Waybill')
+                    ->icon('heroicon-o-printer')
+                    ->url(route('shipments.print.waybill', $record))
+                    ->openUrlInNewTab(),
 
-            Action::make('print_packing')
-                ->label('Packing List')
-                ->icon('heroicon-o-clipboard-document-list')
-                ->color('gray')
-                ->url(route('shipments.print.packing', $record))
-                ->openUrlInNewTab(),
+                Action::make('print_packing')
+                    ->label('Packing List')
+                    ->icon('heroicon-o-clipboard-document-list')
+                    ->url(route('shipments.print.packing', $record))
+                    ->openUrlInNewTab(),
+            ])
+                ->label('Dokumen Lain')
+                ->icon('heroicon-o-ellipsis-vertical')
+                ->color('gray'),
 
             // ── Super Admin ───────────────────────────────────────────────
             // Note: ShipmentTrackingResource scopes out delivered/cancelled records,

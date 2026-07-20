@@ -24,7 +24,6 @@ class CustomerController extends Controller
     {
         $query = Customer::query();
 
-        // Apply search
         if ($request->has('search')) {
             $search = $request->get('search');
             $query->where(function ($q) use ($search) {
@@ -34,7 +33,7 @@ class CustomerController extends Controller
             });
         }
 
-        // Apply branch filter for non-super-admins
+        // Super admin sees all branches; others are scoped to their own.
         if (!$request->user()->hasRole('super_admin')) {
             $query->where(fn ($w) => $w->where('branch_id', $request->user()->effectiveBranchId())->orWhereNull('branch_id'));
         }

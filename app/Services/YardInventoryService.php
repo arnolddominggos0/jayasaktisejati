@@ -5,23 +5,12 @@ namespace App\Services;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
-/**
- * Single source of truth for all Yard Inventory KPIs.
- *
- * All methods are scoped to (date, depot_id).
- * Source of truth: shipment_tracks + unit_inspections + units + shipments.
- * briefing_sessions is NEVER used here.
- *
- * Exit-track rules (from SC.5D.0 audit):
- *   Rack / Flat Rack (sea mode, vehicle_loading IN rack, flat_rack) → delivery_to_port
- *   Non-rack (all other)                                            → stuffing
- */
+
 class YardInventoryService
 {
     // Rack = sea/sea_freight mode AND vehicle_loading IN (rack, flat_rack).
     private const RACK_SQL = "(s.mode IN ('sea', 'sea_freight') AND s.vehicle_loading IN ('rack', 'flat_rack'))";
 
-    // Exit track condition used in correlated NOT EXISTS — references outer `s` alias.
     private const EXIT_SQL = "
         (
             (" . self::RACK_SQL . " AND st_exit.status = 'delivery_to_port')
@@ -29,13 +18,6 @@ class YardInventoryService
             (NOT " . self::RACK_SQL . " AND st_exit.status = 'stuffing')
         )
     ";
-
-    // ──────────────────────────────────────────────────────────────────────────
-    // Unit Masuk Yard
-    //
-    // Unit whose shipment has a 'handover' track with tracked_at::date = $date
-    // and shipment is assigned to $depotId.
-    // ──────────────────────────────────────────────────────────────────────────
 
     public function getUnitMasukYard(Carbon $date, int $depotId): int
     {
@@ -200,10 +182,7 @@ class YardInventoryService
             ->count('u.id');
     }
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // Snapshot — all 5 KPIs in a single call (3 DB queries).
-    // Masuk and Keluar are fetched independently; Dalam = max(0, M-K).
-    // Siap and Bermasalah each require one query.
+    // All 5 KPIs in a single call (3 DB queries). Dalam = max(0, Masuk - Keluar).
     // ──────────────────────────────────────────────────────────────────────────
 
     public function snapshot(Carbon $date, int $depotId): array

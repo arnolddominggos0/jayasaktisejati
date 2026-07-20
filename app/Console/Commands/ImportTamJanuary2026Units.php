@@ -48,7 +48,7 @@ class ImportTamJanuary2026Units extends Command
 
         $isDryRun = $this->option('dry-run');
 
-        // ─── Phase 1: Mapping & Validasi ────────────────────────────────────
+        // Mapping & Validasi.
 
         $valid        = [];
         $duplicates   = [];   // duplikat chassis (dalam file atau DB)
@@ -183,7 +183,7 @@ class ImportTamJanuary2026Units extends Command
             return self::SUCCESS;
         }
 
-        // ─── Phase 2: Insert ─────────────────────────────────────────────────
+        // Insert.
         $successCount  = 0;
         $failCount     = 0;
         $failedRows    = [];
@@ -295,7 +295,7 @@ class ImportTamJanuary2026Units extends Command
             }
         });
 
-        // ─── Phase 3: Hitung Leadtime & Status (dari rules sistem) ───────────
+        // Hitung Leadtime & Status (dari rules sistem).
         if (! empty($importedIds)) {
             $this->newLine();
             $this->line('<fg=cyan>========================================</>');
@@ -344,7 +344,7 @@ class ImportTamJanuary2026Units extends Command
             );
         }
 
-        // ─── Phase 4: Summary Akhir ──────────────────────────────────────────
+        // Summary Akhir.
         $this->newLine();
         $this->line('<fg=cyan>============================</>');
         $this->line('<fg=cyan>  SUMMARY IMPORT            </>');

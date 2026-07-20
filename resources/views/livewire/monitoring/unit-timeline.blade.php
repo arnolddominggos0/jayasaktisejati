@@ -1,6 +1,6 @@
 {{--
-    Operational Timeline — Sprint 6.5.3
-    -----------------------------------------------------------------------
+    Operational Timeline
+
     Source of truth: UnitTimeline ViewModel, built by TimelineBuilder from
     Shipment::tracks (ShipmentTrack records with tracked_at timestamps).
 

@@ -19,7 +19,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 /**
- * DOMAIN-02 — Master Dealer (Vehicle Shipment).
+ * Master Dealer (Vehicle Shipment).
  *
  * Dealer = jaringan distribusi milik Commercial Customer. Operational
  * Master, global (tanpa branch scope) — pola akses identik dengan
