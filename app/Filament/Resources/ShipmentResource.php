@@ -6,10 +6,8 @@ use App\Enums\CargoType;
 use App\Enums\ContainerSize;
 use App\Enums\DeliveryScope;
 use App\Enums\RequestType;
-use App\Enums\ServiceType;
 use App\Enums\ShipmentMode;
 use App\Enums\ShipmentStatus;
-use App\Enums\TrackStatus;
 use App\Filament\Resources\ShipmentResource\Pages\CreateShipment;
 use App\Filament\Resources\ShipmentResource\Pages\EditShipment;
 use App\Filament\Resources\ShipmentResource\Pages\ListShipments;
@@ -46,6 +44,7 @@ use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Tables\Actions\ActionGroup;
 use Filament\Tables\Actions\BulkAction;
 use Filament\Tables\Actions\DeleteBulkAction;
 use Filament\Tables\Actions\EditAction;
@@ -88,6 +87,20 @@ class ShipmentResource extends Resource
         }
 
         return Filament::auth()->user()?->effectiveBranchId();
+    }
+
+    /**
+     * Nilai filter "Jenis Muatan" yang sedang aktif pada tabel, dipakai sebagai
+     * entry point kolom dinamis (Vehicle vs General Cargo). Null berarti belum
+     * dipilih (campuran mode) sehingga hanya Common Columns yang tampil.
+     */
+    protected static function activeCargoTypeFilter($livewire): ?string
+    {
+        if (! method_exists($livewire, 'getTableFilterState')) {
+            return null;
+        }
+
+        return $livewire->getTableFilterState('cargo_type')['value'] ?? null;
     }
 
     public static function resolveOriginCityFromUser(?int $branchId = null): array
@@ -1373,128 +1386,18 @@ class ShipmentResource extends Resource
                 $query->with([
                     'originCity:id,name',
                     'destinationCity:id,name',
-                    'tracks:id,shipment_id,status,actual_at,tracked_at',
+                    'dealer:id,name',
                     'units:id,shipment_id,reg_no,chassis_no,model_no,qty',
                 ]);
             })
             ->columns([
                 TextColumn::make('code')
-                    ->label('Kode')
-                    ->badge()
+                    ->label('Nomor Resi')
                     ->color(fn(Shipment $r) => $r->mode === ShipmentMode::Sea ? 'primary' : 'warning')
                     ->extraAttributes(['class' => 'font-mono'])
                     ->copyable()
                     ->searchable()
                     ->sortable(),
-
-                IconColumn::make('mode')
-                    ->label('Moda')
-                    ->icon(function ($state) {
-                        $val = $state instanceof ShipmentMode ? $state->value : (string) $state;
-
-                        return $val === ShipmentMode::Sea->value ? 'heroicon-m-cog-8-tooth' : 'heroicon-m-truck';
-                    })
-                    ->color(function ($state) {
-                        $val = $state instanceof ShipmentMode ? $state->value : (string) $state;
-
-                        return $val === ShipmentMode::Sea->value ? 'primary' : 'warning';
-                    })
-                    ->tooltip(function ($state) {
-                        $val = $state instanceof ShipmentMode ? $state->value : (string) $state;
-
-                        return $val === ShipmentMode::Sea->value ? 'Laut' : 'Darat';
-                    }),
-
-                TextColumn::make('customer.name')
-                    ->label('Customer')
-                    ->badge()
-                    ->searchable()
-                    ->sortable(),
-
-                TextColumn::make('units_count')
-                    ->label('Unit')
-                    ->counts('units')
-                    ->badge()
-                    ->color('gray')
-                    ->formatStateUsing(fn(?int $state) => $state > 0 ? (string) $state : '—')
-                    ->alignCenter()
-                    ->sortable(),
-
-                TextColumn::make('priority')
-                    ->label('Prioritas')
-                    ->badge()
-                    ->formatStateUsing(fn(?string $state) => match ($state) {
-                        'urgent' => 'Mendesak',
-                        'normal' => 'Normal',
-                        'high'   => 'Tinggi',
-                        'low'    => 'Rendah',
-                        default  => $state ?: '-'
-                    })
-                    ->color(fn(?string $state) => $state === 'urgent' ? 'danger' : 'gray')
-                    ->sortable(),
-
-                TextColumn::make('status')
-                    ->label('Status')
-                    ->badge()
-                    ->getStateUsing(fn(Shipment $r): ShipmentStatus|string|null => $r->status?->label() ?? (is_string($r->status) ? $r->status : '-'))
-                    ->colors([
-                        'gray' => ['Draf'],
-                        'warning' => ['Menunggu', 'Ditahan'],
-                        'info' => ['Penjemputan', 'Dalam Perjalanan'],
-                        'success' => ['Terkirim'],
-                        'danger' => ['Dibatalkan'],
-                    ])
-                    ->sortable(),
-
-                TextColumn::make('eta')
-                    ->label('ETA')
-                    ->badge()
-                    ->dateTime('d M Y H:i')
-                    ->color(function ($state) {
-                        if (! $state) {
-                            return 'gray';
-                        }
-
-                        $eta = Carbon::parse($state);
-                        if ($eta->isPast()) {
-                            return 'danger';
-                        }
-                        if ($eta->diffInDays(now()) <= 2) {
-                            return 'warning';
-                        }
-
-                        return 'success';
-                    })
-                    ->sortable(),
-
-                TextColumn::make('route')
-                    ->label('Rute')
-                    ->html()
-                    ->getStateUsing(function (Shipment $record): string {
-                        $oCity = $record->originCity->name ?? '-';
-                        $dCity = $record->destinationCity->name ?? '-';
-
-                        return "<div class='font-medium'>{$oCity} &rarr; {$dCity}</div>";
-                    })
-                    ->toggleable(),
-
-                TextColumn::make('receiver.name')
-                    ->label('Penerima')
-                    ->badge()
-                    ->placeholder('—')
-                    ->searchable()
-                    ->sortable(),
-
-                TextColumn::make('service_type')
-                    ->label('Layanan')
-                    ->getStateUsing(fn(Shipment $r) => $r->service_type?->label() ?? (is_string($r->service_type) ? $r->service_type : '-'))
-                    ->badge()
-                    ->colors([
-                        'info' => [ServiceType::SeaFreight->label()],
-                        'warning' => [ServiceType::LandTrucking->label(), ServiceType::CarCarrier->label()],
-                    ])
-                    ->sortable(),
-
                 TextColumn::make('request_type')
                     ->label('Tipe')
                     ->badge()
@@ -1519,32 +1422,144 @@ class ShipmentResource extends Resource
                         };
                     }),
 
-                TextColumn::make('service_option')
-                    ->label('Opsi')
-                    ->formatStateUsing(function (?string $state, Shipment $record) {
-                        if ($record->cargo_type === CargoType::Vehicle) {
-                            return 'Unit';
+                TextColumn::make('doc_number')
+                    ->label('SPPB/DO')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('customer.name')
+                    ->label('Customer')
+                    ->searchable()
+                    ->sortable(),
+
+                IconColumn::make('mode')
+                    ->label('Moda')
+                    ->icon(function ($state) {
+                        $val = $state instanceof ShipmentMode ? $state->value : (string) $state;
+
+                        return $val === ShipmentMode::Sea->value ? 'heroicon-m-cog-8-tooth' : 'heroicon-m-truck';
+                    })
+                    ->color(function ($state) {
+                        $val = $state instanceof ShipmentMode ? $state->value : (string) $state;
+
+                        return $val === ShipmentMode::Sea->value ? 'primary' : 'warning';
+                    })
+                    ->tooltip(function ($state) {
+                        $val = $state instanceof ShipmentMode ? $state->value : (string) $state;
+
+                        return $val === ShipmentMode::Sea->value ? 'Laut' : 'Darat';
+                    }),
+
+                // ── Vehicle Shipment Columns — hanya tampil saat filter Jenis Muatan = Vehicle ──
+                TextColumn::make('dealer.name')
+                    ->label('Dealer')
+                    ->placeholder('—')
+                    ->searchable()
+                    ->sortable()
+                    ->visible(fn($livewire) => self::activeCargoTypeFilter($livewire) === CargoType::Vehicle->value),
+
+                TextColumn::make('units_count')
+                    ->label('Jumlah Unit')
+                    ->counts('units')
+                    ->formatStateUsing(fn(?int $state) => $state > 0 ? (string) $state : '—')
+                    ->sortable()
+                    ->visible(fn($livewire) => self::activeCargoTypeFilter($livewire) === CargoType::Vehicle->value),
+
+                // ── General Cargo Columns — hanya tampil saat filter Jenis Muatan = General ──
+                TextColumn::make('packages_total')
+                    ->label('Jumlah Koli')
+                    ->placeholder('—')
+                    ->sortable()
+                    ->visible(fn($livewire) => self::activeCargoTypeFilter($livewire) === CargoType::General->value),
+
+                TextColumn::make('weight_total')
+                    ->label('Berat (kg)')
+                    ->numeric(2, '.', ',')
+                    ->placeholder('—')
+                    ->sortable()
+                    ->visible(fn($livewire) => self::activeCargoTypeFilter($livewire) === CargoType::General->value),
+
+                TextColumn::make('cbm_total')
+                    ->label('CBM')
+                    ->numeric(3, '.', ',')
+                    ->placeholder('—')
+                    ->sortable()
+                    ->visible(fn($livewire) => self::activeCargoTypeFilter($livewire) === CargoType::General->value),
+
+                // ── kembali ke Common Columns ──
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
+                    ->getStateUsing(fn(Shipment $r): ShipmentStatus|string|null => $r->status?->label() ?? (is_string($r->status) ? $r->status : '-'))
+                    ->colors([
+                        'gray' => ['Draf'],
+                        'warning' => ['Menunggu', 'Ditahan'],
+                        'info' => ['Penjemputan', 'Dalam Perjalanan'],
+                        'success' => ['Terkirim'],
+                        'danger' => ['Dibatalkan'],
+                    ])
+                    ->sortable(),
+
+                TextColumn::make('etd')
+                    ->label('ETD')
+                    ->badge()
+                    ->dateTime('d M Y H:i')
+                    ->color('gray')
+                    ->sortable()
+                    ->toggleable(),
+
+                TextColumn::make('eta')
+                    ->label('ETA')
+                    ->badge()
+                    ->dateTime('d M Y H:i')
+                    ->color(function ($state) {
+                        if (! $state) {
+                            return 'gray';
                         }
 
-                        return match ($state) {
-                            'fcl' => 'FCL',
-                            'lcl' => 'LCL',
-                            'truck' => 'Truck',
-                            'towing' => 'Towing',
-                            'car_carrier' => 'Car Carrier',
-                            default => $state ?: '-',
-                        };
+                        $eta = Carbon::parse($state);
+                        if ($eta->isPast()) {
+                            return 'danger';
+                        }
+                        if ($eta->diffInDays(now()) <= 2) {
+                            return 'warning';
+                        }
+
+                        return 'success';
                     })
+                    ->sortable()
+                    ->toggleable(),
+
+                TextColumn::make('priority')
+                    ->label('Prioritas')
                     ->badge()
-                    ->color(fn(?string $state) => match ($state) {
-                        'fcl' => 'primary',
-                        'lcl' => 'info',
-                        'car_carrier' => 'warning',
-                        'towing' => 'warning',
-                        'truck' => 'gray',
-                        default => 'gray',
+                    ->formatStateUsing(fn(?string $state) => match ($state) {
+                        'urgent' => 'Mendesak',
+                        'normal' => 'Normal',
+                        'high'   => 'Tinggi',
+                        'low'    => 'Rendah',
+                        default  => $state ?: '-'
+                    })
+                    ->color(fn(?string $state) => $state === 'urgent' ? 'danger' : 'gray')
+                    ->sortable(),
+
+                TextColumn::make('route')
+                    ->label('Rute')
+                    ->html()
+                    ->getStateUsing(function (Shipment $record): string {
+                        $oCity = $record->originCity->name ?? '-';
+                        $dCity = $record->destinationCity->name ?? '-';
+
+                        return "<div class='font-medium'>{$oCity} &rarr; {$dCity}</div>";
                     })
                     ->toggleable(),
+
+                TextColumn::make('receiver.name')
+                    ->label('Penerima')
+                    ->placeholder('—')
+                    ->searchable()
+                    ->sortable()
+                    ->visible(fn($livewire) => self::activeCargoTypeFilter($livewire) === CargoType::General->value),
 
                 TextColumn::make('delivery_scope')
                     ->label('Cakupan')
@@ -1555,45 +1570,6 @@ class ShipmentResource extends Resource
                         'success' => [DeliveryScope::DoorToDoor->label()],
                         'warning' => [DeliveryScope::DoorToPort->label(), DeliveryScope::PortToDoor->label()],
                     ])
-                    ->toggleable(),
-
-                TextColumn::make('packages_total')
-                    ->label('Koli')
-                    ->getStateUsing(function (Shipment $r) {
-                        return $r->cargo_type === CargoType::General
-                            ? $r->packages_total
-                            : null;
-                    })
-                    ->placeholder('—')
-                    ->sortable()
-                    ->toggleable(),
-
-                TextColumn::make('cbm_total')
-                    ->label('CBM')
-                    ->getStateUsing(function (Shipment $r) {
-                        if ($r->cargo_type !== CargoType::General) {
-                            return null;
-                        }
-
-                        return $r->cbm_total;
-                    })
-                    ->numeric(3, '.', ',')
-                    ->placeholder('—')
-                    ->sortable()
-                    ->toggleable(),
-
-                TextColumn::make('weight_total')
-                    ->label('Berat (kg)')
-                    ->getStateUsing(function (Shipment $r) {
-                        if ($r->cargo_type !== CargoType::General) {
-                            return null;
-                        }
-
-                        return $r->weight_total;
-                    })
-                    ->numeric(2, '.', ',')
-                    ->placeholder('—')
-                    ->sortable()
                     ->toggleable(),
 
                 TextColumn::make('attachments_count')
@@ -1653,89 +1629,6 @@ class ShipmentResource extends Resource
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('timeline_progress')
-                    ->label('Progress')
-                    ->badge()
-                    ->color(function (Shipment $r) {
-                        $mask = method_exists($r, 'timelineMask') ? $r->timelineMask() : self::resolveTimelineMask($r);
-                        $order = TrackStatus::simplifiedForMode($r->mode, $mask);
-                        $total = max(1, count($order));
-
-                        $idx = -1;
-                        $reached = $r->tracks->filter(function ($t) {
-                            return ! empty($t->status) && (! empty($t->actual_at) || ! empty($t->tracked_at));
-                        })->values();
-
-                        $orderMap = [];
-                        foreach ($order as $i => $s) {
-                            $orderMap[$s->value] = $i;
-                        }
-
-                        foreach ($reached as $t) {
-                            $sv = $t->status instanceof TrackStatus ? $t->status->value : (string) $t->status;
-                            if (isset($orderMap[$sv])) {
-                                $idx = max($idx, $orderMap[$sv]);
-                            }
-                        }
-
-                        $done = $idx + 1;
-                        $pct = (int) floor(($done / $total) * 100);
-
-                        if ($pct >= 100) {
-                            return 'success';
-                        }
-                        if ($pct >= 70) {
-                            return 'primary';
-                        }
-                        if ($pct >= 40) {
-                            return 'info';
-                        }
-
-                        return 'gray';
-                    })
-                    ->getStateUsing(function (Shipment $r) {
-                        $cfg = config('jss_timeline');
-                        $mask = method_exists($r, 'timelineMask') ? $r->timelineMask() : self::resolveTimelineMask($r);
-                        $order = TrackStatus::simplifiedForMode($r->mode, $mask);
-                        $total = max(1, count($order));
-
-                        $idx = -1;
-                        $reached = $r->tracks->filter(function ($t) {
-                            return ! empty($t->status) && (! empty($t->actual_at) || ! empty($t->tracked_at));
-                        })->values();
-
-                        $orderMap = [];
-                        foreach ($order as $i => $s) {
-                            $orderMap[$s->value] = $i;
-                        }
-
-                        foreach ($reached as $t) {
-                            $sv = $t->status instanceof TrackStatus ? $t->status->value : (string) $t->status;
-                            if (isset($orderMap[$sv])) {
-                                $idx = max($idx, $orderMap[$sv]);
-                            }
-                        }
-
-                        $done = $idx + 1;
-                        $pct = (int) floor(($done / $total) * 100);
-
-                        $profiles = $cfg['profiles'] ?? [];
-                        $fallbackKey = $cfg['default_profile'] ?? 'standard_sea';
-                        $maskKey = array_search($mask, $profiles, true);
-                        $pname = is_string($maskKey) ? $maskKey : $fallbackKey;
-
-                        return "{$done}/{$total} • {$pct}% • {$pname}";
-                    })
-                    ->toggleable(),
-
-                TextColumn::make('etd')
-                    ->label('ETD')
-                    ->badge()
-                    ->dateTime('d M Y H:i')
-                    ->color('gray')
-                    ->sortable()
-                    ->toggleable(),
-
                 TextColumn::make('updated_at')
                     ->label('Diubah')
                     ->since()
@@ -1750,6 +1643,13 @@ class ShipmentResource extends Resource
             ])
 
             ->filters([
+                SelectFilter::make('cargo_type')
+                    ->label('Jenis Muatan')
+                    ->options([
+                        CargoType::Vehicle->value => CargoType::Vehicle->label(),
+                        CargoType::General->value => CargoType::General->label(),
+                    ]),
+
                 SelectFilter::make('customer_id')
                     ->label('Customer')
                     ->relationship('customer', 'name')
@@ -1762,14 +1662,14 @@ class ShipmentResource extends Resource
                     ->searchable()
                     ->preload(),
             ], layout: FiltersLayout::AboveContent)
-            ->filtersFormColumns(2)
+            ->filtersFormColumns(3)
             ->emptyStateIcon('heroicon-o-clipboard-document-list')
-            ->emptyStateHeading(fn ($livewire) => match ($livewire->activeTab ?? 'semua') {
+            ->emptyStateHeading(fn($livewire) => match ($livewire->activeTab ?? 'semua') {
                 'menunggu-penjemputan' => 'Tidak ada permintaan yang menunggu penjemputan',
                 'perlu-tindakan' => 'Tidak ada permintaan yang memerlukan tindakan',
                 default => 'Belum ada permintaan pengiriman',
             })
-            ->emptyStateDescription(fn ($livewire) => match ($livewire->activeTab ?? 'semua') {
+            ->emptyStateDescription(fn($livewire) => match ($livewire->activeTab ?? 'semua') {
                 'menunggu-penjemputan' => 'Semua permintaan pengiriman telah diproses atau belum ada permintaan baru yang siap dijemput.',
                 'perlu-tindakan' => 'Semua permintaan pengiriman berada pada kondisi normal. Tidak ada tindak lanjut yang diperlukan saat ini.',
                 default => 'Mulai dengan membuat permintaan pengiriman baru atau unggah dokumen SPPB/DO untuk memulai proses operasional.',
@@ -1777,25 +1677,6 @@ class ShipmentResource extends Resource
             ->defaultSort('priority', 'desc')
             ->defaultSort('eta', 'asc')
             ->actions([
-                EditAction::make()->label('Edit'),
-
-                \Filament\Tables\Actions\Action::make('createAssignment')
-                    ->label('Buat Penugasan')
-                    ->icon('heroicon-m-clipboard-document-check')
-                    ->url(fn($record) => ArmadaAssignmentResource::getUrl('create', [
-                        'prefill[shipment_id]' => $record->id,
-                        'prefill[branch_id]' => $record->branch_id,
-                        'prefill[depot_id]' => $record->depot_id,
-                    ]))
-                    ->visible(
-                        fn(Shipment $record) => ($record->mode === ShipmentMode::Land)
-                            && in_array(
-                                ($record->status?->value ?? (string) $record->status),
-                                array_map(fn($s) => $s->value, ShipmentStatus::active()),
-                                true
-                            )
-                    ),
-
                 \Filament\Tables\Actions\Action::make('print_resi')
                     ->label('Cetak Resi')
                     ->icon('heroicon-m-printer')
@@ -1803,12 +1684,33 @@ class ShipmentResource extends Resource
                     ->url(fn($record) => route('shipments.resi', ['shipment' => $record->id]) . '?download=1')
                     ->openUrlInNewTab(),
 
-                \Filament\Tables\Actions\Action::make('sendToFc')
-                    ->label('Kirim ke FC')
-                    ->icon('heroicon-m-paper-airplane')
-                    ->visible(fn(Shipment $r) => $r->status === ShipmentStatus::Draft)
-                    ->requiresConfirmation()
-                    ->action(fn(Shipment $r) => $r->sendToFc()),
+                ActionGroup::make([
+                    EditAction::make()->label('Edit'),
+
+                    \Filament\Tables\Actions\Action::make('createAssignment')
+                        ->label('Buat Penugasan')
+                        ->icon('heroicon-m-clipboard-document-check')
+                        ->url(fn($record) => ArmadaAssignmentResource::getUrl('create', [
+                            'prefill[shipment_id]' => $record->id,
+                            'prefill[branch_id]' => $record->branch_id,
+                            'prefill[depot_id]' => $record->depot_id,
+                        ]))
+                        ->visible(
+                            fn(Shipment $record) => ($record->mode === ShipmentMode::Land)
+                                && in_array(
+                                    ($record->status?->value ?? (string) $record->status),
+                                    array_map(fn($s) => $s->value, ShipmentStatus::active()),
+                                    true
+                                )
+                        ),
+
+                    \Filament\Tables\Actions\Action::make('sendToFc')
+                        ->label('Kirim ke FC')
+                        ->icon('heroicon-m-paper-airplane')
+                        ->visible(fn(Shipment $r) => $r->status === ShipmentStatus::Draft)
+                        ->requiresConfirmation()
+                        ->action(fn(Shipment $r) => $r->sendToFc()),
+                ]),
             ])
             ->bulkActions([
                 BulkAction::make('export_selected')
@@ -1843,7 +1745,7 @@ class ShipmentResource extends Resource
                             $out = fopen('php://output', 'w');
 
                             fputcsv($out, [
-                                'Kode',
+                                'Nomor Resi',
                                 'Pengirim',
                                 'Penerima',
                                 'Asal',

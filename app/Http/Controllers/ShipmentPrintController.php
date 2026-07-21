@@ -193,7 +193,7 @@ class ShipmentPrintController extends Controller
             'abbr'  => 'JSS',
             'color' => '#0137A1',
             'logo'  => $logoDataUri,
-            'site'  => env('APP_BRAND_SITE', 'https://jayasaktisejati.com'),
+            'site'  => env('APP_BRAND_SITE', 'https://jayasaktiapp.com'),
             'phone' => env('COMPANY_PHONE', config('company.phone', '+6221 693 0565')),
         ];
 
@@ -315,7 +315,7 @@ class ShipmentPrintController extends Controller
             'abbr'  => 'JSS',
             'color' => '#0137A1',
             'logo'  => $logoDataUri,
-            'site'  => env('APP_BRAND_SITE', 'https://jayasaktisejati.com'),
+            'site'  => env('APP_BRAND_SITE', 'https://jayasaktiapp.com'),
             'phone' => env('COMPANY_PHONE', config('company.phone', '+6221 693 0565')),
         ];
 
@@ -410,7 +410,7 @@ class ShipmentPrintController extends Controller
             'abbr'  => 'JSS',
             'color' => '#0137A1',
             'logo'  => $logoDataUri,
-            'site'  => env('APP_BRAND_SITE', env('COMPANY_URL', 'https://jayasaktisejati.com')),
+            'site'  => env('APP_BRAND_SITE', env('COMPANY_URL', 'https://jayasaktiapp.com')),
             'phone' => env('COMPANY_PHONE', config('company.phone', '+6221 693 0565')),
             'addr'  => (function () use ($branchInfo) {
                 if (empty($branchInfo)) {

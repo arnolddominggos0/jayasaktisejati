@@ -18,15 +18,18 @@ final class ExceptionEvaluator
      *   'critical' → red  in the per-row table (severity === 'critical' check in blade)
      *   'warning'  → amber in the per-row table
      */
+    // NOTE: only the `label` (UI display text) is Indonesian operational copy
+    // (UX Polish v1.5). The `type` keys ('hold','stuck',…) remain the backend
+    // identifiers used for filtering, CSS, and priority — never change those.
     private const CHIP_DEFINITIONS = [
         'hold' => [
-            'label'    => 'Hold',
+            'label'    => 'Ditahan',
             'severity' => 'critical',
             'color'    => 'red',
             'icon'     => 'heroicon-o-pause-circle',
         ],
         'ng' => [
-            'label'    => 'NG',
+            'label'    => 'Temuan NG',
             'severity' => 'critical',
             'color'    => 'red',
             'icon'     => 'heroicon-o-x-circle',
@@ -38,19 +41,19 @@ final class ExceptionEvaluator
             'icon'     => 'heroicon-o-exclamation-triangle',
         ],
         'delay' => [
-            'label'    => 'Delay',
+            'label'    => 'Terlambat',
             'severity' => 'critical',
             'color'    => 'red',
             'icon'     => 'heroicon-o-clock',
         ],
         'stuck' => [
-            'label'    => 'Stuck',
+            'label'    => 'Perlu Tindak Lanjut',
             'severity' => 'warning',
             'color'    => 'amber',
             'icon'     => 'heroicon-o-arrow-path',
         ],
         'missing_voyage' => [
-            'label'    => 'Missing Voyage',
+            'label'    => 'Belum Ada Voyage',
             'severity' => 'warning',
             'color'    => 'amber',
             'icon'     => 'heroicon-o-map',

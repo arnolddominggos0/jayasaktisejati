@@ -695,11 +695,11 @@
     --mon-divider:     #F1F5F9;
 
     /* -- Type scale (rem) -- */
-    --mon-fs-h1:    2.25rem;     /* 36 - H1 */
+    --mon-fs-h1:    1.875rem;    /* 30 - H1, matches Permintaan Pengiriman's page heading (UX Polish v1.2) */
     --mon-fs-sub:   1rem;        /* 16 - subtitle */
     --mon-fs-body:  0.9375rem;   /* 15 - input / secondary */
     --mon-fs-tb-l:  0.8125rem;   /* 13 - toolbar label / table header */
-    --mon-fs-tbl:   0.875rem;    /* 14 - table body */
+    --mon-fs-tbl:   0.8125rem;   /* 13 - table body, matches Permintaan Pengiriman's .fi-ta-table td */
     --mon-fs-cap:   0.8125rem;   /* 13 - caption */
     --mon-fs-foot:  0.6875rem;   /* 11 - footer (R2: was 12px) */
 
@@ -709,7 +709,7 @@
     --mon-sec-gap:   0.75rem;    /* 12 - section spacing */
     --mon-row-px:    0.875rem;   /* 14 */
     --mon-row-py:    0.5rem;     /* 8 - R2: was 10px, target 34-36px rows */
-    --mon-touch:     2.75rem;    /* 44 - enterprise touch target */
+    --mon-touch:     2.25rem;    /* 36 - matches Permintaan Pengiriman's button/input height (UX Polish v1.2) */
 
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -727,17 +727,17 @@
    ======================================================================= */
 .mon-h1 {
     font-size: var(--mon-fs-h1);
-    font-weight: 800;
-    line-height: 1.1;
+    font-weight: 700;
+    line-height: 1.2;
     letter-spacing: -0.025em;
     color: var(--mon-navy);
 }
 .mon-subtitle {
-    /* 6.3E: +1px readability, slightly stronger weight, darker without being loud */
-    font-size: 1.0625rem;     /* was 1rem (16px) -> 17px */
-    font-weight: 600;          /* was 500 */
+    /* Matches Permintaan Pengiriman's subheading size/weight (UX Polish v1.2) */
+    font-size: 1.125rem;      /* 18px */
+    font-weight: 500;
     line-height: 1.4;
-    color: #57606B;            /* was var(--mon-neutral) #6B7280 */
+    color: #57606B;
 }
 .mon-caption {
     font-size: var(--mon-fs-cap);
@@ -756,7 +756,7 @@
    ======================================================================= */
 .jss-mon-header {
     border-bottom: 1px solid var(--mon-border-soft);
-    padding-bottom: 0.625rem;
+    padding-bottom: 0.5rem;
 }
 /* 6.3F-final: header breathing space - target the existing Tailwind gap
    utilities directly (no Blade change). Compound class selectors beat the
@@ -793,6 +793,9 @@
    Same DOM order as before (dot, number, label) - the live-status dot is
    pulled out of flow via position:absolute below, so flex-column naturally
    stacks number above label without any Blade change. */
+/* KPI chip - card language matches Dashboard Operasional's compact metric
+   style (UX Polish v1.2): bordered surface instead of a solid colour tint,
+   so it reads as the same design system rather than its own accent block. */
 .mon-metric {
     position: relative;
     display: inline-flex;
@@ -803,15 +806,9 @@
     gap: 0.0625rem;
     padding: 0.3125rem 0.875rem;
     border-radius: 0.625rem;
+    border: 1px solid var(--mon-border);
+    background: var(--mon-surface);
     min-width: 3.25rem;
-}
-/* Priority KPI - accent tint, the number an operator should see first */
-.mon-metric:has(.mon-metric-num) {
-    background: var(--mon-accent-50);
-}
-/* Secondary KPI (finished) - neutral tint, clearly a twin chip but quieter */
-.mon-metric:has(.mon-metric-sub) {
-    background: #F1F5F9;
 }
 /* Live-status dot - repositioned to a small corner badge instead of inline */
 .mon-metric:has(.mon-metric-num) .rounded-full.bg-blue-500 {
@@ -822,29 +819,22 @@
     height: 0.375rem;
 }
 .mon-metric-num {
-    font-size: 1.625rem;       /* was 1.875rem - slightly reduced to suit the stacked chip */
+    font-size: 1.625rem;
     font-weight: 800;
     letter-spacing: -0.02em;
     color: var(--mon-navy);
     font-variant-numeric: tabular-nums;
 }
-.mon-metric-sub {
-    font-size: 1.25rem;        /* was var(--mon-fs-cap) 13px - now a real number, not a tiny suffix */
-    font-weight: 800;
-    letter-spacing: -0.015em;
-    color: var(--mon-navy-400);
-    font-variant-numeric: tabular-nums;
-}
 .mon-metric-label {
-    font-size: 0.625rem;       /* was var(--mon-fs-cap) 13px - now a secondary caption under the number */
-    font-weight: 700;
-    letter-spacing: 0.04em;
+    font-size: 0.6875rem;      /* matches Dashboard's .jss-metric-label caption size */
+    font-weight: 500;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
-    color: var(--mon-navy-400);
+    color: var(--mon-neutral);
 }
 .mon-vrule {
     width: 1px;
-    height: 2.25rem;            /* was 1.25rem - matches the taller stacked KPI chips */
+    height: 1.75rem;
     background: var(--mon-border);
     flex-shrink: 0;
 }
@@ -889,17 +879,17 @@
     padding: 0.625rem var(--mon-row-px);
 }
 
-/* Refresh button - framed, secondary, enterprise weight */
+/* Refresh button - matches Permintaan Pengiriman's Filter/toolbar button exactly (UX Polish v1.4) */
 .mon-btn {
     display: inline-flex;
     align-items: center;
-    gap: 0.4375rem;
+    gap: 0.375rem;
     min-height: var(--mon-touch);
-    padding: 0 0.875rem;
+    padding: 0 0.625rem;
     border-radius: var(--mon-radius-sm);
     border: 1px solid var(--mon-border);
     background: var(--mon-surface);
-    font-size: var(--mon-fs-body);
+    font-size: 0.875rem;
     font-weight: 600;
     color: var(--mon-navy-600);
     /* 6.3E Rule 8: button=120ms, focus outline=150ms */
@@ -912,42 +902,9 @@
    Filament form override - scoped to the workspace, presentation only
    (no schema/state changes; mostly label + input density)
    ======================================================================= */
-.jss-monitoring .fi-field-label,
-.jss-monitoring .fi-form-item-label {
-    /* 6.3E: +0.5px and a touch of tracking - easier to scan, still light (Rule 2) */
-    font-size: 0.84375rem;     /* was var(--mon-fs-tb-l) 13px -> 13.5px */
-    font-weight: 600;
-    color: var(--mon-navy-600);
-    letter-spacing: 0.01em;     /* was 0 */
-    margin-bottom: 0.3125rem;   /* was 0.25rem */
-}
-.jss-monitoring .fi-input,
-.jss-monitoring .fi-select,
-.jss-monitoring .fi-fo-select,
-.jss-monitoring select {
-    font-size: var(--mon-fs-body);
-    min-height: var(--mon-touch);
-    border-radius: var(--mon-radius-sm);
-    border-width: 1px;          /* 6.3E: explicit - guarantees consistent border across control types (Rule 5) */
-    border-style: solid;
-    border-color: var(--mon-border);
-    transition: border-color 120ms ease, box-shadow 120ms ease; /* 6.3E: Rule 8 smoothing */
-}
-.jss-monitoring .fi-input:focus,
-.jss-monitoring .fi-select:focus,
-.jss-monitoring .fi-fo-select:focus,
-.jss-monitoring select:focus {
-    border-color: var(--mon-accent);
-    /* 6.3E: softer focus ring - translucent halo + crisp inner line (Rule 5) */
-    box-shadow: 0 0 0 3px rgba(37,99,235,0.12), 0 0 0 1px var(--mon-accent);
-}
-.jss-monitoring .fi-input::placeholder {
-    color: var(--mon-neutral-400);  /* 6.3E: softer placeholder than browser default (Rule 5) */
-    opacity: 1;
-}
-/* Make the search prefix icon navy, not gray - it''s the primary command */
-.jss-monitoring .fi-input .fi-icon,
-.jss-monitoring .fi-fo-prefix svg { color: var(--mon-navy-400); }
+/* Filter bar uses Filament's native field/input/select styling - no
+   overrides - so it renders identically to Permintaan Pengiriman's filters
+   (UX Polish v1.2). Only layout (baseline alignment) is scoped here. */
 
 /* 6.3E Rule 6: bottom-align every toolbar field (Search/Exception/Tampilan/Selesai)
    on one shared baseline, regardless of control type (input/select/toggle all
@@ -1151,17 +1108,15 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    padding: 0.625rem var(--mon-row-px);
+    /* Aligned with Permintaan Pengiriman's .fi-ta-table th (UX Polish v1.2) */
+    padding: 0.5rem 0.625rem;
     text-align: left;
-    /* 6.3E Rule 2 + 6.3F: +0.5px, tighter tracking, darker navy - reads stronger
-       without growing the row or outweighing 14px body text */
-    font-size: 0.875rem;          /* 6.3F: was 0.84375rem (13.5px) -> 14px */
-    font-weight: 800;             /* 6.3F: was 700 - stronger scan-weight */
-    letter-spacing: 0.03em;       /* 6.3F: was 0.035em - slightly tighter now weight is up */
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
-    color: var(--mon-navy);       /* was var(--mon-navy-600) - stronger contrast */
-    /* 6.3E Rule 3: subtle step between toolbar (#F1F5F9) and white body */
-    background: #F7F9FB;          /* was #F8FAFC */
+    color: #6b7280;
+    background: rgba(249, 250, 251, 0.8);
     border-bottom: 1px solid var(--mon-border);
     white-space: nowrap;
 }
@@ -1169,17 +1124,17 @@
 .mon-table thead th.col-ctr { text-align: center; }
 
 .mon-table tbody td {
-    padding: var(--mon-row-py) var(--mon-row-px);
+    /* Matches Permintaan Pengiriman's .fi-ta-table td exactly (UX Polish v1.4) */
+    padding: 0.375rem 0.625rem;
     color: #374151;
     vertical-align: middle;
-    border-bottom: 1px solid var(--mon-divider);
-    line-height: 1.35;
+    border-bottom: 1px solid #f3f4f6;
+    line-height: 1.125rem;
 }
-.mon-table tbody tr { transition: background-color 0.12s ease, box-shadow 0.12s ease; }
-.mon-table tbody tr:nth-child(even) { background: rgba(248,250,252,0.5); }
+.mon-table tbody tr { transition: background-color 0.12s ease; }
+.mon-table tbody tr:nth-child(even) { background: rgba(249,250,251,0.35); }
 .mon-table tbody tr:hover {
-    background: var(--mon-accent-50);
-    box-shadow: inset 3px 0 0 var(--mon-accent);
+    background: rgba(248, 250, 252, 0.6);
 }
 .mon-table td.col-num { text-align: right; font-variant-numeric: tabular-nums; }
 .mon-table td.col-ctr { text-align: center; }
@@ -1198,16 +1153,24 @@
     line-height: 1.25;
 }
 
-/* Status / stage badge - consistent chip language */
+/* Status / stage badge - matches Permintaan Pengiriman's .fi-badge (UX Polish v1.2):
+   subtle by default, so Stage never outweighs Exception on the same row. */
 .mon-badge {
     display: inline-flex; align-items: center; gap: 0.25rem;
-    /* 6.3E Rule 4: slightly more premium padding - not a significant size change */
-    padding: 0.25rem 0.625rem;     /* was 0.1875rem 0.5625rem */
+    padding: 0.125rem 0.5rem;
+    border-radius: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.25;
+}
+/* Exception badges stay the loudest element on the row - coordinators must
+   notice them first (UX Architecture Freeze v1.1, retained in v1.2). */
+.mon-badge-loud {
+    padding: 0.25rem 0.625rem;
     border-radius: 9999px;
     font-size: 0.6875rem;
-    font-weight: 800;               /* was 700 */
+    font-weight: 800;
     letter-spacing: 0.03em;
-    line-height: 1.25;
 }
 /* 6.3E Rule 4: thin inset border per variant for a "framed" premium feel.
    inset box-shadow (not `border`) so box dimensions are unaffected. */
@@ -1243,6 +1206,21 @@
 .mon-age.is-old   { color: #B91C1C; }
 .mon-age.is-stale { color: #B45309; }
 .mon-age.is-fresh { color: var(--mon-neutral); }
+
+/* Action column - explicit Detail affordance (row itself is also clickable).
+   Text-link style (UX Polish v1.2) - secondary information, not a CTA. */
+.mon-table thead th.col-action { text-align: right; }
+.mon-table td.col-action { text-align: right; }
+.mon-action-btn {
+    display: inline-flex; align-items: center; gap: 0.25rem;
+    padding: 0.125rem 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--mon-accent-600);
+    background: transparent;
+    transition: color 0.12s ease;
+}
+.mon-action-btn:hover { color: var(--mon-accent); }
 
 /* Skeleton rows */
 .mon-skel { animation: mon-pulse 1.6s cubic-bezier(0.4,0,0.2,1) infinite; background: #E5E7EB; border-radius: 0.25rem; }
@@ -1515,12 +1493,13 @@
    Sprint 6.3B - Monitoring Grid presentation additions
    ======================================================================= */
 
-/* Row interaction (Task 11) - clickable, keyboard-focusable, accent bar */
+/* Row interaction - clickable, keyboard-focusable */
 .mon-table tbody tr.mon-row { cursor: pointer; }
 .mon-table tbody tr.mon-row:focus { outline: none; }
 .mon-table tbody tr.mon-row:focus-visible {
-    background: var(--mon-accent-50);
-    box-shadow: inset 3px 0 0 var(--mon-accent);
+    background: rgba(248, 250, 252, 0.6);
+    outline: 1px solid var(--mon-accent-300);
+    outline-offset: -1px;
 }
 
 /* Search highlight (Task 10) - accent amber, not garish */
@@ -1582,39 +1561,33 @@
 /* Alpine cloak */
 [x-cloak] { display: none !important; }
 
-/* -- Task 1+2: Row focus / selected / hover - three distinct states -- */
+/* -- Row focus / selected / hover - subtle, enterprise (UX Polish v1.2) --
+   Aligned with Permintaan Pengiriman's row states: plain background tint,
+   no colored left bar / heavy outline. Keyboard focus keeps a thin outline
+   for accessibility, nothing more. */
 .mon-table tbody tr.mon-row {
-    transition: background-color 150ms ease, box-shadow 150ms ease, outline-color 150ms ease;
+    transition: background-color 120ms ease, outline-color 120ms ease;
 }
 
-/* hover (mouse only) - 6.3E Rule 4: bolder bar (was accent-400) + faster timing (Rule 8) */
 .mon-table tbody tr.mon-row:hover:not(.is-focused):not(.is-selected) {
-    background: var(--mon-accent-50);
-    box-shadow: inset 3px 0 0 var(--mon-accent);
-    transition: background-color 120ms ease, box-shadow 120ms ease;
+    background: rgba(248, 250, 252, 0.6);
 }
 
-/* focused (keyboard) - accent left bar + subtle tint + clearer outline (Rule 4) */
 .mon-table tbody tr.mon-row.is-focused {
-    background: var(--mon-accent-50);
-    box-shadow: inset 3px 0 0 var(--mon-accent-600);
-    outline: 1px solid var(--mon-accent-300);  /* was accent-200 - clearer per Rule 4 */
-    outline-offset: -1px;
+    background: rgba(248, 250, 252, 0.6);
 }
 .mon-table tbody tr.mon-row.is-focused:focus { outline: none; }
 .mon-table tbody tr.mon-row.is-focused:focus-visible {
-    outline: 2px solid var(--mon-accent-300);
-    outline-offset: -2px;
+    outline: 1px solid var(--mon-accent-300);
+    outline-offset: -1px;
 }
 
-/* selected (opened in slide) - navy left bar, slightly stronger tint (Rule 4) */
+/* selected (opened in slide) - quiet tint, no bar */
 .mon-table tbody tr.mon-row.is-selected {
-    background: rgba(37, 99, 235, 0.05);   /* was 0.03 - "selected lebih jelas" */
-    box-shadow: inset 3px 0 0 var(--mon-navy-500, #3B556B);
+    background: rgba(37, 99, 235, 0.04);
 }
 .mon-table tbody tr.mon-row.is-selected.is-focused {
-    background: var(--mon-accent-50);
-    box-shadow: inset 3px 0 0 var(--mon-accent-600);
+    background: rgba(37, 99, 235, 0.06);
 }
 
 /* -- Task 10: Accessibility - focus-visible for all interactive elements -- */

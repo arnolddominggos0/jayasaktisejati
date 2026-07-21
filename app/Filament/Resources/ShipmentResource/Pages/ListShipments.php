@@ -150,7 +150,7 @@ class ListShipments extends ListRecords
                     $out = fopen('php://output', 'w');
 
                     fputcsv($out, [
-                        'Kode',
+                        'Nomor Resi',
                         'Pengirim',
                         'Penerima',
                         'Asal',

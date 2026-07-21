@@ -71,7 +71,7 @@
                         <x-filament::input
                             type="search"
                             wire:model.live.debounce.500ms="tableSearch"
-                            placeholder="Cari no. permintaan, SPPB/DO, customer…"
+                            placeholder="Cari No. Resi, SPPB/DO, customer…"
                         />
                     </x-filament::input.wrapper>
                 </div>

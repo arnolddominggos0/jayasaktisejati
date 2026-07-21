@@ -38,10 +38,13 @@ final class AgeCalculator
         $days = (int) Carbon::parse($from)->startOfDay()->diffInDays(now()->startOfDay());
         $isStuck = $days >= $stuckDays;
 
+        // Display copy only (UX Polish v1.5) — operational Indonesian, not the
+        // developer "D+N" notation. The $days int below is untouched, so stuck
+        // detection and every downstream calculation are unaffected.
         $label = match (true) {
             $days === 0 => 'Hari ini',
             $days === 1 => 'Kemarin',
-            default => "D+{$days}",
+            default => "{$days} Hari",
         };
 
         return new AgeData(

@@ -13,7 +13,7 @@
 
         'email' => 'jayasaktisejati1@gmail.com',
 
-        'website' => 'jayasaktisejati.com',
+        'website' => 'jayasaktiapp.com',
 
         /*
         |--------------------------------------------------------------------------

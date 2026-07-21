@@ -15,7 +15,6 @@ use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Resources\Pages\Page;
@@ -105,12 +104,10 @@ class WorkspaceShell extends Page implements HasForms
         }
 
         $this->form->fill([
-            'period'            => $this->period,
             'exception_filter'  => $this->exception_filter,
             'search'            => $this->search,
             'group_mode'        => $this->group_mode,
-            // Toggle ON = status 'all', OFF = status 'active'.
-            'show_finished'     => $this->status === 'all',
+            'branch_id'         => $this->branch_id,
         ]);
 
         $this->generateData();
@@ -118,17 +115,12 @@ class WorkspaceShell extends Page implements HasForms
 
     protected function getFormSchema(): array
     {
+        $isOfficeAdmin = (bool) auth_user()?->isOfficeAdmin();
+
         return [
             Grid::make()
                 ->columns(['default' => 1, 'sm' => 2, 'lg' => 14])
                 ->schema([
-                    Select::make('period')
-                        ->label('Periode')
-                        ->options(PeriodResolver::options())
-                        ->reactive()
-                        ->afterStateUpdated(fn ($state) => $this->updateFilter('period', $state))
-                        ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 2]),
-
                     TextInput::make('search')
                         ->label('Cari')
                         ->prefixIcon('heroicon-o-magnifying-glass')
@@ -145,18 +137,18 @@ class WorkspaceShell extends Page implements HasForms
                                 ->action(fn () => $this->updateFilter('search', '')),
                         )
                         ->extraAttributes(['wire:target' => 'data.search'])
-                        ->columnSpan(['default' => 1, 'sm' => 2, 'lg' => 6]),
+                        ->columnSpan(['default' => 1, 'sm' => 2, 'lg' => $isOfficeAdmin ? 8 : 6]),
 
                     Select::make('exception_filter')
                         ->label('Exception')
                         ->placeholder('Semua')
                         ->options([
-                            'hold'           => 'Hold',
-                            'ng'             => 'NG',
+                            'hold'           => 'Ditahan',
+                            'ng'             => 'Temuan NG',
                             'demurrage'      => 'Demurrage',
-                            'delay'          => 'Delay',
-                            'stuck'          => 'Stuck',
-                            'missing_voyage' => 'Missing Voyage',
+                            'delay'          => 'Terlambat',
+                            'stuck'          => 'Perlu Tindak Lanjut',
+                            'missing_voyage' => 'Belum Ada Voyage',
                         ])
                         ->reactive()
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('exception_filter', $state))
@@ -174,11 +166,13 @@ class WorkspaceShell extends Page implements HasForms
                         ->afterStateUpdated(fn ($state) => $this->updateFilter('group_mode', $state ?? 'flat'))
                         ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 2]),
 
-                    // Toggle ON = status 'all', OFF = 'active'; 'finished' is URL-only.
-                    Toggle::make('show_finished')
-                        ->label('Selesai')
+                    Select::make('branch_id')
+                        ->label('Cabang')
+                        ->placeholder('Semua Cabang')
+                        ->options(fn () => \App\Models\Branch::orderBy('name')->pluck('name', 'id'))
+                        ->visible(! $isOfficeAdmin)
                         ->reactive()
-                        ->afterStateUpdated(fn ($state) => $this->updateFilter('status', $state ? 'all' : 'active'))
+                        ->afterStateUpdated(fn ($state) => $this->updateBranch((string) ($state ?? '')))
                         ->columnSpan(['default' => 1, 'sm' => 1, 'lg' => 2]),
                 ]),
         ];
@@ -226,7 +220,6 @@ class WorkspaceShell extends Page implements HasForms
             'exception_filter' => null,
             'search'           => '',
             'group_mode'       => 'flat',
-            'show_finished'    => false,
         ]);
 
         $this->generateData();
@@ -308,7 +301,10 @@ class WorkspaceShell extends Page implements HasForms
             exception_filter: $this->exception_filter ?: null,
             search:           $this->search ?? '',
             group_mode:       $this->group_mode ?: 'flat',
-            status:           $this->normalizeStatus($this->status),
+            // Monitoring is an active-units workspace only (UX Architecture
+            // Freeze v1.1) — historical/finished units belong to the future
+            // Monitoring Archive module, not this page.
+            status:           'active',
             sort:             $this->sort ?: 'exception-first',
             page:             $this->page,
             page_size:        $this->page_size,
@@ -349,27 +345,16 @@ class WorkspaceShell extends Page implements HasForms
             ($this->route && $this->route !== RouteResolver::default()) ? 1 : 0,
             $this->exception_filter                                     ? 1 : 0,
             strlen($this->search) > 0                                   ? 1 : 0,
-            $this->status !== 'active'                                  ? 1 : 0,
             ($this->sort && $this->sort !== 'exception-first')          ? 1 : 0,
             // Branch counts as a filter only when Super Admin chose one.
             (! $isOfficeAdmin && $this->branch_id)                      ? 1 : 0,
-            ($this->period !== PeriodResolver::default())               ? 1 : 0,
         ])->sum();
     }
 
-    /** Exception and Branch are excluded; Period gets a chip only when not the current month. */
+    /** Exception and Branch are excluded — they already have their own chip/indicator elsewhere. */
     private function activeFilterChips(): array
     {
         $chips = [];
-
-        if ($this->period !== PeriodResolver::default()) {
-            $chips[] = [
-                'field' => 'period',
-                'label' => 'Periode',
-                'value' => ucfirst(PeriodResolver::bounds($this->period)[0]->translatedFormat('F Y')),
-                'clear' => PeriodResolver::default(),
-            ];
-        }
 
         if (strlen($this->search) > 0) {
             $chips[] = [
@@ -377,16 +362,6 @@ class WorkspaceShell extends Page implements HasForms
                 'label' => 'Cari',
                 'value' => $this->search,
                 'clear' => '',
-            ];
-        }
-
-        if ($this->status !== 'active') {
-            $statusLabels = ['finished' => 'Selesai', 'all' => 'Semua Status'];
-            $chips[] = [
-                'field' => 'status',
-                'label' => 'Status',
-                'value' => $statusLabels[$this->status] ?? $this->status,
-                'clear' => 'active',
             ];
         }
 
@@ -419,13 +394,6 @@ class WorkspaceShell extends Page implements HasForms
         }
 
         return $chips;
-    }
-
-    private function normalizeStatus(string $status): string
-    {
-        return in_array($status, config('monitoring.status_options', ['active', 'finished', 'all']), true)
-            ? $status
-            : 'active';
     }
 
     /** Coerces any value to a valid 'Y-m' string; the current month is the fallback. */

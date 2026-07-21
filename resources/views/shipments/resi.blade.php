@@ -95,78 +95,101 @@
     <title>Resi {{ e($shipment->code) }} - {{ e($brand['abbr']) }}</title>
     <style>
         @page {
-            margin: 10mm 8mm
+            margin: 7mm 6mm
         }
 
         body {
             font-family: DejaVu Sans, Arial, Helvetica, sans-serif;
             font-size: 9.5px;
             color: #111827;
-            line-height: 1.4
+            line-height: 1.35
         }
 
         .header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-
             border-bottom: 3px solid #0137A1;
-            padding-bottom: 6px;
-            margin-bottom: 8px
+            padding-bottom: 5px;
+            margin-bottom: 5px;
         }
 
-        .header-left {
-            flex: 1
+        .header-top {
+            display: table;
+            width: 100%;
+            margin-bottom: 5px;
         }
+
+        .header-top-left,
+        .header-top-right {
+            display: table-cell;
+            vertical-align: middle;
+        }
+
+        .brand {
+            display: table;
+        }
+
+        .brand-logo,
+        .brand-text {
+            display: table-cell;
+            vertical-align: middle;
+        }
+
+        .brand-logo img,
+        .brand-logo {
+            height: 38px;
+            width: auto;
+        }
+
+        .brand-text {
+            padding-left: 11px;
+        }
+
 
         .logo-title {
-            font-size: 18px;
-            font-weight: 800;
-
+            font-size: 19px;
+            font-weight: 700;
             color: #0137A1;
-            letter-spacing: .2px
+            line-height: 1.2;
         }
 
-        .company-info {
-            font-size: 8px;
+        .brand-tagline {
+            font-size: 7.5px;
+            font-weight: 600;
             color: #6b7280;
-            line-height: 1.5;
-            margin-top: 3px
+            text-transform: uppercase;
+            letter-spacing: .6px;
+            margin-top: 2px
         }
 
-        .header-right {
-            text-align: right
+        .header-top-right {
+            font-size: 8.5px;
+            color: #374151;
+            text-align: right;
+            white-space: nowrap;
+            padding-left: 12px;
+            border-left: 1px solid #e5e7eb
         }
 
         .resi-box {
             background: #0137A1;
             color: #fff;
-            padding: 8px 16px;
-            border-radius: 6px;
-            text-align: center
+            padding: 6px 14px;
+            border-radius: 6px
         }
 
         .resi-label {
-            font-size: 9px;
-            opacity: .95;
+            font-size: 8.5px;
+            font-weight: 700;
+            opacity: .85;
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
             margin-bottom: 2px
         }
 
         .resi-number {
-            font-size: 16px;
+            font-size: 20px;
             font-weight: 900;
-            letter-spacing: 1px
-        }
-
-        .date-chip {
-            margin-top: 6px;
-            display: inline-block;
-            padding: 3px 6px;
-            border: 1px solid #e5e7eb;
-            border-radius: 4px;
-            font-size: 8.5px;
-            color: #374151;
-            background: #fafafa
+            letter-spacing: 1.2px;
+            line-height: 1.1
         }
 
         .section-label {
@@ -175,18 +198,18 @@
             color: #9ca3af;
             text-transform: uppercase;
             letter-spacing: .5px;
-            margin: 8px 0 4px
+            margin: 5px 0 2px
         }
 
         .meta {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 6px;
+            gap: 5px;
             background: #f9fafb;
             border: 1px solid #e5e7eb;
             border-radius: 6px;
-            padding: 7px;
-            margin: 6px 0;
+            padding: 5px 6px;
+            margin: 3px 0;
             page-break-inside: avoid
         }
 
@@ -209,8 +232,8 @@
             gap: 10px;
             border: 1px solid #e5e7eb;
             border-radius: 6px;
-            padding: 6px 8px;
-            margin: 10px 0 0;
+            padding: 5px 8px;
+            margin: 4px 0 0;
             page-break-inside: avoid
         }
 
@@ -264,15 +287,15 @@
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 8px;
+            gap: 6px;
+            margin-bottom: 5px;
             page-break-inside: avoid
         }
 
         .card {
             border: 1px solid #e5e7eb;
             border-radius: 8px;
-            padding: 8px;
+            padding: 5px 6px;
             background: #fff;
             page-break-inside: avoid
         }
@@ -281,8 +304,8 @@
             font-weight: 900;
             font-size: 10.5px;
             color: #0f172a;
-            margin-bottom: 6px;
-            padding-bottom: 5px;
+            margin-bottom: 4px;
+            padding-bottom: 3px;
 
             border-bottom: 2px solid #0137A1;
         }
@@ -291,7 +314,7 @@
             display: grid;
             grid-template-columns: 40% 60%;
             gap: 8px;
-            margin-bottom: 4px
+            margin-bottom: 3px
         }
 
         .info-label {
@@ -310,13 +333,13 @@
         .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 6px
+            margin-top: 3px
         }
 
         .items-table th,
         .items-table td {
             border: 1px solid #e5e7eb;
-            padding: 5px 8px;
+            padding: 3px 6px;
             text-align: left
         }
 
@@ -340,20 +363,20 @@
         }
 
         .notes-content {
-            min-height: 20px;
+            min-height: 14px;
             font-size: 9px;
             color: #374151;
             font-style: italic
         }
 
         .footer {
-            margin-top: 8px;
-            padding-top: 6px;
+            margin-top: 5px;
+            padding-top: 3px;
             border-top: 1px solid #e5e7eb;
             text-align: center;
             font-size: 8px;
             color: #6b7280;
-            line-height: 1.4
+            line-height: 1.35
         }
 
         .footer strong {
@@ -377,29 +400,26 @@
 
 <body>
     <div class="header">
-        <div class="header-left">
-            <div style="display:flex;align-items:center;gap:12px">
-                @if (!empty($brand['logo']))
-                    <img src="{{ $brand['logo'] }}" alt="Logo" style="height:38px;width:auto">
-                @endif
-                <div>
-                    <div class="logo-title">{{ e($brand['name']) }}</div>
-                    <div class="company-info">
-                        {{ $join([
-                            filled($brand['addr']) ? $brand['addr'] : null,
-                            filled($brand['phone']) ? 'Telp: ' . $brand['phone'] : null,
-                            filled($brand['site']) ? $brand['site'] : null,
-                        ]) }}
+        <div class="header-top">
+            <div class="header-top-left">
+                <div class="brand">
+                    @if (!empty($brand['logo']))
+                        <div class="brand-logo">
+                            <img src="{{ $brand['logo'] }}" alt="Logo">
+                        </div>
+                    @endif
+
+                    <div class="brand-text">
+                        <div class="logo-title">{{ e($brand['name']) }}</div>
+                        <div class="brand-tagline">Freight Forwarding & Logistics</div>
                     </div>
                 </div>
             </div>
+            <div class="header-top-right">Dicetak: {{ e($printedAt ?? $fmtDatetime(now())) }}</div>
         </div>
-        <div class="header-right">
-            <div class="resi-box">
-                <div class="resi-label">NOMOR RESI</div>
-                <div class="resi-number">{{ e($shipment->code) }}</div>
-            </div>
-            <div class="date-chip">Dicetak: {{ e($printedAt ?? $fmtDatetime(now())) }}</div>
+        <div class="resi-box">
+            <div class="resi-label">NOMOR RESI</div>
+            <div class="resi-number">{{ e($shipment->code) }}</div>
         </div>
     </div>
 
@@ -420,7 +440,9 @@
         </div>
         <div>
             <div class="k">{{ $unitCount > 0 ? 'Jumlah Unit' : 'Jumlah Koli' }}</div>
-            <div class="v">{{ $unitCount > 0 ? $unitCount . ' unit' : ($packages > 0 ? number_format($packages) . ' koli' : '-') }}</div>
+            <div class="v">
+                {{ $unitCount > 0 ? $unitCount . ' unit' : ($packages > 0 ? number_format($packages) . ' koli' : '-') }}
+            </div>
         </div>
         <div>
             <div class="k">ETA</div>
@@ -460,7 +482,7 @@
     @endif
 
     @if (filled($shipment->lcl_items) && is_iterable($shipment->lcl_items))
-        <div class="card" style="margin-top:8px">
+        <div class="card" style="margin-top:6px">
             <div class="card-header">Detail Barang (LCL)</div>
             <table class="items-table">
                 <thead>
@@ -497,7 +519,7 @@
     @endif
 
     @if (filled($shipment->units) && is_iterable($shipment->units))
-        <div class="card" style="margin-top:8px">
+        <div class="card" style="margin-top:6px">
             <div class="card-header">Detail Unit Kendaraan</div>
             <table class="items-table">
                 <thead>
@@ -536,7 +558,8 @@
                 @if (filled($shipment->branch?->name ?? $shipment->originBranch?->name))
                     <div class="info-row">
                         <div class="info-label">Cabang Asal</div>
-                        <div class="info-value">{{ $safe($shipment->branch?->name ?? $shipment->originBranch?->name) }}</div>
+                        <div class="info-value">{{ $safe($shipment->branch?->name ?? $shipment->originBranch?->name) }}
+                        </div>
                     </div>
                 @endif
                 <div class="info-row">

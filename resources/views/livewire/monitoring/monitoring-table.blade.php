@@ -78,14 +78,12 @@
             <thead role="rowgroup">
                 <tr role="row">
                     <th scope="col" role="columnheader">Unit</th>
-                    <th scope="col" role="columnheader">SPPB</th>
-                    <th scope="col" role="columnheader">Route</th>
-                    <th scope="col" role="columnheader">Stage</th>
-                    <th scope="col" role="columnheader">Progress</th>
-                    <th scope="col" role="columnheader" class="col-num">Age</th>
                     <th scope="col" role="columnheader">Exception</th>
+                    <th scope="col" role="columnheader">Stage</th>
+                    <th scope="col" role="columnheader" class="col-num">Dwelling</th>
                     <th scope="col" role="columnheader">Voyage</th>
-                    <th scope="col" role="columnheader" class="col-num">ETA</th>
+                    <th scope="col" role="columnheader">Route</th>
+                    <th scope="col" role="columnheader" class="col-action">Action</th>
                 </tr>
             </thead>
 
@@ -95,14 +93,12 @@
                 @foreach (range(1, $skeletonCount) as $_)
                 <tr role="row" aria-hidden="true">
                     <td><div class="flex flex-col gap-1.5"><span class="mon-skel h-3 w-28"></span><span class="mon-skel h-2.5 w-20"></span></div></td>
-                    <td><span class="mon-skel h-3 w-32"></span></td>
-                    <td><span class="mon-skel h-3 w-16"></span></td>
-                    <td><span class="mon-skel h-5 w-24 rounded-full"></span></td>
-                    <td><div class="flex items-center gap-2"><span class="mon-skel h-2 w-16 rounded-full"></span><span class="mon-skel h-2.5 w-8"></span></div></td>
-                    <td class="col-num"><span class="mon-skel h-3 w-10 ml-auto inline-block"></span></td>
                     <td><span class="mon-skel h-4 w-16 rounded-full"></span></td>
+                    <td><span class="mon-skel h-5 w-24 rounded-full"></span></td>
+                    <td class="col-num"><span class="mon-skel h-3 w-10 ml-auto inline-block"></span></td>
                     <td><div class="flex flex-col gap-1.5"><span class="mon-skel h-3 w-12"></span><span class="mon-skel h-2.5 w-20"></span></div></td>
-                    <td class="col-num"><span class="mon-skel h-3 w-20 ml-auto inline-block"></span></td>
+                    <td><span class="mon-skel h-3 w-16"></span></td>
+                    <td class="col-action"><span class="mon-skel h-3 w-12 ml-auto inline-block"></span></td>
                 </tr>
                 @endforeach
             </tbody>
@@ -124,15 +120,6 @@
                             $badge  = $flowZoneBadge[$zone] ?? 'mon-badge-neutral';
                             $stageLabel = $row->stage->is_cancelled ? 'Dibatalkan'
                                 : ($row->stage->is_held ? 'Ditahan' : $row->stage->stage_label);
-
-                            // Progress (Task 5) - already computed by ProgressCalculator
-                            $pct = (int) $row->progress_pct;
-                            $progressFillClass = match(true) {
-                                $row->stage->is_cancelled        => 'is-neutral',
-                                $pct >= 100                       => 'is-success',
-                                $pct >= 75                        => '',
-                                default                           => 'is-warning',
-                            };
 
                             // Age (Task 6) - purely from AgeData (no recomputation in Blade)
                             $ageLabel = $row->age->label;
@@ -182,40 +169,7 @@
                                 </div>
                             </td>
 
-                            {{-- SPPB (Task 10 highlight) --}}
-                            <td role="cell">
-                                <span class="mon-unit-code text-[13px]">{!! SearchHighlighter::highlight($row->doc_number, $term) !!}</span>
-                            </td>
-
-                            {{-- Route (Task 3) - simple with icon --}}
-                            <td role="cell">
-                                <span class="inline-flex items-center gap-1 text-gray-600">
-                                    <x-heroicon-o-arrow-right class="w-3.5 h-3.5 text-gray-400" />
-                                    <span class="font-medium">{{ $row->route_label }}</span>
-                                </span>
-                            </td>
-
-                            {{-- Stage (Task 4) - flow-zone badge --}}
-                            <td role="cell">
-                                <span class="mon-badge {{ $badge }}">{{ $stageLabel }}</span>
-                            </td>
-
-                            {{-- Progress (Task 5) --}}
-                            <td role="cell">
-                                <div class="flex items-center gap-2">
-                                    <div class="mon-progress" role="progressbar" aria-valuenow="{{ $pct }}" aria-valuemin="0" aria-valuemax="100" aria-label="Progress {{ $pct }} persen">
-                                        <div class="mon-progress-fill mon-progress-anim {{ $progressFillClass }}" style="width: {{ max(0, min(100, $pct)) }}%"></div>
-                                    </div>
-                                    <span class="mon-pct">{{ $pct }}%</span>
-                                </div>
-                            </td>
-
-                            {{-- Age (Task 6) - right-aligned, colour-coded --}}
-                            <td role="cell" class="col-num">
-                                <span class="mon-age {{ $ageClass }}">{{ $ageLabel }}</span>
-                            </td>
-
-                            {{-- Exception - priority chips or em-dash --}}
+                            {{-- Exception - priority chips or em-dash; coordinator's first decision signal --}}
                             <td role="cell">
                                 @if ($sortedExceptions->isNotEmpty())
                                     <div class="flex flex-wrap gap-1" role="list" aria-label="Exceptions">
@@ -226,7 +180,7 @@
                                                     : ($ex->severity === 'warning' ? 'mon-badge-warning' : 'mon-badge-neutral');
                                                 $exLabel = $ex->count ? $ex->label . ' · ' . $ex->count : $ex->label;
                                             @endphp
-                                            <span class="mon-badge mon-badge-anim {{ $exClass }}" title="{{ $ex->detail ?? $ex->label }}" role="listitem">
+                                            <span class="mon-badge mon-badge-loud mon-badge-anim {{ $exClass }}" title="{{ $ex->detail ?? $ex->label }}" role="listitem">
                                                 {{ $exLabel }}
                                             </span>
                                         @endforeach
@@ -236,7 +190,17 @@
                                 @endif
                             </td>
 
-                            {{-- Voyage (Task 8 + Task 10 highlight on voyage_no) --}}
+                            {{-- Stage (Task 4) - flow-zone badge; represents operational progress on its own --}}
+                            <td role="cell">
+                                <span class="mon-badge {{ $badge }}">{{ $stageLabel }}</span>
+                            </td>
+
+                            {{-- Dwelling (Task 6) - right-aligned, colour-coded --}}
+                            <td role="cell" class="col-num">
+                                <span class="mon-age {{ $ageClass }}">{{ $ageLabel }}</span>
+                            </td>
+
+                            {{-- Voyage + ETA merged (Task 8/9 + Task 10 highlight on voyage_no) --}}
                             <td role="cell">
                                 @if ($hasVoyage)
                                     <div class="flex flex-col gap-0.5">
@@ -244,15 +208,40 @@
                                         @if (filled($row->vessel_name))
                                             <span class="mon-unit-sub">{!! SearchHighlighter::highlight($row->vessel_name, $term) !!}</span>
                                         @endif
+                                        @if ($eta)
+                                            <span class="mon-unit-sub">ETA {{ $eta }}</span>
+                                        @endif
                                     </div>
                                 @else
-                                    <span class="mon-badge mon-badge-neutral">Belum Assign</span>
+                                    <div class="flex flex-col gap-0.5">
+                                        <span class="mon-badge mon-badge-neutral">Belum Assign</span>
+                                        @if ($eta)
+                                            <span class="mon-unit-sub">ETA {{ $eta }}</span>
+                                        @endif
+                                    </div>
                                 @endif
                             </td>
 
-                            {{-- ETA (Task 9) - simple, right-aligned --}}
-                            <td role="cell" class="col-num">
-                                <span class="text-gray-700 tabular-nums">{{ $eta ?? '-' }}</span>
+                            {{-- Route (Task 3) - reference information, secondary to exception/stage/dwelling --}}
+                            <td role="cell">
+                                <span class="inline-flex items-center gap-1 text-gray-600">
+                                    <x-heroicon-o-arrow-right class="w-3.5 h-3.5 text-gray-400" />
+                                    <span class="font-medium">{{ $row->route_label }}</span>
+                                </span>
+                            </td>
+
+                            {{-- Action - explicit Detail affordance (row itself is also clickable) --}}
+                            <td role="cell" class="col-action">
+                                <button
+                                    type="button"
+                                    wire:click.stop="$dispatch('open-unit-detail', { unitId: {{ $clickTarget }} })"
+                                    class="mon-action-btn"
+                                    aria-label="Buka detail unit {{ $unitPrimary }}"
+                                    title="Detail"
+                                >
+                                    Detail
+                                    <x-heroicon-o-chevron-right class="w-3.5 h-3.5" />
+                                </button>
                             </td>
                         </tr>
                     @endforeach
@@ -263,7 +252,7 @@
                          "no filter matches" from "database genuinely empty". --}}
                     @php $filtersActive = $hasActiveFilters ?? false; @endphp
                     <tr role="row">
-                        <td colspan="9" role="cell">
+                        <td colspan="7" role="cell">
                             @if ($activeSearch && $exceptionActive)
                                 {{-- Search + exception both active - combined message,
                                      no need to spell out both values here since the

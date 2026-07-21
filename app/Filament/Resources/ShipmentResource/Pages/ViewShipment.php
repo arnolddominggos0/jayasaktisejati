@@ -31,7 +31,7 @@ class ViewShipment extends ViewRecord
                     ->columns(3)
                     ->schema([
                         TextEntry::make('code')
-                            ->label('Kode Shipment'),
+                            ->label('Nomor Resi'),
                         TextEntry::make('status')
                             ->label('Status')
                             ->badge(),

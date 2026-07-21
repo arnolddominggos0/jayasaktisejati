@@ -31,12 +31,12 @@
         // so that's visible to the operator instead of looking like a bug. Both
         // values already exist on the page (search, exception_filter).
         $exceptionLabels = [
-            'hold'           => 'Hold',
-            'ng'             => 'NG',
+            'hold'           => 'Ditahan',
+            'ng'             => 'Temuan NG',
             'demurrage'      => 'Demurrage',
-            'delay'          => 'Delay',
-            'stuck'          => 'Stuck',
-            'missing_voyage' => 'Missing Voyage',
+            'delay'          => 'Terlambat',
+            'stuck'          => 'Perlu Tindak Lanjut',
+            'missing_voyage' => 'Belum Ada Voyage',
         ];
         $searchActive = strlen(trim($this->search ?? '')) > 0;
         $exceptionActive = filled($exceptionFilter);
@@ -232,19 +232,11 @@
                         <span class="mon-vrule"></span>
                     @endif
 
-                    {{-- Active units: most prominent (anchor metric) --}}
+                    {{-- Active units: sole KPI - Monitoring is an active-units workspace only (UX Architecture Freeze v1.1) --}}
                     <span class="mon-metric">
                         <span class="size-2 rounded-full bg-blue-500"></span>
                         <span class="mon-metric-num">{{ $summary->activeUnits }}</span>
                         <span class="mon-metric-label">aktif</span>
-                    </span>
-
-                    <span class="mon-vrule"></span>
-
-                    {{-- Finished --}}
-                    <span class="mon-metric">
-                        <span class="mon-metric-sub">{{ $summary->finishedUnits }}</span>
-                        <span class="mon-metric-label">selesai</span>
                     </span>
 
                     <span class="mon-vrule"></span>
@@ -282,21 +274,21 @@
                     $chips = [
                         [
                             'key' => 'delay',
-                            'label' => 'Delay',
+                            'label' => 'Terlambat',
                             'count' => $band->delay_count,
                             'icon' => 'heroicon-o-clock',
                             'tier' => 'danger',
                         ],
                         [
                             'key' => 'ng',
-                            'label' => 'NG',
+                            'label' => 'Temuan NG',
                             'count' => $band->ng_count,
                             'icon' => 'heroicon-o-x-circle',
                             'tier' => 'danger',
                         ],
                         [
                             'key' => 'hold',
-                            'label' => 'Hold',
+                            'label' => 'Ditahan',
                             'count' => $band->hold_count,
                             'icon' => 'heroicon-o-pause-circle',
                             'tier' => 'danger',
@@ -310,14 +302,14 @@
                         ],
                         [
                             'key' => 'missing_voyage',
-                            'label' => 'Missing Voyage',
+                            'label' => 'Belum Ada Voyage',
                             'count' => $band->missing_voyage_count,
                             'icon' => 'heroicon-o-arrow-uturn-right',
                             'tier' => 'warning',
                         ],
                         [
                             'key' => 'stuck',
-                            'label' => 'Stuck',
+                            'label' => 'Perlu Tindak Lanjut',
                             'count' => $band->stuck_count,
                             'icon' => 'heroicon-o-arrow-path',
                             'tier' => 'warning',
