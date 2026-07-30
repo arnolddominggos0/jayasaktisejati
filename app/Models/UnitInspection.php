@@ -7,32 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/**
- * UnitInspection
- *
- * Satu record = satu stage inspeksi untuk satu unit.
- * Stage: pickup → handover_depot → loading → unloading → selfdrive → dooring
- *
- * Source:
- *   live              = dilakukan real-time oleh petugas
- *   historical_import = di-generate retroaktif via UnitInspectionGenerator
- *
- * Gate Decision (SOP TAM):
- *   accept            = semua item OK atau hanya information_only NG
- *   allow_with_remark = ada minor_missing NG, tidak ada major_damage NG
- *   return_to_pdc     = ada major_damage NG
- *
- * @property int              $id
- * @property int              $unit_id
- * @property string           $stage
- * @property string           $status           passed | failed
- * @property string           $source           live | historical_import
- * @property int|null         $checked_by
- * @property string|null      $gate_decision    accept | allow_with_remark | return_to_pdc
- * @property \Carbon\Carbon|null $submitted_at
- * @property \Carbon\Carbon|null $checked_at
- * @property string|null      $notes
- */
 class UnitInspection extends Model
 {
     use HasFactory;
@@ -50,6 +24,7 @@ class UnitInspection extends Model
         'checked_at',
         'notes',
         'signed_by',
+        'signed_position',
         'signed_at',
         'signature_path',
         'pdf_path',
@@ -143,5 +118,22 @@ class UnitInspection extends Model
     public function getIsSubmittedAttribute(): bool
     {
         return $this->submitted_at !== null;
+    }
+
+    public function getFinalizationStateAttribute(): string
+    {
+        if ($this->submitted_at === null) {
+            return 'draft';
+        }
+
+        return $this->isFinalized ? 'finalized' : 'submitted_unsigned';
+    }
+
+    public function getIsFinalizedAttribute(): bool
+    {
+        return $this->submitted_at !== null
+            && filled($this->signed_by)
+            && filled($this->signed_position)
+            && filled($this->signature_path);
     }
 }

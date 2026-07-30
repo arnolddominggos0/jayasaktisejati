@@ -36,6 +36,7 @@ class FieldCoordinatorPanelProvider extends PanelProvider
             ->colors(['primary' => '#0137A1'])
             ->viteTheme('resources/css/filament/fc/theme.css')
             ->darkMode(false)
+            ->databaseNotifications()
 
             ->pages([Dashboard::class])
             ->homeUrl(fn() => Dashboard::getUrl())

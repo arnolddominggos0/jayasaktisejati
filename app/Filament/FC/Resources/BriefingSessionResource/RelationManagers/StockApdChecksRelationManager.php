@@ -3,16 +3,19 @@
 namespace App\Filament\FC\Resources\BriefingSessionResource\RelationManagers;
 
 use App\Models\StockApdCheck;
-use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 
 class StockApdChecksRelationManager extends RelationManager
 {
@@ -37,52 +40,118 @@ class StockApdChecksRelationManager extends RelationManager
     {
         return $form->schema([
 
-            Section::make('Data Stok APD')
-                ->columns(2)
-                ->schema([
+            // Create mode — jenis APD masih harus dipilih.
+            Select::make('ppe_type')
+                ->label('Jenis APD')
+                ->options(function () {
+                    // Kecualikan jenis yang sudah ada agar tidak menabrak UNIQUE.
+                    $session  = $this->getOwnerRecord();
+                    $existing = StockApdCheck::where('session_id', $session->id)
+                        ->pluck('ppe_type')
+                        ->toArray();
 
-                    Select::make('ppe_type')
-                        ->label('Jenis APD')
-                        ->options(function (?StockApdCheck $record) {
-                            if ($record !== null) {
-                                // Edit mode — field is disabled; return all so
-                                // the selected value renders correctly.
-                                return self::PPE_LABELS;
-                            }
+                    return collect(self::PPE_LABELS)
+                        ->reject(fn ($value, $key) => in_array($key, $existing, true))
+                        ->toArray();
+                })
+                ->required()
+                ->native(false)
+                ->visible(fn (?StockApdCheck $record) => $record === null),
 
-                            // Create mode — exclude types that already exist
-                            // for this session to prevent UNIQUE constraint errors.
-                            $session  = $this->getOwnerRecord();
-                            $existing = StockApdCheck::where('session_id', $session->id)
-                                ->pluck('ppe_type')
-                                ->toArray();
+            // Edit mode — jenis APD tidak pernah dapat diubah, jadi tampil sebagai
+            // informasi saja (bukan Select yang ter-disable).
+            Placeholder::make('ppe_type_display')
+                ->label('Jenis APD')
+                ->content(fn (?StockApdCheck $record): string => self::ppeLabel($record?->ppe_type))
+                ->visible(fn (?StockApdCheck $record) => $record !== null),
 
-                            return collect(self::PPE_LABELS)
-                                ->reject(fn ($value, $key) => in_array($key, $existing, true))
-                                ->toArray();
-                        })
-                        ->required()
-                        ->disabled(fn (?StockApdCheck $record) => $record !== null)
-                        ->dehydrated()
-                        ->native(false),
+            Placeholder::make('required_display')
+                ->label('Kebutuhan')
+                ->content(fn (?StockApdCheck $record): string => $this->requiredQuantity($record) . ' unit'),
 
-                    TextInput::make('stock_available')
-                        ->label('Stok Tersedia (unit)')
-                        ->numeric()
-                        ->minValue(0)
-                        ->placeholder('—'),
+            TextInput::make('stock_available')
+                ->label('Stok Hari Ini')
+                ->helperText('Jumlah APD yang benar-benar tersedia hari ini.')
+                ->numeric()
+                ->minValue(0)
+                ->placeholder('—')
+                ->live(onBlur: true),
 
-                ]),
+            Placeholder::make('gap_display')
+                ->label('Gap')
+                ->content(function (Get $get, ?StockApdCheck $record): string {
+                    $stock = $get('stock_available');
 
-            Section::make('Catatan')
-                ->schema([
-                    Textarea::make('remark')
-                        ->label('Catatan')
-                        ->rows(2)
-                        ->maxLength(500),
-                ]),
+                    if ($stock === null || $stock === '') {
+                        return '—';
+                    }
 
+                    $gap = (int) $stock - $this->requiredQuantity($record);
+
+                    return $gap >= 0 ? "+{$gap}" : (string) $gap;
+                }),
+
+            Placeholder::make('status_display')
+                ->label('Status')
+                ->content(function (Get $get, ?StockApdCheck $record): HtmlString {
+                    [$label, $color] = $this->statusBadge($get, $record);
+
+                    return new HtmlString(Blade::render(
+                        '<x-filament::badge :color="$color" size="lg">{{ $label }}</x-filament::badge>',
+                        ['color' => $color, 'label' => $label],
+                    ));
+                }),
+
+            Textarea::make('remark')
+                ->label('Catatan')
+                ->rows(2)
+                ->maxLength(500)
+                ->columnSpanFull(),
+
+        ])->columns(2);
+    }
+
+    // ─── Form helpers (presentation only) ───────────────────────────────────
+
+    private static function ppeLabel(?string $type): string
+    {
+        return self::PPE_LABELS[strtolower((string) $type)] ?? (string) $type ?: '—';
+    }
+
+    /**
+     * Kebutuhan APD. Pada record existing memakai nilai tersimpan; saat membuat
+     * baru, mengikuti target SOP sesi (sama seperti yang diisi CreateAction).
+     */
+    private function requiredQuantity(?StockApdCheck $record): int
+    {
+        return (int) ($record?->required_quantity
+            ?? $this->getOwnerRecord()->summary_headcount
+            ?? 0);
+    }
+
+    /**
+     * Label + warna badge Status.
+     *
+     * Memakai StockApdCheck::getComputedStatusAttribute() apa adanya — rule tidak
+     * diduplikasi maupun diubah, hanya dievaluasi pada nilai yang sedang diisi
+     * di form agar preview bersifat live.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function statusBadge(Get $get, ?StockApdCheck $record): array
+    {
+        $stock = $get('stock_available');
+
+        $probe = new StockApdCheck([
+            'stock_available'   => ($stock === null || $stock === '') ? null : (int) $stock,
+            'required_quantity' => $this->requiredQuantity($record),
         ]);
+
+        return match ($probe->computed_status) {
+            'cukup'  => ['Cukup', 'success'],
+            'kurang' => ['Kurang', 'danger'],
+            default  => ['Belum Diisi', 'warning'],
+        };
     }
 
     // ─── Table ──────────────────────────────────────────────────────────────
@@ -156,6 +225,9 @@ class StockApdChecksRelationManager extends RelationManager
 
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah APD')
+                    ->modalHeading('Pemeriksaan Stok APD')
+                    ->modalDescription('Tambahkan jenis APD yang diperiksa hari ini.')
+                    ->modalSubmitActionLabel('Simpan Pemeriksaan')
                     // Hide when session is terminal or all 4 types are already covered.
                     ->visible(fn () => ! $this->getOwnerRecord()->isTerminal()
                         && StockApdCheck::where(
@@ -214,7 +286,11 @@ class StockApdChecksRelationManager extends RelationManager
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                    ->label('Ubah')
+                    ->label('Periksa')
+                    ->icon('heroicon-m-clipboard-document-check')
+                    ->modalHeading('Pemeriksaan Stok APD')
+                    ->modalDescription(fn (StockApdCheck $record): string => self::ppeLabel($record->ppe_type))
+                    ->modalSubmitActionLabel('Simpan Pemeriksaan')
                     ->visible(fn () => ! $this->getOwnerRecord()->isTerminal()),
                 Tables\Actions\DeleteAction::make()
                     ->label('Hapus')

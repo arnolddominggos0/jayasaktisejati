@@ -37,7 +37,7 @@
                             <td class="px-2 py-2 text-xs"><a class="text-blue-600 font-semibold" href="#">{{ $r['jss'] }}</a></td>
                             <td class="px-2 py-2 text-xs">{{ $r['shipping_line'] }}</td>
                             <td class="px-2 py-2 text-xs">{{ $r['vessel'] }}</td>
-                            <td class="px-2 py-2 text-xs">{{ $r['voyage_no'] }}</td>
+                            <td class="px-2 py-2 text-xs">{{ display_voyage($r['voyage_no']) }}</td>
                             <td class="px-2 py-2 text-xs">{{ $r['lane'] }}</td>
                             <td class="px-2 py-2 text-xs">{{ $r['etd'] ? \Illuminate\Support\Carbon::parse($r['etd'])->format('d M') : '-' }}</td>
                             <td class="px-2 py-2 text-xs">{{ $r['ata'] ? \Illuminate\Support\Carbon::parse($r['ata'])->format('d M') : '-' }}</td>

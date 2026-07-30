@@ -125,7 +125,7 @@
                 <tr class="bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition">
                     <td class="px-4 py-3">
                         <div class="font-semibold text-gray-900 dark:text-white">{{ $row['vessel_name'] }}</div>
-                        <div class="text-xs text-gray-400">{{ $row['voyage_no'] }}</div>
+                        <div class="text-xs text-gray-400">{{ display_voyage($row['voyage_no']) }}</div>
                     </td>
                     <td class="px-3 py-3 text-xs text-gray-500">{{ $row['period_label'] }}</td>
                     <td class="px-3 py-3 text-center font-medium">{{ $row['qty_unit'] }}</td>

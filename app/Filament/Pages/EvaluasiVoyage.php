@@ -256,7 +256,7 @@ class EvaluasiVoyage extends Page
         return [
             'shipment_code' => $shipment->code ?? '-',
             'customer'      => $shipment->customer?->name ?? '-',
-            'voyage_label'  => trim(($voyage?->vessel?->name ?? '-') . ' ' . ($voyage?->voyage_no ?? '')),
+            'voyage_label'  => trim(($voyage?->vessel?->name ?? '-') . ' ' . ($voyage?->voyage_no ? display_voyage($voyage) : '')),
             'period'        => $voyage?->period_month
                 ? Carbon::parse($voyage->period_month)->translatedFormat('F Y')
                 : null,

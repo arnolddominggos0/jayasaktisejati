@@ -24,7 +24,7 @@
                 <td class="px-3 py-2">{{ $r['cargo_plan'] !== '' ? $r['cargo_plan'] : '-' }}</td>
                 <td class="px-3 py-2">{{ $r['vessel'] }}</td>
                 <td class="px-3 py-2 text-center">{{ $r['vessel_capacity'] !== '' ? $r['vessel_capacity'] : '-' }}</td>
-                <td class="px-3 py-2 text-center">{{ $r['voyage_no'] !== '' ? $r['voyage_no'] : '-' }}</td>
+                <td class="px-3 py-2 text-center">{{ $r['voyage_no'] !== '' ? display_voyage($r['voyage_no']) : '-' }}</td>
                 <td class="px-3 py-2">{{ $r['jss'] !== '' ? $r['jss'] : '-' }}</td>
                 <td class="px-3 py-2 text-center">{{ $r['dwelling'] !== '' ? $r['dwelling'] : '-' }}</td>
             </tr>

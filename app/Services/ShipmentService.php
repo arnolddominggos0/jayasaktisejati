@@ -177,12 +177,9 @@
             $updated  = 0;
             $deleted  = 0;
 
-            // Guard: a submission of only blank rows must not delete existing units.
             $hasAnyValidUnit = false;
 
             foreach ($units as $u) {
-                // Require an identifying field so a blank row (qty defaults to 1)
-                // is not treated as a real unit.
                 $hasIdentifier = ! empty($u['chassis_no'])
                     || ! empty($u['engine_no'])
                     || ! empty($u['model_no'])
@@ -196,9 +193,6 @@
                 $id = $u['id'] ?? null;
 
                 if ($id && $existing->has($id)) {
-                    // Preserve container_display if the form did not explicitly submit it.
-                    // FC assigns container_display via the Handover action — Office Admin
-                    // form hides the field (cargo_type=vehicle) so it must never overwrite.
                     $existingUnit       = $existing->get($id);
                     $containerDisplay   = array_key_exists('container_display', $u)
                         ? ($u['container_display'] ?: null)
@@ -233,10 +227,6 @@
                     $created++;
                 }
             }
-
-            // Only run the delete diff if at least one valid unit was processed.
-            // If every submitted row was blank (no identifier), preserve the
-            // existing units untouched — do not destroy them.
             if ($hasAnyValidUnit) {
                 $deleteIds = $existing->keys()->diff($keepIds)->toArray();
                 if (! empty($deleteIds)) {

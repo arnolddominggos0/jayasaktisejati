@@ -28,7 +28,7 @@
                             <td class="border px-3 py-2">{{ $r->jss }}</td>
                             <td class="border px-3 py-2">{{ $r->voyage?->vessel?->shippingLine?->name }}</td>
                             <td class="border px-3 py-2">{{ $r->voyage?->vessel?->name }}</td>
-                            <td class="border px-3 py-2">{{ $r->voyage?->voyage_no }}</td>
+                            <td class="border px-3 py-2">{{ $r->voyage ? display_voyage($r->voyage) : '—' }}</td>
                             <td class="border px-3 py-2">
                                 {{ $r->voyage ? \App\Supports\BusinessRouteResolver::forVoyage($r->voyage) : '—' }}
                             </td>

@@ -16,7 +16,6 @@
 
     $stageLabel  = $activeStage ? (UnitInspection::STAGE_LABELS[$activeStage] ?? $activeStage) : null;
     $canEdit     = ShipmentOwnership::canEdit(auth()->user(), $shipment);
-    $totalStages = count(UnitInspection::STAGES);
 
     // Determine if vehicle cargo (drives container grouping)
     $isVehicleCargo = ($shipment->cargo_type instanceof CargoType)
@@ -34,7 +33,6 @@
             'completed' => $activeInspections->filter(fn($i) => $i->submitted_at !== null)->count(),
             'signed'    => $activeInspections->filter(fn($i) => $i->submitted_at !== null && $i->signature_path !== null)->count(),
             'pending'   => $activeInspections->filter(fn($i) => $i->submitted_at === null)->count(),
-            'legacy'    => $activeInspections->filter(fn($i) => $i->submitted_at !== null && ! $i->signature_path)->count(),
         ];
     }
 
@@ -44,8 +42,17 @@
                                  ->groupBy('container_display')
                                  ->sortKeys();
         $unassignedGroup = $units->filter(fn($u) => blank($u->container_display));
-        // Named containers first, unassigned last
-        $containerGroups = $namedGroups->merge(
+        // Named containers first, unassigned last.
+        // ->toBase(): $namedGroups is an Eloquent Collection (inherited from
+        // $units), and groupBy() keeps each group as an Eloquent Collection too
+        // — so its items are Collections, not Models. Eloquent\Collection::merge()
+        // assumes every item (both sides) is a Model exposing getKey() and builds
+        // a dictionary keyed by primary key; called on group-of-groups data it
+        // crashes with "Method ...Collection::getKey does not exist". We want a
+        // plain associative merge here (combine two keyed group lists), which is
+        // exactly base Support\Collection::merge() — toBase() switches to that
+        // implementation without changing any grouping/ordering behavior.
+        $containerGroups = $namedGroups->toBase()->merge(
             $unassignedGroup->isNotEmpty() ? ['__UNASSIGNED__' => $unassignedGroup] : []
         );
     } else {
@@ -86,16 +93,14 @@
                 </p>
             </div>
         </div>
-
-        @if ($stageSummary['legacy'] > 0)
-            <div class="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-900/20">
-                <x-heroicon-o-exclamation-triangle class="mt-0.5 h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400" />
-                <p class="text-xs text-amber-700 dark:text-amber-300">
-                    {{ $stageSummary['legacy'] }} inspeksi lama tanpa signature ditemukan.
-                </p>
-            </div>
-        @endif
     @endif
+    {{-- Sprint UX-05 (Scope 4): peringatan "inspeksi lama tanpa signature"
+         dihapus dari sini. Ini audit/data-quality note tentang inspeksi yang
+         SUDAH disubmit — bukan sesuatu yang butuh tindakan operator saat ini
+         di Workspace. Tidak ada halaman "Detail Inspection agregat" atau
+         "Dashboard Quality" di codebase ini untuk memindahkannya — jika
+         metrik ini masih diperlukan, perlu displanning sebagai task terpisah
+         (bukan bagian dari penyederhanaan hierarchy sprint ini). --}}
 
     {{-- ══════════════════════════════════════════════════════════════════════ --}}
     {{-- VEHICLE CARGO: grouped by container                                   --}}
@@ -134,7 +139,6 @@
                                 'shipment'    => $shipment,
                                 'activeStage' => $activeStage,
                                 'canEdit'     => $canEdit,
-                                'totalStages' => $totalStages,
                             ])
                         @endforeach
                     </div>
@@ -155,7 +159,6 @@
                     'shipment'    => $shipment,
                     'activeStage' => $activeStage,
                     'canEdit'     => $canEdit,
-                    'totalStages' => $totalStages,
                 ])
             @empty
                 <div class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">

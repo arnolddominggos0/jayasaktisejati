@@ -7,8 +7,10 @@
     ══════════════════════════════════════════════════════════════════════ --}}
     @php $setup = $this->getDailySetup(); @endphp
 
-    <div class="mb-6">
-        <div class="mb-2 flex items-center gap-2 px-1">
+    <div class="space-y-6" wire:poll.30s>
+
+    <div>
+        <div class="mb-3 flex items-center gap-2 px-1">
             <x-heroicon-o-sun class="h-4 w-4 text-gray-400 dark:text-gray-500" />
             <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 Setup Hari Ini
@@ -128,9 +130,140 @@
         </div>
     </div>
 
-    {{-- ══════════════════════════════════════════════════════════════════════
-         SHIPMENT TASK TABLE — existing, tidak ada perubahan
-    ══════════════════════════════════════════════════════════════════════ --}}
-    {{ $this->table }}
+    @php $summary = $this->getDailySummary(); @endphp
+
+    <div>
+        <div class="mb-3 flex items-center gap-2 px-1">
+            <x-heroicon-o-chart-bar class="h-4 w-4 text-gray-400 dark:text-gray-500" />
+            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                Ringkasan Hari Ini
+            </span>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div class="flex h-full flex-col rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Shipment Aktif
+                </p>
+                <p class="mt-auto pt-3 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+                    {{ $summary['shipment_count'] }} Shipment
+                </p>
+            </div>
+
+            <div class="flex h-full flex-col rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Unit Diproses
+                </p>
+                <p class="mt-auto pt-3 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+                    {{ $summary['unit_count'] }} Unit
+                </p>
+            </div>
+
+            <div class="flex h-full flex-col rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    Voyage
+                </p>
+                <p class="mt-auto pt-3 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+                    {{ $summary['voyage_display'] }}
+                </p>
+            </div>
+
+            <div class="flex h-full flex-col rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <p class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    ETD Terdekat
+                </p>
+                <p class="mt-auto pt-3 text-2xl font-semibold tracking-tight text-gray-900 dark:text-white">
+                    {{ $summary['etd_display'] }}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    @php $operationalNotifications = $this->getOperationalNotifications(); @endphp
+
+    @if ($operationalNotifications->isNotEmpty())
+        <div>
+            <div class="mb-3 flex items-center gap-2 px-1">
+                <x-heroicon-o-bell-alert class="h-4 w-4 text-gray-400 dark:text-gray-500" />
+                <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                    Perlu Tindakan
+                </span>
+            </div>
+
+            @if ($operationalNotifications->count() === 1)
+                @php
+                    $notification = $operationalNotifications->first();
+                    $data = $notification->data;
+                    $primaryAction = $data['actions'][0] ?? null;
+                @endphp
+                <div class="flex items-start justify-between gap-4 rounded-xl bg-white p-5
+                            shadow-sm ring-1 ring-primary-600/20 dark:bg-gray-900 dark:ring-primary-400/30">
+                    <div class="flex min-w-0 items-start gap-4">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-900/20">
+                            <x-filament::icon
+                                icon="{{ $data['icon'] ?? 'heroicon-o-bell-alert' }}"
+                                class="h-6 w-6 text-primary-600 dark:text-primary-400"
+                            />
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                {{ $data['title'] ?? 'Pekerjaan Operasional Baru' }}
+                            </p>
+                            @if (! empty($data['body']))
+                                <div class="mt-1 text-sm text-gray-600 dark:text-gray-400">
+                                    {{ str($data['body'])->sanitizeHtml()->toHtmlString() }}
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                    @if ($primaryAction && ! empty($primaryAction['url']))
+                        <a href="{{ $primaryAction['url'] }}"
+                           @if ($primaryAction['shouldMarkAsRead'] ?? false)
+                               x-on:click="window.dispatchEvent(new CustomEvent('markedNotificationAsRead', { detail: { id: '{{ $notification->id }}' } }))"
+                           @endif
+                           class="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2
+                                  text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-500">
+                            {{ $primaryAction['label'] ?? 'Buka' }}
+                        </a>
+                    @endif
+                </div>
+            @else
+                <div class="flex items-center justify-between gap-4 rounded-xl bg-white p-5
+                            shadow-sm ring-1 ring-primary-600/20 dark:bg-gray-900 dark:ring-primary-400/30">
+                    <div class="flex min-w-0 items-center gap-4">
+                        <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary-50 dark:bg-primary-900/20">
+                            <x-heroicon-o-bell-alert class="h-6 w-6 text-primary-600 dark:text-primary-400" />
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                {{ $operationalNotifications->count() }} Pekerjaan Baru
+                            </p>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                                Terdapat {{ $operationalNotifications->count() }} shipment baru yang menunggu tindakan.
+                            </p>
+                        </div>
+                    </div>
+                    <a href="#operational-tasks-table"
+                       class="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2
+                              text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-500">
+                        Lihat Semua
+                    </a>
+                </div>
+            @endif
+        </div>
+    @endif
+
+    <div id="operational-tasks-table">
+        <div class="mb-3 flex items-center gap-2 px-1">
+            <x-heroicon-o-clipboard-document-list class="h-4 w-4 text-gray-400 dark:text-gray-500" />
+            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                Pekerjaan Hari Ini
+            </span>
+        </div>
+
+        {{ $this->table }}
+    </div>
+
+    </div>
 
 </x-filament-panels::page>

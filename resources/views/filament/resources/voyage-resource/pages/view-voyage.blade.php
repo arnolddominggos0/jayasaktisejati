@@ -62,7 +62,7 @@ $headerBorder = OperationalUi::severityBorder($state->severity);
                         @endif
 
                         <div class="text-[11px] font-mono text-gray-400">
-                            ({{ $v->voyage_no }})
+                            ({{ display_voyage($v) }})
                         </div>
 
                         <div class="text-[11px] text-gray-400">

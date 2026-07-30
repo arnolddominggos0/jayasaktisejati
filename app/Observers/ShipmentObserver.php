@@ -129,6 +129,10 @@ class ShipmentObserver
             'status'       => $status,
             'status_label' => $this->statusLabel($status),
         ]);
+
+        \Illuminate\Support\Facades\DB::afterCommit(function () use ($s) {
+            \App\Services\NewOperationalTaskNotifier::notifyForNewShipment($s);
+        });
     }
 
     public function updated(Shipment $s): void

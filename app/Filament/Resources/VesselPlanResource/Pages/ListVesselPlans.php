@@ -14,14 +14,8 @@ class ListVesselPlans extends ListRecords
 {
     protected static string $resource = VesselPlanResource::class;
 
-    // Custom view (bukan bawaan Filament) — supaya dropdown Tahun bisa
-    // dirender sebagai context selector polos tepat di bawah judul, bukan
-    // lewat panel "Filter" native Filament (yang selalu membawa trigger
-    // "Filter", "Filter Aktif", dan "Reset").
     protected static string $view = 'filament.resources.vessel-plan-resource.pages.list-vessel-plans';
 
-    // Tahun = context halaman ("saya sedang melihat tahun berapa"), bukan
-    // advanced filter — persist di URL seperti navigasi biasa (?year=2026).
     #[Url]
     public ?string $year = null;
 
@@ -34,16 +28,11 @@ class ListVesselPlans extends ListRecords
         }
     }
 
-    /**
-     * Query tetap whereYear('period_month', ...) — logika yang sama persis
-     * dengan filter sebelumnya, hanya dipindah dari Filament filter closure
-     * ke sini karena UI-nya sekarang context selector, bukan filter panel.
-     */
     protected function getTableQuery(): ?Builder
     {
         return parent::getTableQuery()?->when(
             filled($this->year),
-            fn (Builder $query) => $query->whereYear('period_month', $this->year)
+            fn(Builder $query) => $query->whereYear('period_month', $this->year)
         );
     }
 
@@ -54,27 +43,21 @@ class ListVesselPlans extends ListRecords
     {
         return VesselPlan::query()
             ->pluck('period_month')
-            ->map(fn ($date) => $date->year)
+            ->map(fn($date) => $date->year)
             ->unique()
             ->sortDesc()
-            ->mapWithKeys(fn ($year) => [(string) $year => (string) $year])
+            ->mapWithKeys(fn($year) => [(string) $year => (string) $year])
             ->all();
     }
 
     protected function getHeaderActions(): array
     {
-        $month = MonthParam::resolve(request('month'));
-
         return [
-            Action::make('generate')
-                ->label("Generate Vessel Plan {$month['label']}")
+            Action::make('create')
+                ->label('Tambah Vessel Plan')
                 ->icon('heroicon-o-plus')
-                ->visible(fn () =>
-                    ! VesselPlan::where('period_month', $month['start'])->exists()
-                )
-                ->action(fn () =>
-                    VesselPlan::generateForMonth($month['start'])
-                ),
+                ->url(static::getResource()::getUrl('create'))
+                ->visible(fn() => auth_user()?->isSuperAdmin() ?? false),
         ];
     }
 }

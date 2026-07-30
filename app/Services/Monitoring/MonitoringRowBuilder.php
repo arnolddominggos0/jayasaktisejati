@@ -78,7 +78,7 @@ final class MonitoringRowBuilder
             age: $age,
             progress_pct: $progress,
             exceptions: $exceptions,
-            eta_label: $shipment->eta?->format('d M Y'),
+            eta_label: $shipment->eta?->translatedFormat('d M Y'),
             lead_time_summary: null,
             is_search_match: (bool) ($unit->is_search_match ?? false),
             is_finished: $isFinished,

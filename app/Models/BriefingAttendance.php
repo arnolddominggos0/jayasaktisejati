@@ -106,11 +106,38 @@ class BriefingAttendance extends Model
             ->orderBy('created_at');
     }
 
+    public function mpChecks()
+    {
+        return $this->hasMany(MpCheck::class, 'attendance_id')
+            ->orderBy('checked_at');
+    }
+
+    public function medicalActions()
+    {
+        return $this->hasManyThrough(
+            MpMedicalAction::class,
+            MpCheck::class,
+            'attendance_id',
+            'mp_check_id',
+            'id',
+            'id'
+        )->orderBy('performed_at');
+    }
+
     /*
     |--------------------------------------------------------------------------
     | ACCESSORS
     |--------------------------------------------------------------------------
     */
+
+    public function getLatestMpCheckAttribute(): ?MpCheck
+    {
+        if ($this->relationLoaded('mpChecks')) {
+            return $this->mpChecks->last();
+        }
+
+        return $this->mpChecks()->latest('checked_at')->first();
+    }
 
     public function getDisplayNameAttribute(): string
     {
@@ -155,14 +182,6 @@ class BriefingAttendance extends Model
         // APD Tidak Lengkap
         if ($this->has_ppe === false) {
             return 'APD Tidak Lengkap';
-        }
-
-        // Istirahat 30 Menit — menunggu recheck, belum final
-        if (
-            $this->medical_action === 'Istirahat 30 menit'
-            && blank($this->recheck_result)
-        ) {
-            return 'Istirahat 30 Menit';
         }
 
         // Berobat — terminal, dikirim ke fasilitas medis

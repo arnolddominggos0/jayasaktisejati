@@ -2,14 +2,23 @@
 
 namespace App\Filament\FC\Resources;
 
+use App\Enums\ContainerAllocationType;
 use App\Filament\FC\Resources\ContainerReadinessSessionResource\Pages;
+use App\Models\BriefingSession;
 use App\Models\ContainerReadinessSession;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Section;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
+use Filament\Support\Enums\Alignment;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\HtmlString;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\IconColumn;
@@ -60,56 +69,99 @@ class ContainerReadinessSessionResource extends Resource
                 ->validationMessages([
                     'unique' => 'Sudah ada data container untuk tanggal ini. Gunakan Edit.',
                 ])
+                ->live(onBlur: true)
                 ->columnSpanFull(),
 
-            TextInput::make('unit_count')
+            Placeholder::make('unit_count_display')
                 ->label('Jumlah Unit')
-                ->helperText('Jumlah unit kendaraan / dokumen SPPB hari ini')
-                ->numeric()
-                ->minValue(0)
-                ->default(0)
-                ->required(),
+                ->helperText('Otomatis — unit yang Handover pada tanggal ini.')
+                ->content(function (Get $get, ?ContainerReadinessSession $record): string {
+                    $date = $get('session_date');
+
+                    // Baris legacy sebelum YARD_CUTOFF mempertahankan angka tersimpan.
+                    if ($record && $date && (string) $date < BriefingSession::YARD_CUTOFF) {
+                        return $record->unit_count . ' unit';
+                    }
+
+                    $probe = new ContainerReadinessSession(['session_date' => $date]);
+
+                    return $probe->derived_unit_count . ' unit';
+                }),
 
             TextInput::make('container_need')
                 ->label('Kebutuhan Container')
-                ->helperText('Jumlah container yang dibutuhkan')
+                ->helperText('Keputusan FC — dipengaruhi jenis & kombinasi kendaraan, Regular vs Rack.')
                 ->numeric()
                 ->minValue(0)
                 ->default(0)
-                ->required(),
+                ->required()
+                ->live(onBlur: true),
 
-            TextInput::make('container_available')
-                ->label('Container Tersedia')
-                ->helperText('Jumlah container yang tersedia / dikonfirmasi')
-                ->numeric()
-                ->minValue(0)
-                ->default(0)
-                ->required(),
+            Section::make('Container Readiness Summary')
+                ->description('Dihitung otomatis dari Kebutuhan Container dan Daftar Container di bawah.')
+                ->columns(3)
+                ->columnSpanFull()
+                ->schema([
+                    Placeholder::make('container_available_display')
+                        ->label('Container Tersedia')
+                        ->content(fn (Get $get): string => self::listedContainerCount($get) . ' container'),
 
-            Textarea::make('notes')
-                ->label('Catatan')
-                ->rows(3)
-                ->columnSpanFull(),
+                    Placeholder::make('gap_display')
+                        ->label('Gap')
+                        ->content(function (Get $get): string {
+                            $gap = self::listedContainerCount($get) - (int) $get('container_need');
 
+                            return $gap >= 0 ? "+{$gap}" : (string) $gap;
+                        }),
+
+                    Placeholder::make('ready_display')
+                        ->label('Status')
+                        ->content(function (Get $get): HtmlString {
+                            [$label, $color] = self::readinessBadge($get);
+
+                            return new HtmlString(Blade::render(
+                                '<x-filament::badge :color="$color" size="lg">{{ $label }}</x-filament::badge>',
+                                ['color' => $color, 'label' => $label],
+                            ));
+                        }),
+                ]),
+
+            Section::make('Daftar Container')
+                ->description('Satu-satunya sumber Container Tersedia. Setiap container wajib diisi nomor dan service (Regular/Rack). Digunakan FC saat Planning Stuffing.')
+                ->columnSpanFull()
+                ->schema([
             Repeater::make('container_numbers')
-                ->label('Nomor Container Tersedia')
-                ->helperText('Masukkan satu nomor container per baris. Digunakan FC saat Planning Loading.')
+                ->hiddenLabel()
                 ->addActionLabel('Tambah Container')
+                ->addActionAlignment(Alignment::End)
                 ->reorderable(false)
+                ->live()
                 ->columnSpanFull()
                 ->schema([
                     TextInput::make('number')
-                        ->label('Nomor Container')
-                        ->placeholder('TGHU1234567')
+                        ->label('Container Number')
+                        ->placeholder('REG001')
                         ->maxLength(20)
                         ->required()
                         ->extraAttributes(['style' => 'font-family: monospace; text-transform: uppercase;']),
+                    Select::make('service')
+                        ->label('Container Service')
+                        ->options([
+                            ContainerAllocationType::Regular->value => ContainerAllocationType::Regular->label(),
+                            ContainerAllocationType::Rack->value => ContainerAllocationType::Rack->label(),
+                        ])
+                        ->native(false)
+                        ->required(),
                 ])
+                ->columns(2)
                 ->dehydrateStateUsing(fn(array $state): array =>
                     collect($state)
-                        ->map(fn($row) => strtoupper(trim($row['number'] ?? '')))
-                        ->filter()
-                        ->unique()
+                        ->map(fn($row) => [
+                            'number' => strtoupper(trim($row['number'] ?? '')),
+                            'service' => $row['service'] ?? null,
+                        ])
+                        ->filter(fn(array $row) => $row['number'] !== '')
+                        ->unique('number')
                         ->values()
                         ->all()
                 )
@@ -120,13 +172,60 @@ class ContainerReadinessSessionResource extends Resource
                     }
                     $component->state(
                         collect($state)
-                            ->map(fn($item) => is_string($item) ? ['number' => $item] : $item)
+                            // Baris lama (sebelum CR-02) tersimpan sebagai string polos
+                            // tanpa service — dinormalisasi agar form tetap bisa dibuka,
+                            // operator diminta melengkapi service saat menyunting.
+                            ->map(fn($item) => is_string($item) ? ['number' => $item, 'service' => null] : $item)
                             ->values()
                             ->all()
                     );
                 }),
+                ]),
+
+            Textarea::make('notes')
+                ->label('Catatan')
+                ->rows(3)
+                ->columnSpanFull(),
 
         ])->columns(2);
+    }
+
+    /**
+     * Jumlah container unik pada Daftar Container yang sedang diisi di form.
+     * Dipakai preview Container Tersedia / Gap / Status.
+     * Nilai final tetap dihitung ContainerReadinessSession::booted().
+     */
+    /**
+     * Label + warna badge untuk Status pada form.
+     *
+     * PENYAJIAN UI SAJA — business rule tidak berubah. Model tetap menyimpan
+     * summary_sufficient = (available >= need), termasuk untuk kondisi 0 >= 0.
+     * Yang dibedakan di sini hanyalah kondisi form yang belum diisi (need 0 dan
+     * daftar kosong) agar tidak terkesan sudah READY sebelum FC menentukan apa pun.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private static function readinessBadge(Get $get): array
+    {
+        $need   = (int) $get('container_need');
+        $listed = self::listedContainerCount($get);
+
+        if ($need === 0 && $listed === 0) {
+            return ['Belum Ditentukan', 'gray'];
+        }
+
+        return $listed >= $need
+            ? ['READY', 'success']
+            : ['Kurang Container', 'danger'];
+    }
+
+    private static function listedContainerCount(Get $get): int
+    {
+        return collect($get('container_numbers') ?? [])
+            ->map(fn ($row) => strtoupper(trim((string) (is_array($row) ? ($row['number'] ?? '') : $row))))
+            ->filter()
+            ->unique()
+            ->count();
     }
 
     // ── Table ─────────────────────────────────────────────────────────────────

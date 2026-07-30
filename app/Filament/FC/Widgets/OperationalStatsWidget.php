@@ -28,11 +28,12 @@ class OperationalStatsWidget extends Widget
 
         // ── 1. Agregat level sesi — JANGAN JOIN ke attendance ─────────────────
         $effectiveUnit = BriefingSession::effectiveUnitSqlExpression();
+        $readySql      = BriefingSession::readySqlExpression();
         $sess = DB::table('briefing_sessions')
             ->selectRaw("
                 COUNT(*)::int                                                     AS total_sessions,
                 COALESCE(SUM({$effectiveUnit}), 0)::int                          AS total_units,
-                SUM(CASE WHEN summary_sufficient = true THEN 1 ELSE 0 END)::int  AS ok_sessions
+                SUM(CASE WHEN {$readySql} THEN 1 ELSE 0 END)::int                AS ok_sessions
             ")
             ->whereYear('date', $year)
             ->when($depotId, fn ($q) => $q->where('depot_id', $depotId))

@@ -6,26 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/**
- * UnitInspectionItem
- *
- * Satu baris item pemeriksaan dalam sebuah stage inspection.
- * Contoh: category="EXTERIOR", item_name="Lampu Depan", result="ok"
- *
- * Finding type (hanya relevan jika result = ng):
- *   major_damage     = kerusakan fisik → memicu RETURN_TO_PDC
- *   minor_missing    = item hilang/tidak ada → memicu ALLOW_WITH_REMARK
- *   information_only = catatan informasi, tidak mempengaruhi gate decision
- *
- * @property int         $id
- * @property int         $unit_inspection_id
- * @property string      $category
- * @property string      $item_name
- * @property string      $result       ok | ng
- * @property string|null $finding_type major_damage | minor_missing | information_only
- * @property string|null $notes
- * @property string|null $photo_url
- */
 class UnitInspectionItem extends Model
 {
     use HasFactory;

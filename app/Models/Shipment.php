@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
@@ -536,15 +537,7 @@ class Shipment extends Model
             throw new DomainException('Shipment masih draft. Kirim ke FC terlebih dahulu.');
         }
 
-        $this->guardInvalidStatusTransition($status);
-
-        $this->ensureHandoverInspectionCleared($status);
-
-        $this->ensureContainerAssigned($status);
-
-        $this->ensureLoadingInspectionCleared($status);
-
-        $this->ensureLoadingSessionCompleted($status);
+        $this->runTransitionGuards($status);
 
         $this->ensureTrackSkeleton();
 
@@ -590,6 +583,61 @@ class Shipment extends Model
         }
 
         return $track;
+    }
+
+    protected function runTransitionGuards(TrackStatus $status): void
+    {
+        $this->evaluateTransitionGuards($status, [
+            'guardInvalidStatusTransition' => fn () => $this->guardInvalidStatusTransition($status),
+            'ensureHandoverInspectionCleared' => fn () => $this->ensureHandoverInspectionCleared($status),
+            'ensureContainerAssigned' => fn () => $this->ensureContainerAssigned($status),
+            'ensureLoadingInspectionCleared' => fn () => $this->ensureLoadingInspectionCleared($status),
+            'ensureLoadingSessionCompleted' => fn () => $this->ensureLoadingSessionCompleted($status),
+        ]);
+    }
+
+    public function assertOperationalGatesForTransition(TrackStatus $status): void
+    {
+        $this->evaluateTransitionGuards($status, [
+            'ensureHandoverInspectionCleared' => fn () => $this->ensureHandoverInspectionCleared($status),
+            'ensureContainerAssigned' => fn () => $this->ensureContainerAssigned($status),
+            'ensureLoadingInspectionCleared' => fn () => $this->ensureLoadingInspectionCleared($status),
+            'ensureLoadingSessionCompleted' => fn () => $this->ensureLoadingSessionCompleted($status),
+        ]);
+    }
+
+    protected function evaluateTransitionGuards(TrackStatus $status, array $guards): void
+    {
+        $currentStatus = $this->currentTrackStatus()?->value;
+        $evaluated = [];
+        $failedGuard = null;
+        $failureMessage = null;
+
+        foreach ($guards as $name => $guard) {
+            try {
+                $guard();
+                $evaluated[$name] = 'passed';
+            } catch (DomainException $e) {
+                $evaluated[$name] = 'failed: '.$e->getMessage();
+                $failedGuard = $name;
+                $failureMessage = $e->getMessage();
+                break; // preserve original behavior: first failing guard stops evaluation
+            }
+        }
+
+        Log::info('SHIPMENT TRANSITION GUARD', [
+            'shipment_id' => $this->id,
+            'shipment_code' => $this->code,
+            'requested_transition' => $status->value,
+            'current_status' => $currentStatus,
+            'guards_evaluated' => $evaluated,
+            'failed_guard' => $failedGuard,
+            'result' => $failedGuard ? 'blocked' : 'allowed',
+        ]);
+
+        if ($failedGuard) {
+            throw new DomainException($failureMessage);
+        }
     }
 
     protected function guardInvalidStatusTransition(TrackStatus $status): void
@@ -665,10 +713,17 @@ class Shipment extends Model
             return;
         }
 
+        if ($reason = $this->handoverInspectionBlockReason()) {
+            throw new DomainException($reason);
+        }
+    }
+
+    protected function handoverInspectionBlockReason(): ?string
+    {
         $unitIds = $this->units()->pluck('id');
 
         if ($unitIds->isEmpty()) {
-            return;
+            return null;
         }
 
         // Validation 1: inspection record must exist for every unit
@@ -678,9 +733,7 @@ class Shipment extends Model
             ->pluck('unit_id');
 
         if ($withInspection->count() < $unitIds->count()) {
-            throw new DomainException(
-                'Inspeksi Handover Depo belum tersedia untuk seluruh unit.'
-            );
+            return 'Inspeksi Handover Depo belum tersedia untuk seluruh unit.';
         }
 
         // Validation 2: all inspections must be submitted
@@ -691,9 +744,7 @@ class Shipment extends Model
             ->count();
 
         if ($unsubmitted > 0) {
-            throw new DomainException(
-                'Masih ada unit yang belum menyelesaikan inspeksi Handover Depo.'
-            );
+            return 'Masih ada unit yang belum menyelesaikan inspeksi Handover Depo.';
         }
 
         // Validation 3: no unit may have return_to_pdc decision
@@ -704,83 +755,104 @@ class Shipment extends Model
             ->count();
 
         if ($rejected > 0) {
-            throw new DomainException(
-                'Ada unit yang ditandai Return To PDC. Selesaikan permasalahan unit terlebih dahulu.'
-            );
+            return 'Ada unit yang ditandai Return To PDC. Selesaikan permasalahan unit terlebih dahulu.';
+        }
+
+        $unfinalized = UnitInspection::query()
+            ->where('stage', 'handover_depot')
+            ->whereIn('unit_id', $unitIds)
+            ->where(fn ($q) => $q->whereNull('signed_by')->orWhereNull('signed_position')->orWhereNull('signature_path'))
+            ->count();
+
+        if ($unfinalized > 0) {
+            return 'Ada unit yang inspeksi Handover Depo-nya belum di-Finalize (PIC/Jabatan/Tanda Tangan belum lengkap).';
+        }
+
+        return null;
+    }
+
+    public function isHandoverInspectionCleared(): bool
+    {
+        return $this->handoverInspectionBlockReason() === null;
+    }
+
+    protected function ensureContainerAssigned(TrackStatus $status): void
+    {
+        if ($status !== TrackStatus::Stuffing) {
+            return;
+        }
+
+        if ($reason = $this->containerAssignmentBlockReason()) {
+            throw new DomainException($reason);
         }
     }
 
-    /**
-     * Gate: Vehicle Cargo — semua unit wajib memiliki container_display sebelum Stuffing.
-     * Rack shipments skip Stuffing entirely, so this gate never fires for them.
-     */
-    protected function ensureContainerAssigned(TrackStatus $status): void
+    protected function containerAssignmentBlockReason(): ?string
     {
-        // if ($status !== TrackStatus::Stuffing) {
-        //     return;
-        // }
+        $isVehicle = ($this->cargo_type instanceof \App\Enums\CargoType)
+            ? $this->cargo_type === \App\Enums\CargoType::Vehicle
+            : $this->cargo_type === \App\Enums\CargoType::Vehicle->value;
 
-        // $isVehicle = ($this->cargo_type instanceof \App\Enums\CargoType)
-        //     ? $this->cargo_type === \App\Enums\CargoType::Vehicle
-        //     : $this->cargo_type === \App\Enums\CargoType::Vehicle->value;
+        if (! $isVehicle) {
+            return null;
+        }
 
-        // if (! $isVehicle) {
-        //     return;
-        // }
+        $units = $this->units()->get();
 
-        // $units = $this->units()->get();
+        if ($units->isEmpty()) {
+            return null;
+        }
 
-        // if ($units->isEmpty()) {
-        //     return;
-        // }
+        $unassigned = $units->filter(function ($unit) {
+            return blank(trim((string) $unit->container_display));
+        });
 
-        // $unassigned = $units->filter(function ($unit) {
-        //     return blank(trim((string) $unit->container_display));
-        // });
+        if ($unassigned->isEmpty()) {
+            return null;
+        }
 
-        // if ($unassigned->isEmpty()) {
-        //     return;
-        // }
+        return sprintf(
+            'Semua unit harus memiliki container assignment sebelum proses Stuffing dapat dilakukan. %d dari %d unit belum memiliki container.',
+            $unassigned->count(),
+            $units->count()
+        );
+    }
 
-        // throw new DomainException(
-        //     sprintf(
-        //         'Semua unit harus memiliki container assignment sebelum proses Stuffing dapat dilakukan. %d dari %d unit belum memiliki container.',
-        //         $unassigned->count(),
-        //         $units->count()
-        //     )
-        // );
+    public function isContainerAssignmentComplete(): bool
+    {
+        return $this->containerAssignmentBlockReason() === null;
     }
 
     protected function ensureLoadingInspectionCleared(TrackStatus $status): void
     {
         $isRack = LoadingSessionAutoCreate::isRackShipment($this);
 
-        // Gate applies only for non-rack ships advancing to DeliveryToPort.
-        // Rack ships go Handover → DeliveryToPort (no Stuffing, no loading inspection).
-        // Handover inspection gate for rack is already handled by ensureHandoverInspectionCleared().
         if ($status !== TrackStatus::DeliveryToPort || $isRack) {
             return;
         }
 
+        if ($reason = $this->loadingInspectionBlockReason()) {
+            throw new DomainException($reason);
+        }
+    }
+
+    protected function loadingInspectionBlockReason(): ?string
+    {
         $unitIds = $this->units()->pluck('id');
 
         if ($unitIds->isEmpty()) {
-            return;
+            return null;
         }
 
-        // Validation 1: loading inspection record must exist for every unit
         $withInspection = UnitInspection::query()
             ->where('stage', 'loading')
             ->whereIn('unit_id', $unitIds)
             ->pluck('unit_id');
 
         if ($withInspection->count() < $unitIds->count()) {
-            throw new DomainException(
-                'Inspeksi Loading belum tersedia untuk seluruh unit.'
-            );
+            return 'Inspeksi Loading belum tersedia untuk seluruh unit.';
         }
 
-        // Validation 2: all loading inspections must be submitted
         $unsubmitted = UnitInspection::query()
             ->where('stage', 'loading')
             ->whereIn('unit_id', $unitIds)
@@ -788,12 +860,9 @@ class Shipment extends Model
             ->count();
 
         if ($unsubmitted > 0) {
-            throw new DomainException(
-                'Masih ada unit yang belum menyelesaikan inspeksi Loading.'
-            );
+            return 'Masih ada unit yang belum menyelesaikan inspeksi Loading.';
         }
 
-        // Validation 3: no unit may have return_to_pdc on loading inspection
         $rejected = UnitInspection::query()
             ->where('stage', 'loading')
             ->whereIn('unit_id', $unitIds)
@@ -801,10 +870,25 @@ class Shipment extends Model
             ->count();
 
         if ($rejected > 0) {
-            throw new DomainException(
-                'Ada unit yang ditandai Return To PDC pada inspeksi Loading. Selesaikan permasalahan unit terlebih dahulu.'
-            );
+            return 'Ada unit yang ditandai Return To PDC pada inspeksi Loading. Selesaikan permasalahan unit terlebih dahulu.';
         }
+
+        $unfinalized = UnitInspection::query()
+            ->where('stage', 'loading')
+            ->whereIn('unit_id', $unitIds)
+            ->where(fn ($q) => $q->whereNull('signed_by')->orWhereNull('signed_position')->orWhereNull('signature_path'))
+            ->count();
+
+        if ($unfinalized > 0) {
+            return 'Ada unit yang inspeksi Loading-nya belum di-Finalize (PIC/Jabatan/Tanda Tangan belum lengkap).';
+        }
+
+        return null;
+    }
+
+    public function isLoadingInspectionCleared(): bool
+    {
+        return $this->loadingInspectionBlockReason() === null;
     }
 
     protected function ensureLoadingSessionCompleted(TrackStatus $status): void
@@ -858,6 +942,104 @@ class Shipment extends Model
                 ['status' => $value],
                 ['tracked_at' => null],
             );
+        }
+    }
+
+    public function syncTimelineFromUnits(): void
+    {
+        if ($this->status === ShipmentStatus::Draft) {
+            return;
+        }
+
+        $units = $this->units()->get();
+        if ($units->isEmpty()) {
+            return;
+        }
+
+        $order = TrackStatus::orderForMode($this->mode);
+        $orderValues = array_map(fn (TrackStatus $s) => $s->value, $order);
+
+        $unitNormalIdx = $units->map(function (Unit $unit) use ($orderValues) {
+            $tracked = $unit->tracks()
+                ->whereNotNull('tracked_at')
+                ->whereIn('status', $orderValues)
+                ->pluck('status')
+                ->map(fn ($s) => $s instanceof TrackStatus ? $s->value : (string) $s);
+
+            $max = -1;
+            foreach ($tracked as $value) {
+                $i = array_search($value, $orderValues, true);
+                if ($i !== false && $i > $max) {
+                    $max = $i;
+                }
+            }
+
+            return $max;
+        });
+
+        $targetIdx = (int) $unitNormalIdx->min();
+
+        $currentOf = fn (Unit $unit): ?TrackStatus => $unit->currentTrackStatus();
+        $allDelivered = $units->every(fn (Unit $u) => $currentOf($u) === TrackStatus::Delivered);
+        $allHold = $units->every(fn (Unit $u) => $currentOf($u) === TrackStatus::Hold);
+        $allCancelled = $units->every(fn (Unit $u) => $currentOf($u) === TrackStatus::Cancelled);
+
+        $this->ensureTrackSkeleton();
+
+        $tracks = $this->tracks()->get()->keyBy(
+            fn (ShipmentTrack $t) => $t->status instanceof TrackStatus ? $t->status->value : (string) $t->status
+        );
+
+        $stamp = function (string $value) use ($tracks): void {
+            $row = $tracks->get($value);
+            if ($row && empty($row->tracked_at)) {
+                $row->updateQuietly(['tracked_at' => now()]);
+            }
+        };
+
+        $clear = function (string $value) use ($tracks): void {
+            $row = $tracks->get($value);
+            if ($row && ! empty($row->tracked_at)) {
+                $row->updateQuietly(['tracked_at' => null]);
+            }
+        };
+
+        if ($allCancelled) {
+            $clear(TrackStatus::Hold->value);
+            $stamp(TrackStatus::Cancelled->value);
+        } elseif ($allHold) {
+            $stamp(TrackStatus::Hold->value);
+        } else {
+            $clear(TrackStatus::Hold->value);
+            $clear(TrackStatus::Cancelled->value);
+
+            $effectiveIdx = $allDelivered ? (count($order) - 1) : $targetIdx;
+            for ($i = 0; $i <= $effectiveIdx; $i++) {
+                $stamp($orderValues[$i]);
+            }
+        }
+
+        $furthestNormal = null;
+        foreach ($order as $status) {
+            $row = $tracks->get($status->value);
+            if ($row && ! empty($row->tracked_at)) {
+                $furthestNormal = $status;
+            }
+        }
+
+        if ($allCancelled) {
+            $newStatus = ShipmentStatus::Cancelled;
+        } elseif ($allHold) {
+            $newStatus = ShipmentStatus::Hold;
+        } elseif ($furthestNormal !== null) {
+            $newStatus = $furthestNormal->toShipmentStatus() ?? ShipmentStatus::Transit;
+        } else {
+            $newStatus = ShipmentStatus::Pending;
+        }
+
+        if ($this->status !== $newStatus) {
+            $this->status = $newStatus;
+            $this->save();
         }
     }
 
@@ -1024,10 +1206,6 @@ class Shipment extends Model
         return $this->belongsTo(Voyage::class, 'voyage_id');
     }
 
-    // voyageRecord() resolves the BelongsTo relation unambiguously.
-    // Use this everywhere you expect a Voyage model — never use ->voyage
-    // on a Shipment to access the model, because shipments.voyage is a
-    // string snapshot column that shadows this relation in getAttribute().
     public function voyageRecord()
     {
         return $this->belongsTo(Voyage::class, 'voyage_id');
@@ -1053,13 +1231,6 @@ class Shipment extends Model
         return $this->belongsTo(Depot::class, 'assigned_depot_id');
     }
 
-    /**
-     * The depot at the shipment's Port of Discharge.
-     *
-     * Resolution chain: shipment.pod_id → depots.port_id
-     * FK-complete — no migration needed.
-     * Returns null if pod_id is unset or no depot serves that port.
-     */
     public function destinationDepot(): ?Depot
     {
         if (! $this->pod_id) {
@@ -1250,18 +1421,6 @@ class Shipment extends Model
         return implode('  |  ', $parts);
     }
 
-    // ─── Unit-derived container accessors ──────────────────────────────────────
-    // Source of truth: units.container_display (not shipments.container_no).
-    // These accessors are always derived from child Unit rows and are never
-    // written back to the shipments table, so they stay correct after any
-    // SPPB consolidation or unit reassignment.
-
-    /**
-     * Return an ordered, deduplicated list of container identifiers
-     * taken from the child Unit rows for this shipment.
-     *
-     * @return string[]
-     */
     public function getContainerListAttribute(): array
     {
         return $this->units()
@@ -1273,19 +1432,11 @@ class Shipment extends Model
             ->all();
     }
 
-    /**
-     * Number of distinct containers used by units of this shipment.
-     */
     public function getContainerCountAttribute(): int
     {
         return count($this->container_list);
     }
 
-    /**
-     * Comma-separated container identifiers, suitable for display in a
-     * single text field.  Returns an empty string when no units have
-     * container_display set.
-     */
     public function getContainerDisplayAttribute(): string
     {
         return collect($this->container_list)->implode(', ');

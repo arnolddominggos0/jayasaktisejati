@@ -453,14 +453,14 @@
                             <span class="mon-context-value">
                                 Cari: <strong>{{ $this->search }}</strong>
                                 <span class="mon-context-sep">&middot;</span>
-                                Exception: <strong>{{ $exceptionLabel }}</strong>
+                                Perhatian: <strong>{{ $exceptionLabel }}</strong>
                             </span>
                         @elseif ($searchActive)
                             <span class="mon-context-label">Menampilkan hasil pencarian</span>
                             <span class="mon-context-value">Cari: <strong>{{ $this->search }}</strong></span>
                         @else
                             <span class="mon-context-label">Filter aktif</span>
-                            <span class="mon-context-value">Exception: <strong>{{ $exceptionLabel }}</strong></span>
+                            <span class="mon-context-value">Perhatian: <strong>{{ $exceptionLabel }}</strong></span>
                         @endif
                         <span class="mon-context-count">
                             {{ $resultCount }} {{ $searchActive ? 'hasil ditemukan' : 'shipment' }}

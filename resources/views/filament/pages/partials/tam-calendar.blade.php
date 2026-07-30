@@ -89,7 +89,7 @@
                                         </div>
 
                                         <div class="text-[8px] opacity-80">
-                                            {{ $chip['voyage_no'] }}
+                                            {{ display_voyage($chip['voyage_no']) }}
                                         </div>
 
                                         @if ($delayLabel)

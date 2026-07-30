@@ -17,6 +17,21 @@ class FcOperationalReadiness extends Widget
     protected static ?string $pollingInterval = '30s';
     protected int|string|array $columnSpan = 'full';
 
+    /** Display labels for ppe_type keys, so issues read "Sarung Tangan" not "sarung_tangan". */
+    private const PPE_LABELS = [
+        'helm'          => 'Helm',
+        'rompi'         => 'Rompi',
+        'sepatu'        => 'Sepatu Safety',
+        'sarung_tangan' => 'Sarung Tangan',
+    ];
+
+    private static function ppeLabels(\Illuminate\Support\Collection $items): string
+    {
+        return $items
+            ->map(fn ($c) => self::PPE_LABELS[strtolower((string) $c->ppe_type)] ?? (string) $c->ppe_type)
+            ->join(', ');
+    }
+
     public function getViewData(): array
     {
         $depotId = $this->getDepotId();
@@ -52,15 +67,23 @@ class FcOperationalReadiness extends Widget
         $unfit = $attendances->filter(fn ($a) => $a->final_mp_status === 'Tidak Fit')->count();
         $kebutuhan = (int) ($session->summary_headcount ?? 0);
 
+        // APD evaluation uses computed_status exclusively — the raw `status`
+        // column is unreliable (see StockApdCheck::getComputedStatusAttribute()).
         $apdChecks = $session->stockApdChecks;
-        $apdTotal = $apdChecks->count();
-        $apdKurang = $apdChecks->filter(fn ($c) => $c->status === 'kurang' || ($c->stock_available !== null && $c->required_quantity !== null && $c->stock_available < $c->required_quantity))->count();
+        $apdTotal  = $apdChecks->count();
+
+        $apdKurangItems = $apdChecks->filter(fn ($c) => $c->computed_status === 'kurang');
+        $apdBelumItems  = $apdChecks->filter(fn ($c) => $c->computed_status === 'belum_diisi');
+
+        $apdKurang = $apdKurangItems->count();
+        $apdBelum  = $apdBelumItems->count();
+        $apdTerisi = $apdTotal - $apdBelum;
 
         $status = $session->mp_check_status;
         $statusLabel = $status instanceof MPCheckStatus ? $status->label() : ucfirst((string) $status);
         $statusColor = $status instanceof MPCheckStatus ? $status->color() : 'gray';
 
-        $isReady = $status?->value === 'cleared';
+        $isReady = $session->isOperationallyReady();
 
         $state = $isReady ? 'ready' : 'not_ready';
 
@@ -79,10 +102,11 @@ class FcOperationalReadiness extends Widget
         }
 
         if ($apdKurang > 0) {
-            $items = $apdChecks->filter(fn ($c) => $c->status === 'kurang' || ($c->stock_available !== null && $c->required_quantity !== null && $c->stock_available < $c->required_quantity))
-                ->pluck('ppe_type')
-                ->join(', ');
-            $issues[] = 'APD kurang: ' . $items;
+            $issues[] = 'APD kurang: ' . self::ppeLabels($apdKurangItems);
+        }
+
+        if ($apdBelum > 0) {
+            $issues[] = 'APD belum diisi: ' . self::ppeLabels($apdBelumItems);
         }
 
         if (! $isReady && $status?->value !== null) {
@@ -101,6 +125,8 @@ class FcOperationalReadiness extends Widget
             'recheck'           => $recheck,
             'apdTotal'          => $apdTotal,
             'apdKurang'         => $apdKurang,
+            'apdBelum'          => $apdBelum,
+            'apdTerisi'         => $apdTerisi,
             'issues'            => $issues,
             'mpPercent'         => $kebutuhan > 0 ? min(100, (int) round(($hadir / $kebutuhan) * 100)) : 0,
             'createBriefingUrl' => BriefingSessionResource::getUrl('create'),
@@ -146,6 +172,8 @@ class FcOperationalReadiness extends Widget
             'recheck'           => 0,
             'apdTotal'          => 0,
             'apdKurang'         => 0,
+            'apdBelum'          => 0,
+            'apdTerisi'         => 0,
             'issues'            => ['Belum ada sesi briefing hari ini'],
             'mpPercent'         => 0,
             'createBriefingUrl' => BriefingSessionResource::getUrl('create'),

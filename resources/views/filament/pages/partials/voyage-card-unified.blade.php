@@ -23,10 +23,10 @@
                     {{ $v->vessel?->name }}
                 </h3>
                 <span class="text-[11px] font-mono font-semibold text-gray-700">
-                    {{ $v->code ?? $v->voyage_no }}
+                    {{ $v->code ?? display_voyage($v) }}
                 </span>
                 @if ($v->code)
-                    <span class="text-[10px] text-gray-400 font-mono">({{ $v->voyage_no }})</span>
+                    <span class="text-[10px] text-gray-400 font-mono">({{ display_voyage($v) }})</span>
                 @endif
             </div>
             <div class="mt-1 text-[11px] text-gray-400">

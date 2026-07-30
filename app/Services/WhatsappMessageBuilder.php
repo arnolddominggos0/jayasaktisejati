@@ -41,9 +41,9 @@ class WhatsappMessageBuilder
                 $etd = $item->planned_etd?->translatedFormat('d M Y');
                 $eta = $item->planned_eta?->translatedFormat('d M Y');
                 $vessel = $this->sanitizeText($item->vessel?->name ?? '-');
-                $voyage = $this->sanitizeText($item->voyage_no ?: '-');
+                $voyage = $item->voyage_no ? $this->sanitizeText(display_voyage($item->voyage_no)) : '-';
 
-                return ($index + 1) . ". {$vessel} V.{$voyage}\n"
+                return ($index + 1) . ". {$vessel} {$voyage}\n"
                     . "   ETD : {$etd}\n"
                     . "   ETA : {$eta}";
             })

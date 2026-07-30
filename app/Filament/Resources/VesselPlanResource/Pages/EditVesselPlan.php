@@ -20,7 +20,6 @@ class EditVesselPlan extends EditRecord
 
     protected static string $view = 'filament.resources.vessel-plan-resource.pages.edit-vessel-plan';
 
-    /** Shared workspace context; presentation state only. */
     public string $shippingLineFilter = '';
 
     public function updatedShippingLineFilter(): void
@@ -28,16 +27,11 @@ class EditVesselPlan extends EditRecord
         $this->dispatch('vpFilterShippingLine', value: $this->shippingLineFilter);
     }
 
-    // Identitas plan adalah periodenya, bukan kata "Ubah" — satu customer
-    // punya sampai 12 plan per tahun, dibedakan lewat bulan.
     public function getBreadcrumb(): string
     {
         return $this->record->period_month->translatedFormat('F Y');
     }
 
-    // Status adalah atribut plan itu sendiri, bukan atribut Route — badge
-    // status karena itu berdampingan dengan judul objek. Badge Filament asli
-    // (bukan class CSS custom) supaya konsisten dengan komponen native lain.
     public function getHeading(): string|Htmlable
     {
         $status = $this->record->status;

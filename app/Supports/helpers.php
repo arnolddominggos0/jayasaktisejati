@@ -25,3 +25,12 @@ if (! function_exists('auth_user')) {
         }
     }
 }
+
+if (! function_exists('display_voyage')) {
+    function display_voyage(mixed $voyage): string
+    {
+        $number = $voyage instanceof \App\Models\Voyage ? $voyage->voyage_no : $voyage;
+
+        return filled($number) ? "V.{$number}" : '—';
+    }
+}

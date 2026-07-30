@@ -304,8 +304,8 @@ class VoyageResource extends Resource
                     TextColumn::make('voyage_identity')
                         ->label('Voyage')
                         ->state(fn($record) => $record->code
-                            ? $record->code . ' (' . $record->voyage_no . ')'
-                            : ($record->voyage_no ?? '—'))
+                            ? $record->code . ' (' . display_voyage($record) . ')'
+                            : display_voyage($record))
                         ->searchable(query: function (Builder $query, string $search): Builder {
                             return $query->where(function ($q) use ($search) {
                                 $q->where('code', 'like', "%{$search}%")

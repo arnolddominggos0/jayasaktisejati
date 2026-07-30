@@ -157,7 +157,7 @@ class VesselPlanItemRelationManager extends RelationManager
                     ->width('w-[28rem]')
                     ->description(function ($record) {
                         $parts = array_filter([
-                            $record->voyage_no ? 'V.' . $record->voyage_no : null,
+                            $record->voyage_no ? display_voyage($record->voyage_no) : null,
                             $record->shippingLine?->name,
                         ]);
 

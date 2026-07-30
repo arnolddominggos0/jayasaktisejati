@@ -13,7 +13,7 @@
         <div>
 
             <div class="font-semibold text-sm">
-                {{ $v->vessel?->name }} — {{ $v->voyage_no }}
+                {{ $v->vessel?->name }} — {{ display_voyage($v) }}
             </div>
 
             <div class="text-xs text-gray-500 mt-1">

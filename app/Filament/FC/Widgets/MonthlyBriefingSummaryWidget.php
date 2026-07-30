@@ -39,6 +39,7 @@ class MonthlyBriefingSummaryWidget extends Widget
 
         // Dual-source: pre-cutoff uses stored unit_masuk_yard; post-cutoff uses Handover tracks.
         $effectiveUnit = BriefingSession::effectiveUnitSqlExpression();
+        $readySql      = BriefingSession::readySqlExpression();
 
         // Aggregate per bulan
         $rows = DB::table('briefing_sessions')
@@ -46,8 +47,8 @@ class MonthlyBriefingSummaryWidget extends Widget
                 EXTRACT(MONTH FROM date)::int                                     AS bulan,
                 COUNT(*)::int                                                      AS total_sesi,
                 COALESCE(SUM({$effectiveUnit}), 0)::int                           AS total_unit,
-                SUM(CASE WHEN summary_sufficient = true  THEN 1 ELSE 0 END)::int  AS sesi_ready,
-                SUM(CASE WHEN summary_sufficient = false THEN 1 ELSE 0 END)::int  AS sesi_ng
+                SUM(CASE WHEN {$readySql} THEN 1 ELSE 0 END)::int                 AS sesi_ready,
+                SUM(CASE WHEN {$readySql} THEN 0 ELSE 1 END)::int                 AS sesi_ng
             ")
             ->whereYear('date', $year)
             ->when(true, $depotFilter)

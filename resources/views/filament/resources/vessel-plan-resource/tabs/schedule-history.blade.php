@@ -40,7 +40,7 @@ $historyRows = $items->map(function ($item) use ($draftMap) {
 
     // Format voyage kanon: V.NNN · Shipping Line
     $voyageCanon = collect([
-        $item->voyage_no ? 'V.' . $item->voyage_no : null,
+        $item->voyage_no ? display_voyage($item->voyage_no) : null,
         $item->shippingLine?->name,
     ])->filter()->implode(' · ') ?: '—';
 

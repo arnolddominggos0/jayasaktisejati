@@ -286,10 +286,46 @@ class BriefingSession extends Model
             ->count();
     }
 
+    /**
+     * SINGLE SOURCE OF TRUTH for "Status Kesiapan Operasional" (READY / NOT READY).
+     *
+     * Every consumer — View Briefing, table badge, DailyBriefingGate, Dashboard,
+     * MP Readiness Monitoring, and the FC widgets — must call this method instead
+     * of re-deriving READY from summary_sufficient / mp_check_status themselves.
+     *
+     * Formula (unchanged from DailyBriefingGate::isReady(), the previous de-facto
+     * authority): manpower is sufficient AND the MP check has reached a state that
+     * authorises operations.
+     *
+     * NOTE: readyManpowerCount() is the raw headcount primitive consumed by
+     * BriefingSessionEvaluator to populate summary_sufficient — it is NOT a
+     * readiness verdict on its own and must not be used as one.
+     *
+     * Mirrored in SQL by readySqlExpression() for aggregate queries.
+     */
     public function isOperationallyReady(): bool
     {
-        $target = (int) $this->summary_headcount;
-        return $target > 0 && $this->readyManpowerCount() >= $target;
+        $status = $this->mp_check_status instanceof MPCheckStatus
+            ? $this->mp_check_status
+            : MPCheckStatus::tryFrom((string) $this->mp_check_status);
+
+        return (bool) $this->summary_sufficient
+            && in_array($status, [MPCheckStatus::Cleared, MPCheckStatus::Approved], true);
+    }
+
+    /**
+     * SQL mirror of isOperationallyReady() for raw aggregate queries that cannot
+     * instantiate models. Returns a boolean expression safe to embed in
+     * SELECT / CASE WHEN / WHERE.
+     *
+     * Must be kept in sync with isOperationallyReady().
+     *
+     * @param  string $alias  Table alias used in the outer query.
+     */
+    public static function readySqlExpression(string $alias = 'briefing_sessions'): string
+    {
+        return "({$alias}.summary_sufficient = true
+                 AND {$alias}.mp_check_status IN ('cleared', 'approved'))";
     }
 
     /**

@@ -34,7 +34,7 @@ class ItemsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('etd')->label('ETD')->dateTime('d M'),
                 Tables\Columns\TextColumn::make('eta')->label('ETA')->dateTime('d M'),
                 Tables\Columns\TextColumn::make('cargo_plan')->label('Plan')->alignCenter(),
-                Tables\Columns\TextColumn::make('voyage_no')->label('Voy'),
+                Tables\Columns\TextColumn::make('voyage_no')->label('Voy')->formatStateUsing(fn ($state) => display_voyage($state)),
                 Tables\Columns\TextColumn::make('jss')->label('JSS')->toggleable(),
                 Tables\Columns\TextColumn::make('lts')->label('LTS')->toggleable(),
                 Tables\Columns\TextColumn::make('dwelling')->label('Dw')->alignCenter()->toggleable(),

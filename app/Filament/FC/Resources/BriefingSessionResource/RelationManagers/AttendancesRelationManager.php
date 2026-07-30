@@ -6,6 +6,7 @@ use App\Enums\AttendanceStatus;
 use App\Models\AttendanceHealthLog;
 use App\Models\BriefingAttendance;
 use App\Models\Manpower;
+use App\Models\MpCheck;
 use Filament\Forms;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
@@ -16,6 +17,7 @@ use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Support\Exceptions\Halt;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -72,6 +74,8 @@ class AttendancesRelationManager extends RelationManager
                     ->required()
                     ->searchable()
                     ->preload()
+                    ->disabled(fn (?BriefingAttendance $record) => $record !== null)
+                    ->dehydrated(fn (?BriefingAttendance $record) => $record === null)
                     ->rule(function (?BriefingAttendance $record) {
                         $session = $this->getOwnerRecord();
 
@@ -339,6 +343,86 @@ class AttendancesRelationManager extends RelationManager
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // NAVIGASI PEMERIKSAAN (Simpan & Berikutnya)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * Kunci record berikutnya mengikuti urutan tabel yang sedang tampil
+     * (menghormati sort, filter, dan pencarian aktif). Null bila record
+     * saat ini adalah yang terakhir.
+     */
+    private function nextAttendanceKey(?BriefingAttendance $record): ?string
+    {
+        if (! $record) {
+            return null;
+        }
+
+        $keys = $this->getFilteredSortedTableQuery()
+            ->pluck($record->getKeyName())
+            ->map(fn ($key) => (string) $key)
+            ->all();
+
+        $index = array_search((string) $record->getKey(), $keys, true);
+
+        if ($index === false) {
+            return null;
+        }
+
+        return $keys[$index + 1] ?? null;
+    }
+
+    /** Nama MP untuk subjudul modal — reguler maupun backup. */
+    private function mpDisplayName(?BriefingAttendance $record): ?string
+    {
+        if (! $record) {
+            return null;
+        }
+
+        if ($record->is_backup) {
+            return ($record->backup_name ?? '—') . ' (Backup)';
+        }
+
+        return $record->manpower?->name ?? '—';
+    }
+
+    /**
+     * Menambahkan record MpCheck (immutable) apabila vital baru saja
+     * disimpan (Tambah MP / Tambah Backup MP / Ubah). Tidak pernah meng-update
+     * check lama — hanya insert. Dilewati bila belum ada vital atau attendance
+     * tidak hadir, dan dilewati juga bila vital tidak berubah pada save
+     * berikutnya (mencegah entri ganda saat FC hanya mengubah field lain,
+     * mis. catatan).
+     */
+    private function recordInitialCheckIfNeeded(BriefingAttendance $record): void
+    {
+        $attVal = $record->attendance_status instanceof AttendanceStatus
+            ? $record->attendance_status->value
+            : (string) $record->attendance_status;
+
+        if ($attVal !== 'present' || blank($record->temperature)) {
+            return;
+        }
+
+        $vitalsChanged  = $record->wasChanged(['temperature', 'bp_systolic', 'bp_diastolic']);
+        $hasNoChecksYet = $record->mpChecks()->doesntExist();
+
+        if (! $vitalsChanged && ! $hasNoChecksYet) {
+            return;
+        }
+
+        $record->mpChecks()->create([
+            'check_type'       => MpCheck::TYPE_INITIAL,
+            'temperature'      => $record->temperature,
+            'bp_systolic'      => $record->bp_systolic,
+            'bp_diastolic'     => $record->bp_diastolic,
+            'status'           => $record->fit_status,
+            'health_complaint' => $record->health_complaint,
+            'checked_at'       => now(),
+            'checked_by'       => auth()->id(),
+        ]);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // TABLE
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -347,6 +431,8 @@ class AttendancesRelationManager extends RelationManager
         return $table
             ->recordTitleAttribute('id')
             ->defaultSort('created_at')
+            ->defaultKeySort()
+            ->modifyQueryUsing(fn (Builder $query) => $query->with('mpChecks'))
             ->columns([
 
                 // ── Nama MP ────────────────────────────────────────────────
@@ -401,30 +487,42 @@ class AttendancesRelationManager extends RelationManager
                     })
                     ->sortable(),
 
-                // ── Suhu ───────────────────────────────────────────────────
+                // ── Suhu (dari MP Check terbaru; fallback ke kolom lama untuk
+                //    attendance sebelum OPS-12 yang belum punya ledger) ──────
                 TextColumn::make('temperature')
                     ->label('Suhu')
-                    ->state(fn ($record) => $record->temperature
-                        ? number_format((float) $record->temperature, 1) . '°C'
-                        : '-')
-                    ->color(fn ($record) => ($record->temperature
-                        && ($record->temperature < 35.5 || $record->temperature > 37.5))
-                        ? 'danger'
-                        : null)
-                    ->sortable(),
+                    ->state(function (BriefingAttendance $record) {
+                        $check = $record->latest_mp_check;
+                        $temp = $check?->temperature ?? $record->temperature;
 
-                // ── Tensi ──────────────────────────────────────────────────
+                        return $temp ? number_format((float) $temp, 1) . '°C' : '-';
+                    })
+                    ->color(function (BriefingAttendance $record) {
+                        $check = $record->latest_mp_check;
+                        $temp = $check?->temperature ?? $record->temperature;
+
+                        return ($temp && ($temp < 35.5 || $temp > 37.5)) ? 'danger' : null;
+                    }),
+
+                // ── Tensi (dari MP Check terbaru; fallback sama seperti Suhu) ─
                 TextColumn::make('bp_display')
                     ->label('Tensi')
-                    ->state(fn ($record) => ($record->bp_systolic && $record->bp_diastolic)
-                        ? "{$record->bp_systolic}/{$record->bp_diastolic}"
-                        : '-')
-                    ->color(function ($record) {
-                        if (! $record->bp_systolic || ! $record->bp_diastolic) {
+                    ->state(function (BriefingAttendance $record) {
+                        $check = $record->latest_mp_check;
+                        $sys = $check?->bp_systolic ?? $record->bp_systolic;
+                        $dia = $check?->bp_diastolic ?? $record->bp_diastolic;
+
+                        return ($sys && $dia) ? "{$sys}/{$dia}" : '-';
+                    })
+                    ->color(function (BriefingAttendance $record) {
+                        $check = $record->latest_mp_check;
+                        $sys = $check?->bp_systolic ?? $record->bp_systolic;
+                        $dia = $check?->bp_diastolic ?? $record->bp_diastolic;
+
+                        if (! $sys || ! $dia) {
                             return null;
                         }
-                        $ok = ($record->bp_systolic  >= 90  && $record->bp_diastolic >= 60)
-                            && ($record->bp_systolic  <= 120 && $record->bp_diastolic <= 80);
+                        $ok = ($sys >= 90 && $dia >= 60) && ($sys <= 120 && $dia <= 80);
 
                         return $ok ? null : 'danger';
                     }),
@@ -514,7 +612,8 @@ class AttendancesRelationManager extends RelationManager
                         $data['mp_type']    = 'regular';  // selalu reguler via form ini
 
                         return $data;
-                    }),
+                    })
+                    ->after(fn (BriefingAttendance $record) => $this->recordInitialCheckIfNeeded($record)),
 
                 // ── Tambah Backup MP ───────────────────────────────────────
                 Tables\Actions\Action::make('addBackup')
@@ -534,12 +633,14 @@ class AttendancesRelationManager extends RelationManager
                     ->action(function (array $data): void {
                         $session = $this->getOwnerRecord();
 
-                        BriefingAttendance::create([
+                        $record = BriefingAttendance::create([
                             ...$data,
                             'session_id'  => $session->id,
                             'manpower_id' => null,   // backup tidak punya FK ke manpower
                             'mp_type'     => 'backup',
                         ]);
+
+                        $this->recordInitialCheckIfNeeded($record);
 
                         Notification::make()
                             ->title('Backup MP ditambahkan')
@@ -591,7 +692,52 @@ class AttendancesRelationManager extends RelationManager
             ->actions([
                 Tables\Actions\EditAction::make()
                     ->label('Ubah')
-                    ->visible(fn () => ! $this->getOwnerRecord()->isTerminal()),
+                    ->modalHeading('Pemeriksaan MP')
+                    ->modalDescription(fn (BriefingAttendance $record) => $this->mpDisplayName($record))
+                    ->modalSubmitActionLabel('Simpan')
+                    ->visible(fn (BriefingAttendance $record) => ! $this->getOwnerRecord()->isTerminal()
+                        && $record->final_mp_status !== 'Perlu Pemeriksaan Ulang')
+                    ->extraModalFooterActions(function (): array {
+                        $action = $this->getMountedTableAction();
+
+                        if (! $action instanceof Tables\Actions\EditAction) {
+                            return [];
+                        }
+
+                        $record = $action->getRecord();
+
+                        if (! $record instanceof BriefingAttendance) {
+                            return [];
+                        }
+
+                        if ($this->nextAttendanceKey($record) === null) {
+                            return [];
+                        }
+
+                        return [
+                            $action
+                                ->makeModalSubmitAction('simpanBerikutnya', arguments: ['next' => true])
+                                ->label('Simpan & Berikutnya')
+                                ->color('gray'),
+                        ];
+                    })
+                    ->after(function (BriefingAttendance $record, array $arguments): void {
+                        $this->recordInitialCheckIfNeeded($record);
+
+                        if (! ($arguments['next'] ?? false)) {
+                            return;
+                        }
+
+                        $nextKey = $this->nextAttendanceKey($record);
+
+                        if ($nextKey === null) {
+                            return;
+                        }
+
+                        $this->replaceMountedTableAction('edit', $nextKey);
+
+                        throw new Halt();
+                    }),
 
                 // ── Tindakan Medis — muncul saat TIDAK FIT & belum ada tindakan ──
                 Tables\Actions\Action::make('tindakanMedis')
@@ -656,15 +802,26 @@ class AttendancesRelationManager extends RelationManager
                             'created_by'     => auth()->id(),
                         ]);
 
+                        $latestCheck = $record->mpChecks()->latest('checked_at')->first();
+
+                        if ($latestCheck) {
+                            $latestCheck->medicalActions()->create([
+                                'action'       => $data['medical_action'],
+                                'notes'        => $data['remark'] ?? null,
+                                'performed_at' => now(),
+                                'performed_by' => auth()->id(),
+                            ]);
+                        }
+
                         Notification::make()
                             ->title('Tindakan medis dicatat')
                             ->success()
                             ->send();
                     }),
 
-                // ── Hasil Recheck — vitals-based, auto-evaluated ──────────────
+                // ── Pemeriksaan Ulang — vitals-based, auto-evaluated ──────────
                 Tables\Actions\Action::make('hasilRecheck')
-                    ->label('Hasil Recheck')
+                    ->label('Pemeriksaan Ulang')
                     ->icon('heroicon-o-clipboard-document-check')
                     ->color('info')
                     ->visible(fn (BriefingAttendance $record): bool =>
@@ -740,6 +897,17 @@ class AttendancesRelationManager extends RelationManager
                             'created_by'    => auth()->id(),
                         ]);
 
+                        $record->mpChecks()->create([
+                            'check_type'       => MpCheck::TYPE_RECHECK,
+                            'temperature'      => $temp,
+                            'bp_systolic'      => $sys,
+                            'bp_diastolic'     => $dia,
+                            'status'           => $recheckResult,
+                            'health_complaint' => null,
+                            'checked_at'       => now(),
+                            'checked_by'       => auth()->id(),
+                        ]);
+
                         $label = $recheckResult === 'FIT' ? 'FIT — Siap Kerja' : 'TIDAK FIT';
 
                         Notification::make()
@@ -747,6 +915,23 @@ class AttendancesRelationManager extends RelationManager
                             ->color($recheckResult === 'FIT' ? 'success' : 'danger')
                             ->send();
                     }),
+
+                // ── Riwayat — timeline pemeriksaan & tindakan, selalu tersedia ──
+                Tables\Actions\Action::make('riwayat')
+                    ->label('Riwayat')
+                    ->icon('heroicon-o-clock')
+                    ->color('gray')
+                    ->visible(fn (BriefingAttendance $record): bool =>
+                        $record->medicalActions()->exists()
+                        || $record->mpChecks()->count() > 1
+                    )
+                    ->modalHeading(fn (BriefingAttendance $record) => 'Riwayat Pemeriksaan — ' . $this->mpDisplayName($record))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Tutup')
+                    ->modalContent(fn (BriefingAttendance $record) => view(
+                        'filament.fc.pages.partials.mp-check-timeline',
+                        ['checks' => $record->mpChecks()->with('medicalActions')->get()]
+                    )),
 
                 Tables\Actions\DeleteAction::make()
                     ->label('Hapus')

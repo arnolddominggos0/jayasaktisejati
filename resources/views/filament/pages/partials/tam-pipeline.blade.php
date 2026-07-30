@@ -178,7 +178,7 @@
                                 {{-- IDENTITY (→ Drawer, where all detail + all actions live) --}}
                                 <button wire:click="openDrawer({{ $v->id }})" class="w-44 shrink-0 text-left">
                                     <span class="block text-[13px] font-bold text-gray-900 hover:text-blue-700 transition leading-tight">{{ $v->vessel?->name }}</span>
-                                    <span class="block text-[10px] text-gray-400 leading-tight">{{ $v->shippingLine?->name ?? '—' }} · V.{{ $v->voyage_no }}</span>
+                                    <span class="block text-[10px] text-gray-400 leading-tight">{{ $v->shippingLine?->name ?? '—' }} · {{ display_voyage($v) }}</span>
                                 </button>
 
                                 {{-- ZONE-RELEVANT DATE (red = window passed, actual not recorded) --}}

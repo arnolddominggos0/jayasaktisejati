@@ -373,6 +373,7 @@ class MpReadinessMonitoring extends Page implements HasTable
 
         // Dual-source: pre-cutoff uses stored unit_masuk_yard; post-cutoff uses Handover tracks.
         $effectiveUnit = BriefingSession::effectiveUnitSqlExpression();
+        $readySql      = BriefingSession::readySqlExpression();
 
         // Agregat per bulan di level sesi — JANGAN JOIN ke attendance
         $sessionData = DB::table('briefing_sessions')
@@ -380,7 +381,7 @@ class MpReadinessMonitoring extends Page implements HasTable
                 EXTRACT(MONTH FROM date)::int                                     AS month_num,
                 COUNT(*)::int                                                     AS session_count,
                 COALESCE(SUM({$effectiveUnit}), 0)::int                          AS total_units,
-                SUM(CASE WHEN summary_sufficient = true THEN 1 ELSE 0 END)::int  AS ok_count
+                SUM(CASE WHEN {$readySql} THEN 1 ELSE 0 END)::int                AS ok_count
             ")
             ->whereYear('date', $year)
             ->when($depotId, fn ($q) => $q->where('depot_id', $depotId))
@@ -675,13 +676,6 @@ class MpReadinessMonitoring extends Page implements HasTable
             'attendances'=> $attendanceRows,
         ];
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Operational table builders (SC.5D.4 — absorbed from YardDashboard)
-    | Exit-gate rules SC.5C.5-D: rack → delivery_to_port, non-rack → stuffing
-    |--------------------------------------------------------------------------
-    */
 
     private function exitNotExistsClosure(): \Closure
     {

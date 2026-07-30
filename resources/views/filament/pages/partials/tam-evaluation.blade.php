@@ -82,7 +82,7 @@
                             <span class="w-4 text-right text-gray-400 font-mono text-[9px]">{{ $i + 1 }}.</span>
                             <div class="flex-1 min-w-0">
                                 <p class="font-medium text-gray-700 truncate">{{ $tv->vessel?->name }}</p>
-                                <p class="text-gray-400 font-mono text-[9px]">{{ $tv->voyage_no }}</p>
+                                <p class="text-gray-400 font-mono text-[9px]">{{ display_voyage($tv) }}</p>
                             </div>
                             <span class="text-red-600 font-bold whitespace-nowrap">
                                 {{ $tv->departure_delay_days }} Hari

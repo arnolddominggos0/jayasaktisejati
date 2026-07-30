@@ -79,7 +79,7 @@
                         <td class="px-4 py-3">
                             <div class="font-medium text-gray-800">{{ $row['vessel_name'] }}</div>
                             @if ($row['voyage_no'] !== '—')
-                                <div class="text-xs text-gray-400">{{ $row['voyage_no'] }}</div>
+                                <div class="text-xs text-gray-400">{{ display_voyage($row['voyage_no']) }}</div>
                             @endif
                         </td>
 

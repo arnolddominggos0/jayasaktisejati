@@ -13,9 +13,9 @@
                 {{ $v->vessel?->name }}
             </div>
             <div class="text-[11px] font-mono text-gray-600">
-                {{ $v->code ?? $v->voyage_no }}
+                {{ $v->code ?? display_voyage($v) }}
                 @if ($v->code)
-                    <span class="text-gray-400">({{ $v->voyage_no }})</span>
+                    <span class="text-gray-400">({{ display_voyage($v) }})</span>
                 @endif
             </div>
 

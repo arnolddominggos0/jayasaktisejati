@@ -152,7 +152,7 @@
                             {{ $v->vessel?->name }}
                         </button>
                         <div class="text-[10px] text-gray-500 mt-0.5">
-                            {{ $v->shippingLine?->name ?? '—' }} · V.{{ $v->voyage_no }}
+                            {{ $v->shippingLine?->name ?? '—' }} · {{ display_voyage($v) }}
                         </div>
                         <div class="text-[9px] text-gray-400 mt-0.5">{{ \App\Supports\BusinessRouteResolver::forVoyage($v) }}</div>
                         <div class="text-[9px] text-gray-400 mt-0.5">

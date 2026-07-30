@@ -32,7 +32,7 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
-<title>Quick Report {{ $voyage->code ?? ('Voyage ' . ($voyage->voyage_no ?? '')) }} – {{ $voyage->vessel?->name ?? '' }}</title>
+<title>Quick Report {{ $voyage->code ?? display_voyage($voyage) }} – {{ $voyage->vessel?->name ?? '' }}</title>
 <style>
     @page { margin: 14mm 11mm 12mm 11mm; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -315,7 +315,7 @@
                         <tr>
                             <td class="lbl">Voyage No</td>
                             <td class="val" style="font-size:9px;color:#6b7280;">
-                                {{ $voyage->voyage_no ?? '&#8211;' }}
+                                {{ display_voyage($voyage) }}
                             </td>
                         </tr>
                         <tr>
@@ -773,7 +773,7 @@
         <div style="font-size:8.5px;color:#6b7280;margin-bottom:12px;line-height:1.7;">
             Laporan ini diterbitkan sebagai Quick Report hasil evaluasi voyage
             <strong>{{ $voyage->vessel?->name ?? '' }}</strong>
-            <strong>{{ $voyage->code ?? ('Voyage ' . ($voyage->voyage_no ?? '')) }}</strong>
+            <strong>{{ $voyage->code ?? display_voyage($voyage) }}</strong>
             periode <strong>{{ $period }}</strong>.
             Dokumen ini bersifat informatif dan digunakan sebagai bahan evaluasi kinerja lead time
             pengiriman kendaraan moda laut.

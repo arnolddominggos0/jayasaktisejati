@@ -1,12 +1,22 @@
 {{-- Health Log Timeline --}}
-{{-- $state = Collection<AttendanceHealthLog> with attendance.manpower eager-loaded --}}
+{{--
+    RCA fix (docs/field-coordinator/RCA-500-VIEW-EDIT-BRIEFING-SESSION.md):
+    $state di custom view Filament Infolist ViewEntry adalah closure atas
+    method setter Entry::state(), BUKAN nilai yang sudah di-resolve. Nilai
+    sebenarnya diakses via $getState(). Di-resolve SEKALI di sini ($items)
+    agar tidak memanggil $getState() berulang di seluruh Blade.
+    $items = Collection<AttendanceHealthLog> with attendance.manpower eager-loaded
+--}}
+@php
+    $items = $getState();
+@endphp
 
-@if($state->isEmpty())
+@if($items->isEmpty())
     <p class="text-sm text-gray-400 dark:text-gray-500 italic">Belum ada riwayat pemeriksaan kesehatan.</p>
 @else
 <div class="flow-root">
     <ul role="list" class="-mb-8">
-        @foreach($state as $log)
+        @foreach($items as $log)
         @php
             $colorMap = [
                 'auto_fit'        => ['dot' => 'bg-green-500',  'badge' => 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'],

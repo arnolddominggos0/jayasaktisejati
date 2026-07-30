@@ -37,7 +37,7 @@ class UpcomingVoyages extends BaseWidget
             Tables\Columns\TextColumn::make('plan_eta')->dateTime()->label('ETA'),
             Tables\Columns\TextColumn::make('shippingLine.name')->label('Line'),
             Tables\Columns\TextColumn::make('vessel.name')->label('Vessel'),
-            Tables\Columns\TextColumn::make('voyage_no')->label('Voyage'),
+            Tables\Columns\TextColumn::make('voyage_no')->label('Voyage')->formatStateUsing(fn ($state) => display_voyage($state)),
             Tables\Columns\TextColumn::make('portFrom.code')->label('POL')->badge(),
             Tables\Columns\TextColumn::make('portTo.code')->label('POD')->badge(),
         ];

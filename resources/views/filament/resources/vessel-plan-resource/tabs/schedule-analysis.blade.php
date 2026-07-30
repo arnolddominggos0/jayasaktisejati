@@ -398,7 +398,7 @@ $fmtDate = fn ($d) => $d ? $d->translatedFormat('d M Y') : '—';
                                     <div class="font-semibold text-gray-800">{{ $item->vessel?->name ?? '—' }}</div>
                                     <div class="text-[11px] mt-0.5">
                                         @if ($item->voyage_no)
-                                            <span class="text-gray-500 font-mono">V.{{ $item->voyage_no }}</span>
+                                            <span class="text-gray-500 font-mono">{{ display_voyage($item->voyage_no) }}</span>
                                             @if ($item->shippingLine?->name)
                                                 <span class="text-gray-300 mx-1">·</span>
                                             @endif

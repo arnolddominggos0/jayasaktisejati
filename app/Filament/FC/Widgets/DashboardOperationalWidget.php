@@ -39,6 +39,7 @@ class DashboardOperationalWidget extends Widget
             ->whereDate('date', $today)
             ->when(true, $depotFilter)
             ->select('id', 'unit_masuk_yard', 'summary_headcount', 'summary_sufficient')
+            ->selectRaw(BriefingSession::readySqlExpression() . ' AS is_ready')
             ->first();
 
         $hasSession = $session !== null;
@@ -91,8 +92,8 @@ class DashboardOperationalWidget extends Widget
             $mpSiapKerja = (int) ($attAgg->siap_kerja ?? 0);
         }
 
-        // ── Readiness: Siap Kerja >= Need MP ────────────────────────────────
-        $isReady = $hasSession && $needMp > 0 && $mpSiapKerja >= $needMp;
+        // ── Readiness: BriefingSession::isOperationallyReady() via SQL mirror ──
+        $isReady = $hasSession && (bool) $session->is_ready;
 
         if (! $hasSession) {
             $readinessLabel = 'Belum Ada Briefing';

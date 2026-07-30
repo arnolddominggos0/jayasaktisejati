@@ -15,7 +15,7 @@
                 <div>
                     <div class="flex items-center gap-2">
                         <div class="font-semibold">
-                            {{ $v->vessel?->name }} — {{ $v->voyage_no }}
+                            {{ $v->vessel?->name }} — {{ display_voyage($v) }}
                         </div>
                         <x-operational.badge :label="$statusBadge['label']" :color="$statusBadge['class']" size="xs" />
                     </div>

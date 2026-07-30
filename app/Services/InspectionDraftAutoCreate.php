@@ -9,40 +9,8 @@ use App\Models\UnitInspectionItem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
-/**
- * InspectionDraftAutoCreate
- *
- * Mirrors LoadingSessionAutoCreate — called from ShipmentTrackObserver::creating().
- *
- * When a ShipmentTrack is created at a stage that requires physical inspection,
- * this service ensures one draft UnitInspection record (with pre-built items)
- * exists per unit in the shipment.
- *
- * Draft indicator:
- *   status        = 'pending'         (status column is NOT NULL, null not allowed)
- *   submitted_at  = null              (canonical "not yet submitted" check)
- *   gate_decision = null
- *
- * Idempotent: firstOrCreate on (unit_id, stage) — safe to call multiple times.
- *
- * ⚠ Side effect on admin QA:
- *   UnitResource::table() uses withCount('inspections') which includes pending drafts.
- *   The "Status Akhir" column will show 'lulus' for draft-only units.
- *   Fix: add ->where('status', '!=', UnitInspection::STATUS_PENDING) to the
- *   UnitResource inspection counts when ready — no model change required.
- */
 class InspectionDraftAutoCreate
 {
-    /**
-     * Maps TrackStatus → inspection stage key.
-     *
-     * Public so ShipmentUnitsRelationManager and other callers can reuse
-     * the canonical mapping instead of duplicating it.
-     *
-     * Returns null for statuses that carry no physical inspection
-     * (onship, vessel_depart, vessel_arrival, hold, cancelled, delivered,
-     * delivery_to_port, stacking, unit_loading — already covered by stuffing).
-     */
     public static function resolveStage(TrackStatus $status): ?string
     {
         return match ($status) {
@@ -56,11 +24,6 @@ class InspectionDraftAutoCreate
         };
     }
 
-    /**
-     * Entry point — called from ShipmentTrackObserver::creating().
-     *
-     * @return array{stage: string|null, units_processed: int, created: int, skipped: int}
-     */
     public static function ensureForTrack(ShipmentTrack $track): array
     {
         $status = $track->status instanceof TrackStatus
@@ -86,15 +49,6 @@ class InspectionDraftAutoCreate
         return self::ensureForShipmentAndStage($shipment, $stage);
     }
 
-    /**
-     * Ensure UnitInspection drafts exist for all units of a shipment at a given stage.
-     *
-     * Called from fillForm() when no skeleton track exists yet (pickup on a brand-new
-     * shipment), so we cannot go through the observer/track lifecycle. Idempotent —
-     * uses firstOrCreate, safe to call multiple times.
-     *
-     * @return array{stage: string, units_processed: int, created: int, skipped: int}
-     */
     public static function ensureForShipmentAndStage(\App\Models\Shipment $shipment, string $stage): array
     {
         $units = $shipment->units()->get(['id']);
@@ -150,14 +104,6 @@ class InspectionDraftAutoCreate
 
         return self::result($stage, $units->count(), $created, $skipped);
     }
-
-    /**
-     * Builds UnitInspectionItem rows for a new draft inspection.
-     *
-     * Template lookup: uses config('unit_inspection_templates')[$stage].
-     * If the stage has no template entry → logs a warning and skips item generation.
-     * No fallback to other stages.
-     */
     private static function createItems(UnitInspection $inspection, string $stage): void
     {
         $templates = config('unit_inspection_templates', []);
@@ -194,5 +140,37 @@ class InspectionDraftAutoCreate
             'created'         => $created,
             'skipped'         => $skipped,
         ];
+    }
+
+    public static function criteriaHelperText(?string $category, ?string $itemName): ?string
+    {
+        if (blank($category) || blank($itemName)) {
+            return null;
+        }
+
+        $templates = config('unit_inspection_templates', []);
+
+        foreach ($templates as $categories) {
+            foreach ((array) $categories as $templateCategory => $items) {
+                if ($templateCategory !== $category) {
+                    continue;
+                }
+
+                foreach ((array) $items as $item) {
+                    if (($item['name'] ?? null) !== $itemName) {
+                        continue;
+                    }
+
+                    $criteria = $item['criteria'] ?? null;
+
+                    if (blank($criteria)) {
+                        return null;
+                    }
+                    return collect((array) $criteria)->implode(' • ');
+                }
+            }
+        }
+
+        return null;
     }
 }

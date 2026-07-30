@@ -15,7 +15,6 @@ use App\Filament\FC\Resources\ShipmentResource\RelationManagers\ShipmentUnitsRel
 use App\Models\City;
 use App\Models\LoadingSession;
 use App\Models\Shipment;
-use App\Models\UnitInspectionItem;
 use App\Services\InspectionDraftAutoCreate;
 use App\Services\LoadingSessionAutoCreate;
 use DomainException;
@@ -24,7 +23,6 @@ use Filament\Forms;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
-use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Radio;
@@ -32,7 +30,6 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -40,7 +37,9 @@ use Filament\Tables;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\HtmlString;
 
 class ShipmentResource extends Resource
 {
@@ -117,21 +116,21 @@ class ShipmentResource extends Resource
             }
 
             if ($isCurrentOrPast) {
-                $label = $status->label().' ✓';
+                $label = $status->label() . ' ✓';
                 $options[$status->value] = $label;
 
                 continue;
             }
 
             if ($isNext) {
-                $options[$status->value] = '➡ '.$status->label();
+                $options[$status->value] = '➡ ' . $status->label();
 
                 continue;
             }
 
             $track = $record->tracks()->where('status', $status->value)->whereNotNull('tracked_at')->exists();
             if ($track) {
-                $options[$status->value] = $status->label().' ✓';
+                $options[$status->value] = $status->label() . ' ✓';
                 $reached = true;
 
                 continue;
@@ -142,8 +141,8 @@ class ShipmentResource extends Resource
 
         $finished = TrackStatus::finished();
         if ($current && ! in_array($current, $finished, true)) {
-            $options[TrackStatus::Hold->value] = '⚠ '.TrackStatus::Hold->label();
-            $options[TrackStatus::Cancelled->value] = '✕ '.TrackStatus::Cancelled->label();
+            $options[TrackStatus::Hold->value] = '⚠ ' . TrackStatus::Hold->label();
+            $options[TrackStatus::Cancelled->value] = '✕ ' . TrackStatus::Cancelled->label();
         }
 
         return $options;
@@ -154,14 +153,23 @@ class ShipmentResource extends Resource
         return [
             Select::make('track_status')
                 ->label('Status Lapangan')
-                ->options(function (?Shipment $record) {
-                    if (! $record) {
-                        return collect(TrackStatus::orderSea())->mapWithKeys(fn ($e) => [$e->value => $e->label()]);
+                ->options(function ($record) {
+
+                    $shipment = static::resolveShipmentRecord($record);
+
+                    if (! $shipment) {
+                        return collect(TrackStatus::orderSea())
+                            ->mapWithKeys(fn($e) => [$e->value => $e->label()]);
                     }
 
-                    return static::getNextTrackStatusOptions($record);
+                    return static::getNextTrackStatusOptions($shipment);
                 })
-                ->default(fn (?Shipment $record) => $record?->nextTrackStatus()?->value)
+                ->default(function ($record) {
+
+                    $shipment = static::resolveShipmentRecord($record);
+
+                    return $shipment?->nextTrackStatus()?->value;
+                })
                 ->required()
                 ->native(false)
                 ->columnSpan(12)
@@ -170,29 +178,38 @@ class ShipmentResource extends Resource
             Placeholder::make('loading_gate_warning')
                 ->label('')
                 ->content('⚠ Shipment ber-rak: Status "Dimuat di Kapal" diupdate otomatis setelah loading checkpoint selesai di AppSheet.')
-                ->visible(
-                    fn (Get $get, ?Shipment $record) => $get('track_status') === TrackStatus::UnitLoading->value
-                        && $record
-                        && LoadingSessionAutoCreate::isRackShipment($record)
-                ),
+                ->visible(function (Get $get, $record) {
+
+                    $shipment = static::resolveShipmentRecord($record);
+
+                    return
+                        $shipment
+                        && $get('track_status') === TrackStatus::UnitLoading->value
+                        && LoadingSessionAutoCreate::isRackShipment($shipment);
+                }),
 
             Checkbox::make('complete_current_step')
                 ->label('Step ini sudah selesai & lanjut ke status berikutnya')
-                ->visible(fn (Get $get, ?Shipment $record) => $record?->nextTrackStatus() !== null)
+                ->visible(function (Get $get, $record) {
+
+                    $shipment = static::resolveShipmentRecord($record);
+
+                    return $shipment?->nextTrackStatus() !== null;
+                })
                 ->default(true)
                 ->columnSpan(12),
 
             DateTimePicker::make('plan_loading_time_at')
                 ->label('Plan Loading Time')
                 ->seconds(false)
-                ->visible(fn (Get $get) => $get('track_status') === TrackStatus::Handover->value)
+                ->visible(fn(Get $get) => $get('track_status') === TrackStatus::Handover->value)
                 ->required()
                 ->columnSpan(6),
 
             DateTimePicker::make('plan_closing_time_at')
                 ->label('Plan Closing Time')
                 ->seconds(false)
-                ->visible(fn (Get $get) => $get('track_status') === TrackStatus::Handover->value)
+                ->visible(fn(Get $get) => $get('track_status') === TrackStatus::Handover->value)
                 ->required()
                 ->columnSpan(6),
 
@@ -200,7 +217,7 @@ class ShipmentResource extends Resource
                 ->label('Catatan Lapangan')
                 ->rows(4)
                 ->columnSpan(12)
-                ->required(fn (Get $get) => in_array($get('track_status'), [
+                ->required(fn(Get $get) => in_array($get('track_status'), [
                     TrackStatus::Hold->value,
                     TrackStatus::Cancelled->value,
                 ], true))
@@ -210,33 +227,20 @@ class ShipmentResource extends Resource
             static::optionalChecksheetSchema()
                 ->columnSpan(12)
                 ->visible(
-                    fn (Get $get): bool => InspectionDraftAutoCreate::resolveStage(
+                    fn(Get $get): bool => InspectionDraftAutoCreate::resolveStage(
                         TrackStatus::tryFrom((string) $get('track_status')) ?? TrackStatus::Hold
                     ) === null
                 ),
         ];
     }
 
-    /**
-     * Reusable inspection form fields for embedding in OperationalTasks updateTrack action.
-     *
-     * Uses a flat single Repeater (inspection_items_flat) because Filament v3
-     * fails to hydrate nested Repeater items from fillForm().
-     *
-     * Each row carries: item_id, inspection_id, unit_id, unit_label, category, item_name,
-     * result, finding_type, notes.
-     *
-     * The caller (OperationalTasks) is responsible for:
-     *   - Filling 'inspection_stage' and 'inspection_items_flat' via ->fillForm()
-     *   - Saving the submitted data to unit_inspection_items / unit_inspections
-     */
-    public static function inspectionFormFields(): array
+    public static function inspectionStatusFields(): array
     {
         return [
             Hidden::make('inspection_stage'),
 
-            Forms\Components\Section::make('Inspeksi Unit')
-                ->description(fn (Get $get): string => match ($get('inspection_stage')) {
+            Forms\Components\Section::make('Inspection Unit')
+                ->description(fn(Get $get): string => match ($get('inspection_stage')) {
                     'pickup' => 'Pemeriksaan kondisi unit saat pickup dari PDC Asal.',
                     'handover_depot' => 'Pemeriksaan kondisi unit saat handover ke Depo.',
                     'loading' => 'Pemeriksaan kondisi unit sebelum dimuat ke kontainer.',
@@ -245,86 +249,33 @@ class ShipmentResource extends Resource
                     'dooring' => 'Pemeriksaan kondisi unit saat serah terima ke customer.',
                     default => '',
                 })
-                ->visible(fn (Get $get): bool => ! empty($get('inspection_stage')))
+                ->visible(fn(Get $get): bool => ! empty($get('inspection_stage')))
                 ->columnSpanFull()
                 ->schema([
-                    Repeater::make('inspection_items_flat')
-                        ->label('Item Pemeriksaan')
-                        ->addable(false)
-                        ->deletable(false)
-                        ->reorderable(false)
-                        ->columnSpanFull()
-                        ->schema([
-                            Hidden::make('item_id'),
-                            Hidden::make('inspection_id'),
-                            Hidden::make('unit_id'),
-                            Hidden::make('unit_label'),
+                    Placeholder::make('inspection_status_list')
+                        ->label('')
+                        ->content(function (Get $get, $record) {
 
-                            Grid::make(5)->schema([
-                                TextInput::make('unit_label_display')
-                                    ->label('Unit')
-                                    ->disabled()
-                                    ->dehydrated(false)
-                                    ->columnSpan(1),
+                            $shipment = static::resolveShipmentRecord($record);
 
-                                TextInput::make('category')
-                                    ->label('Kategori')
-                                    ->disabled()
-                                    ->dehydrated(false)
-                                    ->columnSpan(1),
+                            $stage = $get('inspection_stage');
 
-                                TextInput::make('item_name')
-                                    ->label('Item Pemeriksaan')
-                                    ->disabled()
-                                    ->dehydrated(false)
-                                    ->columnSpan(2),
+                            if (! $shipment || ! $stage) {
+                                return '';
+                            }
 
-                                ToggleButtons::make('result')
-                                    ->label('Hasil')
-                                    ->options([
-                                        UnitInspectionItem::RESULT_OK => 'OK',
-                                        UnitInspectionItem::RESULT_NG => 'NG',
-                                    ])
-                                    ->colors([
-                                        UnitInspectionItem::RESULT_OK => 'success',
-                                        UnitInspectionItem::RESULT_NG => 'danger',
-                                    ])
-                                    ->default(UnitInspectionItem::RESULT_OK)
-                                    ->required()
-                                    ->live()
-                                    ->grouped()
-                                    ->columnSpan(1),
-                            ]),
-
-                            Grid::make(2)
-                                ->schema([
-                                    Select::make('finding_type')
-                                        ->label('Jenis Temuan')
-                                        ->options(UnitInspectionItem::FINDING_LABELS)
-                                        ->required(fn (Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG)
-                                        ->visible(fn (Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG)
-                                        ->live(),
-
-                                    Textarea::make('notes')
-                                        ->label('Catatan / Deskripsi Temuan')
-                                        ->rows(2)
-                                        ->required(fn (Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG)
-                                        ->visible(fn (Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG),
-                                ])
-                                ->visible(fn (Get $get): bool => $get('result') === UnitInspectionItem::RESULT_NG),
-                        ]),
+                            return new HtmlString(
+                                view('filament.fc.shipments.partials.inspection-status-list', [
+                                    'shipment' => $shipment,
+                                    'stage' => $stage,
+                                ])->render()
+                            );
+                        })
+                        ->columnSpanFull(),
                 ]),
         ];
     }
 
-    /**
-     * Reusable optional checkseet Repeater for quick actions.
-     *
-     * Unlike trackUpdateForm(), this has no minItems and is never required —
-     * FC may submit without filling unit data.  When at least one row IS added
-     * the inner fields (model, no_rangka, etc.) remain required, so partial rows
-     * are still rejected.
-     */
     protected static function optionalChecksheetSchema(): Repeater
     {
         return Repeater::make('checkseet')
@@ -356,18 +307,10 @@ class ShipmentResource extends Resource
                     ->directory('shipment-tracks/checkseet')
                     ->multiple()
                     ->image()
-                    ->required(fn (Get $get) => $get('checkseet_status') === 'ng'),
+                    ->required(fn(Get $get) => $get('checkseet_status') === 'ng'),
             ]);
     }
 
-    /**
-     * Shared action callback: append a track entry with optional checkseet.
-     *
-     * - Wraps appendTrack() in a try-catch so DomainExceptions
-     *   (invalid transitions) surface as Filament danger notifications.
-     * - Sends a warning notification when no checkseet rows were provided.
-     * - Sends a success notification listing how many units were recorded.
-     */
     protected static function appendTrackWithCheckseet(
         Shipment $record,
         TrackStatus $status,
@@ -418,17 +361,17 @@ class ShipmentResource extends Resource
                 ->schema([
                     Placeholder::make('code')
                         ->label('Kode')
-                        ->content(fn (Shipment $record) => $record->code)
+                        ->content(fn(Shipment $record) => $record->code)
                         ->columnSpan(4),
 
                     Placeholder::make('status')
                         ->label('Status')
-                        ->content(fn (Shipment $record) => $record->status?->label() ?? '-')
+                        ->content(fn(Shipment $record) => $record->status?->label() ?? '-')
                         ->columnSpan(4),
 
                     Placeholder::make('route')
                         ->label('Rute')
-                        ->content(fn (Shipment $record) => ($record->originCity->name ?? '-').' → '.($record->destinationCity->name ?? '-'))
+                        ->content(fn(Shipment $record) => ($record->originCity->name ?? '-') . ' → ' . ($record->destinationCity->name ?? '-'))
                         ->columnSpan(12),
                 ]),
         ]);
@@ -441,7 +384,7 @@ class ShipmentResource extends Resource
                 TextColumn::make('code')
                     ->label('Kode')
                     ->badge()
-                    ->color(fn (Shipment $record) => $record->mode === ShipmentMode::Sea ? 'primary' : 'warning')
+                    ->color(fn(Shipment $record) => $record->mode === ShipmentMode::Sea ? 'primary' : 'warning')
                     ->extraAttributes(['class' => 'font-mono'])
                     ->copyable()
                     ->searchable()
@@ -449,11 +392,11 @@ class ShipmentResource extends Resource
 
                 IconColumn::make('mode')
                     ->label('Moda')
-                    ->icon(fn ($state) => ($state instanceof ShipmentMode ? $state->value : (string) $state) === ShipmentMode::Sea->value
+                    ->icon(fn($state) => ($state instanceof ShipmentMode ? $state->value : (string) $state) === ShipmentMode::Sea->value
                         ? 'heroicon-m-cog-8-tooth' : 'heroicon-m-truck')
-                    ->color(fn ($state) => ($state instanceof ShipmentMode ? $state->value : (string) $state) === ShipmentMode::Sea->value
+                    ->color(fn($state) => ($state instanceof ShipmentMode ? $state->value : (string) $state) === ShipmentMode::Sea->value
                         ? 'primary' : 'warning')
-                    ->tooltip(fn ($state) => ($state instanceof ShipmentMode ? $state->value : (string) $state) === ShipmentMode::Sea->value
+                    ->tooltip(fn($state) => ($state instanceof ShipmentMode ? $state->value : (string) $state) === ShipmentMode::Sea->value
                         ? 'Laut' : 'Darat'),
 
                 TextColumn::make('customer.name')->label('Pengirim')->badge()->searchable()->toggleable(),
@@ -472,7 +415,7 @@ class ShipmentResource extends Resource
 
                 TextColumn::make('service_type')
                     ->label('Layanan')
-                    ->getStateUsing(fn (Shipment $record) => $record->service_type?->label() ?? (string) $record->service_type ?: '-')
+                    ->getStateUsing(fn(Shipment $record) => $record->service_type?->label() ?? (string) $record->service_type ?: '-')
                     ->badge()
                     ->colors([
                         'info' => [ServiceType::SeaFreight->label()],
@@ -500,8 +443,8 @@ class ShipmentResource extends Resource
                 TextColumn::make('latest_track_status')
                     ->label('Track Status')
                     ->badge()
-                    ->formatStateUsing(fn (Shipment $record) => $record->latest_track_status?->label() ?? '-')
-                    ->color(fn (Shipment $record) => match ($record->latest_track_status) {
+                    ->formatStateUsing(fn(Shipment $record) => $record->latest_track_status?->label() ?? '-')
+                    ->color(fn(Shipment $record) => match ($record->latest_track_status) {
                         TrackStatus::Delivered => 'success',
                         TrackStatus::Cancelled => 'danger',
                         TrackStatus::Hold => 'warning',
@@ -568,7 +511,7 @@ class ShipmentResource extends Resource
                             default => 'gray',
                         };
                     })
-                    ->visible(fn () => true)
+                    ->visible(fn() => true)
                     ->toggleable(),
 
                 TextColumn::make('eta')->label('ETA')->badge()->dateTime('d M Y, H:i')->toggleable(),
@@ -577,19 +520,19 @@ class ShipmentResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Status')
-                    ->options(collect(ShipmentStatus::cases())->mapWithKeys(fn ($c) => [$c->value => $c->label()])),
+                    ->options(collect(ShipmentStatus::cases())->mapWithKeys(fn($c) => [$c->value => $c->label()])),
                 Tables\Filters\SelectFilter::make('origin_city_id')
                     ->label('Asal')
-                    ->options(fn () => City::active()->orderBy('name')->pluck('name', 'id')->toArray())
+                    ->options(fn() => City::active()->orderBy('name')->pluck('name', 'id')->toArray())
                     ->searchable(),
                 Tables\Filters\SelectFilter::make('destination_city_id')
                     ->label('Tujuan')
-                    ->options(fn () => City::active()->orderBy('name')->pluck('name', 'id')->toArray())
+                    ->options(fn() => City::active()->orderBy('name')->pluck('name', 'id')->toArray())
                     ->searchable(),
                 Tables\Filters\SelectFilter::make('tahun')
                     ->label('Tahun')
                     ->options(
-                        fn () => DB::table('shipment_tracks')
+                        fn() => DB::table('shipment_tracks')
                             ->whereIn('status', [TrackStatus::Delivered->value, TrackStatus::Cancelled->value])
                             ->whereNotNull('tracked_at')
                             ->selectRaw('EXTRACT(YEAR FROM tracked_at)::int AS y')
@@ -599,10 +542,10 @@ class ShipmentResource extends Resource
                             ->toArray()
                     )
                     ->modifyQueryUsing(
-                        fn (Builder $query, array $data): Builder => filled($data['value'])
+                        fn(Builder $query, array $data): Builder => filled($data['value'])
                             ? $query->whereHas(
                                 'latestTrack',
-                                fn (Builder $t) => $t->whereYear('tracked_at', (int) $data['value'])->whereNotNull('tracked_at')
+                                fn(Builder $t) => $t->whereYear('tracked_at', (int) $data['value'])->whereNotNull('tracked_at')
                             )
                             : $query
                     ),
@@ -623,10 +566,10 @@ class ShipmentResource extends Resource
                         12 => 'Desember',
                     ])
                     ->modifyQueryUsing(
-                        fn (Builder $query, array $data): Builder => filled($data['value'])
+                        fn(Builder $query, array $data): Builder => filled($data['value'])
                             ? $query->whereHas(
                                 'latestTrack',
-                                fn (Builder $t) => $t->whereMonth('tracked_at', (int) $data['value'])->whereNotNull('tracked_at')
+                                fn(Builder $t) => $t->whereMonth('tracked_at', (int) $data['value'])->whereNotNull('tracked_at')
                             )
                             : $query
                     ),
@@ -639,25 +582,25 @@ class ShipmentResource extends Resource
                         ->label('Cetak Waybill')
                         ->icon('heroicon-m-printer')
                         ->color('primary')
-                        ->url(fn (Shipment $record): string => route('shipments.print.waybill', $record))
+                        ->url(fn(Shipment $record): string => route('shipments.print.waybill', $record))
                         ->openUrlInNewTab()
-                        ->visible(fn (Shipment $record) => auth()->user()?->can('print', $record)),
+                        ->visible(fn(Shipment $record) => auth()->user()?->can('print', $record)),
 
                     Tables\Actions\Action::make('printPackingList')
                         ->label('Cetak Packing List')
                         ->icon('heroicon-m-clipboard-document-list')
                         ->color('info')
-                        ->url(fn (Shipment $record): string => route('shipments.print.packing', $record))
+                        ->url(fn(Shipment $record): string => route('shipments.print.packing', $record))
                         ->openUrlInNewTab()
-                        ->visible(fn (Shipment $record) => auth()->user()?->can('print', $record)),
+                        ->visible(fn(Shipment $record) => auth()->user()?->can('print', $record)),
 
                     Tables\Actions\Action::make('printResi')
                         ->label('Cetak Resi')
                         ->icon('heroicon-m-document-text')
                         ->color('gray')
-                        ->url(fn (Shipment $record): string => route('shipments.resi', $record))
+                        ->url(fn(Shipment $record): string => route('shipments.resi', $record))
                         ->openUrlInNewTab()
-                        ->visible(fn (Shipment $record) => auth()->user()?->can('print', $record)),
+                        ->visible(fn(Shipment $record) => auth()->user()?->can('print', $record)),
                 ])->label('Cetak')->icon('heroicon-m-printer')->color('gray'),
             ])
             ->bulkActions([])
@@ -679,5 +622,18 @@ class ShipmentResource extends Resource
             ShipmentUnitsRelationManager::class,
             LoadingSessionsRelationManager::class,
         ];
+    }
+
+    protected static function resolveShipmentRecord($record): ?Shipment
+    {
+        if ($record instanceof Shipment) {
+            return $record;
+        }
+
+        if ($record instanceof \App\Models\Unit) {
+            return $record->shipment;
+        }
+
+        return null;
     }
 }

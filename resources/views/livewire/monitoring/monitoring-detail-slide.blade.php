@@ -62,7 +62,7 @@
                     <p class="jss-detail-subtitle">
                         {{ $unitDetail->shipment_code }}
                         @if ($unitDetail->route_label)
-                            &middot; {{ $unitDetail->route_label }}
+                            &middot; {{ \Illuminate\Support\Str::title($unitDetail->route_label) }}
                         @endif
                     </p>
                 @endif
@@ -174,7 +174,7 @@
                                 @if ($unitDetail->container_display)
                                     {{ $unitDetail->container_display }}
                                 @else
-                                    <span class="jss-detail-empty-val">Belum di-assign</span>
+                                    <span class="jss-detail-empty-val">Belum ditentukan</span>
                                 @endif
                             </dd>
                         </dl>
@@ -212,7 +212,7 @@
                         @if ($unitDetail->admin->last_tracked_at)
                             <p class="mon-foot mt-1" style="color:var(--mon-neutral-400)">
                                 Pergerakan terakhir:
-                                {{ $unitDetail->admin->last_tracked_at->format('d M Y, H:i') }}
+                                {{ $unitDetail->admin->last_tracked_at->translatedFormat('d M Y, H:i') }}
                             </p>
                         @else
                             <p class="mon-foot mt-1" style="color:var(--mon-neutral-400)">Belum ada pergerakan tercatat</p>
@@ -263,13 +263,13 @@
                         <p class="jss-detail-sub-label">Jadwal</p>
                         <dl class="grid grid-cols-2 gap-x-4 gap-y-2">
                             <dt class="mon-foot" style="color:var(--mon-neutral-400)">Diminta</dt>
-                            <dd class="mon-table">{{ $unitDetail->admin->requested_at?->format('d M Y') ?? '—' }}</dd>
+                            <dd class="mon-table">{{ $unitDetail->admin->requested_at?->translatedFormat('d M Y') ?? '—' }}</dd>
 
                             <dt class="mon-foot" style="color:var(--mon-neutral-400)">ETD</dt>
-                            <dd class="mon-table">{{ $unitDetail->admin->etd?->format('d M Y') ?? '—' }}</dd>
+                            <dd class="mon-table">{{ $unitDetail->admin->etd?->translatedFormat('d M Y') ?? '—' }}</dd>
 
                             <dt class="mon-foot" style="color:var(--mon-neutral-400)">ETA</dt>
-                            <dd class="mon-table">{{ $unitDetail->admin->eta?->format('d M Y') ?? '—' }}</dd>
+                            <dd class="mon-table">{{ $unitDetail->admin->eta?->translatedFormat('d M Y') ?? '—' }}</dd>
                         </dl>
                     </div>
 
@@ -316,6 +316,17 @@
                             <span class="jss-detail-section-title">Inspeksi</span>
                         </div>
                         <p class="jss-detail-placeholder" style="padding:0.625rem 0">Segera hadir</p>
+                    </div>
+
+                    {{-- Detail Unit Workspace v1.0: entry point ke halaman
+                         operasional penuh (additive — perilaku slide-over lama
+                         tidak berubah). --}}
+                    <div class="pt-1">
+                        <a href="{{ \App\Filament\Resources\ShipmentTrackingResource::getUrl('unit', ['unitId' => $unitDetail->unit_id]) }}"
+                           class="mon-deeplink">
+                            Buka Workspace Lengkap
+                            <x-heroicon-o-arrow-top-right-on-square class="w-3.5 h-3.5" />
+                        </a>
                     </div>
 
                     {{-- Deep Links --}}

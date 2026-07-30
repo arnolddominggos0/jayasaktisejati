@@ -140,9 +140,9 @@
                         <div>
                             <div class="text-gray-500">Voyage</div>
                             <div class="font-semibold font-mono text-sm">
-                                {{ $selectedMilestone->voyage->code ?? $selectedMilestone->voyage->voyage_no }}
+                                {{ $selectedMilestone->voyage->code ?? display_voyage($selectedMilestone->voyage) }}
                                 @if ($selectedMilestone->voyage->code)
-                                    <span class="text-gray-400 font-normal text-[10px]">({{ $selectedMilestone->voyage->voyage_no }})</span>
+                                    <span class="text-gray-400 font-normal text-[10px]">({{ display_voyage($selectedMilestone->voyage) }})</span>
                                 @endif
                             </div>
                         </div>

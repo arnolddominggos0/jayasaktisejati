@@ -8,10 +8,10 @@ use App\Filament\FC\Resources\BriefingSessionResource\RelationManagers\Attendanc
 use App\Filament\FC\Resources\BriefingSessionResource\RelationManagers\StockApdChecksRelationManager;
 use App\Models\BriefingSession;
 use App\Models\Depot;
-use App\Models\Shipment;
 use Filament\Facades\Filament;
 use Filament\Forms\Get;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
@@ -20,6 +20,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
@@ -90,22 +91,25 @@ class BriefingSessionResource extends Resource
                         ->default(now())
                         ->closeOnDateSelection()
                         ->required()
+                        ->disabled(fn(string $operation) => $operation === 'edit')
                         ->live()
                         ->rules([
-                            // Prevent duplicate briefings: one per depot per day.
                             fn(Get $get, ?BriefingSession $record): \Closure => function (
                                 string $attribute,
-                                mixed  $value,
+                                mixed $value,
                                 \Closure $fail,
                             ) use ($get, $record): void {
                                 $depotId = $get('depot_id');
+
                                 if (! $value || ! $depotId) {
                                     return;
                                 }
+
                                 $exists = BriefingSession::whereDate('date', $value)
                                     ->where('depot_id', $depotId)
                                     ->when($record?->id, fn($q, $id) => $q->where('id', '!=', $id))
                                     ->exists();
+
                                 if ($exists) {
                                     $fail('Briefing untuk tanggal ini di depot yang dipilih sudah ada.');
                                 }
@@ -118,6 +122,7 @@ class BriefingSessionResource extends Resource
                         ->searchable()
                         ->preload()
                         ->required()
+                        ->disabled(fn(string $operation) => $operation === 'edit')
                         ->default(function () {
                             $user = Filament::auth()->user();
 
@@ -131,6 +136,7 @@ class BriefingSessionResource extends Resource
                             $coordId = $state
                                 ? Depot::where('id', $state)->value('coordinator_user_id')
                                 : null;
+
                             $set('coordinator_user_id', $coordId);
                         }),
 
@@ -171,99 +177,26 @@ class BriefingSessionResource extends Resource
                             'min'      => 'Target manpower minimal 1 orang.',
                         ]),
 
+                    FileUpload::make('briefing_evidence_path')
+                        ->label('Foto Briefing')
+                        ->helperText('Bukti visual pelaksanaan briefing harian sebelum aktivitas lapangan dimulai.')
+                        ->image()
+                        ->disk('public')
+                        ->directory('briefing-sessions/evidence')
+                        ->visibility('public')
+                        ->maxSize(5120)
+                        ->imagePreviewHeight('200')
+                        ->openable()
+                        ->downloadable()
+                        ->nullable()
+                        ->columnSpanFull(),
+
                     Textarea::make('notes')
                         ->label('Catatan / Topik Briefing')
                         ->columnSpanFull()
                         ->rows(3),
+
                 ]),
-
-            // Section::make('Shipment Kandidat')
-            //     ->description('Pilih shipment yang akan dikerjakan pada sesi briefing ini.')
-            //     ->schema([
-            //         Select::make('shipments')
-            //             ->label('Shipment')
-            //             ->multiple()
-            //             ->required()
-            //             ->minItems(1)
-            //             ->relationship(
-            //                 name: 'shipments',
-            //                 titleAttribute: 'code',
-            //                 modifyQueryUsing: function (Builder $query, Get $get) {
-            //                     $depotId = $get('depot_id');
-
-            //                     // Select only non-JSON columns so PostgreSQL DISTINCT works.
-            //                     // Filament's multi-select relationship adds DISTINCT internally;
-            //                     // shipments has JSON columns (attachments, containers, etc.)
-            //                     // that break DISTINCT on shipments.*.
-            //                     return $query
-            //                         ->select([
-            //                             'shipments.id',
-            //                             'shipments.code',
-            //                             'shipments.customer_id',
-            //                             'shipments.status',
-            //                             'shipments.assigned_depot_id',
-            //                         ])
-            //                         ->readyForBriefing($depotId ?: null)
-            //                         ->orderBy('shipments.code');
-            //                 }
-            //             )
-            //             ->getOptionLabelFromRecordUsing(fn (Shipment $r) =>
-            //                 $r->code . ' — ' . ($r->customer?->name ?? '-')
-            //             )
-            //             ->searchable(['code'])
-            //             ->preload(false)
-            //             ->columnSpanFull()
-            //             ->validationMessages([
-            //                 'required' => 'Minimal 1 shipment harus dipilih.',
-            //                 'min'      => 'Minimal 1 shipment harus dipilih.',
-            //             ]),
-            //     ]),
-
-            Section::make('Shipment Readiness')
-                ->columns(4)
-                ->visible(fn (?BriefingSession $record) => $record !== null)
-                ->schema([
-                    Placeholder::make('shipment_assigned')
-                        ->label('Shipment Assigned')
-                        ->content(fn (BriefingSession $record): string =>
-                            (string) $record->shipments()->count()
-                        ),
-
-                    Placeholder::make('expected_unit')
-                        ->label('Expected Unit')
-                        ->content(fn (BriefingSession $record): string =>
-                            $record->expected_unit . ' unit'
-                        ),
-
-                    Placeholder::make('actual_unit_masuk_yard')
-                        ->label('Actual Unit Handover')
-                        ->content(fn (BriefingSession $record): string =>
-                            $record->actual_unit_masuk_yard . ' unit'
-                        ),
-
-                    Placeholder::make('unit_gap')
-                        ->label('Gap (Expected − Actual)')
-                        ->content(fn (BriefingSession $record): string =>
-                            $record->unit_gap . ' unit'
-                        ),
-                ]),
-
-            Section::make('Status MP Check')
-                ->columns(1)
-                ->schema([
-                    Placeholder::make('mp_check_status_display')
-                        ->label('Status')
-                        ->content(function (?BriefingSession $record): string {
-                            if (! $record?->mp_check_status) {
-                                return 'Draft';
-                            }
-                            $enum = $record->mp_check_status instanceof MPCheckStatus
-                                ? $record->mp_check_status
-                                : MPCheckStatus::tryFrom((string) $record->mp_check_status);
-                            return $enum?->label() ?? 'Draft';
-                        }),
-                ])
-                ->visible(fn(?BriefingSession $record) => $record !== null),
         ]);
     }
 
@@ -277,6 +210,16 @@ class BriefingSessionResource extends Resource
                     ->date('d M Y')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: false),
+                IconColumn::make('briefing_evidence_path')
+                    ->label('Foto')
+                    ->getStateUsing(fn(BriefingSession $record) => filled($record->briefing_evidence_path))
+                    ->boolean()
+                    ->trueIcon('heroicon-o-photo')
+                    ->falseIcon('heroicon-o-minus')
+                    ->trueColor('success')
+                    ->falseColor('gray')
+                    ->alignCenter()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 // ── Depot & PIC (toggleable — detail reference) ───────────
                 TextColumn::make('depot.name')
@@ -301,7 +244,7 @@ class BriefingSessionResource extends Resource
                     ->label('Expected')
                     ->alignCenter()
                     ->suffix(' unit')
-                    ->getStateUsing(fn ($record) => $record->expected_unit)
+                    ->getStateUsing(fn($record) => $record->expected_unit)
                     ->sortable(false),
 
                 // ── Actual Unit Handover — derived post-cutoff, legacy pre-cutoff ──
@@ -309,16 +252,16 @@ class BriefingSessionResource extends Resource
                     ->label('Actual Handover')
                     ->alignCenter()
                     ->suffix(' unit')
-                    ->getStateUsing(fn ($record) => $record->actual_unit_masuk_yard)
+                    ->getStateUsing(fn($record) => $record->actual_unit_masuk_yard)
                     ->sortable(false),
 
                 // ── Gap Unit ──────────────────────────────────────────────
                 TextColumn::make('unit_gap_col')
                     ->label('Gap')
                     ->alignCenter()
-                    ->getStateUsing(fn ($record) => $record->unit_gap)
-                    ->formatStateUsing(fn ($state) => $state > 0 ? "+{$state}" : (string) $state)
-                    ->color(fn ($state) => $state <= 0 ? 'success' : 'warning')
+                    ->getStateUsing(fn($record) => $record->unit_gap)
+                    ->formatStateUsing(fn($state) => $state > 0 ? "+{$state}" : (string) $state)
+                    ->color(fn($state) => $state <= 0 ? 'success' : 'warning')
                     ->badge()
                     ->sortable(false),
 
@@ -345,31 +288,23 @@ class BriefingSessionResource extends Resource
 
                         return $attend - $need;
                     })
-                    ->formatStateUsing(fn ($state) => $state > 0 ? "+{$state}" : (string) $state)
-                    ->color(fn ($state) => match (true) {
+                    ->formatStateUsing(fn($state) => $state > 0 ? "+{$state}" : (string) $state)
+                    ->color(fn($state) => match (true) {
                         $state > 0  => 'success',
                         $state === 0 => 'gray',
                         default     => 'danger',
                     })
-                    ->weight(fn ($state) => $state < 0 ? 'bold' : null)
+                    ->weight(fn($state) => $state < 0 ? 'bold' : null)
                     ->alignCenter()
                     ->sortable(false),
 
-                // ── READY / NOT READY — FIT >= need AND mp_check cleared ──
+                // ── READY / NOT READY — BriefingSession::isOperationallyReady() ──
                 TextColumn::make('mp_readiness_status')
                     ->label('Kesiapan')
                     ->badge()
-                    ->state(function ($record) {
-                        $sufficient = (bool) $record->summary_sufficient;
-                        $val        = $record->mp_check_status instanceof MPCheckStatus
-                            ? $record->mp_check_status->value
-                            : (string) $record->mp_check_status;
-                        $cleared    = $val === 'cleared';
-
-                        return ($sufficient && $cleared) ? 'ready' : 'not_ready';
-                    })
-                    ->formatStateUsing(fn ($state) => $state === 'ready' ? 'READY' : 'NOT READY')
-                    ->color(fn ($state) => $state === 'ready' ? 'success' : 'danger')
+                    ->state(fn ($record) => $record->isOperationallyReady() ? 'ready' : 'not_ready')
+                    ->formatStateUsing(fn($state) => $state === 'ready' ? 'READY' : 'NOT READY')
+                    ->color(fn($state) => $state === 'ready' ? 'success' : 'danger')
                     ->alignCenter()
                     ->sortable(false),
 
@@ -429,14 +364,14 @@ class BriefingSessionResource extends Resource
 
                 Tables\Actions\EditAction::make()
                     ->label('Ubah')
-                    ->visible(fn ($record) => ! $record->isTerminal()),
+                    ->visible(fn($record) => ! $record->isTerminal()),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
                         ->label('Hapus Terpilih')
                         ->before(function (Tables\Actions\DeleteBulkAction $action, \Illuminate\Database\Eloquent\Collection $records) {
-                            $terminal = $records->filter(fn ($r) => $r->isTerminal());
+                            $terminal = $records->filter(fn($r) => $r->isTerminal());
                             if ($terminal->isNotEmpty()) {
                                 \Filament\Notifications\Notification::make()
                                     ->title("Tidak dapat menghapus {$terminal->count()} sesi Approved/Failed")

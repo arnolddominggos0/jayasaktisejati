@@ -44,7 +44,7 @@
                 'name' => 'Manado (Kantor Cabang)',
                 'short_name' => 'Manado',
                 'whatsapp' => '624318142227',
-                'contact_person' => 'Pak Arnold',
+                'contact_person' => '',
                 'address' => 'Jl. Kombos Atas No.84Kairagi Satu, Kec. Mapanget, Kota Manado, Sulawesi Utara',
             ],
         ],

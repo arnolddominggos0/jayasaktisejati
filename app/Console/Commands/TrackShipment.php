@@ -8,16 +8,6 @@ use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Auth;
 
-/**
- * Shipment Tracking Command
- * Update shipment status step by step
- *
- * Usage:
- *   php artisan shipment:track {code} {status}
- *   php artisan shipment:track JSS0426SH1234 pickup
- *   php artisan shipment:track JSS0426SH1234 handover --note="Handover ke depo"
- *   php artisan shipment:track JSS0426SH1234 delivered --note="Diterima oleh ..."
- */
 class TrackShipment extends Command
 {
     protected $signature = 'shipment:track

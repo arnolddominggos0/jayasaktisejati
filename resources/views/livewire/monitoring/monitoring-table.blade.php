@@ -67,7 +67,7 @@
      wire:key="mon-table-{{ $currentPage }}-{{ md5($term) }}"
      data-total-rows="{{ $rowCount }}"
      role="grid"
-     aria-label="Monitoring table - {{ $total }} unit"
+     aria-label="Tabel monitoring - {{ $total }} unit"
      aria-rowcount="{{ $total }}"
      tabindex="-1">
 
@@ -78,12 +78,12 @@
             <thead role="rowgroup">
                 <tr role="row">
                     <th scope="col" role="columnheader">Unit</th>
-                    <th scope="col" role="columnheader">Exception</th>
-                    <th scope="col" role="columnheader">Stage</th>
+                    <th scope="col" role="columnheader">Perhatian</th>
+                    <th scope="col" role="columnheader">Tahap</th>
                     <th scope="col" role="columnheader" class="col-num">Dwelling</th>
                     <th scope="col" role="columnheader">Voyage</th>
-                    <th scope="col" role="columnheader">Route</th>
-                    <th scope="col" role="columnheader" class="col-action">Action</th>
+                    <th scope="col" role="columnheader">Rute</th>
+                    <th scope="col" role="columnheader" class="col-action">Aksi</th>
                 </tr>
             </thead>
 
@@ -129,7 +129,7 @@
                                 default                                     => 'is-fresh',
                             };
                             if ($row->age->fallback_used) {
-                                $ageLabel .= ' (est)';
+                                $ageLabel .= ' (perkiraan)';
                             }
 
                             // Exceptions - priority-sorted chips
@@ -172,7 +172,7 @@
                             {{-- Exception - priority chips or em-dash; coordinator's first decision signal --}}
                             <td role="cell">
                                 @if ($sortedExceptions->isNotEmpty())
-                                    <div class="flex flex-wrap gap-1" role="list" aria-label="Exceptions">
+                                    <div class="flex flex-wrap gap-1" role="list" aria-label="Perhatian">
                                         @foreach ($sortedExceptions as $ex)
                                             @php
                                                 $exClass = $ex->severity === 'critical'
@@ -186,7 +186,7 @@
                                         @endforeach
                                     </div>
                                 @else
-                                    <span class="text-gray-300" aria-label="No exceptions">-</span>
+                                    <span class="text-gray-300" aria-label="Tanpa perhatian">-</span>
                                 @endif
                             </td>
 
@@ -214,7 +214,7 @@
                                     </div>
                                 @else
                                     <div class="flex flex-col gap-0.5">
-                                        <span class="mon-badge mon-badge-neutral">Belum Assign</span>
+                                        <span class="mon-badge mon-badge-neutral">Belum Ada Voyage</span>
                                         @if ($eta)
                                             <span class="mon-unit-sub">ETA {{ $eta }}</span>
                                         @endif
@@ -222,11 +222,11 @@
                                 @endif
                             </td>
 
-                            {{-- Route (Task 3) - reference information, secondary to exception/stage/dwelling --}}
+                            {{-- Rute (Task 3) - informasi referensi. UX v1.5: Title Case
+                                 (nama kota di DB uppercase) + tanpa arrow depan. --}}
                             <td role="cell">
                                 <span class="inline-flex items-center gap-1 text-gray-600">
-                                    <x-heroicon-o-arrow-right class="w-3.5 h-3.5 text-gray-400" />
-                                    <span class="font-medium">{{ $row->route_label }}</span>
+                                    <span class="font-medium">{{ \Illuminate\Support\Str::title($row->route_label) }}</span>
                                 </span>
                             </td>
 

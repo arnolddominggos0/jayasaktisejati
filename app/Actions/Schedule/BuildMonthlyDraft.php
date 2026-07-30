@@ -91,7 +91,7 @@ class BuildMonthlyDraft
         foreach ($rows as $r) {
             $parts = array_filter([
                 $r['Vessel'],
-                $r['Voyage'] ? 'V.' . $r['Voyage'] : null,
+                $r['Voyage'] ? display_voyage($r['Voyage']) : null,
                 $r['ETD (Plan)'] ? 'ETD ' . Carbon::parse($r['ETD (Plan)'])->format('d-m-Y') : null,
                 ($r['POL'] && $r['POD']) ? $r['POL'] . ' → ' . $r['POD'] : null,
             ]);

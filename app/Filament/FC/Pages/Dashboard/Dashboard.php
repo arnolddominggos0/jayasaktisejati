@@ -163,7 +163,7 @@ class Dashboard extends Page
             'has_briefing'   => true,
             'fit_count'      => $fitCount,
             'need_mp'        => (int) ($session->summary_headcount ?? 0),
-            'is_ready'       => (bool) $session->summary_sufficient,
+            'is_ready'       => $session->isOperationallyReady(),
             'status_label'   => $statusLabel,
             'view_url'       => BriefingSessionResource::getUrl('view', ['record' => $session->id]),
             'monitoring_url' => $monitoringUrl,

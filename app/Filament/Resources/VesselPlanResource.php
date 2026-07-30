@@ -3,9 +3,11 @@
 namespace App\Filament\Resources;
 
 use App\Models\VesselPlan;
-use App\Supports\MonthParam;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\IconPosition;
+use Filament\Forms\Form;
+use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
@@ -23,10 +25,6 @@ class VesselPlanResource extends Resource
     protected static ?string $modelLabel      = 'Perencanaan Kapal';
     protected static ?int    $navigationSort  = 2;
     protected static ?string $navigationIcon  = 'heroicon-o-calendar-days';
-
-    // ── Authorization ─────────────────────────────────────────────────────────
-    // VesselPlan is global (no branch). office_admin: read-only reference.
-    // super_admin: full CRUD.
 
     public static function shouldRegisterNavigation(): bool
     {
@@ -51,6 +49,35 @@ class VesselPlanResource extends Resource
     public static function canDelete($record): bool
     {
         return auth_user()?->isSuperAdmin() ?? false;
+    }
+
+    public static function form(Form $form): Form
+    {
+        return $form
+            ->schema([
+                Select::make('period_month')
+                    ->label('Periode')
+                    ->options(
+                        collect(range(0, 12))
+                            ->mapWithKeys(function ($i) {
+                                $date = now()->startOfMonth()->addMonths($i);
+
+                                return [
+                                    $date->toDateString() => $date->translatedFormat('F Y'),
+                                ];
+                            })
+                    )
+                    ->searchable()
+                    ->required(),
+
+                Select::make('route_code')
+                    ->label('Rute')
+                    ->options([
+                        'JKT-BTG' => 'Jakarta → Bitung',
+                    ])
+                    ->default('JKT-BTG')
+                    ->required(),
+            ]);
     }
 
     public static function table(Table $table): Table
@@ -122,43 +149,18 @@ class VesselPlanResource extends Resource
                     ->visible(fn($record) => $record?->isRevision()),
             ])
 
-            // Tahun BUKAN advanced filter — hanya ada satu, dan ia adalah
-            // context halaman ("bulan-bulan tahun berapa yang sedang saya
-            // lihat"), bukan penyaring tambahan. Karena itu tidak memakai
-            // Filament ->filters() (yang otomatis membawa panel "Filter",
-            // "Filter Aktif", dan "Reset" — furniture yang tidak perlu untuk
-            // satu context selector). Dropdown Tahun + query whereYear-nya
-            // sekarang hidup di ListVesselPlans (getYearOptions()/
-            // getTableQuery()), dirender sebagai elemen halaman biasa
-            // tepat di bawah judul — lihat list-vessel-plans.blade.php.
-
-            // Belum ada Vessel Plan sama sekali (bukan cuma filter tahun
-            // kosong) — arahkan langsung ke aksi generate untuk bulan
-            // berjalan, konsisten dengan header action "Generate Vessel
-            // Plan {bulan}" di ListVesselPlans.
             ->emptyStateHeading('Belum ada Vessel Plan')
             ->emptyStateDescription('Mulai buat planning untuk periode pertama.')
             ->emptyStateIcon('heroicon-o-calendar-days')
             ->emptyStateActions([
-                Tables\Actions\Action::make('emptyGenerate')
-                    ->label('Buat Vessel Plan')
+                Tables\Actions\Action::make('create')
+                    ->label('Tambah Vessel Plan')
                     ->icon('heroicon-o-plus')
-                    ->visible(fn () => auth_user()?->isSuperAdmin() ?? false)
-                    ->action(function () {
-                        $month = MonthParam::resolve(request('month'));
-
-                        VesselPlan::generateForMonth($month['start']);
-                    }),
+                    ->url(static::getUrl('create'))
+                    ->visible(fn() => auth_user()?->isSuperAdmin() ?? false),
             ])
 
             ->actions([
-
-                // Satu aksi navigasi utama per baris ("Buka →"), bukan
-                // aksi workflow. Sebelumnya EditAction hanya tampil saat
-                // isEditable() (bukan Final) — akibatnya baris Final tidak
-                // punya aksi apa pun di index, padahal edit page sudah
-                // mendukung membuka plan Final (read-only). Selalu tampil;
-                // otorisasi tetap dijaga oleh VesselPlanResource::canEdit().
                 Tables\Actions\EditAction::make()
                     ->label('Buka')
                     ->icon('heroicon-o-arrow-right')
@@ -181,7 +183,7 @@ class VesselPlanResource extends Resource
                             );
                         }
                     })
-                    ->visible(fn($record) => $record?->isDraft()),  
+                    ->visible(fn($record) => $record?->isDraft()),
 
                 Tables\Actions\Action::make('finalize')
                     ->label('Finalisasi')

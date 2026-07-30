@@ -4,19 +4,6 @@ namespace App\Services;
 
 use App\Models\VesselPlan;
 
-/**
- * Planning Recognition engine — Vessel Plan SOP validation.
- *
- * Canon v1.1 (Axiom 5 — Recognition): produces planning-domain Recognition
- * only — every output must yield a clear Planner decision. False-positive
- * inter-vessel overlap rules are intentionally excluded; parallel vessel
- * operation is normal, not a violation.
- *
- * Contract stability: `detectConflicts()`, the `conflicts` key, and the
- * `violations` key are plain-text/legacy-shaped because other consumers
- * (VesselPlan::sopStatus(), the Operational Summary widget) depend on
- * that exact shape.
- */
 class VesselPlanAnalyzer
 {
     public function analyze(VesselPlan $plan): array
@@ -43,20 +30,14 @@ class VesselPlanAnalyzer
             default => 'critical',
         };
 
-        // Actionable per-vessel ETD gap warnings (SOP violation, with vessel name).
         $gapWarnings = $this->buildGapWarnings($items, $gapData['gaps'], $gapLimit);
 
-        // SOP violation summary text — preserved for legacy consumers
-        // (VesselPlan::sopStatus() + header KPI strip widget).
         $violations = $this->buildViolationSummary($maxGap, $gapLimit, $riskLevel);
 
-        // Invalid chronology (ETA <= ETD) — retained planning-domain rule.
         $chronologyIssues = $this->detectChronologyIssues($items);
 
-        // conflicts key preserved (architecture) — now Invalid chronology only.
         $conflicts = $this->detectConflicts($items);
 
-        // New planning Recognition — actionable per vessel.
         $missingSailing = $this->detectMissingSailing($items);
         $missingVoyage = $this->detectMissingVoyage($items);
 
@@ -135,11 +116,6 @@ class VesselPlanAnalyzer
         ];
     }
 
-    /**
-     * Actionable per-vessel ETD gap warnings (SOP violation Recognition).
-     * Each warning carries the vessel name so Planner knows exactly which
-     * vessel to inspect.
-     */
     protected function buildGapWarnings($items, array $gaps, int $gapLimit): array
     {
         $warnings = [];
@@ -165,11 +141,6 @@ class VesselPlanAnalyzer
         return $warnings;
     }
 
-    /**
-     * SOP violation summary text — preserved for legacy consumers
-     * (VesselPlan::sopStatus() + Operational Summary widget). Kept as plain
-     * strings so existing contracts are not broken.
-     */
     protected function buildViolationSummary(int $maxGap, int $gapLimit, string $riskLevel): array
     {
         if ($riskLevel === 'warning') {
@@ -182,18 +153,6 @@ class VesselPlanAnalyzer
         return [];
     }
 
-    /**
-     * Detect planning-domain conflicts.
-     *
-     * Only the legitimate Invalid chronology rule (ETA <= ETD) is checked
-     * here. Inter-vessel overlap (same ETD, or ETA of one vessel overlapping
-     * ETD of the next) is intentionally not a conflict — parallel vessel
-     * operation is normal for this business.
-     *
-     * Returns string messages (legacy `conflicts` contract) so existing
-     * consumers keep working. Structured form available via
-     * `detectChronologyIssues()`.
-     */
     protected function detectConflicts($items): array
     {
         $issues = $this->detectChronologyIssues($items);
@@ -204,10 +163,6 @@ class VesselPlanAnalyzer
         );
     }
 
-    /**
-     * Invalid chronology Recognition (ETA <= ETD) — legitimate planning-domain
-     * rule, single-vessel check, actionable per vessel.
-     */
     protected function detectChronologyIssues($items): array
     {
         $issues = [];
@@ -226,10 +181,6 @@ class VesselPlanAnalyzer
         return $issues;
     }
 
-    /**
-     * Missing sailing days Recognition — vessel with ETD/ETA not filled so
-     * planned_sailing_days cannot be derived. Actionable per vessel.
-     */
     protected function detectMissingSailing($items): array
     {
         $missing = [];
@@ -246,10 +197,6 @@ class VesselPlanAnalyzer
         return $missing;
     }
 
-    /**
-     * Missing voyage Recognition — vessel without voyage_no selected.
-     * Required for finalization. Actionable per vessel.
-     */
     protected function detectMissingVoyage($items): array
     {
         $missing = [];
@@ -265,10 +212,6 @@ class VesselPlanAnalyzer
         return $missing;
     }
 
-    /**
-     * Planning Readiness aggregation. Planner sees "Siap dikirim ke TAM" or
-     * "Belum siap" plus specific reason counts, not a long technical list.
-     */
     protected function buildReadiness(
         array $gapWarnings,
         array $chronologyIssues,

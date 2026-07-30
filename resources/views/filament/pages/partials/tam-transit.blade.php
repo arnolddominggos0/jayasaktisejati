@@ -15,7 +15,7 @@
             <div class="flex justify-between">
                 <div>
                     <div class="font-semibold text-lg">
-                        {{ $v->vessel?->name }} — {{ $v->voyage_no }}
+                        {{ $v->vessel?->name }} — {{ display_voyage($v) }}
                     </div>
                     <div class="text-sm text-gray-500">
                         {{ \App\Supports\BusinessRouteResolver::forVoyage($v) }}

@@ -2,7 +2,7 @@
     use App\Models\UnitInspection;
     use App\Filament\FC\Pages\InspectUnitPage;
 
-    // Variables passed from daftar-unit: $unit, $shipment, $activeStage, $canEdit, $totalStages
+    // Variables passed from daftar-unit: $unit, $shipment, $activeStage, $canEdit
 
     // All in-memory — no extra queries
     $inspByStage = $unit->inspections->keyBy('stage');
@@ -12,20 +12,41 @@
         ? InspectUnitPage::getUrl(['record' => $shipment->getKey(), 'unit' => $unit->getKey()])
         : null;
 
-    // Progress counts
-    $passedCount    = $unit->inspections->where('status', UnitInspection::STATUS_PASSED)->count();
-    $failedCount    = $unit->inspections->where('status', UnitInspection::STATUS_FAILED)->count();
-    $submittedCount = $unit->inspections->filter(fn ($i) => $i->submitted_at !== null)->count();
-    $pendingCount   = $totalStages - $submittedCount;
+    // Sprint UX-04 (Scope 1+2): progres HANYA sampai tahap aktif — ini
+    // BUKAN penyederhanaan tampilan semata, ini mengikuti bentuk data
+    // aslinya. InspectionDraftAutoCreate::resolveStage() hanya membuat baris
+    // UnitInspection sampai tahap aktif; stage sesudahnya memang belum
+    // pernah tercipta di database. Mengiterasi UnitInspection::STAGES penuh
+    // (lama) berarti UI menampilkan slot yang secara data belum eksis.
+    $activeIndex   = $activeStage ? array_search($activeStage, UnitInspection::STAGES, true) : false;
+    $visibleStages = $activeIndex !== false
+        ? array_slice(UnitInspection::STAGES, 0, $activeIndex + 1)
+        : [];
 
-    // Latest submitted gate decision
-    $latestSubmitted = $unit->inspections
-        ->filter(fn ($i) => $i->submitted_at !== null)
-        ->sortByDesc('submitted_at')
-        ->first();
+    // Sprint UX-04 (Scope 5): alert operasional HARUS selalu terlihat dari
+    // TAHAP MANA PUN — bukan hanya tahap aktif. Unit yang pernah Return to
+    // PDC atau Gagal di tahap sebelumnya tetap butuh perhatian operator
+    // terlepas di tahap mana ia sedang bekerja sekarang. allow_with_remark
+    // SENGAJA tidak dianggap "masalah" di sini — gate itu tetap lolos,
+    // hanya disertai catatan (detail lengkapnya ada di InspectUnitPage).
+    $problemInspection = $unit->inspections->first(
+        fn ($i) => $i->gate_decision === UnitInspection::GATE_RETURN_TO_PDC
+            || $i->status === UnitInspection::STATUS_FAILED
+    );
 @endphp
 
 <div class="px-4 py-3 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+
+    {{-- ── Alert operasional (Scope 5) — selalu terlihat, lintas tahap ───────── --}}
+    @if ($problemInspection)
+        <div class="mb-2 flex items-center gap-1.5 rounded-md bg-red-50 dark:bg-red-900/20 px-2.5 py-1.5 text-xs font-semibold text-red-700 dark:text-red-400">
+            <x-heroicon-m-exclamation-triangle class="h-4 w-4 shrink-0" />
+            <span>
+                {{ UnitInspection::STAGE_LABELS[$problemInspection->stage] ?? $problemInspection->stage }} —
+                {{ $problemInspection->gate_decision === UnitInspection::GATE_RETURN_TO_PDC ? 'Return to PDC' : 'Gagal Inspeksi' }}
+            </span>
+        </div>
+    @endif
 
     {{-- ── Primary identifier row ──────────────────────────────────────────── --}}
     <div class="flex items-start justify-between gap-3">
@@ -105,118 +126,34 @@
         </div>
     </div>
 
-    {{-- ── Progress summary ────────────────────────────────────────────────── --}}
-    <div class="mt-2 flex items-center gap-3 text-xs">
-        <span class="text-gray-600 dark:text-gray-400">
-            Selesai:
-            <span class="font-semibold text-gray-900 dark:text-white">{{ $submittedCount }} / {{ $totalStages }}</span>
-        </span>
-        <span class="text-gray-300 dark:text-gray-600">·</span>
-        <span class="text-green-700 dark:text-green-400">
-            Passed: <span class="font-semibold">{{ $passedCount }}</span>
-        </span>
-        @if ($failedCount > 0)
-            <span class="text-gray-300 dark:text-gray-600">·</span>
-            <span class="text-red-600 dark:text-red-400">
-                Failed: <span class="font-semibold">{{ $failedCount }}</span>
-            </span>
-        @endif
-        <span class="text-gray-300 dark:text-gray-600">·</span>
-        <span class="text-amber-600 dark:text-amber-400">
-            Pending: <span class="font-semibold">{{ $pendingCount }}</span>
-        </span>
-    </div>
+    {{-- ── Progress tahap (Sprint UX-04) — HANYA sampai tahap aktif ──────────── --}}
+    {{-- Tahap yang belum relevan tidak dirender sama sekali (bukan "-", --}}
+    {{-- bukan "Pending") — lihat $visibleStages di atas. --}}
+    @if (! empty($visibleStages))
+        <div class="mt-2 flex flex-wrap gap-1.5">
+            @foreach ($visibleStages as $stageKey)
+                @php
+                    $stageInsp = $inspByStage[$stageKey] ?? null;
+                    $isActive  = $stageKey === $activeStage;
 
-    {{-- ── Stage chips ─────────────────────────────────────────────────────── --}}
-    <div class="mt-2 flex flex-wrap gap-1.5">
-        @foreach (UnitInspection::STAGE_LABELS as $stageKey => $stageName)
-            @php
-                $stageInsp  = $inspByStage[$stageKey] ?? null;
-                $isActive   = $stageKey === $activeStage;
-
-                if (! $stageInsp) {
-                    $chipClass  = 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500';
-                    $chipStatus = '—';
-                } elseif ($stageInsp->submitted_at === null) {
-                    $chipClass  = 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
-                    $chipStatus = 'Pending';
-                } elseif ($stageInsp->status === UnitInspection::STATUS_PASSED) {
-                    $chipClass  = 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-                    $chipStatus = 'Passed';
-                } else {
-                    $chipClass  = 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400';
-                    $chipStatus = 'Failed';
-                }
-            @endphp
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium
-                         {{ $chipClass }}
-                         {{ $isActive ? 'ring-1 ring-inset ring-blue-400 dark:ring-blue-500' : '' }}">
-                <span class="text-[10px] opacity-75">{{ $stageName }}</span>
-                <span class="font-semibold">{{ $chipStatus }}</span>
-            </span>
-        @endforeach
-    </div>
-
-    {{-- ── Latest gate decision ─────────────────────────────────────────────── --}}
-    @if ($latestSubmitted?->gate_decision)
-        @php
-            $gateKey   = $latestSubmitted->gate_decision;
-            $gateText  = UnitInspection::GATE_LABELS[$gateKey] ?? $gateKey;
-            $gateClass = match ($gateKey) {
-                UnitInspection::GATE_ACCEPT            => 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
-                UnitInspection::GATE_ALLOW_WITH_REMARK => 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
-                UnitInspection::GATE_RETURN_TO_PDC     => 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
-                default                                 => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-            };
-        @endphp
-        <div class="mt-2 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-            <span>Gate terakhir:</span>
-            <span class="inline-flex items-center px-2 py-0.5 rounded font-semibold {{ $gateClass }}">
-                {{ $gateText }}
-            </span>
-            <span class="text-[10px] text-gray-400 dark:text-gray-500">
-                {{ $latestSubmitted->submitted_at->format('d M Y') }}
-            </span>
-        </div>
-    @endif
-
-    {{-- ── Active stage evidence (PIC + timestamp + PDF) ─────────────────────── --}}
-    @if ($isDone && $inspection)
-        <div class="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
-            <span class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold
-                {{ $inspection->status === UnitInspection::STATUS_PASSED
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' }}">
-                {{ strtoupper($inspection->status) }}
-            </span>
-
-            @if ($inspection->signed_by)
-                <span class="flex items-center gap-1">
-                    <x-heroicon-o-user-circle class="h-3 w-3 shrink-0" />
-                    {{ $inspection->signed_by }}
+                    if (! $stageInsp || $stageInsp->submitted_at === null) {
+                        $chipClass  = 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+                        $chipStatus = 'Pending';
+                    } elseif ($stageInsp->status === UnitInspection::STATUS_PASSED) {
+                        $chipClass  = 'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+                        $chipStatus = 'Passed';
+                    } else {
+                        $chipClass  = 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+                        $chipStatus = 'Failed';
+                    }
+                @endphp
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium
+                             {{ $chipClass }}
+                             {{ $isActive ? 'ring-1 ring-inset ring-blue-400 dark:ring-blue-500' : '' }}">
+                    <span class="text-[10px] opacity-75">{{ UnitInspection::STAGE_LABELS[$stageKey] ?? $stageKey }}</span>
+                    <span class="font-semibold">{{ $chipStatus }}</span>
                 </span>
-            @else
-                <span class="italic text-amber-500 dark:text-amber-400">Tanpa tanda tangan</span>
-            @endif
-
-            @if ($inspection->submitted_at)
-                <span class="flex items-center gap-1">
-                    <x-heroicon-o-clock class="h-3 w-3 shrink-0" />
-                    {{ $inspection->submitted_at->format('d M Y H:i') }}
-                </span>
-            @endif
-
-            @if ($inspection->pdf_path)
-                <a href="{{ asset('storage/' . $inspection->pdf_path) }}"
-                   target="_blank"
-                   class="ml-auto flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold
-                          bg-primary-50 text-primary-700 hover:bg-primary-100
-                          dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/40
-                          transition-colors">
-                    <x-heroicon-m-arrow-down-tray class="h-3 w-3 shrink-0" />
-                    Download PDF
-                </a>
-            @endif
+            @endforeach
         </div>
     @endif
 

@@ -101,7 +101,7 @@ class LeadTimeAnalysisService
 
                 return [
                     'voyage_id'    => $voyage?->id,
-                    'voyage_label' => trim(($voyage?->vessel?->name ?? '-') . ' ' . ($voyage?->voyage_no ?? '')),
+                    'voyage_label' => trim(($voyage?->vessel?->name ?? '-') . ' ' . ($voyage?->voyage_no ? display_voyage($voyage) : '')),
                     'vessel_name'  => $voyage?->vessel?->name ?? '-',
                     'voyage_no'    => $voyage?->voyage_no ?? '-',
                     'period_label' => $voyage?->period_month

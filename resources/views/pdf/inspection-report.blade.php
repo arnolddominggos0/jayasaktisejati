@@ -23,6 +23,10 @@
         'information_only'                        => 'Information Only',
         default                                   => $type ?? '—',
     };
+
+    $allItems  = $items->flatten();
+    $okCount   = $allItems->where('result', 'ok')->count();
+    $ngCount   = $allItems->where('result', 'ng')->count();
 @endphp
 <!DOCTYPE html>
 <html lang="id">
@@ -51,14 +55,13 @@
     }
     .header-logo-col {
         display: table-cell;
-        width: 60%;
+        width: 52%;
         vertical-align: middle;
     }
     .header-doc-col {
         display: table-cell;
-        width: 40%;
+        width: 48%;
         vertical-align: middle;
-        text-align: right;
     }
     .company-name {
         font-size: 14px;
@@ -77,11 +80,25 @@
         color: #111827;
         text-transform: uppercase;
         letter-spacing: 0.5px;
+        margin-bottom: 3px;
     }
-    .doc-id {
+    .doc-meta-table {
+        width: 100%;
+        border-collapse: collapse;
         font-size: 7.5px;
+    }
+    .doc-meta-table td {
+        padding: 1px 0;
+        vertical-align: top;
+    }
+    .doc-meta-table .doc-meta-label {
+        width: 42%;
         color: #6b7280;
-        margin-top: 2px;
+        font-weight: 600;
+    }
+    .doc-meta-table .doc-meta-value {
+        color: #111827;
+        font-weight: 700;
     }
 
     /* ── Section heading ─────────────────────────────────────────── */
@@ -118,54 +135,49 @@
     }
     .info-two-col .label { width: 18%; }
 
-    /* ── Checklist table ─────────────────────────────────────────── */
-    .checklist-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 0;
-        font-size: 8px;
+    /* ── Checksheet — hasil pemeriksaan per kategori ─────────────── */
+    .category-block {
+        margin-top: 5px;
     }
-    .checklist-table th {
-        background: #dbeafe;
-        color: #1e3a8a;
-        font-weight: 700;
-        text-transform: uppercase;
-        font-size: 7px;
-        letter-spacing: 0.3px;
-        padding: 3px 6px;
-        border: 0.5px solid #bfdbfe;
-        text-align: left;
-    }
-    .checklist-table td {
-        padding: 3px 6px;
-        border: 0.5px solid #e5e7eb;
-        vertical-align: top;
-    }
-    .checklist-table .cat-row td {
-        background: #f8fafc;
-        font-weight: 700;
-        color: #374151;
+    .category-heading {
+        background: #f1f5f9;
+        color: #1e293b;
         font-size: 7.5px;
+        font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.3px;
+        letter-spacing: 0.4px;
+        padding: 3px 7px;
+        border-left: 3px solid #1e40af;
+        margin-bottom: 2px;
     }
-    .badge-ok {
-        display: inline-block;
-        background: #dcfce7;
+    .check-item {
+        padding: 1.5px 7px 1.5px 12px;
+        font-size: 8.5px;
+    }
+    .check-mark-ok {
         color: #14532d;
-        padding: 1px 5px;
-        border-radius: 3px;
-        font-size: 7px;
         font-weight: 700;
+        margin-right: 5px;
     }
-    .badge-ng {
-        display: inline-block;
-        background: #fee2e2;
+    .check-mark-ng {
         color: #991b1b;
-        padding: 1px 5px;
-        border-radius: 3px;
-        font-size: 7px;
         font-weight: 700;
+        margin-right: 5px;
+    }
+    .check-item-ng-detail {
+        margin: 2px 7px 5px 24px;
+        padding: 4px 8px;
+        background: #fef2f2;
+        border-left: 2px solid #991b1b;
+        font-size: 7.5px;
+        color: #374151;
+    }
+    .check-item-ng-detail .finding-row {
+        margin-bottom: 1px;
+    }
+    .check-item-ng-detail .label-inline {
+        color: #6b7280;
+        font-weight: 600;
     }
 
     /* ── Result summary ──────────────────────────────────────────── */
@@ -195,6 +207,36 @@
         font-size: 13px;
         font-weight: 700;
         margin-top: 2px;
+    }
+    .result-count-row {
+        display: table;
+        width: 100%;
+        margin-top: 0;
+        border: 0.5px solid #e5e7eb;
+        border-top: none;
+    }
+    .result-count-cell {
+        display: table-cell;
+        width: 33.33%;
+        padding: 6px 10px;
+        text-align: center;
+        border-right: 0.5px solid #e5e7eb;
+    }
+    .result-count-cell:last-child {
+        border-right: none;
+    }
+    .result-count-label {
+        font-size: 6.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        color: #6b7280;
+        font-weight: 600;
+    }
+    .result-count-value {
+        font-size: 11px;
+        font-weight: 700;
+        margin-top: 1px;
+        color: #111827;
     }
 
     /* ── Signature ───────────────────────────────────────────────── */
@@ -266,49 +308,62 @@
         </div>
         <div class="header-doc-col">
             <div class="doc-title">Unit Inspection Report</div>
-            <div class="doc-id">
-                #{{ $ins->id }}
-                &nbsp;·&nbsp;
-                {{ $safeStr(UnitInspection::STAGE_LABELS[$ins->stage] ?? $ins->stage) }}
-            </div>
+            <table class="doc-meta-table">
+                <tr>
+                    <td class="doc-meta-label">Inspection No</td>
+                    <td class="doc-meta-value">#{{ $ins->id }}</td>
+                </tr>
+                <tr>
+                    <td class="doc-meta-label">Tanggal</td>
+                    <td class="doc-meta-value">{{ $ins->submitted_at?->format('d M Y H:i') ?? '—' }}</td>
+                </tr>
+                <tr>
+                    <td class="doc-meta-label">Stage</td>
+                    <td class="doc-meta-value">{{ $safeStr(UnitInspection::STAGE_LABELS[$ins->stage] ?? $ins->stage) }}</td>
+                </tr>
+                <tr>
+                    <td class="doc-meta-label">Status</td>
+                    <td class="doc-meta-value" style="color: {{ $statusColor }}">{{ strtoupper($ins->status ?? '—') }}</td>
+                </tr>
+            </table>
         </div>
     </div>
 </div>
 
-{{-- ── Shipment Information ──────────────────────────────────────────── --}}
-<div class="section-heading">Shipment Information</div>
+{{-- ── Informasi Pengiriman ──────────────────────────────────────────── --}}
+<div class="section-heading">Informasi Pengiriman</div>
 <table class="info-table info-two-col">
     <tr>
-        <td class="label">Shipment Code</td>
+        <td class="label">Shipment</td>
         <td class="value">{{ $safeStr($s->code) }}</td>
-        <td class="label">Voyage</td>
-        <td class="value">{{ $safeStr($s->voyage) }}</td>
-    </tr>
-    <tr>
         <td class="label">Customer</td>
         <td class="value">{{ $safeStr($s->customer?->name) }}</td>
-        <td class="label">Origin</td>
-        <td class="value">{{ $safeStr($s->pol ?? $s->route_from) }}</td>
+    </tr>
+    <tr>
+        <td class="label">Voyage</td>
+        <td class="value">{{ display_voyage($s->voyage) }}</td>
+        <td class="label">Route</td>
+        <td class="value">{{ $safeStr($s->route_summary) }}</td>
     </tr>
     <tr>
         <td class="label">Destination</td>
-        <td class="value" colspan="3">{{ $safeStr($s->pod ?? $s->route_to) }}</td>
+        <td class="value" colspan="3">{{ $safeStr($s->destinationCity?->name ?? $s->pod ?? $s->route_to) }}</td>
     </tr>
 </table>
 
-{{-- ── Unit Information ──────────────────────────────────────────────── --}}
-<div class="section-heading">Unit Information</div>
+{{-- ── Informasi Unit ──────────────────────────────────────────────── --}}
+<div class="section-heading">Informasi Unit</div>
 <table class="info-table info-two-col">
     <tr>
         <td class="label">Model</td>
         <td class="value">{{ $safeStr($u->model_no) }}</td>
-        <td class="label">No Rangka</td>
+        <td class="label">Chassis</td>
         <td class="value" style="font-family: monospace;">{{ $safeStr($u->chassis_no) }}</td>
     </tr>
     <tr>
-        <td class="label">No Mesin</td>
+        <td class="label">Engine</td>
         <td class="value" style="font-family: monospace;">{{ $safeStr($u->engine_no) }}</td>
-        <td class="label">Warna</td>
+        <td class="label">Color</td>
         <td class="value">{{ $safeStr($u->color) }}</td>
     </tr>
     <tr>
@@ -317,75 +372,40 @@
     </tr>
 </table>
 
-{{-- ── Inspection Information ────────────────────────────────────────── --}}
-<div class="section-heading">Inspection Information</div>
-<table class="info-table info-two-col">
-    <tr>
-        <td class="label">Stage</td>
-        <td class="value">{{ $safeStr(UnitInspection::STAGE_LABELS[$ins->stage] ?? $ins->stage) }}</td>
-        <td class="label">Tanggal Inspeksi</td>
-        <td class="value">{{ $ins->submitted_at?->format('d M Y H:i') ?? '—' }}</td>
-    </tr>
-    <tr>
-        <td class="label">Diperiksa Oleh</td>
-        <td class="value">{{ $safeStr($ins->checkedBy?->name) }}</td>
-        <td class="label">PIC</td>
-        <td class="value">{{ $safeStr($ins->signed_by) }}</td>
-    </tr>
-    <tr>
-        <td class="label">Tanda Tangan</td>
-        <td class="value" colspan="3">{{ $ins->signed_at?->format('d M Y H:i') ?? '—' }}</td>
-    </tr>
-</table>
-
-{{-- ── Checklist ──────────────────────────────────────────────────────── --}}
-<div class="section-heading">Checklist Pemeriksaan</div>
-<table class="checklist-table">
-    <thead>
-        <tr>
-            <th style="width:20%">Kategori</th>
-            <th style="width:38%">Item Pemeriksaan</th>
-            <th style="width:10%;text-align:center">Hasil</th>
-            <th style="width:18%">Jenis Temuan</th>
-            <th style="width:14%">Catatan</th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach ($items as $category => $categoryItems)
-            <tr class="cat-row">
-                <td colspan="5">{{ $category }}</td>
-            </tr>
-            @foreach ($categoryItems as $item)
-                <tr>
-                    <td></td>
-                    <td>{{ $item->item_name }}</td>
-                    <td style="text-align:center">
-                        @if ($item->result === 'ok')
-                            <span class="badge-ok">OK</span>
-                        @else
-                            <span class="badge-ng">NG</span>
-                        @endif
-                    </td>
-                    <td>
-                        @if ($item->result === 'ng' && $item->finding_type)
-                            {{ $findingLabel($item->finding_type) }}
-                        @else
-                            —
-                        @endif
-                    </td>
-                    <td style="font-size:7.5px;color:#374151">
-                        {{ filled($item->notes) ? $item->notes : '—' }}
-                    </td>
-                </tr>
-            @endforeach
+{{-- ── Hasil Pemeriksaan ──────────────────────────────────────────────── --}}
+<div class="section-heading">Hasil Pemeriksaan</div>
+@foreach ($items as $category => $categoryItems)
+    <div class="category-block">
+        <div class="category-heading">{{ $category }}</div>
+        @foreach ($categoryItems as $item)
+            <div class="check-item">
+                @if ($item->result === 'ok')
+                    <span class="check-mark-ok">✓</span>
+                @else
+                    <span class="check-mark-ng">✗</span>
+                @endif
+                {{ $item->item_name }}
+            </div>
+            @if ($item->result === 'ng')
+                <div class="check-item-ng-detail">
+                    <div class="finding-row">
+                        <span class="label-inline">Jenis Temuan:</span> {{ $findingLabel($item->finding_type) }}
+                    </div>
+                    @if (filled($item->notes))
+                        <div class="finding-row">
+                            <span class="label-inline">Catatan:</span> {{ $item->notes }}
+                        </div>
+                    @endif
+                </div>
+            @endif
         @endforeach
-    </tbody>
-</table>
+    </div>
+@endforeach
 
 {{-- ── Result Summary ────────────────────────────────────────────────── --}}
 <div class="result-row">
     <div class="result-cell">
-        <div class="result-label">Status Inspeksi</div>
+        <div class="result-label">Inspection Result</div>
         <div class="result-value" style="color: {{ $statusColor }}">
             {{ strtoupper($ins->status ?? '—') }}
         </div>
@@ -397,6 +417,20 @@
         </div>
     </div>
 </div>
+<div class="result-count-row">
+    <div class="result-count-cell">
+        <div class="result-count-label">Jumlah Item OK</div>
+        <div class="result-count-value" style="color:#14532d">{{ $okCount }}</div>
+    </div>
+    <div class="result-count-cell">
+        <div class="result-count-label">Jumlah Item NG</div>
+        <div class="result-count-value" style="color:#991b1b">{{ $ngCount }}</div>
+    </div>
+    <div class="result-count-cell">
+        <div class="result-count-label">Jumlah Temuan</div>
+        <div class="result-count-value">{{ $ngCount }}</div>
+    </div>
+</div>
 
 {{-- ── Digital Signature ─────────────────────────────────────────────── --}}
 <div class="section-heading">Tanda Tangan Digital</div>
@@ -404,7 +438,9 @@
     <div class="sig-cell">
         <div class="sig-field-label">Nama PIC</div>
         <div class="sig-field-value">{{ $safeStr($ins->signed_by) }}</div>
-        <div class="sig-field-label" style="margin-top:5px">Tanggal Tanda Tangan</div>
+        <div class="sig-field-label" style="margin-top:5px">Jabatan</div>
+        <div class="sig-field-value">{{ $safeStr($ins->signed_position) }}</div>
+        <div class="sig-field-label" style="margin-top:5px">Tanggal</div>
         <div class="sig-field-value">{{ $ins->signed_at?->format('d M Y H:i') ?? '—' }}</div>
     </div>
     <div class="sig-cell">

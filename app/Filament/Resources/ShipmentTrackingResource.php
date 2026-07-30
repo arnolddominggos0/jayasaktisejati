@@ -261,6 +261,8 @@ class ShipmentTrackingResource extends Resource
         return [
             'index'  => Pages\WorkspaceShell::route('/'),
             'manage' => Pages\ManageShipmentTracking::route('/{record}/manage'),
+            // Detail Unit Workspace (v1.0) — halaman operasional penuh per unit.
+            'unit'   => Pages\UnitWorkspace::route('/unit/{unitId}'),
         ];
     }
 }

@@ -140,7 +140,7 @@ class WorkspaceShell extends Page implements HasForms
                         ->columnSpan(['default' => 1, 'sm' => 2, 'lg' => $isOfficeAdmin ? 8 : 6]),
 
                     Select::make('exception_filter')
-                        ->label('Exception')
+                        ->label('Perhatian')
                         ->placeholder('Semua')
                         ->options([
                             'hold'           => 'Ditahan',
