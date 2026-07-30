@@ -224,7 +224,7 @@
 </section>
 
 <!-- Stats Section with Counter Animation -->
-<section class="py-16 bg-white relative -mt-1">
+<section class="pt-20 pb-12 bg-white relative -mt-1">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div class="text-center group">
@@ -715,7 +715,7 @@
 </section>
 
 <!-- Coverage Section with Map -->
-<section class="py-20 bg-white">
+<section class="pt-20 pb-6 bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="text-center mb-12">
             <span class="text-blue-600 font-semibold text-sm uppercase tracking-wide">Jangkauan</span>
