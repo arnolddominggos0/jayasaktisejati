@@ -681,7 +681,7 @@
                 <h3 class="text-xl font-bold text-white mb-3">Tim Profesional</h3>
                 <p class="text-blue-200">100+ SDM handal yang tersebar di berbagai kantor untuk pelayanan terbaik.</p>
             </div>
-            
+            p
             <div class="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 hover:bg-white/20 transition-all duration-300 transform hover:-translate-y-1">
                 <div class="w-14 h-14 bg-white rounded-xl flex items-center justify-center mb-6">
                     <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

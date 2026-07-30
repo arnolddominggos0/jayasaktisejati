@@ -46,8 +46,6 @@ class EditVesselPlan extends EditRecord
         );
     }
 
-    // Header hanya identitas dokumen — customer dan route, tanpa instruksi
-    // atau guidance. Feedback TAM tetap terekam dan terbaca di Log Persetujuan.
     public function getSubheading(): string|Htmlable|null
     {
         $rute = BusinessRouteResolver::forPlan($this->record);
@@ -66,8 +64,6 @@ class EditVesselPlan extends EditRecord
     {
         parent::mount($record);
 
-        // Eager-load relasi Tab 2/3 + identitas Hero (pol/pod/customer)
-        // agar metadata rail tidak trigger lazy-load saat render subheading.
         $this->record->loadMissing([
             'items.vessel',
             'items.shippingLine',

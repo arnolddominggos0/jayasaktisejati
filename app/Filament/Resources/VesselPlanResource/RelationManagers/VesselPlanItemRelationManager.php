@@ -239,9 +239,6 @@ class VesselPlanItemRelationManager extends RelationManager
             ])
             ->actionsAlignment('center')
 
-            // Pesan empty state berbeda tergantung apakah filter Shipping
-            // Line sedang aktif, supaya jelas apakah memang belum ada
-            // jadwal sama sekali atau hanya tidak ada untuk filter ini.
             ->emptyStateHeading('Belum ada jadwal pada Vessel Plan ini')
             ->emptyStateDescription(function () {
                 return filled($this->vpShippingLineFilter)
@@ -254,11 +251,6 @@ class VesselPlanItemRelationManager extends RelationManager
                     ->icon('heroicon-o-plus')
                     ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
             ])
-
-            // Toolbar CTA disembunyikan saat tabel benar-benar kosong supaya
-            // tidak dobel dengan CTA di dalam empty state (aksi yang sama,
-            // area yang sama). Begitu ada 1 jadwal, empty state hilang dan
-            // toolbar CTA ini jadi satu-satunya CTA "Tambah Jadwal" lagi.
             ->headerActions([
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah Jadwal')

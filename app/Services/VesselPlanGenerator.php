@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Enums\VesselPlanStatus;
-use App\Models\Port;
 use App\Models\VesselPlan;
 use App\Supports\RouteCode;
 use Illuminate\Support\Carbon;
@@ -55,32 +54,4 @@ class VesselPlanGenerator
         return $plan;
     }
 
-    public function generateForMonth(Carbon $periodMonth): VesselPlan
-    {
-        $period = $periodMonth
-            ->copy()
-            ->startOfMonth();
-
-        $existing = VesselPlan::query()
-            ->whereDate('period_month', $period)
-            ->first();
-
-        if ($existing) {
-            return $existing;
-        }
-        $plan = VesselPlan::create([
-            'customer_id' => VesselPlan::resolveTamCustomer()?->id,
-            'period_month' => $period->toDateString(),
-            'route_code' => 'JKT-BTG',
-
-            'pol_id' => Port::where('code', config('tam.route.pol_code'))->value('id'),
-            'pod_id' => Port::where('code', config('tam.route.pod_code'))->value('id'),
-
-            'status' => VesselPlanStatus::Draft,
-        ]);
-
-        $plan->syncRoutePorts();
-
-        return $plan;
-    }
 }

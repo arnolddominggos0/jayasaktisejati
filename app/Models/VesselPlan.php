@@ -7,14 +7,12 @@ use App\Models\Customer;
 use App\Models\Port;
 use App\Services\VesselPlanAnalyzer;
 use App\Services\VesselPlanFinalizationService;
-use App\Services\VesselPlanGenerator;
 use App\Services\VesselPlanSubmissionService;
 use App\Services\WhatsappMessageBuilder;
 use App\Supports\RouteCode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 class VesselPlan extends Model
 {
@@ -102,11 +100,6 @@ class VesselPlan extends Model
             ->whereRaw('LOWER(name) = ?', ['toyota astra motor'])
             ->orWhereRaw('LOWER(name) like ?', ['%toyota astra motor%'])
             ->first();
-    }
-
-    public static function generateForMonth(Carbon $periodMonth): self
-    {
-        return app(VesselPlanGenerator::class)->generateForMonth($periodMonth);
     }
 
     public function resolveRoutePortIds(): array
