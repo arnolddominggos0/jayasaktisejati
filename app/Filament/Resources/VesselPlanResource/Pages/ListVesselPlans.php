@@ -40,12 +40,20 @@ class ListVesselPlans extends ListRecords
      */
     public function getYearOptions(): array
     {
-        return VesselPlan::query()
+        $years = VesselPlan::query()
             ->pluck('period_month')
-            ->map(fn($date) => $date->year)
+            ->map(fn($date) => (string) $date->year)
             ->unique()
-            ->sortDesc()
-            ->mapWithKeys(fn($year) => [(string) $year => (string) $year])
+            ->sortDesc();
+
+        if ($years->isEmpty()) {
+            return [
+                (string) now()->year => (string) now()->year,
+            ];
+        }
+
+        return $years
+            ->mapWithKeys(fn($year) => [$year => $year])
             ->all();
     }
 
@@ -56,7 +64,10 @@ class ListVesselPlans extends ListRecords
                 ->label('Tambah Vessel Plan')
                 ->icon('heroicon-o-plus')
                 ->url(static::getResource()::getUrl('create'))
-                ->visible(fn() => auth_user()?->isSuperAdmin() ?? false),
+                ->visible(function () {
+                    return auth_user()?->isSuperAdmin()
+                        && VesselPlan::query()->exists();
+                }),
         ];
     }
 }
