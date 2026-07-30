@@ -43,9 +43,9 @@
             'manado' => [
                 'name' => 'Manado (Kantor Cabang)',
                 'short_name' => 'Manado',
-                'whatsapp' => '624318142227',
-                'contact_person' => '',
-                'address' => 'Jl. Kombos Atas No.84Kairagi Satu, Kec. Mapanget, Kota Manado, Sulawesi Utara',
+                'whatsapp' => '628114322445',
+                'contact_person' => 'Pak Marshel',
+                'address' => 'Jl. Kombos Atas No.84 Kairagi Satu, Kec. Mapanget, Kota Manado, Sulawesi Utara',
             ],
         ],
 
@@ -58,7 +58,7 @@
         |
         */
 
-        'default_branch' => 'surabaya',
+        'default_branch' => 'jakarta',
 
         /*
         |--------------------------------------------------------------------------
@@ -78,5 +78,19 @@
             'fcl' => 'Halo, saya ingin menanyakan tentang pengiriman FCL Full Container. Bisa dibantu?',
             'project_cargo' => 'Halo, saya ingin menanyakan tentang Project Cargo. Bisa dibantu?',
             'general' => 'Halo, saya ingin menanyakan informasi tentang layanan pengiriman. Bisa dibantu?',
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Social Media Links
+        |--------------------------------------------------------------------------
+        |
+        | Links to the company's social media profiles.
+        |
+        */
+        'social_media' => [
+            'facebook' => 'https://www.facebook.com/jayasaktisejati',
+            'instagram' => 'https://www.instagram.com/jayasaktisejati',
+            'linkedin' => 'https://www.linkedin.com/company/pt-jaya-sakti-sejati/',
         ],
     ];

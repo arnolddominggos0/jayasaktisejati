@@ -97,7 +97,7 @@ class VesselPlanItemRelationManager extends RelationManager
                         ->disabled(fn(Get $get) => blank($get('shipping_line_id'))),
                 ])
                 ->columns(2),
-                
+
             Forms\Components\Section::make('Informasi Voyage')
                 ->schema([
                     TextInput::make('voyage_no')
@@ -249,6 +249,9 @@ class VesselPlanItemRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah Jadwal')
                     ->icon('heroicon-o-plus')
+                    ->action(function () {
+                        dd('Action jalan');
+                    })
                     ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
             ])
             ->headerActions([
