@@ -79,35 +79,55 @@ class UserResource extends Resource
                                     ->placeholder('user@example.com'),
 
                                 TextInput::make('password')
-                                    ->label(fn (?User $record) => $record
+                                    ->label(fn(?User $record) => $record
                                         ? 'Password (kosongkan jika tidak diubah)'
                                         : 'Password')
-                                    ->helperText(fn (?User $record) => $record
+                                    ->helperText(fn(?User $record) => $record
                                         ? 'Biarkan kosong jika tidak mengganti password.'
                                         : 'Minimal 8 karakter.')
                                     ->password()
                                     ->revealable()
-                                    ->required(fn (?User $record) => $record === null)
+                                    ->required(fn(?User $record) => $record === null)
                                     ->minLength(8)
-    				    ->dehydrateStateUsing(fn (?string $state) => filled($state) ? Hash::make(trim($state)) : null)
-    				    ->dehydrated(fn (?string $state) => filled($state))
-    				    ->maxLength(100)
+                                    ->dehydrateStateUsing(fn(?string $state) => filled($state) ? Hash::make(trim($state)) : null)
+                                    ->dehydrated(fn(?string $state) => filled($state))
+                                    ->maxLength(100),
                             ])
                             ->columns(2),
 
+                        Section::make('Role')
+                            ->schema([
+                                Select::make('role_name')
+                                    ->label('Role')
+                                    ->options(
+                                        fn() => Role::query()->orderBy('name')->pluck('name', 'name')
+                                    )
+                                    ->searchable()
+                                    ->live()
+                                    ->required()
+                                    ->dehydrated(false)
+                                    ->helperText('Hanya satu role per pengguna.')
+                                    ->afterStateHydrated(function (Select $component, ?User $record) {
+                                        if ($record) {
+                                            $component->state($record->getRoleNames()->first());
+                                        }
+                                    }),
+                            ]),
+
                         Section::make('Atribusi')
+                            ->visible(fn(Get $get) => $get('role_name') !== 'super_admin')
                             ->schema([
                                 Select::make('branch_id')
                                     ->label('Cabang')
                                     ->placeholder('Pilih cabang')
                                     ->options(
-                                        fn () => $isSuper
+                                        fn() => $isSuper
                                             ? Branch::query()->orderBy('name')->pluck('name', 'id')
                                             : Branch::query()->whereKey(auth_user()?->branch_id)->pluck('name', 'id')
                                     )
-                                    ->default(fn () => auth_user()?->branch_id)
+                                    ->default(fn() => auth_user()?->branch_id)
                                     ->searchable()
-                                    ->required(),
+                                    ->required(fn(Get $get) => $get('role_name') !== 'customer'),
 
                                 Select::make('customer_id')
                                     ->label('Customer (untuk akun portal)')
@@ -118,30 +138,11 @@ class UserResource extends Resource
                                             ->pluck('name', 'id')
                                     )
                                     ->searchable()
-                                    ->nullable()
-                                    ->visible(fn (Get $get) => $get('role_name') === 'customer')
-                                    ->required(fn (Get $get) => $get('role_name') === 'customer')
+                                    ->visible(fn(Get $get) => $get('role_name') === 'customer')
+                                    ->required(fn(Get $get) => $get('role_name') === 'customer')
                                     ->helperText('Wajib jika role = customer.'),
                             ])
                             ->columns(2),
-
-                        Section::make('Role')
-                            ->schema([
-                                Select::make('role_name')
-                                    ->label('Role')
-                                    ->options(
-                                        fn () => Role::query()->orderBy('name')->pluck('name', 'name')
-                                    )
-                                    ->searchable()
-                                    ->required()
-                                    ->dehydrated(false) // tidak disimpan ke kolom users
-                                    ->helperText('Hanya satu role per pengguna.')
-                                    ->afterStateHydrated(function (Select $component, ?User $record) {
-                                        if ($record) {
-                                            $component->state($record->getRoleNames()->first());
-                                        }
-                                    }),
-                            ]),
                     ])
                     ->columnSpan(['lg' => 2]),
             ])
@@ -160,73 +161,73 @@ class UserResource extends Resource
                     ->badge()
                     ->separator(', ')
                     ->sortable(false)
-                    ->formatStateUsing(fn ($state) => is_array($state) ? implode(', ', $state) : (string) $state),
+                    ->formatStateUsing(fn($state) => is_array($state) ? implode(', ', $state) : (string) $state),
 
-                TextColumn::make('fc_scope_status')
-                    ->label('Scope FC')
-                    ->getStateUsing(function (User $record): string {
-                        if (! $record->isFieldCoordinator()) {
-                            return '—';
-                        }
+                // TextColumn::make('fc_scope_status')
+                //     ->label('Scope FC')
+                //     ->getStateUsing(function (User $record): string {
+                //         if (! $record->isFieldCoordinator()) {
+                //             return '—';
+                //         }
 
-                        $scopeComplete = $record->scope_unit_id
-                            && $record->scope_branch_id
-                            && $record->scope_unit_type;
+                //         $scopeComplete = $record->scope_unit_id
+                //             && $record->scope_branch_id
+                //             && $record->scope_unit_type;
 
-                        if ($scopeComplete) {
-                            // Verify live depot assignment still matches
-                            $liveDepot = Depot::where('coordinator_user_id', $record->id)->first();
-                            if (! $liveDepot) {
-                                return '⚠ Tidak ada depot';
-                            }
-                            $mismatch = $record->scope_unit_id !== $liveDepot->id
-                                || $record->scope_branch_id !== $liveDepot->branch_id
-                                || $record->scope_unit_type !== 'depot';
-                            return $mismatch ? '⚠ Scope mismatch' : '✓ Lengkap';
-                        }
+                //         if ($scopeComplete) {
+                //             // Verify live depot assignment still matches
+                //             $liveDepot = Depot::where('coordinator_user_id', $record->id)->first();
+                //             if (! $liveDepot) {
+                //                 return '⚠ Tidak ada depot';
+                //             }
+                //             $mismatch = $record->scope_unit_id !== $liveDepot->id
+                //                 || $record->scope_branch_id !== $liveDepot->branch_id
+                //                 || $record->scope_unit_type !== 'depot';
+                //             return $mismatch ? '⚠ Scope mismatch' : '✓ Lengkap';
+                //         }
 
-                        // Scope fields NULL — check if depot exists as fallback
-                        $liveDepot = Depot::where('coordinator_user_id', $record->id)->first();
-                        if (! $liveDepot) {
-                            return '⚠ Tidak ada depot';
-                        }
+                //         // Scope fields NULL — check if depot exists as fallback
+                //         $liveDepot = Depot::where('coordinator_user_id', $record->id)->first();
+                //         if (! $liveDepot) {
+                //             return '⚠ Tidak ada depot';
+                //         }
 
-                        return '⚠ Scope tidak diisi';
-                    })
-                    ->badge()
-                    ->color(function (User $record): string {
-                        if (! $record->isFieldCoordinator()) {
-                            return 'gray';
-                        }
+                //         return '⚠ Scope tidak diisi';
+                //     })
+                //     ->badge()
+                //     ->color(function (User $record): string {
+                //         if (! $record->isFieldCoordinator()) {
+                //             return 'gray';
+                //         }
 
-                        $scopeComplete = $record->scope_unit_id
-                            && $record->scope_branch_id
-                            && $record->scope_unit_type;
+                //         $scopeComplete = $record->scope_unit_id
+                //             && $record->scope_branch_id
+                //             && $record->scope_unit_type;
 
-                        if ($scopeComplete) {
-                            $liveDepot = Depot::where('coordinator_user_id', $record->id)->first();
-                            if (! $liveDepot) return 'danger';
-                            $mismatch = $record->scope_unit_id !== $liveDepot->id
-                                || $record->scope_branch_id !== $liveDepot->branch_id
-                                || $record->scope_unit_type !== 'depot';
-                            return $mismatch ? 'danger' : 'success';
-                        }
+                //         if ($scopeComplete) {
+                //             $liveDepot = Depot::where('coordinator_user_id', $record->id)->first();
+                //             if (! $liveDepot) return 'danger';
+                //             $mismatch = $record->scope_unit_id !== $liveDepot->id
+                //                 || $record->scope_branch_id !== $liveDepot->branch_id
+                //                 || $record->scope_unit_type !== 'depot';
+                //             return $mismatch ? 'danger' : 'success';
+                //         }
 
-                        $liveDepot = Depot::where('coordinator_user_id', $record->id)->first();
-                        return $liveDepot ? 'warning' : 'danger';
-                    })
-                    ->tooltip(function (User $record): ?string {
-                        if (! $record->isFieldCoordinator()) {
-                            return null;
-                        }
-                        if (! $record->scope_unit_id) {
-                            return 'scope_branch_id, scope_unit_id, scope_unit_type belum diisi. '
-                                . 'Middleware menggunakan fallback depot langsung. '
-                                . 'Isi scope fields di form edit user untuk konfigurasi kanonik.';
-                        }
-                        return null;
-                    })
-                    ->toggleable(),
+                //         $liveDepot = Depot::where('coordinator_user_id', $record->id)->first();
+                //         return $liveDepot ? 'warning' : 'danger';
+                //     })
+                //     ->tooltip(function (User $record): ?string {
+                //         if (! $record->isFieldCoordinator()) {
+                //             return null;
+                //         }
+                //         if (! $record->scope_unit_id) {
+                //             return 'scope_branch_id, scope_unit_id, scope_unit_type belum diisi. '
+                //                 . 'Middleware menggunakan fallback depot langsung. '
+                //                 . 'Isi scope fields di form edit user untuk konfigurasi kanonik.';
+                //         }
+                //         return null;
+                //     })
+                //     ->toggleable(),
 
                 TextColumn::make('updated_at')->label('Diubah')->since()->sortable(),
             ])
@@ -240,7 +241,7 @@ class UserResource extends Resource
                 Tables\Actions\EditAction::make()->label('Ubah'),
                 Tables\Actions\DeleteAction::make()
                     ->label('Hapus')
-                    ->visible(fn ($record) => (auth_user()?->isSuperAdmin() ?? false)
+                    ->visible(fn($record) => (auth_user()?->isSuperAdmin() ?? false)
                         && ! $record->isSuperAdmin()
                         && ($record->id !== auth_user()?->id)),
             ])
