@@ -29,14 +29,40 @@
 }
 .fi-sidebar .fi-sidebar-item a {
     border-radius: 0.75rem;
+    transition: background-color 150ms ease, color 150ms ease;
 }
 .fi-sidebar .fi-sidebar-item a:hover {
     background-color: #f1f5f9;
+}
+/* Active nav item — soft brand tint instead of plain gray, so the current
+   page reads clearly against the rest of the menu. */
+.fi-sidebar .fi-sidebar-item-button.bg-gray-100 {
+    background-color: rgb(1 55 161 / 0.07);
+}
+/* Clearer separation between nav groups beyond the default gap alone. */
+.fi-sidebar-nav-groups > .fi-sidebar-group:not(:first-child) .fi-sidebar-group-button {
+    padding-top: 0.875rem;
+    border-top: 1px solid rgb(15 23 42 / 0.06);
 }
 @media (max-width: 640px) {
     .fi-sidebar {
         max-width: 18rem;
     }
+}
+
+/* Page title — the strongest element on the page. Tight tracking at this size
+   keeps it confident rather than merely large. */
+.fi-header-heading {
+    font-size: 1.875rem;
+    line-height: 2.25rem;
+    letter-spacing: -0.02em;
+}
+/* Single subheading, clearly secondary. 8px below the title (header rhythm). */
+.fi-header-subheading {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: rgb(100 116 139);
 }
 
 button,

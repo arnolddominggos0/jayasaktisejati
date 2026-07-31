@@ -43,6 +43,12 @@ class Dashboard extends Page
         return static::$title ?? 'Dashboard';
     }
 
+    public function getSubheading(): string|Htmlable|null
+    {
+        // Satu subtitle: apa halaman ini + kapan.
+        return 'Ringkasan operasional hari ini · ' . Carbon::now()->translatedFormat('l, d F Y');
+    }
+
     // ── Context helpers ───────────────────────────────────────────────────────
 
     public function getBranchContext(): ?Branch

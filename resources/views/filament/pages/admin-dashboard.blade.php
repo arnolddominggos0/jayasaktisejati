@@ -29,13 +29,26 @@
     $kpiTotal     = $onTimeTotal + $lateTotal;
     $onTimePct    = $kpiTotal > 0 ? (int) round($onTimeTotal / $kpiTotal * 100) : 0;
 
-    $scopeUser   = auth_user();
-    $scopeRole   = $scopeUser?->isSuperAdmin() ? 'Super Admin' : 'Office Admin';
-    $scopeBranch = $scopeUser?->isSuperAdmin()
-        ? 'Semua Cabang'
-        : (\Illuminate\Support\Facades\DB::table('branches')->where('id', $scopeUser?->effectiveBranchId())->value('name') ?? 'Cabang');
+    $scopeUser = auth_user();
+    $scopeRole = $scopeUser?->isSuperAdmin() ? 'Super Admin' : 'Office Admin';
 
-    $tamBusinessRoute = \App\Supports\RouteCode::display(\App\Supports\RouteCode::default());
+    // Konteks header mengikuti scope dashboard yang sedang aktif — bukan rute tetap.
+    // Cermin dari AdminDashboard::resolvedBranchId(): office_admin terkunci ke
+    // cabangnya sendiri, super_admin mengikuti filter (null = seluruh cabang).
+    $scopeBranchId = $scopeUser?->isOfficeAdmin()
+        ? $scopeUser?->effectiveBranchId()
+        : ($this->branch_id ?: null);
+
+    $scopeBranch = $scopeBranchId
+        ? (\Illuminate\Support\Facades\DB::table('branches')->where('id', $scopeBranchId)->value('name') ?? 'Cabang')
+        : 'Semua Cabang';
+
+    // Moda mengikuti filter; null = belum dipersempit.
+    $scopeMode = match ($this->mode) {
+        \App\Enums\ShipmentMode::Sea->value  => 'Laut',
+        \App\Enums\ShipmentMode::Land->value => 'Darat',
+        default                              => 'Semua Moda',
+    };
 
     $overPort  = (int) ($tamPortStock['over_three'] ?? 0);
     $ngCount   = (int) ($insp['ng'] ?? 0);
@@ -52,39 +65,35 @@
         {{-- ══════════════════════════════════════════════════════════════════
              PAGE HEADER
         ══════════════════════════════════════════════════════════════════ --}}
-        <div class="jss-header flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div class="flex flex-col gap-3">
-                <div class="jss-page-titles">
-                    <h1 class="jss-h1">Dashboard</h1>
-                    <p class="jss-subhead">Dashboard Operasional</p>
-                </div>
-                <div class="flex items-center flex-wrap gap-2">
-                    <span class="jss-meta-badge bg-gray-100 text-gray-700 ring-gray-200">
-                        <x-heroicon-m-user-circle class="h-3.5 w-3.5 text-gray-400" />
-                        {{ $scopeRole }}
-                    </span>
-                    <span class="jss-meta-badge bg-amber-50 text-amber-700 ring-amber-200">
-                        <x-heroicon-m-building-office class="h-3.5 w-3.5 text-amber-500" />
-                        {{ $scopeBranch }}
-                    </span>
-                    <span class="jss-meta-badge bg-primary-50 text-primary-700 ring-primary-200">
-                        <x-heroicon-m-globe-alt class="h-3.5 w-3.5 text-primary-500" />
-                        {{ $tamBusinessRoute }} <span class="text-primary-400">· TAM</span>
-                    </span>
-                </div>
-            </div>
-            <div class="flex items-center gap-2.5 shrink-0">
-                @if ($scopeUser?->isSuperAdmin())
-                    <div class="text-xs text-gray-400 [&_.fi-fo-field-wrp]:mb-0 [&_.fi-input-wrp]:py-1 [&_.fi-input-wrp]:text-xs">
-                        {{ $this->form }}
-                    </div>
-                @endif
-                <span class="jss-meta-badge bg-gray-100 text-gray-500 ring-gray-200">
-                    <x-heroicon-m-clock class="h-3.5 w-3.5 text-gray-400" />
+        <header class="jss-page-header">
+            <h1 class="jss-page-title">Dashboard</h1>
+            <p class="jss-page-subtitle">Ringkasan operasional dan KPI pengiriman</p>
+
+            <div class="jss-page-context">
+                <span class="jss-page-context__item">
+                    <x-heroicon-m-user-circle />
+                    {{ $scopeRole }}
+                </span>
+                <span class="jss-page-context__item">
+                    <x-heroicon-m-building-office />
+                    {{ $scopeBranch }}
+                </span>
+                <span class="jss-page-context__item">
+                    <x-heroicon-m-arrows-right-left />
+                    {{ $scopeMode }}
+                </span>
+                <span class="jss-page-context__item">
+                    <x-heroicon-m-clock />
                     {{ now()->format('H:i') }} WIB
                 </span>
             </div>
-        </div>
+
+            @if ($scopeUser?->isSuperAdmin())
+                <div class="jss-page-toolbar">
+                    {{ $this->form }}
+                </div>
+            @endif
+        </header>
 
         {{-- ══════════════════════════════════════════════════════════════════
              ROW 1 — HERO KPI (4 cols)

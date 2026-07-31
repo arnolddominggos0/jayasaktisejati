@@ -8,17 +8,18 @@
         $kesiapan  = $this->getKesiapanOperasional();
         $perhatian = $this->getPerluPerhatian();
 
-        // Badge ringkas status briefing — awareness saja, action ada di Tugas Operasional.
+        // Chip status briefing — awareness saja, action ada di Tugas Operasional.
+        // Flat (tanpa ring) agar sebobot chip lingkup di sebelahnya.
         if (! $bs['has_briefing']) {
-            $briefingBadgeCls = 'bg-gray-100 text-gray-600 ring-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:ring-gray-700';
+            $briefingBadgeCls = 'bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-gray-300';
             $briefingBadgeIco = 'heroicon-m-clock';
             $briefingBadgeTxt = 'Belum Briefing';
         } elseif ($bs['is_ready']) {
-            $briefingBadgeCls = 'bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:ring-emerald-800';
+            $briefingBadgeCls = 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400';
             $briefingBadgeIco = 'heroicon-m-check-badge';
             $briefingBadgeTxt = "Briefing Selesai · MP {$bs['fit_count']}/{$bs['need_mp']}";
         } else {
-            $briefingBadgeCls = 'bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:ring-amber-800';
+            $briefingBadgeCls = 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400';
             $briefingBadgeIco = 'heroicon-m-exclamation-triangle';
             $briefingBadgeTxt = "Briefing · MP {$bs['fit_count']}/{$bs['need_mp']} Belum Siap";
         }
@@ -29,88 +30,74 @@
          Konteks lokasi: Branch → Depot, dengan badge ringkas status briefing.
          Awareness saja — action Briefing/Container ada di Tugas Operasional.
     ══════════════════════════════════════════════════════════════════════ --}}
-    <div class="mb-6">
-        <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50 dark:bg-primary-900/20">
-                        <x-heroicon-m-building-office-2 class="h-6 w-6 text-primary-600 dark:text-primary-400" />
-                    </div>
-                    <div>
-                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400">Lingkup Operasional</p>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <h2 class="text-lg font-semibold text-gray-950 dark:text-white">
-                                {{ $this->getBranchName() }}
-                            </h2>
-                            @if ($this->hasDepotContext())
-                                <span class="text-gray-400 dark:text-gray-500">→</span>
-                                <span class="text-base font-medium text-gray-700 dark:text-gray-300">
-                                    {{ $this->getDepotName() }}
-                                </span>
-                            @endif
-                        </div>
-                    </div>
-                </div>
+    {{-- Context bar — lapisan ketiga header (judul → subtitle → konteks).
+         Kedua chip berbagi tinggi, radius, padding, dan ukuran teks yang sama
+         supaya terbaca sebagai satu baris konteks, bukan pill yang mengambang. --}}
+    <div class="-mt-2 mb-2 flex flex-wrap items-center gap-2">
+        {{-- Lingkup operasional: Branch → Depot --}}
+        <span class="inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg bg-gray-100 px-2.5 text-[11px] font-medium text-gray-600 dark:bg-white/5 dark:text-gray-300">
+            <x-heroicon-m-building-office-2 class="h-3.5 w-3.5 shrink-0 text-gray-400 dark:text-gray-500" />
+            <span class="truncate">{{ $this->getBranchName() }}</span>
+            @if ($this->hasDepotContext())
+                <span class="text-gray-300 dark:text-gray-600">·</span>
+                <span class="truncate">{{ $this->getDepotName() }}</span>
+            @endif
+        </span>
 
-                {{-- Badge ringkas status briefing --}}
-                <div class="shrink-0">
-                    <span class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 {{ $briefingBadgeCls }}">
-                        <x-dynamic-component :component="$briefingBadgeIco" class="h-3.5 w-3.5" />
-                        {{ $briefingBadgeTxt }}
-                    </span>
-                </div>
-            </div>
-        </div>
+        {{-- Status briefing hari ini --}}
+        <span class="inline-flex h-7 max-w-full items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-medium {{ $briefingBadgeCls }}">
+            <x-dynamic-component :component="$briefingBadgeIco" class="h-3.5 w-3.5 shrink-0" />
+            <span class="truncate">{{ $briefingBadgeTxt }}</span>
+        </span>
     </div>
 
     {{-- ══════════════════════════════════════════════════════════════════════
          SECTION 2 — KESIAPAN OPERASIONAL HARI INI
          2 card: MP Readiness · Container Readiness.
     ══════════════════════════════════════════════════════════════════════ --}}
-    <div class="mb-6">
-        <div class="mb-2 flex items-center gap-2 px-1">
-            <x-heroicon-o-signal class="h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                Kesiapan Operasional Hari Ini
-            </span>
-        </div>
+    <div class="mb-8">
+        <p class="mb-3 px-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            Kesiapan Operasional Hari Ini
+        </p>
 
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
 
             {{-- Card 1 — MP Readiness --}}
             @php
                 $mpFit  = $kesiapan['mp_fit'];
                 $mpNeed = $kesiapan['mp_need'];
                 if ($mpFit === null) {
-                    $mpIconBg  = 'bg-gray-100 dark:bg-gray-800';
-                    $mpIconCol = 'text-gray-400 dark:text-gray-500';
-                    $mpPrimary = 'Menunggu Briefing';
-                    $mpSub     = null;
-                    $mpNumCls  = 'text-gray-400 dark:text-gray-500';
-                    $mpPrimCls = 'text-base font-semibold';
+                    // Belum ada sesi briefing hari ini — tidak ada angka untuk ditampilkan.
+                    $mpValue  = null;
+                    $mpStatus = 'Menunggu Briefing';
+                    $mpUnit   = null;
+                    $mpSub    = 'Belum ada sesi briefing hari ini';
+                    $mpNumCls = 'text-gray-400 dark:text-gray-500';
                 } else {
-                    $mpReady   = $mpFit >= $mpNeed;
-                    $mpIconBg  = $mpReady ? 'bg-emerald-50 dark:bg-emerald-900/20' : 'bg-amber-50 dark:bg-amber-900/20';
-                    $mpIconCol = $mpReady ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400';
-                    $mpPrimary = "{$mpFit} / {$mpNeed}";
-                    $mpSub     = $mpReady ? 'MP Hadir — Siap' : 'MP Hadir — Belum Cukup';
-                    $mpNumCls  = $mpReady ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400';
-                    $mpPrimCls = 'text-xl font-bold';
+                    $mpReady  = $mpFit >= $mpNeed;
+                    $mpValue  = "{$mpFit} / {$mpNeed}";
+                    $mpStatus = null;
+                    $mpUnit   = 'MP';
+                    $mpSub    = $mpReady ? 'MP Hadir — Siap' : 'MP Hadir — Belum Cukup';
+                    $mpNumCls = $mpReady ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400';
                 }
             @endphp
-            <div class="flex items-center gap-4 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl {{ $mpIconBg }}">
-                    <x-heroicon-o-users class="h-6 w-6 {{ $mpIconCol }}" />
-                </div>
-                <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-950/5 transition-shadow duration-200 hover:shadow-md dark:bg-gray-900 dark:ring-white/10">
+                <div class="flex items-center gap-1.5">
+                    <x-heroicon-o-users class="h-3.5 w-3.5 shrink-0 text-gray-300 dark:text-gray-600" />
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                         MP Readiness
-                    </p>
-                    <p class="mt-0.5 {{ $mpPrimCls }} {{ $mpNumCls }}">{{ $mpPrimary }}</p>
-                    @if ($mpSub)
-                        <p class="text-xs text-gray-400 dark:text-gray-500">{{ $mpSub }}</p>
-                    @endif
+                    </span>
                 </div>
+                <p class="mt-3 flex items-baseline gap-1.5">
+                    @if ($mpValue !== null)
+                        <span class="text-3xl font-bold tabular-nums tracking-tight {{ $mpNumCls }}">{{ $mpValue }}</span>
+                        <span class="text-sm font-medium text-gray-400 dark:text-gray-500">{{ $mpUnit }}</span>
+                    @else
+                        <span class="text-lg font-semibold {{ $mpNumCls }}">{{ $mpStatus }}</span>
+                    @endif
+                </p>
+                <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">{{ $mpSub }}</p>
             </div>
 
             {{-- Card 2 — Container Readiness --}}
@@ -118,41 +105,42 @@
                 $cAvailKes = $kesiapan['container_available'];
                 $cReady    = $kesiapan['container_ready'];
                 if ($cAvailKes === null) {
-                    $cIconBg   = 'bg-gray-100 dark:bg-gray-800';
-                    $cIconCol  = 'text-gray-400 dark:text-gray-500';
-                    $cPrimary  = 'Belum Diinput';
-                    $cSub      = null;
-                    $cNumCls   = 'text-gray-400 dark:text-gray-500';
-                    $cPrimCls  = 'text-base font-semibold';
+                    // Belum ada baris container readiness untuk hari ini.
+                    $cValue   = null;
+                    $cStatus  = 'Belum Diinput';
+                    $cUnit    = null;
+                    $cSub     = 'Belum ada input container hari ini';
+                    $cNumCls  = 'text-gray-400 dark:text-gray-500';
                 } elseif ($cReady) {
-                    $cIconBg   = 'bg-emerald-50 dark:bg-emerald-900/20';
-                    $cIconCol  = 'text-emerald-600 dark:text-emerald-400';
-                    $cPrimary  = "{$cAvailKes} Container";
-                    $cSub      = 'Container Ready';
-                    $cNumCls   = 'text-emerald-700 dark:text-emerald-400';
-                    $cPrimCls  = 'text-xl font-bold';
+                    $cValue   = $cAvailKes;
+                    $cStatus  = null;
+                    $cUnit    = 'Container';
+                    $cSub     = 'Container Ready';
+                    $cNumCls  = 'text-emerald-600 dark:text-emerald-400';
                 } else {
-                    $cIconBg   = 'bg-rose-50 dark:bg-rose-900/20';
-                    $cIconCol  = 'text-rose-600 dark:text-rose-400';
-                    $cPrimary  = "{$cAvailKes} Container";
-                    $cSub      = 'Container — Belum Cukup';
-                    $cNumCls   = 'text-rose-700 dark:text-rose-400';
-                    $cPrimCls  = 'text-xl font-bold';
+                    $cValue   = $cAvailKes;
+                    $cStatus  = null;
+                    $cUnit    = 'Container';
+                    $cSub     = 'Container — Belum Cukup';
+                    $cNumCls  = 'text-rose-600 dark:text-rose-400';
                 }
             @endphp
-            <div class="flex items-center gap-4 rounded-xl bg-white p-5 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl {{ $cIconBg }}">
-                    <x-heroicon-o-archive-box class="h-6 w-6 {{ $cIconCol }}" />
-                </div>
-                <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-950/5 transition-shadow duration-200 hover:shadow-md dark:bg-gray-900 dark:ring-white/10">
+                <div class="flex items-center gap-1.5">
+                    <x-heroicon-o-archive-box class="h-3.5 w-3.5 shrink-0 text-gray-300 dark:text-gray-600" />
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                         Container Readiness
-                    </p>
-                    <p class="mt-0.5 {{ $cPrimCls }} {{ $cNumCls }}">{{ $cPrimary }}</p>
-                    @if ($cSub)
-                        <p class="text-xs text-gray-400 dark:text-gray-500">{{ $cSub }}</p>
-                    @endif
+                    </span>
                 </div>
+                <p class="mt-3 flex items-baseline gap-1.5">
+                    @if ($cValue !== null)
+                        <span class="text-3xl font-bold tabular-nums tracking-tight {{ $cNumCls }}">{{ $cValue }}</span>
+                        <span class="text-sm font-medium text-gray-400 dark:text-gray-500">{{ $cUnit }}</span>
+                    @else
+                        <span class="text-lg font-semibold {{ $cNumCls }}">{{ $cStatus }}</span>
+                    @endif
+                </p>
+                <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">{{ $cSub }}</p>
             </div>
 
         </div>
@@ -163,65 +151,69 @@
          4 KPI: Handover Hari Ini · Ready Loading · Loading Hari Ini · Bermasalah
     ══════════════════════════════════════════════════════════════════════ --}}
     @php $kpi = $this->getTodayActivityKpis(); @endphp
-    <div class="mb-6">
-        <div class="mb-2 flex items-center gap-2 px-1">
-            <x-heroicon-o-bolt class="h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                Aktivitas Hari Ini
-            </span>
-        </div>
+    <div class="mb-8">
+        <p class="mb-3 px-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            Aktivitas Hari Ini
+        </p>
 
-        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
 
             {{-- A — Handover Hari Ini --}}
-            <div class="flex flex-col gap-1 rounded-xl bg-white px-5 py-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-                <div class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                    <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5" />
-                    Handover Hari Ini
+            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-950/5 transition-shadow duration-200 hover:shadow-md dark:bg-gray-900 dark:ring-white/10">
+                <div class="flex items-center gap-1.5">
+                    <x-heroicon-o-arrow-down-tray class="h-3.5 w-3.5 shrink-0 text-gray-300 dark:text-gray-600" />
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        Handover Hari Ini
+                    </span>
                 </div>
-                <p class="mt-1 text-3xl font-bold text-gray-900 dark:text-white">
+                <p class="mt-3 text-3xl font-bold tabular-nums tracking-tight text-gray-900 dark:text-white">
                     {{ $kpi['handover_today'] }}
                 </p>
-                <p class="text-xs text-gray-400 dark:text-gray-500">unit masuk depot hari ini</p>
+                <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">unit masuk depot hari ini</p>
             </div>
 
             {{-- B — Ready Loading --}}
-            <div class="flex flex-col gap-1 rounded-xl bg-white px-5 py-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-                <div class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-emerald-500 dark:text-emerald-400">
-                    <x-heroicon-o-check-circle class="h-3.5 w-3.5" />
-                    Ready Loading
+            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-950/5 transition-shadow duration-200 hover:shadow-md dark:bg-gray-900 dark:ring-white/10">
+                <div class="flex items-center gap-1.5">
+                    <x-heroicon-o-check-circle class="h-3.5 w-3.5 shrink-0 text-gray-300 dark:text-gray-600" />
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        Ready Loading
+                    </span>
                 </div>
-                <p class="mt-1 text-3xl font-bold {{ $kpi['ready_loading'] > 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500' }}">
+                <p class="mt-3 text-3xl font-bold tabular-nums tracking-tight {{ $kpi['ready_loading'] > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-300 dark:text-gray-600' }}">
                     {{ $kpi['ready_loading'] }}
                 </p>
-                <p class="text-xs text-gray-400 dark:text-gray-500">unit lolos seluruh requirement</p>
+                <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">unit lolos seluruh requirement</p>
             </div>
 
             {{-- C — Loading Hari Ini --}}
-            <div class="flex flex-col gap-1 rounded-xl bg-white px-5 py-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-                <div class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-sky-500 dark:text-sky-400">
-                    <x-heroicon-o-truck class="h-3.5 w-3.5" />
-                    Loading Hari Ini
+            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-950/5 transition-shadow duration-200 hover:shadow-md dark:bg-gray-900 dark:ring-white/10">
+                <div class="flex items-center gap-1.5">
+                    <x-heroicon-o-truck class="h-3.5 w-3.5 shrink-0 text-gray-300 dark:text-gray-600" />
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        Loading Hari Ini
+                    </span>
                 </div>
-                <p class="mt-1 text-3xl font-bold {{ $kpi['loading_today'] > 0 ? 'text-sky-700 dark:text-sky-400' : 'text-gray-400 dark:text-gray-500' }}">
+                <p class="mt-3 text-3xl font-bold tabular-nums tracking-tight {{ $kpi['loading_today'] > 0 ? 'text-sky-600 dark:text-sky-400' : 'text-gray-300 dark:text-gray-600' }}">
                     {{ $kpi['loading_today'] }}
                 </p>
-                <p class="text-xs text-gray-400 dark:text-gray-500">unit masuk proses loading hari ini</p>
+                <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">unit masuk proses loading hari ini</p>
             </div>
 
             {{-- D — Bermasalah --}}
-            <div class="flex flex-col gap-1 rounded-xl bg-white px-5 py-4 shadow-sm ring-1 ring-gray-950/5
+            <div class="rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-950/5 transition-shadow duration-200 hover:shadow-md
                         {{ $kpi['problematic_today'] > 0 ? 'ring-rose-200 dark:ring-rose-900/40' : '' }}
                         dark:bg-gray-900 dark:ring-white/10">
-                <div class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider
-                            {{ $kpi['problematic_today'] > 0 ? 'text-rose-500 dark:text-rose-400' : 'text-gray-400 dark:text-gray-500' }}">
-                    <x-heroicon-o-exclamation-circle class="h-3.5 w-3.5" />
-                    Bermasalah
+                <div class="flex items-center gap-1.5">
+                    <x-heroicon-o-exclamation-circle class="h-3.5 w-3.5 shrink-0 text-gray-300 dark:text-gray-600" />
+                    <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        Bermasalah
+                    </span>
                 </div>
-                <p class="mt-1 text-3xl font-bold {{ $kpi['problematic_today'] > 0 ? 'text-rose-700 dark:text-rose-400' : 'text-gray-400 dark:text-gray-500' }}">
+                <p class="mt-3 text-3xl font-bold tabular-nums tracking-tight {{ $kpi['problematic_today'] > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-gray-300 dark:text-gray-600' }}">
                     {{ $kpi['problematic_today'] }}
                 </p>
-                <p class="text-xs text-gray-400 dark:text-gray-500">unit return to PDC hari ini</p>
+                <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">unit return to PDC hari ini</p>
             </div>
 
         </div>
@@ -232,78 +224,62 @@
          Exception monitoring — selalu tampil, bukan conditional.
          FC harus tahu kondisi depot: merah jika ada masalah, hijau jika aman.
     ══════════════════════════════════════════════════════════════════════ --}}
-    <div class="mb-6">
-        <div class="mb-2 flex items-center gap-2 px-1">
-            <x-heroicon-o-exclamation-triangle class="h-4 w-4 text-gray-400 dark:text-gray-500" />
-            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                Perlu Perhatian
-            </span>
-        </div>
+    <div class="mb-8">
+        <p class="mb-3 px-1 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            Perlu Perhatian
+        </p>
 
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {{-- Kedua kartu memakai satu blok markup identik (varian dihitung di awal)
+             agar padding, alignment, dan rhythm-nya tidak bisa melenceng. --}}
+        @php
+            $perhatianCards = [
+                [
+                    'label'  => 'Shipment Bermasalah',
+                    'count'  => $perhatian['bermasalah'],
+                    'icon'   => $perhatian['bermasalah'] > 0 ? 'heroicon-o-x-circle' : 'heroicon-o-check-circle',
+                    'numCls' => $perhatian['bermasalah'] > 0
+                        ? 'text-rose-600 dark:text-rose-400'
+                        : 'text-emerald-600 dark:text-emerald-400',
+                    'ring'   => $perhatian['bermasalah'] > 0
+                        ? 'ring-rose-200 dark:ring-rose-900/50'
+                        : 'ring-gray-950/5 dark:ring-white/10',
+                    'sub'    => $perhatian['bermasalah'] > 0
+                        ? 'Ada unit Return to PDC'
+                        : 'Tidak ada unit bermasalah',
+                ],
+                [
+                    'label'  => 'Shipment Tertahan',
+                    'count'  => $perhatian['tertahan'],
+                    'icon'   => $perhatian['tertahan'] > 0 ? 'heroicon-o-pause-circle' : 'heroicon-o-check-circle',
+                    'numCls' => $perhatian['tertahan'] > 0
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-emerald-600 dark:text-emerald-400',
+                    'ring'   => $perhatian['tertahan'] > 0
+                        ? 'ring-amber-200 dark:ring-amber-900/50'
+                        : 'ring-gray-950/5 dark:ring-white/10',
+                    'sub'    => $perhatian['tertahan'] > 0
+                        ? 'Track requirement belum selesai'
+                        : 'Tidak ada shipment tertahan',
+                ],
+            ];
+        @endphp
 
-            {{-- Shipment Bermasalah --}}
-            @if ($perhatian['bermasalah'] > 0)
-            <div class="flex items-center gap-4 rounded-xl bg-white p-5 shadow-sm ring-1 ring-rose-200 dark:bg-gray-900 dark:ring-rose-900/50">
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-900/20">
-                    <x-heroicon-o-x-circle class="h-6 w-6 text-rose-600 dark:text-rose-400" />
-                </div>
-                <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                        Shipment Bermasalah
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            @foreach ($perhatianCards as $card)
+                <div class="rounded-xl bg-white p-6 shadow-sm ring-1 {{ $card['ring'] }} transition-shadow duration-200 hover:shadow-md dark:bg-gray-900">
+                    <div class="flex items-center gap-1.5">
+                        <x-dynamic-component :component="$card['icon']" class="h-3.5 w-3.5 shrink-0 text-gray-300 dark:text-gray-600" />
+                        <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                            {{ $card['label'] }}
+                        </span>
+                    </div>
+                    <p class="mt-3 flex items-baseline gap-1.5">
+                        <span class="text-3xl font-bold tabular-nums tracking-tight {{ $card['numCls'] }}">{{ $card['count'] }}</span>
+                        <span class="text-sm font-medium text-gray-400 dark:text-gray-500">Shipment</span>
                     </p>
-                    <p class="mt-0.5 text-xl font-bold text-rose-700 dark:text-rose-400">
-                        {{ $perhatian['bermasalah'] }} Shipment
-                    </p>
-                    <p class="text-xs text-gray-400 dark:text-gray-500">Ada unit Return to PDC</p>
+                    <p class="mt-1.5 text-xs text-gray-400 dark:text-gray-500">{{ $card['sub'] }}</p>
                 </div>
-            </div>
-            @else
-            <div class="flex items-center gap-4 rounded-xl bg-white p-5 shadow-sm ring-1 ring-emerald-100 dark:bg-gray-900 dark:ring-emerald-900/30">
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20">
-                    <x-heroicon-o-check-circle class="h-6 w-6 text-emerald-500 dark:text-emerald-400" />
-                </div>
-                <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                        Shipment Bermasalah
-                    </p>
-                    <p class="mt-0.5 text-xl font-bold text-emerald-600 dark:text-emerald-400">0 Shipment</p>
-                    <p class="text-xs text-emerald-500 dark:text-emerald-500">Tidak ada unit bermasalah</p>
-                </div>
-            </div>
-            @endif
-
-            {{-- Shipment Tertahan --}}
-            @if ($perhatian['tertahan'] > 0)
-            <div class="flex items-center gap-4 rounded-xl bg-white p-5 shadow-sm ring-1 ring-amber-200 dark:bg-gray-900 dark:ring-amber-900/50">
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-50 dark:bg-amber-900/20">
-                    <x-heroicon-o-pause-circle class="h-6 w-6 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                        Shipment Tertahan
-                    </p>
-                    <p class="mt-0.5 text-xl font-bold text-amber-700 dark:text-amber-400">
-                        {{ $perhatian['tertahan'] }} Shipment
-                    </p>
-                    <p class="text-xs text-gray-400 dark:text-gray-500">Track requirement belum selesai</p>
-                </div>
-            </div>
-            @else
-            <div class="flex items-center gap-4 rounded-xl bg-white p-5 shadow-sm ring-1 ring-emerald-100 dark:bg-gray-900 dark:ring-emerald-900/30">
-                <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 dark:bg-emerald-900/20">
-                    <x-heroicon-o-check-circle class="h-6 w-6 text-emerald-500 dark:text-emerald-400" />
-                </div>
-                <div class="min-w-0">
-                    <p class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
-                        Shipment Tertahan
-                    </p>
-                    <p class="mt-0.5 text-xl font-bold text-emerald-600 dark:text-emerald-400">0 Shipment</p>
-                    <p class="text-xs text-emerald-500 dark:text-emerald-500">Tidak ada shipment tertahan</p>
-                </div>
-            </div>
-            @endif
-
+            @endforeach
         </div>
     </div>
 
@@ -315,14 +291,13 @@
          Diurutkan: latest_track_at DESC.
     ══════════════════════════════════════════════════════════════════════ --}}
     @php $yardUnits = $this->getActiveYardUnits(); @endphp
-    <div class="mb-6">
-        <div class="mb-2 flex items-center gap-2 px-1">
-            <x-heroicon-o-cube-transparent class="h-4 w-4 text-sky-500 dark:text-sky-400" />
-            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+    <div class="mb-8">
+        <div class="mb-3 flex items-center gap-2 px-1">
+            <span class="text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 Unit Aktif di Yard
             </span>
             @if (count($yardUnits) > 0)
-                <span class="ml-1 rounded-full bg-sky-100 px-2 py-0.5 text-xs font-bold text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium tabular-nums text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                     {{ count($yardUnits) }} unit
                 </span>
             @endif
@@ -391,7 +366,7 @@
                             <td class="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
                                 {{ $yu['voyage'] }}
                             </td>
-                            <td class="px-4 py-3 text-right text-xs text-gray-400 dark:text-gray-500">
+                            <td class="px-4 py-3 text-right text-xs tabular-nums text-gray-400 dark:text-gray-500">
                                 {{ $yu['updated_at'] }}
                             </td>
                         </tr>
