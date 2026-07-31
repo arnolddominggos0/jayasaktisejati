@@ -90,7 +90,7 @@
         */
         'social_media' => [
             'facebook' => 'https://www.facebook.com/jayasaktisejati',
-            'instagram' => 'https://www.instagram.com/jayasaktisejati',
+            'instagram' => 'https://www.instagram.com/pt.jayasaktisejati1995/',
             'linkedin' => 'https://www.linkedin.com/company/pt-jaya-sakti-sejati/',
         ],
     ];

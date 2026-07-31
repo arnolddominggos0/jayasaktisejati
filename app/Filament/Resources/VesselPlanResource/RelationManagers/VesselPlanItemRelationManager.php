@@ -239,27 +239,26 @@ class VesselPlanItemRelationManager extends RelationManager
             ])
             ->actionsAlignment('center')
 
-            ->emptyStateHeading('Belum ada jadwal pada Vessel Plan ini')
-            ->emptyStateDescription(function () {
-                return filled($this->vpShippingLineFilter)
-                    ? 'Belum ada jadwal untuk Shipping Line ini.'
-                    : 'Tambahkan jadwal kapal pertama untuk mulai menyusun rencana pengiriman bulan ini.';
-            })
-            ->emptyStateActions([
-                Tables\Actions\CreateAction::make()
-                    ->label('Tambah Jadwal')
-                    ->icon('heroicon-o-plus')
-                    ->action(function () {
-                        dd('Action jalan');
-                    })
-                    ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
-            ])
+            // ->emptyStateHeading('Belum ada jadwal pada Vessel Plan ini')
+            // ->emptyStateDescription(function () {
+            //     return filled($this->vpShippingLineFilter)
+            //         ? 'Belum ada jadwal untuk Shipping Line ini.'
+            //         : 'Tambahkan jadwal kapal pertama untuk mulai menyusun rencana pengiriman bulan ini.';
+            // })
+            // ->emptyStateActions([
+            //     Tables\Actions\CreateAction::make()
+            //         ->label('Tambah Jadwal')
+            //         ->icon('heroicon-o-plus')
+            //         ->action(function () {
+            //             dd('Action jalan');
+            //         })
+            //         ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
+            // ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah Jadwal')
                     ->icon('heroicon-o-plus')
-                    ->visible(fn() => $this->getOwnerRecord()?->isEditable()
-                        && $this->getOwnerRecord()->items->isNotEmpty()),
+                    ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
             ])
 
             ->actions([

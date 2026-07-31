@@ -4,12 +4,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="PT Jaya Sakti Sejati - Solusi Logistik Terpercaya. Melayani pengiriman domestik dan internasional dengan jangkauan seluruh Indonesia.">
-    <meta name="keywords" content="logistik, freight forwarding, container, pengiriman, jasa transportasi">
-    <title>@yield('title', 'PT Jaya Sakti Sejati')</title>
+    @php
+        // Judul & deskripsi dipakai ulang oleh <title>, Open Graph, dan Twitter
+        // Card supaya ketiganya tidak pernah saling berbeda.
+        $seoTitle = \Illuminate\Support\Facades\View::yieldContent(
+            'title',
+            'PT Jaya Sakti Sejati - Solusi Freight Forwarding Terpercaya di Indonesia'
+        );
+        $seoDescription = \Illuminate\Support\Facades\View::yieldContent(
+            'description',
+            'PT Jaya Sakti Sejati - Solusi Logistik Terpercaya. Melayani pengiriman domestik dan internasional dengan jangkauan seluruh Indonesia.'
+        );
+    @endphp
 
-    <!--Favicon-->
-    <link rel="icon" type="image/png" href="{{ asset('images/favicon/favicon-32x32.png') }}">
+    <meta name="description" content="{{ $seoDescription }}">
+    <meta name="keywords" content="logistik, freight forwarding, container, pengiriman, jasa transportasi">
+    <title>{{ $seoTitle }}</title>
+
+    <link rel="canonical" href="{{ url()->current() }}">
+    <meta name="robots" content="index, follow">
+
+    {{-- Favicon.
+         /favicon.ico dideklarasikan lebih dulu karena file itu multi-resolusi
+         (16/32/48) — 48px adalah ukuran yang direkomendasikan Google untuk
+         favicon hasil pencarian. Deklarasi PNG di bawahnya tetap dipertahankan
+         demi kompatibilitas browser lama. --}}
+    <link rel="icon" href="{{ asset('favicon.ico') }}" sizes="any">
+    <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('images/favicon/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('images/favicon/favicon-16x16.png') }}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('images/favicon/apple-touch-icon.png') }}">
+    <link rel="manifest" href="{{ asset('images/favicon/site.webmanifest') }}">
+    <meta name="theme-color" content="#0137A1">
+
+    {{-- Open Graph --}}
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="PT Jaya Sakti Sejati">
+    <meta property="og:locale" content="id_ID">
+    <meta property="og:title" content="{{ $seoTitle }}">
+    <meta property="og:description" content="{{ $seoDescription }}">
+    <meta property="og:url" content="{{ url()->current() }}">
+    <meta property="og:image" content="{{ asset('images/favicon/android-chrome-512x512.png') }}">
+    <meta property="og:image:width" content="512">
+    <meta property="og:image:height" content="512">
+
+    {{-- Twitter Card --}}
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ $seoTitle }}">
+    <meta name="twitter:description" content="{{ $seoDescription }}">
+    <meta name="twitter:image" content="{{ asset('images/favicon/android-chrome-512x512.png') }}">
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -167,6 +210,28 @@
     </style>
 
     @stack('styles')
+
+    {{-- Structured data (Organization) — membantu Google mengaitkan nama, situs,
+         dan logo resmi perusahaan. --}}
+    @php
+        // Dibangun di dalam blok PHP: kunci '@context'/'@type' tidak boleh
+        // melewati parser Blade, yang akan menganggapnya sebagai directive.
+        $organizationSchema = json_encode([
+            '@context'      => 'https://schema.org',
+            '@type'         => 'Organization',
+            'name'          => 'PT Jaya Sakti Sejati',
+            'alternateName' => 'Jaya Sakti Sejati',
+            'url'           => url('/'),
+            'logo'          => asset('images/logo.png'),
+            'image'         => asset('images/favicon/android-chrome-512x512.png'),
+            'description'   => $seoDescription,
+            'areaServed'    => [
+                '@type' => 'Country',
+                'name'  => 'Indonesia',
+            ],
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    @endphp
+    <script type="application/ld+json">{!! $organizationSchema !!}</script>
 </head>
 
 <body class="antialiased text-slate-800 bg-white smooth-scroll">
