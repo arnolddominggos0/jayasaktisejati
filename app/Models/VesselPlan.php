@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Distribution\DistributionBoundary;
 use App\Enums\VesselPlanStatus;
 use App\Models\Customer;
 use App\Models\Port;
@@ -49,8 +50,15 @@ class VesselPlan extends Model
     {
         static::creating(function (VesselPlan $plan) {
 
+            // Layer 1 tidak mengenal customer tertentu. Penerima default
+            // diputuskan oleh domain Distribution, bukan oleh model jadwal.
+            //
+            // Penetapan masih terjadi di sini karena belum ada tabel
+            // distribusi — customer_id untuk sementara tetap tinggal di
+            // vessel_plans. Yang berpindah pada sprint ini adalah
+            // PENGETAHUAN-nya, bukan penyimpanannya.
             if (! $plan->customer_id) {
-                $plan->customer_id = static::resolveTamCustomer()?->id;
+                $plan->customer_id = app(DistributionBoundary::class)->defaultRecipientId();
             }
         });
     }
@@ -85,22 +93,8 @@ class VesselPlan extends Model
         return $this->belongsTo(Port::class, 'pod_id');
     }
 
-    public static function resolveTamCustomer(): ?Customer
-    {
-        $configuredId = (int) config('jss_customers.tam_id', 0);
-
-        if ($configuredId > 0) {
-            $customer = Customer::find($configuredId);
-            if ($customer) {
-                return $customer;
-            }
-        }
-
-        return Customer::query()
-            ->whereRaw('LOWER(name) = ?', ['toyota astra motor'])
-            ->orWhereRaw('LOWER(name) like ?', ['%toyota astra motor%'])
-            ->first();
-    }
+    // resolveTamCustomer() dipindah ke App\Domain\Distribution\DistributionBoundary.
+    // Model jadwal tidak boleh mengenal customer tertentu (ARCH-01 Layer 1).
 
     public function resolveRoutePortIds(): array
     {
@@ -113,8 +107,15 @@ class VesselPlan extends Model
 
         [$routePol, $routePod] = RouteCode::parts((string) $this->route_code);
 
-        $polCode = $routePol ?: config('tam.route.pol_code');
-        $podCode = $routePod ?: config('tam.route.pod_code');
+        // UNLOCODE dari registry RouteCode adalah sumber otoritatif pemetaan
+        // rute → pelabuhan. Bagian pendek (mis. 'MND') hanya label rute, bukan
+        // kode pelabuhan: Manado dilayani pelabuhan Bitung (IDBTG), sehingga
+        // 'MND' → 'IDMND' tidak pernah ketemu dan POD gagal ter-resolve.
+        //
+        // Ini juga menghapus ketergantungan Layer 1 pada config('tam.*') —
+        // model jadwal tidak boleh mengenal konfigurasi milik satu customer.
+        $polCode = RouteCode::polUnlocode((string) $this->route_code) ?: $routePol;
+        $podCode = RouteCode::podUnlocode((string) $this->route_code) ?: $routePod;
 
         if (! $polCode || ! $podCode) {
             return ['pol_id' => $polId, 'pod_id' => $podId];

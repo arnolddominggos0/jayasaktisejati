@@ -7,9 +7,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * @deprecated Voyage-centric architecture. ShippingSchedule tidak lagi dipakai
- *             sebagai layer operasional. Akan dihapus setelah satu siklus operasional
- *             berjalan menggunakan Voyage langsung.
+ * @deprecated LEGACY — domain jadwal lama.
+ *
+ * Vessel Plan adalah sumber jadwal yang otoritatif (ARCH-02 / ARCH-03):
+ *
+ *     Vessel Plan → Finalisasi → Voyage → Shipment → Monitoring
+ *
+ * Tabel `shipping_schedules` saat ini KOSONG (0 baris), namun sejumlah Action
+ * dan Widget masih membaca/menulis ke sana. Selama dibiarkan aktif, ia
+ * berpotensi menjadi sumber jadwal tandingan.
+ *
+ * JANGAN membangun fitur baru di atas model ini.
+ * Kebutuhan jadwal baru harus bermuara pada Vessel Plan.
+ *
+ * Penghapusan menunggu keputusan produk — lihat
+ * docs/audit/ARCH-02-LAYER-1-SOURCE-OF-TRUTH.md §4b.
  */
 class ShippingSchedule extends Model
 {

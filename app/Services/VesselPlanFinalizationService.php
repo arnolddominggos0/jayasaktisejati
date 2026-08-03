@@ -133,7 +133,7 @@ class VesselPlanFinalizationService
                         $draftRow['planned_etd'],
                         $draftRow['planned_eta']
                     ),
-                    'notes'        => 'Draft schedule — jadwal awal sebelum persetujuan TAM',
+                    'notes'        => 'Draft schedule — jadwal awal sebelum finalisasi',
                     'captured_at'  => $draftRow['captured_at'] ?? $finalizedAt,
                     'captured_by'  => $actorName,
                 ]
@@ -153,7 +153,7 @@ class VesselPlanFinalizationService
                     $voyage->etd,
                     $voyage->eta
                 ),
-                'notes'        => 'Final schedule — disetujui dan difinalisasi oleh TAM',
+                'notes'        => 'Final schedule — jadwal perusahaan yang telah difinalisasi',
                 'captured_at'  => $finalizedAt,
                 'captured_by'  => $actorName,
             ]
@@ -162,7 +162,7 @@ class VesselPlanFinalizationService
 
     /**
      * Validate that every item in the plan has a real voyage_no before finalization.
-     * voyage_no must come from TAM schedule, CSV import, or user input — never generated.
+     * voyage_no must come from the shipping line schedule, CSV import, or user input — never generated.
      */
     protected function assertAllItemsHaveVoyageNo(VesselPlan $plan): void
     {
@@ -188,7 +188,7 @@ class VesselPlanFinalizationService
 
         throw new DomainException(
             "Finalisasi gagal: {$missing->count()} item belum memiliki voyage_no.\n" .
-            "Isi voyage_no dari schedule TAM sebelum melanjutkan:\n{$details}"
+            "Isi voyage_no dari jadwal shipping line sebelum melanjutkan:\n{$details}"
         );
     }
 

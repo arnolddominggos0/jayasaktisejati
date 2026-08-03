@@ -19,14 +19,12 @@ class ListVoyages extends ListRecords
 
     public function getSubheading(): ?string
     {
-        return 'Data operasional dan pergerakan voyage';
+        return 'Voyage operasional dihasilkan dari Vessel Plan yang telah difinalisasi.';
     }
 
     protected function getHeaderActions(): array
     {
-        return [
-            Actions\CreateAction::make()->label('Tambah Voyage'),
-        ];
+        return [];
     }
 
     protected function getTableQuery(): Builder

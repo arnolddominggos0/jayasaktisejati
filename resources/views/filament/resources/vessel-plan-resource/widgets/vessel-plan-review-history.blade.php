@@ -4,8 +4,8 @@
      Filament, default collapsed, supaya tidak memperpanjang halaman
      saat tidak dibutuhkan. --}}
 <x-filament::section
-    heading="Riwayat Persetujuan & Audit"
-    description="Lihat riwayat pengiriman draft, revisi, persetujuan, dan finalisasi vessel plan."
+    heading="Riwayat Distribusi"
+    description="Riwayat pengiriman draft ke customer, revisi, persetujuan, dan finalisasi."
     collapsible
     collapsed
 >
@@ -84,7 +84,7 @@
 
             <div class="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
 
-                {{-- Ringkasan / Feedback TAM — label dinamis, lihat note_label --}}
+                {{-- Ringkasan / Catatan Customer — label dinamis, lihat note_label --}}
                 <template x-if="entry?.note">
                     <div>
                         <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1" x-text="entry.note_label"></div>

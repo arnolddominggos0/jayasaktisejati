@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\VesselPlanResource\Pages;
 
 use App\Filament\Resources\VesselPlanResource;
+use App\Models\Port;
 use App\Models\VesselPlan;
 use App\Supports\RouteCode;
 use Filament\Resources\Pages\CreateRecord;
@@ -19,8 +20,20 @@ class CreateVesselPlan extends CreateRecord
             ->startOfMonth()
             ->toDateString();
 
-        $data['route_code'] = $data['route_code']
-            ?? RouteCode::default();
+        $polCode = Port::query()->whereKey($data['pol_id'] ?? null)->value('code');
+        $podCode = Port::query()->whereKey($data['pod_id'] ?? null)->value('code');
+
+        $routeCode = ($polCode && $podCode)
+            ? RouteCode::businessFromPortCodes($polCode, $podCode)
+            : null;
+
+        if (! $routeCode) {
+            throw ValidationException::withMessages([
+                'pod_id' => 'Kombinasi POL dan POD tersebut belum terdaftar sebagai rute layanan.',
+            ]);
+        }
+
+        $data['route_code'] = $routeCode;
 
         if (
             VesselPlan::query()
@@ -32,13 +45,6 @@ class CreateVesselPlan extends CreateRecord
                 'period_month' => 'Vessel Plan untuk periode dan rute tersebut sudah ada.',
             ]);
         }
-
-        $draft = new VesselPlan($data);
-
-        $ports = $draft->resolveRoutePortIds();
-
-        $data['pol_id'] = $ports['pol_id'];
-        $data['pod_id'] = $ports['pod_id'];
 
         return $data;
     }

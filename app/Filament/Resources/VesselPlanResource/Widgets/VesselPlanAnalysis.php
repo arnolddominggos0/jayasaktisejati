@@ -20,10 +20,6 @@ class VesselPlanAnalysis extends StatsOverviewWidget
         $itemCount = $this->record->items->count();
         $unitSuffix = fn(string $unit) => '<span class="text-base font-normal text-gray-500"> ' . $unit . '</span>';
 
-        // Belum ada jadwal = belum ada apa pun untuk dianalisis. Tampilkan
-        // placeholder netral, bukan hasil analyze() (yang defaultnya
-        // gap_ok=true/max_gap=0 untuk plan kosong) — itu memberi kesan
-        // palsu bahwa evaluasi sudah dilakukan dan semuanya "OK".
         if ($itemCount === 0) {
             return [
                 Stat::make('Jadwal', 0)

@@ -10,6 +10,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Maatwebsite\Excel\Facades\Excel;
 
+/**
+ * @deprecated LEGACY — bagian dari domain `shipping_schedules`.
+ *
+ * Vessel Plan adalah sumber jadwal yang otoritatif (ARCH-03).
+ * Jangan membangun fitur baru di atas Action ini.
+ * Lihat App\Models\ShippingSchedule untuk konteks lengkap.
+ */
 class BuildMonthlyDraft
 {
     public static function run(int $year, int $month, string $version = 'v1.0'): TamMonthlyKpi

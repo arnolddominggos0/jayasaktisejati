@@ -48,13 +48,9 @@ class BusinessRouteResolver
      */
     public static function forPlan(VesselPlan $plan): string
     {
-        if (! empty($plan->route_code)) {
-            $label = RouteCode::display($plan->route_code);
-            if ($label !== null) {
-                return $label;
-            }
-        }
-
+        // DATA-04: POL/POD adalah source of truth untuk tampilan rute.
+        // route_code hanya dipakai sebagai fallback saat port belum terisi
+        // (mis. data lama), bukan sebagai sumber utama label.
         $plan->loadMissing(['pol', 'pod']);
 
         $pol = $plan->pol?->city ?? $plan->pol?->name ?? null;
@@ -62,6 +58,13 @@ class BusinessRouteResolver
 
         if ($pol && $pod) {
             return "{$pol} → {$pod}";
+        }
+
+        if (! empty($plan->route_code)) {
+            $label = RouteCode::display($plan->route_code);
+            if ($label !== null) {
+                return $label;
+            }
         }
 
         return $plan->route_code ?? '—';

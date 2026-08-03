@@ -7,6 +7,13 @@ use App\Models\Port;
 use App\Models\ShippingSchedule;
 use App\Models\Voyage;
 
+/**
+ * @deprecated LEGACY — bagian dari domain `shipping_schedules`.
+ *
+ * Vessel Plan adalah sumber jadwal yang otoritatif (ARCH-03).
+ * Jangan membangun fitur baru di atas Action ini.
+ * Lihat App\Models\ShippingSchedule untuk konteks lengkap.
+ */
 class SyncVoyagesToSchedule
 {
     public static function run(ShippingSchedule|int $schedule): void

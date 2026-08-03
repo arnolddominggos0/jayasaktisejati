@@ -24,30 +24,19 @@ class VesselPlanItemRelationManager extends RelationManager
 
     protected static ?string $title = 'Jadwal Kapal';
 
-    // Filter Shipping Line dikendalikan dari toolbar di blade parent lewat
-    // event Livewire, diterapkan ke query tabel via modifyQueryUsing() di bawah.
     public ?string $vpShippingLineFilter = null;
 
     #[On('vpFilterShippingLine')]
     public function applyVpShippingLineFilter(?string $value = null): void
     {
         $this->vpShippingLineFilter = filled($value) ? $value : null;
-
-        // Reset pagination to avoid hidden rows when filter narrows result set.
-        $this->resetPage();
     }
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
-        // Section title (identitas tab) berbeda dari table heading —
-        // lihat getTableHeading().
         return self::sectionCopy($ownerRecord)['title'];
     }
 
-    // Judul tabel dikosongkan karena Workspace Header di halaman parent
-    // sudah menampilkan judul dan konteks yang sama; heading kosong membuat
-    // baris header tabel native Filament otomatis menyisakan hanya action
-    // "Tambah Jadwal" rata kanan.
     protected function getTableHeading(): string
     {
         return '';
@@ -65,8 +54,6 @@ class VesselPlanItemRelationManager extends RelationManager
             ];
         }
 
-        // Description dikosongkan di seluruh status — section header di
-        // parent blade sudah jadi satu-satunya deskripsi workflow tab ini.
         return match (true) {
             $plan->isFinal() => ['title' => 'Jadwal Kapal', 'description' => null],
             $plan->isSent(), $plan->isRevision() => ['title' => 'Jadwal Kapal', 'description' => null],
@@ -127,14 +114,14 @@ class VesselPlanItemRelationManager extends RelationManager
                 ->columns(2),
 
             Forms\Components\Section::make('Rencana Muatan')
-                ->description('Dicatat setelah menerima Final Schedule dari TAM.')
+                ->description('Diisi ketika alokasi muatan sudah ditetapkan.')
                 ->visible(fn() => ! ($this->getOwnerRecord()?->isDraft() ?? true))
                 ->schema([
                     TextInput::make('cargo_plan')
                         ->label('Rencana Muatan (unit)')
                         ->numeric()
                         ->minValue(0)
-                        ->helperText('Alokasi unit sesuai Final Schedule dari TAM.'),
+                        ->helperText('Jumlah unit yang dialokasikan untuk kapal ini.'),
                 ])
                 ->columns(1),
         ]);
@@ -150,7 +137,6 @@ class VesselPlanItemRelationManager extends RelationManager
                 );
             })
             ->columns([
-                // Kolom Kapal paling lebar — identifier utama baris.
                 TextColumn::make('vessel.name')
                     ->label('Kapal / Voyage')
                     ->weight('semibold')
@@ -185,8 +171,6 @@ class VesselPlanItemRelationManager extends RelationManager
                     ->formatStateUsing(fn($state) => $state?->translatedFormat('d M Y'))
                     ->placeholder('—'),
 
-                // Kosong ditampilkan sebagai "Belum diisi" (abu), bukan dash —
-                // field ini baru terisi setelah Final Schedule dari TAM diterima.
                 TextColumn::make('cargo_plan')
                     ->label('Rencana Muatan')
                     ->alignCenter()
@@ -238,22 +222,11 @@ class VesselPlanItemRelationManager extends RelationManager
                     }),
             ])
             ->actionsAlignment('center')
-
-            // ->emptyStateHeading('Belum ada jadwal pada Vessel Plan ini')
-            // ->emptyStateDescription(function () {
-            //     return filled($this->vpShippingLineFilter)
-            //         ? 'Belum ada jadwal untuk Shipping Line ini.'
-            //         : 'Tambahkan jadwal kapal pertama untuk mulai menyusun rencana pengiriman bulan ini.';
-            // })
-            // ->emptyStateActions([
-            //     Tables\Actions\CreateAction::make()
-            //         ->label('Tambah Jadwal')
-            //         ->icon('heroicon-o-plus')
-            //         ->action(function () {
-            //             dd('Action jalan');
-            //         })
-            //         ->visible(fn() => $this->getOwnerRecord()?->isEditable()),
-            // ])
+            ->emptyStateIcon('heroicon-o-calendar-days')
+            ->emptyStateHeading('Belum ada jadwal kapal')
+            ->emptyStateDescription(fn() => filled($this->vpShippingLineFilter)
+                ? 'Tidak ada jadwal untuk shipping line yang dipilih. Ubah filter untuk melihat jadwal lain.'
+                : 'Tambahkan jadwal pertama untuk mulai menyusun Vessel Plan periode ini.')
             ->headerActions([
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah Jadwal')

@@ -4,7 +4,6 @@ namespace App\Filament\Resources\VesselPlanResource\Pages;
 
 use App\Enums\VesselPlanStatus;
 use App\Filament\Resources\VesselPlanResource;
-use App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanReviewHistory;
 use App\Supports\BusinessRouteResolver;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Textarea;
@@ -49,13 +48,13 @@ class EditVesselPlan extends EditRecord
     public function getSubheading(): string|Htmlable|null
     {
         $rute = BusinessRouteResolver::forPlan($this->record);
-        $pelanggan = $this->record->customer?->name ?? '—';
+        $periode = $this->record->period_month->translatedFormat('F Y');
 
         return new HtmlString(
             '<div class="vp-document-meta">'
-            .'<span>'.e($pelanggan).'</span>'
-            .'<span class="vp-document-meta-sep" aria-hidden="true">&bull;</span>'
             .'<span>'.e($rute).'</span>'
+            .'<span class="vp-document-meta-sep" aria-hidden="true">&bull;</span>'
+            .'<span>'.e($periode).'</span>'
             .'</div>'
         );
     }
@@ -77,42 +76,61 @@ class EditVesselPlan extends EditRecord
 
     protected function getFooterWidgets(): array
     {
-        return [
-            VesselPlanReviewHistory::class,
-        ];
+        return [];
     }
 
-    public function getFooterWidgetsColumns(): int
+    public function distributionStatus(): array
     {
-        return 1;
+        return match (true) {
+            $this->record->isSent()     => ['Menunggu Review', 'warning'],
+            $this->record->isRevision() => ['Perlu Revisi', 'danger'],
+            $this->record->isFinal()    => ['Disetujui Customer', 'success'],
+            default                     => ['Belum Dikirim', 'gray'],
+        };
     }
 
+    public function submitDraftAction(): Action
+    {
+        return Action::make('submitDraft')
+            ->label(fn () => filled($this->record->sent_at) ? 'Kirim Draft Lagi' : 'Kirim Draft')
+            ->icon('heroicon-o-paper-airplane')
+            ->color('primary')
+            // Tampil pada Draft dan Revision. Pada Revision tombol sengaja
+            // tampil TAPI nonaktif (lihat submitDraftDisabledReason): operator
+            // perlu tahu langkah berikutnya, sementara service tetap hanya
+            // menerima status Draft — workflow tidak diubah.
+            ->visible(fn () => $this->record->isDraft() || $this->record->isRevision())
+            ->disabled(fn () => ! $this->record->canSubmitDraft())
+            ->tooltip(fn () => $this->submitDraftDisabledReason())
+            ->requiresConfirmation()
+            ->modalHeading('Kirim Draft Vessel Plan')
+            ->modalDescription(fn () => sprintf(
+                'Draft akan dikirim via WhatsApp ke customer yang terhubung dengan vessel plan ini: %s.',
+                $this->record->customer?->name ?? 'belum ada customer terhubung'
+            ))
+            ->modalSubmitActionLabel('Kirim Draft')
+            ->action(function () {
+                $this->record->submitDraft(auth()->id());
+
+                Notification::make()
+                    ->title('Draft terkirim')
+                    ->body('Snapshot draft berhasil disimpan.')
+                    ->success()
+                    ->send();
+
+                $waUrl = $this->record->waUrl();
+                if ($waUrl) {
+                    $this->redirect($waUrl);
+                }
+            });
+    }
+
+    /**
+     * Header hanya memuat lifecycle JADWAL: finalisasi, revisi, hapus.
+     */
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('submitDraft')
-                ->label('Kirim ke TAM (WhatsApp)')
-                ->icon('heroicon-o-paper-airplane')
-                ->color('primary')
-                ->visible(fn () => $this->record->isDraft())
-                ->disabled(fn () => ! $this->record->canSubmitDraft())
-                ->tooltip(fn () => $this->submitDraftDisabledReason())
-                ->requiresConfirmation()
-                ->action(function () {
-                    $this->record->submitDraft(auth()->id());
-
-                    Notification::make()
-                        ->title('Draft Dikirim ke TAM')
-                        ->body('Snapshot draft berhasil disimpan.')
-                        ->success()
-                        ->send();
-
-                    $waUrl = $this->record->waUrl();
-                    if ($waUrl) {
-                        $this->redirect($waUrl);
-                    }
-                }),
-
             Action::make('finalize')
                 ->label('Setujui & Finalisasi')
                 ->icon('heroicon-o-check-circle')
@@ -157,22 +175,40 @@ class EditVesselPlan extends EditRecord
                 ->outlined()
                 ->visible(fn () => $this->record->isDraft())
                 ->requiresConfirmation()
-                ->action(fn () => $this->record->delete()),
+                ->modalHeading('Hapus Vessel Plan')
+                ->modalDescription('Vessel plan beserta jadwal kapal di dalamnya akan dihapus. Tindakan ini tidak dapat dibatalkan.')
+                ->action(function () {
+                    $this->record->delete();
+
+                    Notification::make()
+                        ->title('Vessel Plan dihapus')
+                        ->success()
+                        ->send();
+
+                    // Wajib redirect: halaman Edit beserta Relation Manager-nya
+                    // masih ter-mount setelah action selesai, dan akan mencoba
+                    // render ulang terhadap record yang sudah tidak ada.
+                    $this->redirect(VesselPlanResource::getUrl('index'), navigate: false);
+                }),
         ];
     }
 
     protected function submitDraftDisabledReason(): string
     {
+        if ($this->record->isRevision()) {
+            return 'Simpan perbaikan jadwal terlebih dahulu, lalu draft dapat dikirim ulang.';
+        }
+
         if ($this->record->items()->count() === 0) {
             return 'Tambahkan rencana kapal terlebih dahulu.';
         }
 
         if (! $this->record->customer_id) {
-            return 'Customer TAM belum terhubung ke vessel plan.';
+            return 'Hubungkan customer ke vessel plan terlebih dahulu.';
         }
 
         if (! $this->record->hasWhatsappRecipient()) {
-            return 'Nomor WhatsApp customer TAM belum tersedia.';
+            return 'Nomor WhatsApp customer belum tersedia.';
         }
 
         return '';

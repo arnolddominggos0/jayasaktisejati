@@ -28,10 +28,9 @@ class VesselPlanReviewHistory extends Widget
                 return [
                     'action' => $this->formatActionLabel($review->action),
                     'note' => $review->note,
-                    // "Feedback TAM" untuk event Revision (isinya = alasan
-                    // penolakan TAM); event lain memakai label netral.
+                    // Alasan revisi berasal dari customer; event lain netral.
                     'note_label' => $review->action === VesselPlan::REVIEW_ACTION_REVISION_REQUESTED
-                        ? 'Feedback TAM'
+                        ? 'Catatan Customer'
                         : 'Ringkasan',
                     'actor' => $review->actor?->name ?? 'System',
                     'acted_at' => $review->acted_at?->format('d M Y H:i'),
@@ -49,13 +48,6 @@ class VesselPlanReviewHistory extends Widget
         ];
     }
 
-    /**
-     * Hanya field yang menjelaskan keputusan approval yang ditampilkan.
-     * sailing_avg (metrik performa, bukan bagian keputusan) dan snapshot_id
-     * (FK internal, tidak bermakna bisnis bagi pembaca) sengaja tidak ikut.
-     *
-     * @return array<int, array{label: string, value: string}>
-     */
     protected function buildSnapshot(array $meta): array
     {
         $snapshot = [];
@@ -81,9 +73,9 @@ class VesselPlanReviewHistory extends Widget
     protected function formatActionLabel(string $action): string
     {
         return match ($action) {
-            VesselPlan::REVIEW_ACTION_DRAFT_SUBMITTED => 'Draft Dikirim',
-            VesselPlan::REVIEW_ACTION_REVISION_REQUESTED => 'Revisi Diminta',
-            VesselPlan::REVIEW_ACTION_APPROVED => 'Final Disetujui',
+            VesselPlan::REVIEW_ACTION_DRAFT_SUBMITTED    => 'Draft dikirim ke customer',
+            VesselPlan::REVIEW_ACTION_REVISION_REQUESTED => 'Customer meminta revisi',
+            VesselPlan::REVIEW_ACTION_APPROVED           => 'Customer menyetujui draft',
             default => str_replace('_', ' ', ucfirst($action)),
         };
     }

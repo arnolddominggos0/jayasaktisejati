@@ -2,12 +2,16 @@
 
 namespace App\Filament\Resources;
 
+use App\Models\Port;
 use App\Models\VesselPlan;
+use App\Supports\RouteCode;
 use Filament\Resources\Resource;
 use Filament\Support\Enums\IconPosition;
 use Filament\Forms\Form;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Section;
 use Filament\Forms\Components\Select;
+use Illuminate\Support\Carbon;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
@@ -55,28 +59,60 @@ class VesselPlanResource extends Resource
     {
         return $form
             ->schema([
-                Select::make('period_month')
-                    ->label('Periode')
-                    ->options(
-                        collect(range(0, 12))
-                            ->mapWithKeys(function ($i) {
-                                $date = now()->startOfMonth()->addMonths($i);
+                Section::make('Informasi Perencanaan')
+                    ->description('Periode serta pelabuhan muat dan bongkar untuk vessel plan ini.')
+                    ->columns(2)
+                    ->schema([
 
-                                return [
-                                    $date->toDateString() => $date->translatedFormat('F Y'),
-                                ];
+                        Select::make('period_month')
+                            ->label('Periode')
+                            ->helperText('Bulan perencanaan jadwal kapal.')
+                            ->columnSpanFull()
+                            ->options(function (?VesselPlan $record): array {
+                                $options = collect(range(0, 12))
+                                    ->mapWithKeys(function (int $i) {
+                                        $date = now()->startOfMonth()->addMonths($i);
+
+                                        return [$date->toDateString() => $date->translatedFormat('F Y')];
+                                    });
+
+                                if ($record?->period_month) {
+                                    $own = $record->period_month->copy()->startOfMonth();
+                                    $options->put($own->toDateString(), $own->translatedFormat('F Y'));
+                                }
+
+                                return $options->sortKeys()->all();
                             })
-                    )
-                    ->searchable()
-                    ->required(),
+                            ->formatStateUsing(fn ($state) => filled($state)
+                                ? Carbon::parse($state)
+                                    ->timezone(config('app.timezone'))
+                                    ->startOfMonth()
+                                    ->toDateString()
+                                : null)
+                            ->searchable()
+                            ->required(),
+                            
+                        Select::make('pol_id')
+                            ->label('POL — Pelabuhan Muat')
+                            ->helperText('Pelabuhan tempat muatan dinaikkan.')
+                            ->relationship('pol', 'name')
+                            ->getOptionLabelFromRecordUsing(fn (Port $record) => $record->city ?: $record->name)
+                            ->default(fn () => Port::query()->where('code', RouteCode::polUnlocode(RouteCode::default()))->value('id'))
+                            ->searchable()
+                            ->preload()
+                            ->required(),
 
-                Select::make('route_code')
-                    ->label('Rute')
-                    ->options([
-                        'JKT-BTG' => 'Jakarta → Bitung',
-                    ])
-                    ->default('JKT-BTG')
-                    ->required(),
+                        Select::make('pod_id')
+                            ->label('POD — Pelabuhan Bongkar')
+                            ->helperText('Pelabuhan tujuan pembongkaran.')
+                            ->relationship('pod', 'name')
+                            ->getOptionLabelFromRecordUsing(fn (Port $record) => $record->city ?: $record->name)
+                            ->default(fn () => Port::query()->where('code', RouteCode::podUnlocode(RouteCode::default()))->value('id'))
+                            ->searchable()
+                            ->preload()
+                            ->required(),
+
+                    ]),
             ]);
     }
 
@@ -150,7 +186,7 @@ class VesselPlanResource extends Resource
             ])
 
             ->emptyStateHeading('Belum ada Vessel Plan')
-            ->emptyStateDescription('Mulai buat planning untuk periode pertama.')
+            ->emptyStateDescription('Buat vessel plan untuk mulai menyusun jadwal pelayaran pada periode ini.')
             ->emptyStateIcon('heroicon-o-calendar-days')
             ->emptyStateActions([
                 Tables\Actions\Action::make('create')

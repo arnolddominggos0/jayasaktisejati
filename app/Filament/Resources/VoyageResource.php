@@ -27,19 +27,6 @@ use Filament\Tables\Filters\TernaryFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 
-/**
- * Voyage Registry — Master Data & Audit Layer
- *
- * Ownership: Voyage Lifecycle, Delay Audit Trail, Milestone Monitoring,
- *            Manifest Voyage, Administrative Override, Historical Audit.
- *
- * THIS IS NOT an operational dashboard. Responsibilities per module:
- *   - Monitoring Kapal TAM  → operational daily, cargo, achievement, KPI, delay analysis
- *   - Evaluasi Voyage       → lead time, dwelling, sailing, SLA, NG analysis
- *   - Voyage Registry       → master voyage data, lifecycle state, audit trail
- *
- * Do not add real-time operational widgets here. Use Monitoring Kapal TAM instead.
- */
 class VoyageResource extends Resource
 {
     protected static ?string $model = Voyage::class;
@@ -51,14 +38,6 @@ class VoyageResource extends Resource
     protected static ?string $pluralLabel     = 'Registry Voyage';
     protected static ?string $modelLabel      = 'Voyage';
     protected static ?int    $navigationSort  = 5;
-
-    // ── Authorization ─────────────────────────────────────────────────────────
-    // Voyage is a core domain entity — no branch scoping, no dedicated workspace.
-    // Registry Voyage removed from navigation per Architecture Freeze (2026-06-26).
-    // Routes remain active. Resource class retained. Model unchanged.
-    // Operational input: Monitoring Kapal TAM.
-    // KPI analysis: Evaluasi Voyage.
-    // Planning origin: Perencanaan Kapal.
 
     public static function shouldRegisterNavigation(): bool
     {
@@ -72,7 +51,7 @@ class VoyageResource extends Resource
 
     public static function canCreate(): bool
     {
-        return auth_user()?->isSuperAdmin() ?? false;
+        return false;
     }
 
     public static function canEdit($record): bool

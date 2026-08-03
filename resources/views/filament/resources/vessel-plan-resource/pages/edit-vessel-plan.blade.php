@@ -63,7 +63,9 @@ default => 'schedule',
                 </button>
 
                 @if ($hasFinalSnapshot)
-                <button type="button" @click="tab = 'history'" :class="tab === 'history' ? 'vp-tab is-active' : 'vp-tab'">
+                <button type="button" @click="
+                console.log('tab history clicked');
+                tab = 'history'" :class="tab === 'history' ? 'vp-tab is-active' : 'vp-tab'">
                     <x-heroicon-o-clock class="w-4 h-4" />
                     Riwayat Jadwal
                 </button>
@@ -104,12 +106,56 @@ default => 'schedule',
                  Identitas plan tidak diulang di sini — sudah ada di Header. --}}
             <div class="vp-workspace">
 
+                {{-- ──────────────────────────────────────────────────────────
+                     Strip Distribusi — ringkas, bukan card.
+                     Menggantikan panel "Distribusi Draft" (UX-02) yang membuat
+                     halaman memanjang. Informasi yang dibawa ke sini: nama
+                     customer, status distribusi, dan tanggal kirim terakhir —
+                     ketiganya tidak tersedia di tempat lain (Tab Review hanya
+                     punya checklist boolean "Customer terhubung", bukan nama).
+                     Riwayat lengkapnya ada di zona Distribution (bawah halaman).
+                ─────────────────────────────────────────────────────────── --}}
+                @php
+                [$distStatusLabel, $distStatusColor] = $this->distributionStatus();
+                $sudahDikirim = filled($record->sent_at);
+                @endphp
+
+                <div class="vp-dist-strip">
+                    <div class="vp-dist-strip__info">
+                        <span class="vp-dist-strip__label">Distribusi</span>
+
+                        @if ($sudahDikirim)
+                        <span class="vp-dist-strip__customer">{{ $record->customer?->name ?? '—' }}</span>
+                        <span class="vp-dist-strip__sep" aria-hidden="true">&bull;</span>
+                        <x-filament::badge :color="$distStatusColor" size="sm">
+                            {{ $distStatusLabel }}
+                        </x-filament::badge>
+                        <span class="vp-dist-strip__sep" aria-hidden="true">&bull;</span>
+                        <span class="vp-dist-strip__date">
+                            {{ $record->sent_at->translatedFormat('d F Y') }}
+                        </span>
+                        @else
+                        <span class="vp-dist-strip__muted">Belum pernah dikirim</span>
+                        @endif
+                    </div>
+
+                    {{-- Action submitDraft() tidak berubah — hanya lokasinya.
+                         Guard eksplisit: ->visible() tidak diterapkan saat aksi
+                         dirender lewat magic property.
+                         Sent & Final tanpa tombol (lihat UX-02). --}}
+                    @if ($record->isDraft() || $record->isRevision())
+                    <div class="vp-dist-strip__action">
+                        {{ $this->submitDraftAction }}
+                    </div>
+                    @endif
+                </div>
+
                 {{-- Toolbar Simpan/Batal — divider, bukan kotak terpisah.
                      Livewire form wiring (wire:submit="save") preserved as-is.
                      Hanya tampil saat form dirty. Pengecualian: fase Revision
                      selalu menampilkannya, karena Simpan adalah satu-satunya
                      jalan mengembalikan status ke Draft agar plan bisa
-                     dikirim ulang ke TAM. --}}
+                     didistribusikan ulang. --}}
                 @capture($form)
                 @unless($record->isFinal())
                 <div
@@ -186,6 +232,7 @@ default => 'schedule',
                 ['record' => $record, 'items' => $items]
                 )
             </div>
+
         </div>
         {{-- /tab:analysis --}}
 
@@ -205,6 +252,29 @@ default => 'schedule',
 
     </div>
     {{-- /x-data tabs --}}
+
+    {{-- ══════════════════════════════════════════════════════════════════════
+         BOUNDARY — DISTRIBUTION
+         Di luar workspace jadwal (tab Jadwal & Review) secara sengaja.
+         Workspace = jadwal kapal perusahaan (Layer 1).
+         Zona ini = mengirim jadwal Final ke customer (Layer 2).
+
+         Riwayat distribusi ikut ke sini, BUKAN ke tab Review: Review adalah
+         audit perubahan jadwal (snapshot, Draft vs Final), bukan approval
+         customer.
+    ══════════════════════════════════════════════════════════════════════ --}}
+    <div class="vp-boundary">
+        <div class="vp-boundary__label">
+            <x-heroicon-m-paper-airplane class="w-3.5 h-3.5" />
+            Distribution
+        </div>
+
+        @livewire(
+        \App\Filament\Resources\VesselPlanResource\Widgets\VesselPlanReviewHistory::class,
+        ['record' => $record]
+        )
+    </div>
+
     <x-filament-actions::modals />
 
 

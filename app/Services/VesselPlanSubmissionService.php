@@ -17,11 +17,11 @@ class VesselPlanSubmissionService
         }
 
         if (! $plan->customer_id) {
-            throw new DomainException('Customer TAM belum diatur pada vessel plan.');
+            throw new DomainException('Penerima distribusi belum diatur pada vessel plan.');
         }
 
         if (! $plan->whatsapp_phone) {
-            throw new DomainException('Nomor WhatsApp customer TAM belum tersedia.');
+            throw new DomainException('Nomor WhatsApp penerima distribusi belum tersedia.');
         }
 
         $analysis = $plan->analyze();

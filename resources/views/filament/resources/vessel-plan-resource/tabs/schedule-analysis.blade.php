@@ -43,7 +43,7 @@ $hasRoutePorts   = filled($record->pol_id) && filled($record->pod_id);
 
 $submitChecks = [
     ['label' => 'Jadwal kapal telah disusun',  'pass' => $hasItems],
-    ['label' => 'Customer TAM terhubung',      'pass' => $hasCustomer],
+    ['label' => 'Penerima distribusi terhubung',      'pass' => $hasCustomer],
     ['label' => 'Nomor WhatsApp tersedia',      'pass' => $hasWhatsapp],
 ];
 
@@ -69,7 +69,7 @@ if ($isFinal) {
     // Final plans get their own banner; exec summary skipped.
 } elseif ($isEditable) {
     if ($submitPass && $planReady) {
-        $execTitle     = 'Plan siap dikirim ke TAM';
+        $execTitle     = 'Jadwal siap didistribusikan';
         $execNarrative = 'Seluruh persyaratan submit telah terpenuhi.';
         $execBullets   = [
             $scheduleCount . ' jadwal diverifikasi',
@@ -182,7 +182,7 @@ $fmtDate = fn ($d) => $d ? $d->translatedFormat('d M Y') : '—';
         $reviewSubtitle = match (true) {
             $isFinal         => 'Hasil akhir jadwal yang telah disetujui.',
             $isSent          => 'Verifikasi jadwal final sebelum difinalisasi.',
-            $isEditable      => 'Ringkasan kesiapan jadwal sebelum dikirim ke TAM.',
+            $isEditable      => 'Ringkasan kesiapan jadwal sebelum didistribusikan.',
             default          => 'Ringkasan kesiapan jadwal.',
         };
     @endphp

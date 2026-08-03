@@ -17,10 +17,14 @@ final class RouteCode
 {
     // ── Registry ─────────────────────────────────────────────────────────────
     // idx: 0=business_code 1=voyage_code 2=display 3=pol_part 4=pod_part 5=pol_unlocode 6=pod_unlocode
+    // INVARIAN: satu pasangan UNLOCODE hanya boleh dimiliki SATU business route.
+    // Sebelum DATA-04, JKT-MND dan JKT-BTG sama-sama memakai IDJKT→IDBTG
+    // (Bitung adalah pelabuhan yang melayani Manado), sehingga POL/POD tidak
+    // dapat menentukan route secara unik. JKT-BTG dihapus dan datanya
+    // dimigrasikan ke JKT-MND agar POL/POD bisa jadi source of truth.
     private const REGISTRY = [
         ['JKT-MND', 'JKTMND', 'Jakarta → Manado', 'JKT', 'MND', 'IDJKT', 'IDBTG'],
-        ['JKT-BTG', 'JKTBTG', 'Jakarta → Bitung', 'JKT', 'BTG', 'IDJKT', 'IDBTG'],
-        // Future routes — append here:
+        // Future routes — append here (jaga pasangan UNLOCODE tetap unik):
         // ['JKT-MKS', 'JKTMKS', 'Jakarta → Makassar', 'JKT', 'MKS', 'IDJKT', 'IDMKS'],
         // ['JKT-SBY', 'JKTSBY', 'Jakarta → Surabaya', 'JKT', 'SBY', 'IDJKT', 'IDSUB'],
     ];
@@ -135,6 +139,46 @@ final class RouteCode
         self::boot();
         $key = strtoupper(trim($polCode)) . '|' . strtoupper(trim($podCode));
         return self::$byUNLOCODE[$key] ?? null;
+    }
+
+    /**
+     * Resolve vessel_plans.route_code (business code) from a POL/POD UNLOCODE
+     * pair. Kebalikan dari polUnlocode()/podUnlocode().
+     *
+     * RouteCode::businessFromPortCodes('IDJKT', 'IDBTG') => 'JKT-MND'
+     * Returns null when no registry entry matches.
+     */
+    public static function businessFromPortCodes(string $polCode, string $podCode): ?string
+    {
+        self::boot();
+        $pol = strtoupper(trim($polCode));
+        $pod = strtoupper(trim($podCode));
+
+        foreach (self::$byBusiness as $entry) {
+            if ($entry['polU'] === $pol && $entry['podU'] === $pod) {
+                return $entry['business'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * UNLOCODE pelabuhan muat untuk sebuah business route.
+     */
+    public static function polUnlocode(string $businessCode): ?string
+    {
+        self::boot();
+        return self::$byBusiness[strtoupper(trim($businessCode))]['polU'] ?? null;
+    }
+
+    /**
+     * UNLOCODE pelabuhan bongkar untuk sebuah business route.
+     */
+    public static function podUnlocode(string $businessCode): ?string
+    {
+        self::boot();
+        return self::$byBusiness[strtoupper(trim($businessCode))]['podU'] ?? null;
     }
 
     /**

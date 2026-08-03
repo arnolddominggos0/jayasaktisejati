@@ -34,7 +34,7 @@ class VesselPlanGenerator
             ->resolveRoutePortIds();
 
         $plan = VesselPlan::create([
-            'customer_id'  => VesselPlan::resolveTamCustomer()?->id,
+            'customer_id'  => app(\App\Domain\Distribution\DistributionBoundary::class)->defaultRecipientId(),
 
             'period_month' => $nextMonth->toDateString(),
 
